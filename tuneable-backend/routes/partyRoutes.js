@@ -3,6 +3,10 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const Party = require('../models/Party'); // Import the Party model
 const Playlist = require('../models/Playlist'); // Import the Playlist model
+const { broadcast } = require('../utils/broadcast'); // Import broadcast function
+
+console.log('Broadcast function:', broadcast);
+
 
 // Create a new party (and its playlist)
 router.post('/', authMiddleware, async (req, res) => {
@@ -30,6 +34,10 @@ router.post('/', authMiddleware, async (req, res) => {
     });
 
     await party.save();
+
+    // Broadcast the new party creation
+    broadcast(party._id, { message: 'New party created', party });
+
     res.status(201).json({ message: 'Party created successfully', party });
   } catch (err) {
     res.status(500).json({ error: 'Error creating party', details: err.message });
@@ -75,6 +83,9 @@ router.post('/:id/playlist', authMiddleware, async (req, res) => {
     playlist.tracks = [...playlist.tracks, ...tracks]; // Add new tracks to the playlist
     await playlist.save();
 
+    // Broadcast the playlist update
+    broadcast(party._id, { message: 'Playlist updated', playlist });
+
     res.status(200).json({ message: 'Playlist updated successfully', playlist });
   } catch (err) {
     res.status(500).json({ error: 'Error updating playlist', details: err.message });
@@ -86,6 +97,11 @@ router.post('/:id/playlist/bid', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params; // Party ID
     const { trackId, bidAmount } = req.body; // Track ID and bid amount
+
+    // validate bid amount
+    if (bidAmount <= 0) {
+        return res.status(400).json({ error: 'Bid amount must be greater than zero' });
+      }      
 
     // Find the party and its associated playlist
     const party = await Party.findById(id);
@@ -105,12 +121,12 @@ router.post('/:id/playlist/bid', authMiddleware, async (req, res) => {
     }
 
     track.bid = Math.max(track.bid, bidAmount); // Update bid only if it's higher
+    playlist.tracks = playlist.tracks.sort((a, b) => b.bid - a.bid); // Sort tracks by bids
     await playlist.save();
 
-    // Reorder tracks based on bids (descending order)
-    playlist.tracks = playlist.tracks.sort((a, b) => b.bid - a.bid);
+    // Broadcast the updated playlist
+    broadcast(party._id, { message: 'Bid placed successfully', playlist });
 
-    await playlist.save();
     res.status(200).json({ message: 'Bid placed successfully', playlist });
   } catch (err) {
     res.status(500).json({ error: 'Error placing bid', details: err.message });
