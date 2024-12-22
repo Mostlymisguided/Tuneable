@@ -25,3 +25,6 @@ Thumbs.db
 
 tuneable-backend/data/db/*
 !tuneable-backend/data/db/.keep
+
+generateToken.js
+
