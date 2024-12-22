@@ -8,9 +8,9 @@ function Parties() {
   useEffect(() => {
     const fetchParties = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/parties", {
+        const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/parties`, {
           headers: {
-            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzY1N2YwYTdkMjUxOWI0NTQyMTQ2MjciLCJlbWFpbCI6InRlc3R1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzM0NzI2NTg0LCJleHAiOjE3MzQ3MzM3ODR9.afPtV_uWfo84qaT2rLE1lRpaK7lz5_XHaogl2A2U8hk`,
+            Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
           },
         });
         setParties(response.data.parties);
