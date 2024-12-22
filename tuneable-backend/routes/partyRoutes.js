@@ -44,6 +44,16 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// Get all parties
+router.get('/', authMiddleware, async (req, res) => {
+    try {
+      const parties = await Party.find(); // Adjust the query as necessary
+      res.status(200).json({ message: 'Parties fetched successfully', parties });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch parties', details: err.message });
+    }
+  });
+  
 // Get the playlist for a specific party
 router.get('/:id/playlist', authMiddleware, async (req, res) => {
   try {
