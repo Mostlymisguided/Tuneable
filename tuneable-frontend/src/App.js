@@ -4,6 +4,7 @@ import NavBar from './components/NavBar';
 import Home from './pages/Home';
 import Parties from './pages/Parties';
 import Playlists from './pages/Playlists';
+import YouTubeSearch from './pages/YouTubeSearch';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/parties" element={<Parties />} />
         <Route path="/playlists" element={<Playlists />} />
+        <Route path="/youtube-search" element={<YouTubeSearch />} />
       </Routes>
     </Router>
   );
