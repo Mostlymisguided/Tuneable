@@ -13,7 +13,12 @@ const playlistSchema = new mongoose.Schema(
         bid: { type: Number, default: 0 }, // Default bid is 0
       },
     ],
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    user: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'User', 
+      required: false, // User is optional
+      index: true 
+    },
   },
   { timestamps: true }
 );
