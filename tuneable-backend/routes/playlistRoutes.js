@@ -1,18 +1,27 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const crypto = require('crypto'); // For hashing dev-user into ObjectId
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const Playlist = require('../models/Playlist');
+
+// Generate a consistent ObjectId for dev-user
+const devUserId = new mongoose.Types.ObjectId(
+  crypto.createHash('md5').update('dev-user').digest('hex').substring(0, 24)
+);
 
 // Create a new playlist
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, description } = req.body;
 
-    // Populate user field with userId from token
+    // Populate user field with userId from token, replacing dev-user with ObjectId
+    const userId = req.user.userId === 'dev-user' ? devUserId : req.user.userId;
+
     const playlist = new Playlist({
       name,
       description,
-      user: req.user.userId, // Extracted from token
+      user: userId, // Use consistent ObjectId for dev-user
     });
 
     await playlist.save();
@@ -28,8 +37,11 @@ router.post('/:id/tracks', authMiddleware, async (req, res) => {
     const { id } = req.params; // Playlist ID
     const { title, artist, platform, url } = req.body;
 
+    // Adjust userId for dev-user
+    const userId = req.user.userId === 'dev-user' ? devUserId : req.user.userId;
+
     // Find the playlist and ensure it belongs to the logged-in user
-    const playlist = await Playlist.findOne({ _id: id, user: req.user.userId });
+    const playlist = await Playlist.findOne({ _id: id, user: userId });
     if (!playlist) {
       return res.status(404).json({ error: 'Playlist not found or unauthorized' });
     }
@@ -52,7 +64,8 @@ router.get('/', authMiddleware, async (req, res) => {
     console.log('Fetching playlists for user:', req.user.userId); // Debugging log
 
     // Adjust query logic for dev_user
-    const query = req.user.userId === 'dev_user' ? {} : { user: req.user.userId };
+    const userId = req.user.userId === 'dev-user' ? devUserId : req.user.userId;
+    const query = req.user.userId === 'dev_user' ? {} : { user: userId };
 
     // Find playlists that belong to the logged-in user
     const playlists = await Playlist.find(query).select('-__v');
