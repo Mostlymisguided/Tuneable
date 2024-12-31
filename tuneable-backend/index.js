@@ -1,7 +1,7 @@
 // Import Express and other dependencies
 const express = require('express');
-const connectDB = require('./db'); // Import the database connection module
-const { setWebSocketServer } = require('./utils/broadcast'); // Import WebSocket setup
+const db = require('./db'); // Import the database connection module
+const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
 require('dotenv').config(); // Load environment variables from .env file
 const cors = require('cors'); // Add this if using a frontend from a different domain
 
@@ -17,9 +17,9 @@ const youtubeRoutes = require('./routes/youtube'); // Import the YouTube API rou
 const PORT = process.env.PORT || 8000;
 
 // Connect to the database
-connectDB().catch((err) => {
+db.connectDB().catch((err) => {
   console.error('Error connecting to the database:', err);
-  process.exit(1); // Exit the application if DB connection fails
+  process.exit(1);
 });
 
 // Middleware to parse JSON bodies and handle CORS
@@ -58,23 +58,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start the server with WebSocket integration
-const server = app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
-
-// Initialize WebSocket Server
-setWebSocketServer(server);
-
-// Function to broadcast updates
-const broadcast = (partyId, data) => {
-  console.log(`Broadcasting to partyId: ${partyId}`, data);
-  wss.clients.forEach((client) => {
-    if (client.readyState === 1) {
-      client.send(JSON.stringify({ partyId, ...data }));
-    }
+// Start the server only if this file is run directly
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
   });
-};
 
-// Export broadcast function for use in routes
-module.exports = broadcast;
+  // Initialize WebSocket Server
+  setWebSocketServer(server);
+}
+
+// Export app and broadcast function from utils
+module.exports = { app, broadcast };
