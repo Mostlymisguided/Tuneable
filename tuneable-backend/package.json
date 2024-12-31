@@ -28,8 +28,8 @@
     "supertest": "^6.3.3"
   },
   "jest": {
-    "setupFilesAfterEnv": [
-      "<rootDir>/jest.setup.js"
-    ]
-  }
+  "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
+  "testEnvironment": "node",
+  "testTimeout": 10000
+}
 }

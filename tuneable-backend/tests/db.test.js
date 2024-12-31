@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const db = require('../db'); // Ensure the path to db.js is correct
+
 
 jest.mock('../db', () => ({
     connectDB: jest.fn(() => Promise.resolve()), // Mock connectDB
