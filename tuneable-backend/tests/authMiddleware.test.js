@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middleware/authMiddleware'); // Adjust the path as necessary
 const httpMocks = require('node-mocks-http');
+const mongoose = require('mongoose');
 
 jest.mock('../db', () => ({
     connectDB: jest.fn(() => Promise.resolve()), // Mock connectDB
