@@ -14,129 +14,130 @@ const devUserId = new mongoose.Types.ObjectId(
   crypto.createHash('md5').update('dev-user').digest('hex').substring(0, 24)
 );
 
+// Centralized error handler
+const handleError = (res, err, message, status = 500) => {
+  console.error(`${message}:`, err.message);
+  res.status(status).json({ error: message, details: err.message });
+};
+
+// Helper function to generate unique codes
+const generateUniqueCode = async () => {
+  let code;
+  let exists;
+  do {
+    code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    exists = await Party.findOne({ code });
+  } while (exists);
+  return code;
+};
+
 // Create a new party (and its playlist)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name } = req.body;
+    const code = await generateUniqueCode(); // Ensure unique code
 
-    // Generate a random unique code for the party
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    // Resolve userId
     const userId = req.user.userId === 'dev-user' ? devUserId : req.user.userId;
-    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ error: 'Invalid userId format' });
     }
 
-    // Create a new playlist for the party
     const playlist = new Playlist({
       name: `${name} Playlist`,
       description: `Playlist for ${name}`,
-      user: userId, // Use the consistent ObjectId for dev-user
+      user: userId,
       tracks: [],
     });
 
     await playlist.save();
 
-    // Create a new party
     const party = new Party({
       name,
       code,
-      host: userId, // Use the consistent ObjectId for dev-user
+      host: userId,
       playlist: playlist._id,
     });
 
     await party.save();
 
-    // Broadcast the new party creation
     broadcast(party._id, { message: 'New party created', party });
-
     res.status(201).json({ message: 'Party created successfully', party });
   } catch (err) {
-    console.error('Error creating party:', err.message);
-    res.status(500).json({ error: 'Error creating party', details: err.message });
+    handleError(res, err, 'Error creating party');
   }
 });
 
 // Update the playlist for a specific party
 router.post('/:id/playlist', authMiddleware, async (req, res) => {
   try {
-    const { id } = req.params; // Party ID
-    const { tracks } = req.body; // Tracks to add
+    const { id } = req.params;
+    const { tracks } = req.body;
 
-    // Find the party
     const party = await Party.findById(id);
-    if (!party) {
-      return res.status(404).json({ error: 'Party not found' });
-    }
+    if (!party) return res.status(404).json({ error: 'Party not found' });
 
-    // Find the associated playlist
-    const playlist = await Playlist.findById(party.playlist);
-    if (!playlist) {
-      return res.status(404).json({ error: 'Playlist not found' });
-    }
+    const playlist = await Playlist.findByIdAndUpdate(
+      party.playlist,
+      { $addToSet: { tracks: { $each: tracks } } },
+      { new: true }
+    );
 
-    // Add new tracks to the playlist
-    playlist.tracks = [...playlist.tracks, ...tracks];
-    await playlist.save();
+    if (!playlist) return res.status(404).json({ error: 'Playlist not found' });
 
-    // Respond with the updated playlist
     res.status(200).json({ message: 'Playlist updated successfully', playlist });
   } catch (err) {
-    console.error('Error updating playlist:', err.message);
-    res.status(500).json({ error: 'Error updating playlist', details: err.message });
+    handleError(res, err, 'Error updating playlist');
   }
 });
 
 // Get all parties
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const parties = await Party.find(); // Fetch all parties
+    const parties = await Party.find();
     res.status(200).json({ message: 'Parties fetched successfully', parties });
   } catch (err) {
-    console.error('Error fetching parties:', err.message);
-    res.status(500).json({ error: 'Failed to fetch parties', details: err.message });
+    handleError(res, err, 'Failed to fetch parties');
   }
 });
 
 // Place or increase a bid on a track
 router.post('/:id/playlist/bid', authMiddleware, async (req, res) => {
   try {
-    const { id } = req.params; // Party ID
-    const { trackId, bidAmount } = req.body; // Track ID and bid amount
+    const { id } = req.params;
+    const { trackId, bidAmount } = req.body;
+    const userId = req.user.userId;
 
     if (bidAmount <= 0) {
       return res.status(400).json({ error: 'Bid amount must be greater than zero' });
     }
 
-    // Find the party
-    const party = await Party.findById(id);
-    if (!party) {
-      return res.status(404).json({ error: 'Party not found' });
+    const party = await Party.findById(id).populate('playlist');
+    if (!party) return res.status(404).json({ error: 'Party not found' });
+
+    const track = party.playlist.tracks.id(trackId);
+    if (!track) return res.status(404).json({ error: 'Track not found' });
+
+    const existingBidder = track.bidders.find((bid) => bid.userId === userId);
+    if (existingBidder) {
+      existingBidder.amount = Math.max(existingBidder.amount, bidAmount);
+    } else {
+      track.bidders.push({ userId, amount: bidAmount });
     }
 
-    // Find and update the associated playlist
-    const playlist = await Playlist.findById(party.playlist);
-    if (!playlist) {
-      return res.status(404).json({ error: 'Playlist not found' });
-    }
-
-    // Find the track in the playlist
-    const track = playlist.tracks.id(trackId);
-    if (!track) {
-      return res.status(404).json({ error: 'Track not found' });
-    }
-
-    // Update the bid
     track.bid = Math.max(track.bid, bidAmount);
-    playlist.tracks = playlist.tracks.sort((a, b) => b.bid - a.bid); // Sort tracks by bid
-    await playlist.save();
+    await party.playlist.save();
 
-    // Respond with the updated playlist
-    res.status(200).json({ message: 'Bid placed successfully', playlist });
+    broadcast(party._id, {
+      type: 'BID_UPDATED',
+      trackId,
+      bidAmount,
+      userId,
+      playlist: party.playlist,
+    });
+
+    res.status(200).json({ message: 'Bid placed successfully!', track, playlist: party.playlist });
   } catch (err) {
-    console.error('Error placing bid:', err.message);
-    res.status(500).json({ error: 'Error placing bid', details: err.message });
+    handleError(res, err, 'Error placing bid');
   }
 });
 
@@ -147,30 +148,22 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
     const party = await Party.findById(id).populate({
       path: 'playlist',
-      populate: { path: 'tracks', options: { sort: { bid: -1 } } }, // Sort tracks by highest bid
+      select: 'name tracks',
+      populate: {
+        path: 'tracks',
+        select: 'title bid',
+        options: { sort: { bid: -1 } },
+      },
     });
 
-    if (!party) {
-      return res.status(404).json({ error: 'Party not found' });
-    }
-
-    // Replace dev-user with the consistent ObjectId if necessary
-    if (party.playlist && party.playlist.user && party.playlist.user.equals(devUserId)) {
-      party.playlist.user = devUserId;
-    }
+    if (!party) return res.status(404).json({ error: 'Party not found' });
 
     res.status(200).json({
       message: 'Party details fetched successfully',
-      party: {
-        id: party._id,
-        name: party.name,
-        code: party.code,
-        playlist: party.playlist,
-      },
+      party,
     });
   } catch (err) {
-    console.error('Error fetching party details:', err.message);
-    res.status(500).json({ error: 'Error fetching party details', details: err.message });
+    handleError(res, err, 'Error fetching party details');
   }
 });
 
