@@ -1,8 +1,10 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import '../App.css'; // Import a CSS file for styling
 
 const NavBar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Check if the user is authenticated
   const isAuthenticated = !!localStorage.getItem('authToken');
@@ -14,27 +16,36 @@ const NavBar = () => {
   };
 
   return (
-    <nav>
-      <ul>
-        <li><Link to="/">Home</Link></li>
+    <nav className="navbar">
+      <ul className="nav-links">
+        <li className={location.pathname === '/' ? 'active' : ''}>
+          <Link to="/">Home</Link>
+        </li>
         {isAuthenticated ? (
           <>
-            <li><Link to="/parties">Parties</Link></li>
-            <li><Link to="/playlists">Playlists</Link></li>
-            <li><Link to="/youtube-search">YouTube Search</Link></li>
+            <li className={location.pathname === '/parties' ? 'active' : ''}>
+              <Link to="/parties">Parties</Link>
+            </li>
+            <li className={location.pathname === '/playlists' ? 'active' : ''}>
+              <Link to="/playlists">Playlists</Link>
+            </li>
+            <li className={location.pathname === '/search' ? 'active' : ''}>
+              <Link to="/search">Search</Link>
+            </li>
             <li>
-              <button
-                onClick={handleLogout}
-                style={{ cursor: 'pointer', background: 'none', border: 'none', color: 'blue' }}
-              >
+              <button className="logout-button" onClick={handleLogout}>
                 Logout
               </button>
             </li>
           </>
         ) : (
           <>
-            <li><Link to="/register">Register</Link></li>
-            <li><Link to="/login">Login</Link></li>
+            <li className={location.pathname === '/register' ? 'active' : ''}>
+              <Link to="/register">Register</Link>
+            </li>
+            <li className={location.pathname === '/login' ? 'active' : ''}>
+              <Link to="/login">Login</Link>
+            </li>
           </>
         )}
       </ul>
