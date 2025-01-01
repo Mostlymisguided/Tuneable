@@ -4,9 +4,10 @@ import NavBar from './components/NavBar';
 import Home from './pages/Home';
 import Parties from './pages/Parties';
 import Playlists from './pages/Playlists';
-import YouTubeSearch from './pages/YouTubeSearch';
-import Register from './pages/Register'; // Add Register Component
-import Login from './pages/Login'; // Add Login Component
+import SearchPage from './pages/SearchPage'; // Updated import for SearchPage
+import Register from './pages/Register';
+import Login from './pages/Login';
+import Party from './pages/Party'; // Party component
 
 // Function to check if the user is authenticated
 const isAuthenticated = () => {
@@ -27,8 +28,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/parties" element={<ProtectedRoute element={<Parties />} />} />
+        <Route path="/party/:id" element={<ProtectedRoute element={<Party />} />} /> {/* Party Details Route */}
         <Route path="/playlists" element={<ProtectedRoute element={<Playlists />} />} />
-        <Route path="/youtube-search" element={<ProtectedRoute element={<YouTubeSearch />} />} />
+        <Route path="/search" element={<ProtectedRoute element={<SearchPage />} />} /> {/* Updated Search Route */}
       </Routes>
     </Router>
   );

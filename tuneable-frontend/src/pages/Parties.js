@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom"; // Import Link from React Router
 
 function Parties() {
   const [parties, setParties] = useState([]);
@@ -28,7 +29,10 @@ function Parties() {
       {error && <p>{error}</p>}
       <ul>
         {parties.map((party) => (
-          <li key={party._id}>{party.name}</li>
+          <li key={party._id}>
+            {/* Create a clickable link for each party */}
+            <Link to={`/party/${party._id}`}>{party.name}</Link>
+          </li>
         ))}
       </ul>
     </div>
