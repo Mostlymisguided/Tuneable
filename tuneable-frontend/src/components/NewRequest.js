@@ -1,9 +1,11 @@
-import React from 'react';
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const NewRequest = () => {
+  const navigate = useNavigate();
+
   const handleRequest = () => {
-    // Logic to open a modal or redirect to search
-    console.log('New song request initiated');
+    navigate("/search"); // Navigate to the new search route
   };
 
   return (

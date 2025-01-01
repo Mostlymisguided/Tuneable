@@ -5,6 +5,7 @@ const SearchPage = () => {
     const [results, setResults] = useState([]);
     const [query, setQuery] = useState('');
     const [nextPageToken, setNextPageToken] = useState(null);
+    const [source, setSource] = useState('youtube'); // Default to YouTube
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [bidAmount, setBidAmount] = useState(0.77); // Default bid amount
@@ -17,7 +18,7 @@ const SearchPage = () => {
 
         try {
             const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
-                params: { query, pageToken },
+                params: { query, source, pageToken },
                 headers: {
                     Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
                 },
@@ -27,7 +28,7 @@ const SearchPage = () => {
             setResults(pageToken ? [...results, ...newResults] : newResults); // Append for pagination
             setNextPageToken(newToken || null);
         } catch (err) {
-            setError('Failed to fetch results. Please try again.');
+            setError(err.response?.data?.error || 'Failed to fetch results. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -35,7 +36,7 @@ const SearchPage = () => {
 
     // Handle search action
     const handleSearch = () => {
-        setResults([]);
+        setResults([]); // Clear results for new search
         setNextPageToken(null);
         fetchResults();
     };
@@ -55,17 +56,41 @@ const SearchPage = () => {
             alert('Song added to queue with your bid!');
         } catch (err) {
             console.error('Error adding song to queue:', err);
+            alert('Failed to add song to queue. Please try again.');
         }
+    };
+
+    // Handle source change
+    const handleSourceChange = (newSource) => {
+        setSource(newSource);
+        setResults([]); // Clear results
+        setQuery(''); // Clear query
+        setNextPageToken(null); // Reset pagination
+        setError(null); // Clear errors
     };
 
     return (
         <div className="search-page">
             <header className="search-header">
                 <h1>New Request</h1>
+                <div className="search-options">
+                    <button
+                        className={source === 'youtube' ? 'active' : ''}
+                        onClick={() => handleSourceChange('youtube')}
+                    >
+                        YouTube
+                    </button>
+                    <button
+                        className={source === 'music' ? 'active' : ''}
+                        onClick={() => handleSourceChange('music')}
+                    >
+                        Music Database
+                    </button>
+                </div>
                 <div className="search-bar">
                     <input
                         type="text"
-                        placeholder="Search for songs, artists, or videos"
+                        placeholder={`Search for ${source === 'youtube' ? 'videos' : 'songs'}`}
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                     />

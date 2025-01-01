@@ -7,11 +7,14 @@ const cors = require('cors'); // Add this if using a frontend from a different d
 
 const app = express();
 
+const searchRoutes = require('./routes/search'); // Update the import
+app.use('/api/search', searchRoutes); // Update the route registration
+
+
 // User, playlist, and party routes
 const userRoutes = require('./routes/userRoutes');
 const playlistRoutes = require('./routes/playlistRoutes');
 const partyRoutes = require('./routes/partyRoutes');
-const youtubeRoutes = require('./routes/youtube'); // Import the YouTube API routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -45,7 +48,6 @@ app.get('/api/test', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/parties', partyRoutes);
-app.use('/api/youtube', youtubeRoutes); // Add the YouTube routes here
 
 // Fallback for unknown routes
 app.use((req, res, next) => {

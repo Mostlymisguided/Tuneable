@@ -229,3 +229,47 @@ footer {
 .logout-button:hover {
   background-color: #4c00ff;
 }
+
+.search-options {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+.search-options button {
+  padding: 10px 20px;
+  background: #222;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.search-options button.active {
+  background: #4c00ff;
+}
+
+.search-options button:hover {
+  background: #4c00ff;
+  color: #fff;
+}
+
+.error-message {
+  color: red;
+  margin-top: 10px;
+}
+
+.load-more {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: #4c00ff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.load-more:hover {
+  background: #3700b3;
+}
