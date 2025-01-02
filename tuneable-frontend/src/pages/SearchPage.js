@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 
 const SearchPage = () => {
-    const [results, setResults] = useState([]);
+    const [results, setResults] = useState([]); // Ensure it's initialized as an array
     const [query, setQuery] = useState('');
     const [nextPageToken, setNextPageToken] = useState(null);
     const [source, setSource] = useState('youtube'); // Default to YouTube
@@ -15,7 +15,7 @@ const SearchPage = () => {
         if (!query) return;
         setLoading(true);
         setError(null);
-
+    
         try {
             const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
                 params: { query, source, pageToken },
@@ -23,30 +23,55 @@ const SearchPage = () => {
                     Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
                 },
             });
-
-            const { results: newResults, nextPageToken: newToken } = response.data;
-            setResults(pageToken ? [...results, ...newResults] : newResults); // Append for pagination
-            setNextPageToken(newToken || null);
+    
+            console.log('API Response:', response.data); // Debug API response
+    
+            const { videos = [] } = response.data; // Ensure 'videos' is valid
+            const mappedResults = videos.map((video) => ({
+                id: video.id,
+                url: video.url || `https://www.youtube.com/watch?v=${video.id}`, // Default YouTube URL
+                platform: 'youtube', // Assuming YouTube for this example
+                title: video.title,
+                thumbnail: video.thumbnail,
+                channelTitle: video.channelTitle,
+            }));
+    
+            setResults(pageToken ? [...results, ...mappedResults] : mappedResults); // Append or set new results
+            setNextPageToken(response.data.nextPageToken || null); // Handle pagination
         } catch (err) {
+            console.error('Error fetching results:', err);
             setError(err.response?.data?.error || 'Failed to fetch results. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    // Handle search action
     const handleSearch = () => {
-        setResults([]); // Clear results for new search
+        setResults([]); // Clear previous results
         setNextPageToken(null);
         fetchResults();
     };
 
-    // Handle bidding on a song
-    const handleBid = async (songId) => {
+    const handleBid = async (song) => {
+        console.log('Received song object:', song); // Debugging log
         try {
+            const partyId = localStorage.getItem('partyId'); // Retrieve from local storage
+            if (!partyId) {
+                throw new Error('Party ID not found');
+            }
+            const { id: songId, url, platform = source, title } = song; // Extract required fields from the song object
+            // Log each field to debug
+        console.log('Song ID:', songId);
+        console.log('URL:', url);
+        console.log('Platform:', platform);
+        console.log('Title:', title);
+        
+            if (!songId || !url || !platform || !title) {
+                throw new Error('Missing required song details');
+            }
             await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/add-to-queue`,
-                { songId, bidAmount },
+                { partyId, songId, bidAmount, url, platform, title },
                 {
                     headers: {
                         Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
@@ -59,8 +84,8 @@ const SearchPage = () => {
             alert('Failed to add song to queue. Please try again.');
         }
     };
+    
 
-    // Handle source change
     const handleSourceChange = (newSource) => {
         setSource(newSource);
         setResults([]); // Clear results
@@ -100,34 +125,40 @@ const SearchPage = () => {
                 </div>
             </header>
 
-            {error && <p className="error-message">{error}</p>}
+            {error && <p className="error-message">Error: {error}</p>}
+
+            {loading && <p>Loading...</p>}
 
             <div className="results">
                 <h2>Results...</h2>
                 <ul>
-                    {results.map((item, index) => (
-                        <li key={item.id} className={index === 2 ? 'highlighted' : ''}>
-                            <div className="result-item">
-                                <img
-                                    src={item.thumbnail}
-                                    alt={item.title}
-                                    className="thumbnail"
-                                />
-                                <div className="song-details">
-                                    <h4>{item.title}</h4>
-                                    <p>{item.artist || item.channelTitle}</p>
-                                </div>
-                                <div className="bid-section">
-                                    <input
-                                        type="number"
-                                        value={bidAmount}
-                                        onChange={(e) => setBidAmount(Number(e.target.value))}
+                    {results && results.length > 0 ? (
+                        results.map((item, index) => (
+                            <li key={item.id} className={index === 2 ? 'highlighted' : ''}>
+                                <div className="result-item">
+                                    <img
+                                        src={item.thumbnail}
+                                        alt={item.title}
+                                        className="thumbnail"
                                     />
-                                    <button onClick={() => handleBid(item.id)}>+ Bid</button>
+                                    <div className="song-details">
+                                        <h4>{item.title}</h4>
+                                        <p>{item.artist || item.channelTitle}</p>
+                                    </div>
+                                    <div className="bid-section">
+                                        <input
+                                            type="number"
+                                            value={bidAmount}
+                                            onChange={(e) => setBidAmount(Number(e.target.value))}
+                                        />
+                                        <button onClick={() => handleBid(item)}>+ Bid</button>
+                                    </div>
                                 </div>
-                            </div>
-                        </li>
-                    ))}
+                            </li>
+                        ))
+                    ) : (
+                        <p>No results found</p>
+                    )}
                 </ul>
             </div>
 
