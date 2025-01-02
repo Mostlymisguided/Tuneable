@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 
 const SearchPage = () => {
+    const [searchParams] = useSearchParams();
+    const partyId = searchParams.get('partyId'); // Extract partyId from query params
     const [results, setResults] = useState([]); // Ensure it's initialized as an array
     const [query, setQuery] = useState('');
     const [nextPageToken, setNextPageToken] = useState(null);
@@ -10,12 +13,19 @@ const SearchPage = () => {
     const [error, setError] = useState(null);
     const [bidAmount, setBidAmount] = useState(0.77); // Default bid amount
 
-    // Fetch search results from the backend
+    useEffect(() => {
+        console.log("Party ID:", partyId);
+        if (!partyId) {
+            alert('Party ID is missing. Please return to the previous page.');
+            // Optionally, navigate back to the party selection page
+        }
+    }, [partyId]);
+
     const fetchResults = async (pageToken = null) => {
         if (!query) return;
         setLoading(true);
         setError(null);
-    
+
         try {
             const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
                 params: { query, source, pageToken },
@@ -23,19 +33,17 @@ const SearchPage = () => {
                     Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
                 },
             });
-    
-            console.log('API Response:', response.data); // Debug API response
-    
+
             const { videos = [] } = response.data; // Ensure 'videos' is valid
             const mappedResults = videos.map((video) => ({
                 id: video.id,
-                url: video.url || `https://www.youtube.com/watch?v=${video.id}`, // Default YouTube URL
+                url: video.url || `https://www.youtube.com/watch?v=${video.id}`,
                 platform: 'youtube', // Assuming YouTube for this example
                 title: video.title,
                 thumbnail: video.thumbnail,
                 channelTitle: video.channelTitle,
             }));
-    
+
             setResults(pageToken ? [...results, ...mappedResults] : mappedResults); // Append or set new results
             setNextPageToken(response.data.nextPageToken || null); // Handle pagination
         } catch (err) {
@@ -53,38 +61,41 @@ const SearchPage = () => {
     };
 
     const handleBid = async (song) => {
-        console.log('Received song object:', song); // Debugging log
         try {
-            const partyId = localStorage.getItem('partyId'); // Retrieve from local storage
-            if (!partyId) {
-                throw new Error('Party ID not found');
+            const partyId = localStorage.getItem('partyId'); // Retrieve partyId from localStorage
+            const payload = {
+                partyId,
+                songId: song.id,
+                bidAmount: 1.5, // Example bid amount
+                url: song.url,
+                platform: song.platform === 'youtube' ? 'YouTube' : song.platform,
+                title: song.title,
+            };
+    
+            // Validate payload
+            if (!partyId || !payload.songId || !payload.url || !payload.platform || !payload.title) {
+                console.error('Invalid payload:', payload);
+                alert('Missing required fields. Please try again.');
+                return;
             }
-            const { id: songId, url, platform = source, title } = song; // Extract required fields from the song object
-            // Log each field to debug
-        console.log('Song ID:', songId);
-        console.log('URL:', url);
-        console.log('Platform:', platform);
-        console.log('Title:', title);
-        
-            if (!songId || !url || !platform || !title) {
-                throw new Error('Missing required song details');
-            }
-            await axios.post(
+    
+            console.log('Sending payload:', payload); // Debugging log
+            const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/add-to-queue`,
-                { partyId, songId, bidAmount, url, platform, title },
+                payload,
                 {
                     headers: {
                         Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
                     },
                 }
             );
+            console.log('Song added:', response.data);
             alert('Song added to queue with your bid!');
-        } catch (err) {
-            console.error('Error adding song to queue:', err);
+        } catch (error) {
+            console.error('Error adding song to queue:', error);
             alert('Failed to add song to queue. Please try again.');
         }
-    };
-    
+    };    
 
     const handleSourceChange = (newSource) => {
         setSource(newSource);
@@ -133,17 +144,13 @@ const SearchPage = () => {
                 <h2>Results...</h2>
                 <ul>
                     {results && results.length > 0 ? (
-                        results.map((item, index) => (
-                            <li key={item.id} className={index === 2 ? 'highlighted' : ''}>
+                        results.map((item) => (
+                            <li key={item.id}>
                                 <div className="result-item">
-                                    <img
-                                        src={item.thumbnail}
-                                        alt={item.title}
-                                        className="thumbnail"
-                                    />
+                                    <img src={item.thumbnail} alt={item.title} className="thumbnail" />
                                     <div className="song-details">
                                         <h4>{item.title}</h4>
-                                        <p>{item.artist || item.channelTitle}</p>
+                                        <p>{item.channelTitle}</p>
                                     </div>
                                     <div className="bid-section">
                                         <input
