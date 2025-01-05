@@ -1,8 +1,9 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-const NewRequest = ({ refreshPlaylist, partyId }) => {
+const NewRequest = ({ refreshPlaylist }) => {
   const navigate = useNavigate();
+  const { partyId } = useParams(); // Extract partyId from the URL
 
   const handleRequest = () => {
     if (!partyId) {

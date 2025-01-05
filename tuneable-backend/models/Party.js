@@ -6,7 +6,15 @@ const trackSchema = new mongoose.Schema({
     artist: { type: String },
     platform: {
         type: String,
-        enum: ['YouTube', 'Spotify', 'SoundCloud', 'Deezer', 'Apple Music', 'Tidal', 'Amazon Music'],
+        enum: [
+            'YouTube', 'youtube',
+            'Spotify', 'spotify',
+            'SoundCloud', 'soundcloud',
+            'Deezer', 'deezer',
+            'Apple Music', 'applemusic',
+            'Tidal', 'tidal',
+            'Amazon Music', 'amazonmusic',
+        ],
         required: true,
     },
     url: { type: String, required: true },
@@ -37,10 +45,6 @@ const PartySchema = new mongoose.Schema({
     currentSong: { type: mongoose.Schema.Types.ObjectId, ref: 'Song' },
     code: { type: String, unique: true, required: true },
 }, { timestamps: true });
-
-// Add indexes for performance
-//PartySchema.index({ code: 1 }, { unique: true });
-//PartySchema.index({ host: 1 });
 
 // Avoid overwriting the model
 module.exports = mongoose.models.Party || mongoose.model('Party', PartySchema);
