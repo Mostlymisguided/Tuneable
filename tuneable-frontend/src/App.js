@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import NavBar from './components/NavBar';
 import Home from './pages/Home';
 import Parties from './pages/Parties';
-import Playlists from './pages/Playlists';
 import SearchPage from './pages/SearchPage'; // Updated import for SearchPage
 import Register from './pages/Register';
 import Login from './pages/Login';
@@ -29,9 +28,8 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/parties" element={<ProtectedRoute element={<Parties />} />} />
-        <Route path="/party/:partyId" element={<ProtectedRoute element={<Party />} />} /> {/* Updated Party Details Route */}
-        <Route path="/playlists" element={<ProtectedRoute element={<Playlists />} />} />
-        <Route path="/search" element={<ProtectedRoute element={<SearchPage />} />} /> {/* Updated Search Route */}
+        <Route path="/party/:partyId" element={<ProtectedRoute element={<Party />} />} /> {/* Party Details Route */}
+        <Route path="/search" element={<ProtectedRoute element={<SearchPage />} />} /> {/* Search Route */}
         <Route path="/create-party" element={<ProtectedRoute element={<CreateParty />} />} /> {/* Create Party Route */}
       </Routes>
     </Router>

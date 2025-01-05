@@ -26,15 +26,12 @@ const NavBar = () => {
             <li className={location.pathname === '/parties' ? 'active' : ''}>
               <Link to="/parties">Parties</Link>
             </li>
-            <li className={location.pathname === '/playlists' ? 'active' : ''}>
-              <Link to="/playlists">Playlists</Link>
-            </li>
             <li className={location.pathname === '/search' ? 'active' : ''}>
               <Link to="/search">Search</Link>
             </li>
             <li className={location.pathname === '/create-party' ? 'active' : ''}>
               <Link to="/create-party">Create Party</Link>
-            </li> {/* Add Create Party Link */}
+            </li>
             <li>
               <button className="logout-button" onClick={handleLogout}>
                 Logout
