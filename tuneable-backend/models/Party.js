@@ -1,106 +1,46 @@
-// Updated Party Model
 const mongoose = require('mongoose');
 
-// Define the track schema (integrated from Playlist.js)
+// Define the track schema
 const trackSchema = new mongoose.Schema({
     title: { type: String, required: true },
     artist: { type: String },
     platform: {
         type: String,
-        enum: ['YouTube', 'Spotify', 'SoundCloud', 'Deezer', 'Apple Music'],
+        enum: ['YouTube', 'Spotify', 'SoundCloud', 'Deezer', 'Apple Music', 'Tidal', 'Amazon Music'],
         required: true,
     },
     url: { type: String, required: true },
-    bid: { type: Number, default: 0 }, // Track highest bid
+    bid: { type: Number, default: 0 },
     bidders: [
         {
-            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Reference to user
-            amount: { type: Number, required: true }, // Bid amount
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            amount: { type: Number, required: true },
         },
     ],
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 });
 
+// Add pre-save validation to trackSchema
+trackSchema.pre('save', function (next) {
+    if (!this.title || !this.url || !this.platform) {
+        return next(new Error('Track must include title, url, and platform.'));
+    }
+    next();
+});
+
+// Define the party schema
 const PartySchema = new mongoose.Schema({
     name: { type: String, required: true },
     host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    songs: [trackSchema], // Embed the track schema as "songs"
-    currentSong: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Song', // Or simply refer to the object within the songs array
-    },
+    songs: [trackSchema],
+    currentSong: { type: mongoose.Schema.Types.ObjectId, ref: 'Song' },
+    code: { type: String, unique: true, required: true },
 }, { timestamps: true });
 
-module.exports = mongoose.model('Party', PartySchema);
+// Add indexes for performance
+//PartySchema.index({ code: 1 }, { unique: true });
+//PartySchema.index({ host: 1 });
 
-// Updated Party Routes
-const express = require('express');
-const router = express.Router();
-const Party = require('../models/party');
-const auth = require('../middleware/auth');
-
-// Add a song to the party
-router.post('/:partyId/songs', auth, async (req, res) => {
-    try {
-        const { title, artist, platform, url } = req.body;
-        const party = await Party.findById(req.params.partyId);
-
-        if (!party) return res.status(404).send('Party not found');
-
-        const newSong = {
-            title,
-            artist,
-            platform,
-            url,
-            bidders: [],
-            addedBy: req.user._id,
-        };
-
-        party.songs.push(newSong);
-        await party.save();
-        res.status(201).send(party);
-    } catch (error) {
-        res.status(500).send({ message: error.message });
-    }
-});
-
-// Bid on a song
-router.post('/:partyId/songs/:songId/bid', auth, async (req, res) => {
-    try {
-        const { amount } = req.body;
-        const party = await Party.findById(req.params.partyId);
-
-        if (!party) return res.status(404).send('Party not found');
-
-        const song = party.songs.id(req.params.songId);
-        if (!song) return res.status(404).send('Song not found');
-
-        song.bidders.push({ userId: req.user._id, amount });
-        song.bid = Math.max(song.bid, amount);
-        await party.save();
-        res.status(201).send(party);
-    } catch (error) {
-        res.status(500).send({ message: error.message });
-    }
-});
-
-// Remove a song from the party
-router.delete('/:partyId/songs/:songId', auth, async (req, res) => {
-    try {
-        const party = await Party.findById(req.params.partyId);
-
-        if (!party) return res.status(404).send('Party not found');
-
-        const song = party.songs.id(req.params.songId);
-        if (!song) return res.status(404).send('Song not found');
-
-        song.remove();
-        await party.save();
-        res.status(200).send(party);
-    } catch (error) {
-        res.status(500).send({ message: error.message });
-    }
-});
-
-module.exports = router;
+// Avoid overwriting the model
+module.exports = mongoose.models.Party || mongoose.model('Party', PartySchema);

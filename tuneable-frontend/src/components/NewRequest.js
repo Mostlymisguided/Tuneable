@@ -5,6 +5,11 @@ const NewRequest = ({ refreshPlaylist, partyId }) => {
   const navigate = useNavigate();
 
   const handleRequest = () => {
+    if (!partyId) {
+      alert("Party ID is missing. Please ensure you are on a valid party page.");
+      return;
+    }
+
     // Trigger playlist refresh if the function is provided
     if (typeof refreshPlaylist === "function") {
       refreshPlaylist();

@@ -1,11 +1,10 @@
 const express = require('express');
-const axios = require('axios');
 const NodeCache = require('node-cache');
-const router = express.Router();
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
 // const musicDatabaseService = require('../services/musicDatabaseService'); // Optional additional source
 
-const cache = new NodeCache({ stdTTL: 600 }); // Cache results for 10 minutes
+const router = express.Router();
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
 
 // General search route
 router.get('/', async (req, res) => {
@@ -20,7 +19,7 @@ router.get('/', async (req, res) => {
     }
     if (query.length > 100) {
         console.error('Query is too long:', query);
-        return res.status(400).json({ error: 'Query is too long' });
+        return res.status(400).json({ error: 'Query parameter exceeds maximum length of 100 characters' });
     }
 
     console.log('Query:', query, 'Source:', source, 'PageToken:', pageToken); // Debug log query details
@@ -36,24 +35,33 @@ router.get('/', async (req, res) => {
     try {
         let result;
 
-        if (source === 'youtube') {
-            console.log('Using YouTube service'); // Debug log for source
-            result = await youtubeService.searchYouTube(query, pageToken);
-        } else if (source === 'music') {
-            console.log('Using Music Database service'); // Debug log for source
-            result = await musicDatabaseService.searchMusic(query);
-        } else {
-            console.error('Invalid source parameter:', source); // Log invalid source
-            return res.status(400).json({ error: 'Invalid source parameter' });
+        switch (source) {
+            case 'youtube':
+                console.log('Using YouTube service'); // Debug log for source
+                result = await youtubeService.searchYouTube(query, pageToken);
+                break;
+
+            case 'music':
+                console.log('Using Music Database service'); // Debug log for source
+                result = await musicDatabaseService.searchMusic(query);
+                break;
+
+            default:
+                console.error('Invalid source parameter:', source); // Log invalid source
+                return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
         }
+
+        // Log service response size (optional)
+        console.log(`Service returned ${result?.videos?.length || 0} items for query: "${query}"`);
 
         // Cache the result
         cache.set(cacheKey, result);
         console.log('Caching result for query:', cacheKey); // Debug log for caching
+
         res.json(result);
     } catch (error) {
-        console.error('Search Error:', error); // Log any errors
-        res.status(500).json({ error: 'Failed to perform search' });
+        console.error('Search Error:', error.message); // Log any errors
+        res.status(500).json({ error: 'Failed to perform search', details: error.message });
     }
 });
 

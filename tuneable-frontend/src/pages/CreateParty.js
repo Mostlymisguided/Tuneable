@@ -32,11 +32,17 @@ const CreateParty = () => {
             const { party } = response.data; // Extract party object
             const partyId = party._id; // Get partyId
             localStorage.setItem('partyId', partyId); // Store partyId in local storage
-            alert(`Party "${partyName}" created successfully!`);
+            alert(`Party "${partyName}" created successfully! Party Code: ${party.code}`); // Include party code in the alert
             window.location.href = `/party/${partyId}`; // Redirect to the party page
         } catch (err) {
             console.error('Error creating party:', err);
-            setError(err.response?.data?.error || 'Failed to create party. Please try again.');
+
+            // Enhanced error handling
+            if (err.response?.data?.details?.includes('E11000 duplicate key')) {
+                setError('A unique code could not be generated for the party. Please try again.');
+            } else {
+                setError(err.response?.data?.error || 'Failed to create party. Please try again.');
+            }
         } finally {
             setLoading(false);
         }

@@ -2,14 +2,13 @@ const express = require('express');
 const db = require('./db'); // Import the database connection module
 const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
 require('dotenv').config(); // Load environment variables from .env file
-const cors = require('cors'); // Add this if using a frontend from a different domain
+const cors = require('cors');
 
 const app = express();
 
-const searchRoutes = require('./routes/search'); // Update the import
-const userRoutes = require('./routes/userRoutes');
-const playlistRoutes = require('./routes/playlistRoutes');
-const partyRoutes = require('./routes/partyRoutes');
+const searchRoutes = require('./routes/search'); // Import search routes
+const userRoutes = require('./routes/userRoutes'); // Import user routes
+const partyRoutes = require('./routes/partyRoutes'); // Updated to only include unified partyRoutes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -49,8 +48,7 @@ app.get('/api/test', (req, res) => {
 // Add routes
 app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/playlists', playlistRoutes);
-app.use('/api/parties', partyRoutes);
+app.use('/api/parties', partyRoutes); // Unified party and playlist functionality
 
 // Fallback for unknown routes
 app.use((req, res, next) => {

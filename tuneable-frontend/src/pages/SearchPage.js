@@ -62,26 +62,17 @@ const SearchPage = () => {
 
     const handleBid = async (song) => {
         try {
-            const partyId = localStorage.getItem('partyId'); // Retrieve partyId from localStorage
             const payload = {
-                partyId,
-                songId: song.id,
-                bidAmount: 1.5, // Example bid amount
-                url: song.url,
-                platform: song.platform === 'youtube' ? 'YouTube' : song.platform,
                 title: song.title,
+                artist: song.artist,
+                platform: song.platform,
+                url: song.url,
             };
     
-            // Validate payload
-            if (!partyId || !payload.songId || !payload.url || !payload.platform || !payload.title) {
-                console.error('Invalid payload:', payload);
-                alert('Missing required fields. Please try again.');
-                return;
-            }
+            console.log('Sending payload:', payload);
     
-            console.log('Sending payload:', payload); // Debugging log
             const response = await axios.post(
-                `${process.env.REACT_APP_BACKEND_URL}/api/parties/add-to-queue`,
+                `${process.env.REACT_APP_BACKEND_URL}/api/parties/${song.partyId}/songs`, // Updated route
                 payload,
                 {
                     headers: {
@@ -89,13 +80,13 @@ const SearchPage = () => {
                     },
                 }
             );
-            console.log('Song added:', response.data);
-            alert('Song added to queue with your bid!');
+    
+            console.log('Song added successfully:', response.data);
         } catch (error) {
             console.error('Error adding song to queue:', error);
-            alert('Failed to add song to queue. Please try again.');
         }
-    };    
+    };
+    
 
     const handleSourceChange = (newSource) => {
         setSource(newSource);
