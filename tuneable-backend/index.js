@@ -1,4 +1,3 @@
-// Import Express and other dependencies
 const express = require('express');
 const db = require('./db'); // Import the database connection module
 const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
@@ -8,10 +7,6 @@ const cors = require('cors'); // Add this if using a frontend from a different d
 const app = express();
 
 const searchRoutes = require('./routes/search'); // Update the import
-app.use('/api/search', searchRoutes); // Update the route registration
-
-
-// User, playlist, and party routes
 const userRoutes = require('./routes/userRoutes');
 const playlistRoutes = require('./routes/playlistRoutes');
 const partyRoutes = require('./routes/partyRoutes');
@@ -25,9 +20,16 @@ db.connectDB().catch((err) => {
   process.exit(1);
 });
 
-// Middleware to parse JSON bodies and handle CORS
+// Explicit CORS configuration
+app.use(cors({
+  origin: 'http://localhost:3000', // Allow only frontend requests
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+  credentials: true, // Allow credentials if needed
+}));
+
+// Middleware to parse JSON bodies
 app.use(express.json());
-app.use(cors());
 
 // Basic route
 app.get('/', (req, res) => {
@@ -45,6 +47,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Add routes
+app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/parties', partyRoutes);

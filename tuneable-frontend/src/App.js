@@ -8,6 +8,7 @@ import SearchPage from './pages/SearchPage'; // Updated import for SearchPage
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Party from './pages/Party'; // Party component
+import CreateParty from './pages/CreateParty'; // Import CreateParty component
 
 // Function to check if the user is authenticated
 const isAuthenticated = () => {
@@ -28,9 +29,10 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/parties" element={<ProtectedRoute element={<Parties />} />} />
-        <Route path="/party/:id" element={<ProtectedRoute element={<Party />} />} /> {/* Party Details Route */}
+        <Route path="/party/:partyId" element={<ProtectedRoute element={<Party />} />} /> {/* Updated Party Details Route */}
         <Route path="/playlists" element={<ProtectedRoute element={<Playlists />} />} />
         <Route path="/search" element={<ProtectedRoute element={<SearchPage />} />} /> {/* Updated Search Route */}
+        <Route path="/create-party" element={<ProtectedRoute element={<CreateParty />} />} /> {/* Create Party Route */}
       </Routes>
     </Router>
   );
