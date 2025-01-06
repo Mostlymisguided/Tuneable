@@ -8,7 +8,8 @@ const app = express();
 
 const searchRoutes = require('./routes/search'); // Import search routes
 const userRoutes = require('./routes/userRoutes'); // Import user routes
-const partyRoutes = require('./routes/partyRoutes'); // Updated to only include unified partyRoutes
+const partyRoutes = require('./routes/partyRoutes'); // Unified party and playlist functionality
+const songRoutes = require('./routes/songRoutes'); // Import song routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -49,6 +50,7 @@ app.get('/api/test', (req, res) => {
 app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parties', partyRoutes); // Unified party and playlist functionality
+app.use('/api/parties', songRoutes); // Mount song-specific routes
 
 // Fallback for unknown routes
 app.use((req, res, next) => {

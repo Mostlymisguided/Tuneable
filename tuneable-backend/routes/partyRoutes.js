@@ -4,6 +4,10 @@ const crypto = require('crypto');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const Party = require('../models/Party'); // Import the Party model
+const Song = require('../models/song'); // Import the Song model
+const Bid = require('../models/Bid'); // Import the Bid model
+const { isValidObjectId } = require('../utils/validators'); // Utility function to validate ObjectId - Import from utils
+
 const { broadcast } = require('../utils/broadcast');
 
 // Generate a consistent ObjectId for dev-user
@@ -18,8 +22,6 @@ const handleError = (res, err, message, status = 500) => {
     res.status(status).json({ error: message, details: err.message });
 };
 
-// Utility function to validate ObjectId
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // Utility function to derive a unique code from partyId
 const deriveCodeFromPartyId = (partyId) => {
@@ -34,49 +36,60 @@ const deriveCodeFromPartyId = (partyId) => {
 
 // Create a new party
 router.post('/', authMiddleware, async (req, res) => {
+    try {
+        const { name, devUserId: explicitDevUserId } = req.body;
+
+        // Determine the host ID
+        let userId;
+        if (explicitDevUserId) {
+            userId = explicitDevUserId;
+        } else if (req.user.userId === 'dev-user') {
+            userId = devUserId;
+        } else {
+            userId = req.user.userId;
+        }
+
+        if (!isValidObjectId(userId)) {
+            return res.status(400).json({ error: 'Invalid userId format' });
+        }
+
+        // Manually create an ObjectId
+        const objectId = new mongoose.Types.ObjectId();
+
+        // Derive the partyCode from the manually created ObjectId
+        const partyCode = deriveCodeFromPartyId(objectId.toString());
+
+        // Create the Party object with the manually created ObjectId
+        const party = new Party({
+            _id: objectId, // Set the _id explicitly
+            name,
+            host: userId,
+            partyCode, // Include the partyCode during creation
+            songs: [],
+        });
+
+        // Save the party
+        await party.save();
+
+        console.log(`Generated partyCode: ${partyCode}`);
+        broadcast(party._id, { message: 'New party created', party });
+
+        res.status(201).json({ message: 'Party created successfully', party });
+    } catch (err) {
+        handleError(res, err, 'Error creating party');
+    }
+});
+
+// Fetch all parties
+router.get('/', authMiddleware, async (req, res) => {
   try {
-      const { name, devUserId: explicitDevUserId } = req.body;
-
-      // Determine the host ID
-      let userId;
-      if (explicitDevUserId) {
-          userId = explicitDevUserId;
-      } else if (req.user.userId === 'dev-user') {
-          userId = devUserId;
-      } else {
-          userId = req.user.userId;
-      }
-
-      if (!isValidObjectId(userId)) {
-          return res.status(400).json({ error: 'Invalid userId format' });
-      }
-
-      // Manually create an ObjectId
-      const objectId = new mongoose.Types.ObjectId();
-
-      // Derive the partyCode from the manually created ObjectId
-      const partyCode = deriveCodeFromPartyId(objectId.toString());
-
-      // Create the Party object with the manually created ObjectId
-      const party = new Party({
-          _id: objectId, // Set the _id explicitly
-          name,
-          host: userId,
-          partyCode, // Include the partyCode during creation
-          songs: [],
-      });
-
-      // Save the party
-      await party.save();
-
-      console.log(`Generated partyCode: ${partyCode}`);
-      broadcast(party._id, { message: 'New party created', party });
-
-      res.status(201).json({ message: 'Party created successfully', party });
+    const parties = await Party.find().select('-songs'); // Exclude songs for performance
+    res.status(200).json({ message: 'Parties fetched successfully', parties });
   } catch (err) {
-      handleError(res, err, 'Error creating party');
+    handleError(res, err, 'Failed to fetch parties');
   }
 });
+
 
 // Fetch party details and its songs sorted by bids
 router.get('/:id/details', authMiddleware, async (req, res) => {
@@ -87,9 +100,9 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Invalid Party ID' });
         }
 
-        const party = await Party.findById(id).select('name songs').populate({
-            path: 'songs.bidders.userId',
-            select: 'name',
+        const party = await Party.findById(id).populate({
+            path: 'songs',
+            model: 'Song', // Explicitly use the Song model
         });
 
         if (!party) return res.status(404).json({ error: 'Party not found' });
@@ -116,11 +129,14 @@ router.post('/:partyId/songs', authMiddleware, async (req, res) => {
         const party = await Party.findById(partyId);
         if (!party) return res.status(404).json({ error: 'Party not found' });
 
-        const newSong = { title, artist, platform, url, bidders: [] };
-        party.songs.push(newSong);
+        // Create a new song document
+        const newSong = await Song.create({ title, artist, platform, url, bidders: [] });
+        
+        // Add the song's ObjectId to the party's songs array
+        party.songs.push(newSong._id);
         await party.save();
 
-        res.status(201).json({ message: 'Song added successfully', party });
+        res.status(201).json({ message: 'Song added successfully', song: newSong });
     } catch (err) {
         handleError(res, err, 'Error adding song to party');
     }
@@ -128,60 +144,72 @@ router.post('/:partyId/songs', authMiddleware, async (req, res) => {
 
 // Place or increase a bid on a song
 router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
-    try {
-        const { partyId, songId } = req.params;
-        const { bidAmount } = req.body;
-        const userId = req.user.userId;
+  console.log('Route Hit:', req.originalUrl);
+  console.log('Party ID:', req.params.partyId);
+  console.log('Song ID:', req.params.songId);
+  console.log('Bid Amount:', req.body.bidAmount);
+  console.log('User ID:', req.user?.userId);
 
-        if (bidAmount <= 0) {
-            return res.status(400).json({ error: 'Bid amount must be greater than zero' });
-        }
+  try {
+    const { partyId, songId } = req.params;
+    const { bidAmount } = req.body;
+    const userId = req.user.userId;
 
-        if (!isValidObjectId(userId) || !isValidObjectId(partyId) || !isValidObjectId(songId)) {
-            return res.status(400).json({ error: 'Invalid ID format' });
-        }
-
-        const party = await Party.findById(partyId);
-        if (!party) return res.status(404).json({ error: 'Party not found' });
-
-        const song = party.songs.id(songId);
-        if (!song) return res.status(404).json({ error: 'Song not found' });
-
-        const existingBidder = song.bidders.find(
-            (bid) => bid.userId.toString() === userId.toString()
-        );
-
-        if (existingBidder) {
-            existingBidder.amount = Math.max(existingBidder.amount, bidAmount);
-        } else {
-            song.bidders.push({ userId, amount: bidAmount });
-        }
-
-        song.bid = Math.max(song.bid || 0, bidAmount);
-
-        await party.save();
-        broadcast(party._id, {
-            type: 'BID_UPDATED',
-            songId,
-            bidAmount,
-            userId,
-            songs: party.songs,
-        });
-
-        res.status(200).json({ message: 'Bid placed successfully!', song });
-    } catch (err) {
-        handleError(res, err, 'Error placing bid');
+    if (bidAmount <= 0) {
+      return res.status(400).json({ error: 'Bid amount must be greater than zero' });
     }
-});
 
-// Get all parties
-router.get('/', authMiddleware, async (req, res) => {
-    try {
-        const parties = await Party.find();
-        res.status(200).json({ message: 'Parties fetched successfully', parties });
-    } catch (err) {
-        handleError(res, err, 'Failed to fetch parties');
+    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(partyId) || !mongoose.Types.ObjectId.isValid(songId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
     }
+
+    const party = await Party.findById(partyId);
+    if (!party) return res.status(404).json({ error: 'Party not found' });
+
+    const song = await Song.findById(songId);
+    if (!song) return res.status(404).json({ error: 'Song not found' });
+
+    console.log('Populated song before update:', JSON.stringify(song, null, 2));
+
+    // Add the new bid to the bidders array
+    song.bidders.push({ userId, amount: bidAmount });
+
+    // Calculate the new total bids
+    const totalBids = song.bidders.reduce((sum, bidder) => sum + bidder.amount, 0);
+
+    // Update the song's bid field to reflect the total
+    song.bid = totalBids;
+
+    // Save the updated song document
+    await song.save();
+
+    // Re-fetch the song with populated user data
+    const updatedSong = await Song.findById(songId).populate({
+      path: 'bidders.userId',
+      model: 'User',
+      select: 'username',
+    });
+
+    console.log('Updated song with populated bidders:', JSON.stringify(updatedSong, null, 2));
+
+    // Broadcast the updated bid information
+    broadcast(partyId, {
+      type: 'BID_UPDATED',
+      songId: song._id,
+      bidAmount,
+      userId,
+      currentBid: totalBids,
+    });
+
+    res.status(200).json({
+      message: 'Bid placed successfully!',
+      currentBid: totalBids,
+      bidders: updatedSong.bidders,
+    });
+  } catch (err) {
+    console.error('Error placing bid:', err.message);
+    res.status(500).json({ error: 'Error placing bid', details: err.message });
+  }
 });
 
 module.exports = router;
