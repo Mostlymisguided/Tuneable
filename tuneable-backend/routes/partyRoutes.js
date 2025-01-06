@@ -1,4 +1,3 @@
-// Updated Party Routes
 const express = require('express');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
@@ -6,8 +5,6 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const Party = require('../models/Party'); // Import the Party model
 const { broadcast } = require('../utils/broadcast');
-
-console.log('Broadcast function:', broadcast);
 
 // Generate a consistent ObjectId for dev-user
 const devUserId = new mongoose.Types.ObjectId(
@@ -17,8 +14,12 @@ const devUserId = new mongoose.Types.ObjectId(
 // Centralized error handler
 const handleError = (res, err, message, status = 500) => {
     console.error(`${message}:`, err.message);
+    console.error('Request Body:', res.req.body);
     res.status(status).json({ error: message, details: err.message });
 };
+
+// Utility function to validate ObjectId
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // Utility function to derive a unique code from partyId
 const deriveCodeFromPartyId = (partyId) => {
@@ -33,39 +34,58 @@ const deriveCodeFromPartyId = (partyId) => {
 
 // Create a new party
 router.post('/', authMiddleware, async (req, res) => {
-    try {
-        const { name } = req.body;
+  try {
+      const { name, devUserId: explicitDevUserId } = req.body;
 
-        const userId = req.user.userId === 'dev-user' ? devUserId : req.user.userId;
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ error: 'Invalid userId format' });
-        }
+      // Determine the host ID
+      let userId;
+      if (explicitDevUserId) {
+          userId = explicitDevUserId;
+      } else if (req.user.userId === 'dev-user') {
+          userId = devUserId;
+      } else {
+          userId = req.user.userId;
+      }
 
-        // Create the Party object (partyId is generated here)
-        const party = new Party({
-            name,
-            host: userId,
-            songs: [],
-        });
+      if (!isValidObjectId(userId)) {
+          return res.status(400).json({ error: 'Invalid userId format' });
+      }
 
-        // Derive the code from the partyId
-        const code = deriveCodeFromPartyId(party._id.toString());
-        party.code = code;
+      // Manually create an ObjectId
+      const objectId = new mongoose.Types.ObjectId();
 
-        // Save the party to the database
-        await party.save();
+      // Derive the partyCode from the manually created ObjectId
+      const partyCode = deriveCodeFromPartyId(objectId.toString());
 
-        broadcast(party._id, { message: 'New party created', party });
-        res.status(201).json({ message: 'Party created successfully', party });
-    } catch (err) {
-        handleError(res, err, 'Error creating party');
-    }
+      // Create the Party object with the manually created ObjectId
+      const party = new Party({
+          _id: objectId, // Set the _id explicitly
+          name,
+          host: userId,
+          partyCode, // Include the partyCode during creation
+          songs: [],
+      });
+
+      // Save the party
+      await party.save();
+
+      console.log(`Generated partyCode: ${partyCode}`);
+      broadcast(party._id, { message: 'New party created', party });
+
+      res.status(201).json({ message: 'Party created successfully', party });
+  } catch (err) {
+      handleError(res, err, 'Error creating party');
+  }
 });
 
 // Fetch party details and its songs sorted by bids
 router.get('/:id/details', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ error: 'Invalid Party ID' });
+        }
 
         const party = await Party.findById(id).select('name songs').populate({
             path: 'songs.bidders.userId',
@@ -85,89 +105,73 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
 // Add a song to a party
 router.post('/:partyId/songs', authMiddleware, async (req, res) => {
-  try {
-      const { partyId } = req.params;
-      const { title, artist, platform, url } = req.body;
+    try {
+        const { partyId } = req.params;
+        const { title, artist, platform, url } = req.body;
 
-      // Validate partyId
-      if (!mongoose.Types.ObjectId.isValid(partyId)) {
-          return res.status(400).json({ error: 'Invalid Party ID' });
-      }
+        if (!isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid Party ID' });
+        }
 
-      const party = await Party.findById(partyId);
-      if (!party) {
-          return res.status(404).json({ error: 'Party not found' });
-      }
+        const party = await Party.findById(partyId);
+        if (!party) return res.status(404).json({ error: 'Party not found' });
 
-      const newSong = { title, artist, platform, url, bidders: [] };
-      party.songs.push(newSong);
-      await party.save();
+        const newSong = { title, artist, platform, url, bidders: [] };
+        party.songs.push(newSong);
+        await party.save();
 
-      res.status(201).json({ message: 'Song added successfully', party });
-  } catch (error) {
-      console.error('Error adding song to party:', error);
-      res.status(500).json({ error: 'Error adding song to party', details: error.message });
-  }
+        res.status(201).json({ message: 'Song added successfully', party });
+    } catch (err) {
+        handleError(res, err, 'Error adding song to party');
+    }
 });
 
 // Place or increase a bid on a song
 router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
-  try {
-      const { partyId, songId } = req.params;
-      const { bidAmount } = req.body;
-      const userId = req.user.userId;
+    try {
+        const { partyId, songId } = req.params;
+        const { bidAmount } = req.body;
+        const userId = req.user.userId;
 
-      if (bidAmount <= 0) {
-          return res.status(400).json({ error: 'Bid amount must be greater than zero' });
-      }
+        if (bidAmount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than zero' });
+        }
 
-      // Validate and convert userId to ObjectId
-      let userObjectId;
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-          userObjectId = mongoose.Types.ObjectId(userId);
-      } else {
-          return res.status(400).json({ error: 'Invalid userId format' });
-      }
+        if (!isValidObjectId(userId) || !isValidObjectId(partyId) || !isValidObjectId(songId)) {
+            return res.status(400).json({ error: 'Invalid ID format' });
+        }
 
-      // Fetch the party and validate existence
-      const party = await Party.findById(partyId);
-      if (!party) return res.status(404).json({ error: 'Party not found' });
+        const party = await Party.findById(partyId);
+        if (!party) return res.status(404).json({ error: 'Party not found' });
 
-      // Find the song in the party's songs array
-      const song = party.songs.id(songId);
-      if (!song) return res.status(404).json({ error: 'Song not found' });
+        const song = party.songs.id(songId);
+        if (!song) return res.status(404).json({ error: 'Song not found' });
 
-      // Check if the user already placed a bid on this song
-      const existingBidder = song.bidders.find(
-          (bid) => bid.userId.toString() === userObjectId.toString()
-      );
+        const existingBidder = song.bidders.find(
+            (bid) => bid.userId.toString() === userId.toString()
+        );
 
-      if (existingBidder) {
-          existingBidder.amount = Math.max(existingBidder.amount, bidAmount);
-      } else {
-          // Add new bidder
-          song.bidders.push({ userId: userObjectId, amount: bidAmount });
-      }
+        if (existingBidder) {
+            existingBidder.amount = Math.max(existingBidder.amount, bidAmount);
+        } else {
+            song.bidders.push({ userId, amount: bidAmount });
+        }
 
-      // Update the song's highest bid
-      song.bid = Math.max(song.bid || 0, bidAmount);
+        song.bid = Math.max(song.bid || 0, bidAmount);
 
-      // Save the updated party document
-      await party.save();
+        await party.save();
+        broadcast(party._id, {
+            type: 'BID_UPDATED',
+            songId,
+            bidAmount,
+            userId,
+            songs: party.songs,
+        });
 
-      // Broadcast the bid update
-      broadcast(party._id, {
-          type: 'BID_UPDATED',
-          songId,
-          bidAmount,
-          userId: userObjectId,
-          songs: party.songs,
-      });
-
-      res.status(200).json({ message: 'Bid placed successfully!', song });
-  } catch (err) {
-      handleError(res, err, 'Error placing bid');
-  }
+        res.status(200).json({ message: 'Bid placed successfully!', song });
+    } catch (err) {
+        handleError(res, err, 'Error placing bid');
+    }
 });
 
 // Get all parties
