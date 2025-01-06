@@ -1,4 +1,3 @@
-// models/song.js
 const mongoose = require('mongoose');
 
 const songSchema = new mongoose.Schema({
@@ -29,4 +28,5 @@ const songSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model('Song', songSchema);
+// Use the existing model if it is already compiled, otherwise define it
+module.exports = mongoose.models.Song || mongoose.model('Song', songSchema);
