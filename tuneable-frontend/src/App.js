@@ -7,6 +7,7 @@ import SearchPage from './pages/SearchPage'; // Updated import for SearchPage
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Party from './pages/Party'; // Party component
+import UserProfile from './pages/UserProfile'; // Import UserProfile
 import CreateParty from './pages/CreateParty'; // Import CreateParty component
 
 // Function to check if the user is authenticated
@@ -31,6 +32,7 @@ function App() {
         <Route path="/party/:partyId" element={<ProtectedRoute element={<Party />} />} /> {/* Party Details Route */}
         <Route path="/search" element={<ProtectedRoute element={<SearchPage />} />} /> {/* Search Route */}
         <Route path="/create-party" element={<ProtectedRoute element={<CreateParty />} />} /> {/* Create Party Route */}
+        <Route path="/profile" element={<ProtectedRoute element={<UserProfile />} />} /> {/* User Profile Route */}
       </Routes>
     </Router>
   );

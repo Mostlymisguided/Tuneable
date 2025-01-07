@@ -83,12 +83,16 @@ router.post('/', authMiddleware, async (req, res) => {
 // Fetch all parties
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const parties = await Party.find().select('-songs'); // Exclude songs for performance
+    const parties = await Party.find()
+      .select('-songs') // Exclude songs for performance
+      .populate('host', 'username'); // Populate host field with username
+
     res.status(200).json({ message: 'Parties fetched successfully', parties });
   } catch (err) {
     handleError(res, err, 'Failed to fetch parties');
   }
 });
+
 
 
 // Fetch party details and its songs sorted by bids

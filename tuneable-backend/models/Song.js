@@ -21,6 +21,7 @@ const songSchema = new mongoose.Schema({
     bidders: [
         {
             userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            username: { type: String }, // Add username to bidders array
             amount: { type: Number, required: true },
         },
     ],
