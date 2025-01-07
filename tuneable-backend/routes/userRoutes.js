@@ -96,4 +96,29 @@ router.get('/profile', authMiddleware, async (req, res) => {
   }
 });
 
+// PUT: Update user profile
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { avatar, bio, preferences } = req.body;
+
+    // Update fields selectively
+    const updatedFields = {};
+    if (avatar) updatedFields.avatar = avatar;
+    if (bio) updatedFields.bio = bio;
+    if (preferences) updatedFields.preferences = preferences;
+
+    const user = await User.findByIdAndUpdate(req.user.userId, updatedFields, { new: true }).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Profile updated successfully',
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating profile', details: error.message });
+  }
+});
+
 module.exports = router;
