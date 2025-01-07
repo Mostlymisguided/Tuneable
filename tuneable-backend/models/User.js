@@ -3,13 +3,18 @@ const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  email:    { type: String, required: true, unique: true },
-  password: { type: String, required: true }
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  avatar: { type: String, default: '' }, // URL for the user's avatar
+  bio: { type: String, default: '' },    // Short user bio or description
+  preferences: {                         // User-specific preferences
+    theme: { type: String, default: 'light' }, // e.g., light or dark mode
+    notifications: { type: Boolean, default: true } // Enable/disable notifications
+  }
 }, { timestamps: true });
 
 // Pre-save hook to hash the password
 userSchema.pre('save', async function(next) {
-  // Only hash if password is new or modified
   if (!this.isModified('password')) return next();
 
   try {
