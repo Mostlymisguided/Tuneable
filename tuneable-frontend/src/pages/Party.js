@@ -6,57 +6,53 @@ import NewRequest from '../components/NewRequest';
 import Footer from '../components/Footer';
 
 const Party = () => {
-    const [partyName, setPartyName] = useState('Party'); // State for the party name
-    const [songs, setSongs] = useState([]); // Updated to songs
+    const [partyName, setPartyName] = useState('Party');
+    const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
-    const { partyId } = useParams(); // Retrieve partyId from the URL
-    const navigate = useNavigate(); // Initialize navigate
+    const { partyId } = useParams();
+    const navigate = useNavigate();
 
-    // Function to fetch the party details, wrapped with useCallback
     const fetchPartyDetails = useCallback(async () => {
         setLoading(true);
         try {
-            console.log('Fetching party details for party ID:', partyId);
+            const token = localStorage.getItem('token') || process.env.REACT_APP_DEV_TOKEN;
             const response = await axios.get(
-                `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`, // Correct route
+                `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`,
                 {
                     headers: {
-                        Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
+                        Authorization: `Bearer ${token}`,
                     },
                 }
             );
-            console.log('Fetched party details:', response.data);
             const party = response.data.party;
-            setPartyName(party.name || 'Party'); // Set party name dynamically
-            setSongs(party.songs || []); // Updated to use songs
-            setCurrentSong(party.songs[0] || {}); // Updated to use songs
-            setErrorMessage(null); // Clear previous errors
+            setPartyName(party.name || 'Party');
+            setSongs(party.songs || []);
+            setCurrentSong(party.songs[0] || {});
+            setErrorMessage(null);
         } catch (error) {
             console.error('Error fetching party details:', error);
-            setErrorMessage('Failed to load party details. Please try again later.');
+            setErrorMessage(error.response?.data?.error || 'Failed to load party details. Please try again later.');
         } finally {
             setLoading(false);
         }
-    }, [partyId]); // Add partyId as a dependency
+    }, [partyId]);
 
-    // Fetch the party details on component mount or when the partyId changes
     useEffect(() => {
         if (partyId) {
             fetchPartyDetails();
         }
-    }, [partyId, fetchPartyDetails]); // Add fetchPartyDetails to dependencies
+    }, [partyId, fetchPartyDetails]);
 
-    // Navigate to the search page
     const navigateToSearch = () => {
-        localStorage.setItem('partyId', partyId); // Save partyId in localStorage
-        navigate(`/search?partyId=${partyId}`); // Navigate to search page with query param
+        localStorage.setItem('partyId', partyId);
+        navigate(`/search?partyId=${partyId}`);
     };
 
     return (
         <div className="party-container">
-            <h1>{partyName}</h1> {/* Use the partyName state here */}
+            <h1>{partyName}</h1>
             {errorMessage && <p className="error-message" style={{ color: 'red' }}>{errorMessage}</p>}
             {loading ? (
                 <p>Loading party details...</p>
@@ -64,7 +60,19 @@ const Party = () => {
                 <div className="playlist">
                     {songs.length > 0 ? (
                         songs.map((song, index) => (
-                            <SongCard key={song._id} song={song} rank={index + 1} /> // Updated key to song._id
+                            <SongCard
+                                key={song._id}
+                                song={song}
+                                rank={index + 1}
+                                partyId={partyId}
+                                onBidPlaced={(songId, bidAmount) => {
+                                    setSongs((prevSongs) =>
+                                        prevSongs.map((s) =>
+                                            s._id === songId ? { ...s, bid: bidAmount } : s
+                                        )
+                                    );
+                                }}
+                            />
                         ))
                     ) : (
                         <p>No songs in the playlist yet. Be the first to add one!</p>
@@ -72,9 +80,9 @@ const Party = () => {
                 </div>
             )}
             <div className="actions">
-                <button onClick={navigateToSearch}>Search for Songs</button> {/* Button to navigate to search */}
+                <button onClick={navigateToSearch}>Search for Songs</button>
             </div>
-            <NewRequest refreshPlaylist={fetchPartyDetails} /> {/* Pass refreshPlaylist to NewRequest */}
+            <NewRequest refreshPlaylist={fetchPartyDetails} />
             <Footer currentSong={currentSong} />
         </div>
     );

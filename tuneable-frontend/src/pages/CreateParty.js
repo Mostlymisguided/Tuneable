@@ -31,8 +31,9 @@ const CreateParty = () => {
 
             const { party } = response.data; // Extract party object
             const partyId = party._id; // Get partyId
+            const partyCode = party.partyCode; // Get the updated partyCode field
             localStorage.setItem('partyId', partyId); // Store partyId in local storage
-            alert(`Party "${partyName}" created successfully! Party Code: ${party.code}`); // Include party code in the alert
+            alert(`Party "${partyName}" created successfully! Party Code: ${partyCode}`); // Include partyCode in the alert
             window.location.href = `/party/${partyId}`; // Redirect to the party page
         } catch (err) {
             console.error('Error creating party:', err);

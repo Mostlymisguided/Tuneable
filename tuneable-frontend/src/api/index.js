@@ -4,13 +4,28 @@ import axios from 'axios';
 const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const DEV_TOKEN = process.env.REACT_APP_DEV_TOKEN;
 
-// Create an Axios instance with the base URL and Authorization header
+// Create an Axios instance with the base URL
 const API = axios.create({
   baseURL: backendUrl,
-  headers: {
-    Authorization: `Bearer ${DEV_TOKEN}`, // Attach token globally
-  },
 });
+
+// Dynamically attach the token to the headers
+API.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token') || DEV_TOKEN;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Log errors for debugging
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
 
 // Example: Fetch parties
 export const fetchParties = async () => {

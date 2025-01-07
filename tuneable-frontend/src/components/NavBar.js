@@ -32,6 +32,9 @@ const NavBar = () => {
             <li className={location.pathname === '/create-party' ? 'active' : ''}>
               <Link to="/create-party">Create Party</Link>
             </li>
+            <li className={location.pathname === '/profile' ? 'active' : ''}>
+              <Link to="/profile">Profile</Link>
+            </li>
             <li>
               <button className="logout-button" onClick={handleLogout}>
                 Logout
