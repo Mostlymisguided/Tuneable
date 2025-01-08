@@ -36,48 +36,50 @@ const deriveCodeFromPartyId = (partyId) => {
 
 // Create a new party
 router.post('/', authMiddleware, async (req, res) => {
-    try {
-        const { name, devUserId: explicitDevUserId } = req.body;
+  try {
+      const { name, devUserId: explicitDevUserId } = req.body;
 
-        // Determine the host ID
-        let userId;
-        if (explicitDevUserId) {
-            userId = explicitDevUserId;
-        } else if (req.user.userId === 'dev-user') {
-            userId = devUserId;
-        } else {
-            userId = req.user.userId;
-        }
+      // Determine the host ID
+      let userId;
+      if (explicitDevUserId) {
+          userId = explicitDevUserId;
+      } else if (req.user.userId === 'dev-user') {
+          userId = devUserId;
+      } else {
+          userId = req.user.userId;
+      }
 
-        if (!isValidObjectId(userId)) {
-            return res.status(400).json({ error: 'Invalid userId format' });
-        }
+      if (!isValidObjectId(userId)) {
+          return res.status(400).json({ error: 'Invalid userId format' });
+      }
 
-        // Manually create an ObjectId
-        const objectId = new mongoose.Types.ObjectId();
+      // Manually create an ObjectId
+      const objectId = new mongoose.Types.ObjectId();
 
-        // Derive the partyCode from the manually created ObjectId
-        const partyCode = deriveCodeFromPartyId(objectId.toString());
+      // Derive the partyCode from the manually created ObjectId
+      const partyCode = deriveCodeFromPartyId(objectId.toString());
 
-        // Create the Party object with the manually created ObjectId
-        const party = new Party({
-            _id: objectId, // Set the _id explicitly
-            name,
-            host: userId,
-            partyCode, // Include the partyCode during creation
-            songs: [],
-        });
+      // Create the Party object with the manually created ObjectId
+      const party = new Party({
+          _id: objectId, // Set the _id explicitly
+          name,
+          host: userId,
+          partyCode, // Include the partyCode during creation
+          songs: [],
+          attendees: [userId], // Add the host as the first attendee
+          bidders: [],         // Initialize bidders as empty
+      });
 
-        // Save the party
-        await party.save();
+      // Save the party
+      await party.save();
 
-        console.log(`Generated partyCode: ${partyCode}`);
-        broadcast(party._id, { message: 'New party created', party });
+      console.log(`Generated partyCode: ${partyCode}`);
+      broadcast(party._id, { message: 'New party created', party });
 
-        res.status(201).json({ message: 'Party created successfully', party });
-    } catch (err) {
-        handleError(res, err, 'Error creating party');
-    }
+      res.status(201).json({ message: 'Party created successfully', party });
+  } catch (err) {
+      handleError(res, err, 'Error creating party');
+  }
 });
 
 // Fetch all parties
@@ -94,30 +96,62 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 
-
 // Fetch party details and its songs sorted by bids
 router.get('/:id/details', authMiddleware, async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+      const { id } = req.params;
 
-        if (!isValidObjectId(id)) {
-            return res.status(400).json({ error: 'Invalid Party ID' });
-        }
+      if (!isValidObjectId(id)) {
+          return res.status(400).json({ error: 'Invalid Party ID' });
+      }
 
-        const party = await Party.findById(id).populate({
-            path: 'songs',
-            model: 'Song', // Explicitly use the Song model
-        });
+      const party = await Party.findById(id)
+          .populate({
+              path: 'songs',
+              model: 'Song', // Populate the songs array using the Song model
+          })
+          .populate({
+              path: 'attendees',
+              model: 'User', // Populate the attendees array using the User model
+              select: 'username', // Only include the username field
+          });
 
-        if (!party) return res.status(404).json({ error: 'Party not found' });
+      if (!party) return res.status(404).json({ error: 'Party not found' });
 
-        res.status(200).json({
-            message: 'Party details fetched successfully',
-            party,
-        });
-    } catch (err) {
-        handleError(res, err, 'Error fetching party details');
+      res.status(200).json({
+          message: 'Party details fetched successfully',
+          party,
+      });
+  } catch (err) {
+      handleError(res, err, 'Error fetching party details');
+  }
+});
+
+// Join a party
+router.post('/:id/join', authMiddleware, async (req, res) => {
+  const { id } = req.params; // Party ID
+  const userId = req.user.id; // Authenticated user's ID
+
+  try {
+    // Find the party by ID
+    const party = await Party.findById(id);
+    if (!party) {
+      return res.status(404).json({ error: 'Party not found' });
     }
+
+    // Check if the user is already in the attendees list
+    if (party.attendees.includes(userId)) {
+      return res.status(400).json({ error: 'User already joined the party' });
+    }
+
+    // Add the user to the attendees array
+    party.attendees.push(userId);
+    await party.save();
+
+    res.status(200).json({ message: 'Successfully joined the party', party });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to join the party' });
+  }
 });
 
 // Add a song to a party

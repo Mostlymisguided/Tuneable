@@ -1,14 +1,14 @@
-// models/party.js
 const mongoose = require('mongoose');
 
-// Define the party schema
 const PartySchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    songs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }], // Reference songs instead of embedding
-    currentSong: { type: mongoose.Schema.Types.ObjectId, ref: 'Song' },
-    partyCode: { type: String, unique: true, required: true }, // Renamed from 'code' to 'partyCode'
-}, { timestamps: true });
+  name: { type: String, required: true },
+  host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  partyCode: { type: String, required: true, unique: true },
+  attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track attendees
+  bidders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],   // Track bidders
+  songs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
 
-module.exports = mongoose.models.Party || mongoose.model('Party', PartySchema);
+module.exports = mongoose.model('Party', PartySchema);

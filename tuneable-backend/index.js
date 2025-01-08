@@ -6,9 +6,9 @@ const cors = require('cors');
 
 const app = express();
 
-const searchRoutes = require('./routes/search'); // Import search routes
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const partyRoutes = require('./routes/partyRoutes'); // Unified party and playlist functionality
+const searchRoutes = require('./routes/search'); // Import search routes
 const songRoutes = require('./routes/songRoutes'); // Import song routes
 
 // Use environment variable for port or default to 8000
