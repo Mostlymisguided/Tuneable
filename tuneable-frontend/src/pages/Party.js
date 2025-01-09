@@ -4,15 +4,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SongCard from '../components/SongCard';
 import NewRequest from '../components/NewRequest';
 import Footer from '../components/Footer';
+import WebPlayer from '../components/WebPlayer';
 
 const Party = () => {
     const [partyName, setPartyName] = useState('Party');
     const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
-    const [attendees, setAttendees] = useState([]); // State to track attendees
+    const [attendees, setAttendees] = useState([]);
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [isJoined, setIsJoined] = useState(false); // Track if the user has joined the party
+    const [isJoined, setIsJoined] = useState(false);
     const { partyId } = useParams();
     const navigate = useNavigate();
 
@@ -27,10 +28,10 @@ const Party = () => {
                 }
             );
             const party = response.data.party;
-            console.log('Fetched Party Details:', party); // Debug attendees
+            console.log('Fetched Party Details:', party);
             setPartyName(party.name || 'Party');
             setSongs(party.songs || []);
-            setAttendees(party.attendees || []); // Check if attendees include null
+            setAttendees(party.attendees || []);
             setCurrentSong(party.songs[0] || {});
             setIsJoined(party.attendees?.some((attendee) => attendee?._id === response.data.userId));
             setErrorMessage(null);
@@ -40,7 +41,7 @@ const Party = () => {
         } finally {
             setLoading(false);
         }
-    }, [partyId]);    
+    }, [partyId]);
 
     const handleJoinParty = async () => {
         try {
@@ -55,8 +56,8 @@ const Party = () => {
                 }
             );
             alert(response.data.message);
-            setIsJoined(true); // Update the state to indicate the user has joined
-            fetchPartyDetails(); // Refresh details to update attendees
+            setIsJoined(true);
+            fetchPartyDetails();
         } catch (error) {
             console.error('Error joining party:', error);
             setErrorMessage(error.response?.data?.error || 'Failed to join the party. Please try again later.');
@@ -125,6 +126,12 @@ const Party = () => {
             </div>
             <NewRequest refreshPlaylist={fetchPartyDetails} />
             <Footer currentSong={currentSong} />
+            {currentSong?.url && (
+                <div className="player-container">
+                    <h3>Now Playing</h3>
+                    <WebPlayer url={currentSong.url} />
+                </div>
+            )}
         </div>
     );
 };

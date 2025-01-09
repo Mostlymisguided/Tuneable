@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import axios from 'axios';
 
 const Register = () => {
-  const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    city: '', // Add city to formData
+    country: '', // Add country to formData
+  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -14,7 +20,18 @@ const Register = () => {
     e.preventDefault();
     setError('');
     try {
-      const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/users/register`, formData);
+      const response = await axios.post(
+        `${process.env.REACT_APP_BACKEND_URL}/api/users/register`,
+        {
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          homeLocation: {
+            city: formData.city,
+            country: formData.country,
+          }, // Include homeLocation
+        }
+      );
       console.log('Registration successful:', response.data);
       setSuccess(true);
     } catch (err) {
@@ -59,6 +76,24 @@ const Register = () => {
             value={formData.password}
             onChange={handleChange}
             required
+          />
+        </div>
+        <div>
+          <label>City (optional):</label>
+          <input
+            type="text"
+            name="city"
+            value={formData.city}
+            onChange={handleChange}
+          />
+        </div>
+        <div>
+          <label>Country (optional):</label>
+          <input
+            type="text"
+            name="country"
+            value={formData.country}
+            onChange={handleChange}
           />
         </div>
         <button type="submit">Register</button>

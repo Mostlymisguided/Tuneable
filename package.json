@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "react-player": "^2.16.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",

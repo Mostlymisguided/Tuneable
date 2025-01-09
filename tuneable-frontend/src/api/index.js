@@ -46,5 +46,5 @@ export const searchYouTube = (query) => {
   });
 };
 
-// Export the API instance for use in other components
+// Export the API instance as the default export
 export default API;
