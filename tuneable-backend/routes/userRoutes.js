@@ -12,7 +12,7 @@ const SECRET_KEY = process.env.JWT_SECRET || 'bananasarebluewhenpigsfly'; // Use
 // POST: Register a new user
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, homeLocation } = req.body;
 
     // Check if email or username already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -21,7 +21,12 @@ router.post('/register', async (req, res) => {
     }
 
     // Create a new user instance
-    const user = new User({ username, email, password });
+    const user = new User({
+      username,
+      email,
+      password,
+      homeLocation: homeLocation || {}, // Optional homeLocation field
+    });
     await user.save(); // The pre('save') hook will hash the password
 
     res.status(201).json({
@@ -30,6 +35,7 @@ router.post('/register', async (req, res) => {
         _id: user._id,
         username: user.username,
         email: user.email,
+        homeLocation: user.homeLocation, // Include homeLocation in response
       },
     });
   } catch (error) {

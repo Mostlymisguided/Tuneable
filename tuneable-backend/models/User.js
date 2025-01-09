@@ -7,6 +7,10 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   avatar: { type: String, default: '' }, // URL for the user's avatar
   bio: { type: String, default: '' },    // Short user bio or description
+  homeLocation: {
+    city: { type: String, default: null },
+    country: { type: String, default: null },
+},
   preferences: {                         // User-specific preferences
     theme: { type: String, default: 'light' }, // e.g., light or dark mode
     notifications: { type: Boolean, default: true } // Enable/disable notifications
