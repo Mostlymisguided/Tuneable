@@ -45,7 +45,7 @@ const Party = () => {
 
     const handleJoinParty = async () => {
         try {
-            const token = localStorage.getItem('token') || process.env.REACT_APP_DEV_TOKEN;
+            const token = localStorage.getItem('authToken') || process.env.REACT_APP_DEV_TOKEN;
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/join`,
                 {},

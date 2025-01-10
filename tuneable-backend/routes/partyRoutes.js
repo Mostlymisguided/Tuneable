@@ -31,51 +31,53 @@ const deriveCodeFromPartyId = () =>
  * Access: Protected (requires valid token)
  */
 router.post('/', authMiddleware, async (req, res) => {
-    try {
-        const { name, devUserId: explicitDevUserId } = req.body;
+  try {
+      const { name } = req.body; // Extract only the name from the request body
 
-        // Determine the host ID based on the environment and token
-        let userId = req.user.userId;
+      // Validate the party name
+      if (!name) {
+          return res.status(400).json({ error: 'Party name is required' });
+      }
 
-        // In development mode, allow `devUserId` or explicit override
-        if (process.env.NODE_ENV !== 'production') {
-            if (req.user.userId === 'dev-user') {
-                userId = devUserId;
-            } else if (explicitDevUserId) {
-                userId = explicitDevUserId;
-            }
-        }
+      // Use the userId from the token
+      const userId = req.user.userId;
 
-        // Validate the derived `userId`
-        if (!isValidObjectId(userId)) {
-            return res.status(400).json({ error: 'Invalid userId format' });
-        }
+      console.log (userId);
 
-        // Generate a unique ObjectId and party code
-        const objectId = new mongoose.Types.ObjectId();
-        const partyCode = deriveCodeFromPartyId();
+      // Validate the userId from the token
+      if (!isValidObjectId(userId)) {
+          return res.status(400).json({ error: 'Invalid userId' });
+      }
 
-        // Create and save the new party document
-        const party = new Party({
-            _id: objectId,
-            name,
-            host: userId,
-            partyCode,
-            songs: [],
-            attendees: [userId], // Add the host as the first attendee
-            bidders: [],
-        });
+      // Generate a unique ObjectId and party code
+      const objectId = new mongoose.Types.ObjectId();
+      const partyCode = deriveCodeFromPartyId();
 
-        await party.save();
+      // Create and save the new party document
+      const party = new Party({
+          _id: objectId,
+          name,
+          host: userId,
+          partyCode,
+          songs: [],
+          attendees: [userId], // Add the host as the first attendee
+          bidders: [],
+      });
 
-        // Broadcast the creation of the new party
-        console.log(`Generated partyCode: ${partyCode}`);
-        broadcast(party._id, { message: 'New party created', party });
+      await party.save();
 
-        res.status(201).json({ message: 'Party created successfully', party });
-    } catch (err) {
-        handleError(res, err, 'Error creating party');
-    }
+      // Broadcast the creation of the new party
+      try {
+          broadcast(party._id, { message: 'New party created', party });
+      } catch (broadcastErr) {
+          console.error('Error broadcasting party creation:', broadcastErr.message);
+      }
+
+      res.status(201).json({ message: 'Party created successfully', party });
+  } catch (err) {
+      console.error('Error creating party:', err.message);
+      res.status(500).json({ error: 'Error creating party', details: err.message });
+  }
 });
 
 /**
