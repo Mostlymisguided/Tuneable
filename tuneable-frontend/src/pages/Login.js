@@ -4,6 +4,7 @@ import axios from 'axios';
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Add loading state
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -12,14 +13,26 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true); // Show loading state
     try {
       const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/users/login`, formData);
+
       console.log('Login successful:', response.data);
       const { token } = response.data;
-      localStorage.setItem('authToken', token); // Save token for authenticated requests
-      window.location.href = '/'; // Redirect to home
+
+      // Save token in localStorage
+      localStorage.setItem('authToken', token); // Use a consistent key ('token')
+
+      // Set the default authorization header for Axios
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      alert('Login successful!'); // Notify the user
+      window.location.href = '/'; // Redirect to home page or dashboard
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      console.error('Login error:', err.response?.data || err.message);
+      setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false); // Hide loading state
     }
   };
 
@@ -48,7 +61,9 @@ const Login = () => {
             required
           />
         </div>
-        <button type="submit">Login</button>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Logging in...' : 'Login'}
+        </button>
       </form>
     </div>
   );

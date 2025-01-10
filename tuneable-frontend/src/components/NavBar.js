@@ -11,9 +11,12 @@ const NavBar = () => {
 
   // Handle logout
   const handleLogout = () => {
+    console.log('AuthToken before logout:', localStorage.getItem('authToken')); // Log current token
     localStorage.removeItem('authToken'); // Clear token from localStorage
+    console.log('AuthToken after logout:', localStorage.getItem('authToken')); // Should log null
     navigate('/login'); // Redirect to login page
-  };
+};
+
 
   return (
     <nav className="navbar">

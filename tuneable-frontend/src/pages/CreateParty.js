@@ -17,6 +17,16 @@ const CreateParty = () => {
             return;
         }
 
+        // Retrieve token from localStorage
+        const token = localStorage.getItem('authToken'); // Ensure you're using the correct key
+        console.log('AuthToken for party creation:', token); // Debug log
+
+        if (!token) {
+            alert('You must be logged in to create a party.');
+            window.location.href = '/login'; // Redirect to login page
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -25,13 +35,14 @@ const CreateParty = () => {
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties`,
                 { name: partyName },
                 {
-                    headers: { Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}` },
+                    headers: { Authorization: `Bearer ${token}` }, // Use the retrieved token
                 }
             );
 
             const { party } = response.data; // Extract party object
             const partyId = party._id; // Get partyId
             const partyCode = party.partyCode; // Get the updated partyCode field
+
             localStorage.setItem('partyId', partyId); // Store partyId in local storage
             alert(`Party "${partyName}" created successfully! Party Code: ${partyCode}`); // Include partyCode in the alert
             window.location.href = `/party/${partyId}`; // Redirect to the party page

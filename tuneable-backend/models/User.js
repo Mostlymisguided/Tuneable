@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save hook to hash the password
-userSchema.pre('save', async function(next) {
+/* userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -28,7 +28,7 @@ userSchema.pre('save', async function(next) {
   } catch (err) {
     next(err);
   }
-});
+}); */
 
 // Method to compare passwords
 userSchema.methods.comparePassword = async function(candidatePassword) {
