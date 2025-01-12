@@ -36,8 +36,9 @@ router.post('/', authMiddleware, async (req, res) => {
 
       // Validate the party name
       if (!name) {
-          return res.status(400).json({ error: 'Party name is required' });
-      }
+          return res.status(400).json({ error: 'Party name is required' });     
+      
+        }
 
       // Use the userId from the token
       const userId = req.user.userId;

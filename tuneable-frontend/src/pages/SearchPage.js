@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useSearchParams } from 'react-router-dom';
+import debounce from 'lodash.debounce';
 
 const SearchPage = () => {
     const [searchParams] = useSearchParams();
-    const partyId = searchParams.get('partyId'); // Extract partyId from query params
+    const partyId = searchParams.get('partyId');
     const [results, setResults] = useState([]);
     const [query, setQuery] = useState('');
     const [nextPageToken, setNextPageToken] = useState(null);
-    const [source, setSource] = useState('youtube'); // Default to YouTube
+    const [source, setSource] = useState('youtube');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [bidAmount, setBidAmount] = useState(0.77); // Default bid amount
+    const [bidAmount, setBidAmount] = useState(0.77);
     const [devUser, setDevUser] = useState(null);
 
     useEffect(() => {
@@ -22,27 +23,30 @@ const SearchPage = () => {
         }
     }, [partyId]);
 
-    // Decode DEV_TOKEN and set devUser
     useEffect(() => {
         const token = process.env.REACT_APP_DEV_TOKEN;
         if (token) {
-            const decoded = jwtDecode(token);
-            const devUserFromToken = {
-                id: decoded.userId,
-                role: decoded.role,
-            };
-            setDevUser(devUserFromToken);
-            console.log('Decoded devUser:', devUserFromToken);
+            try {
+                const decoded = jwtDecode(token);
+                const devUserFromToken = {
+                    id: decoded.userId,
+                    role: decoded.role,
+                };
+                setDevUser(devUserFromToken);
+                console.log('Decoded devUser:', devUserFromToken);
+            } catch (err) {
+                console.error('Invalid DEV_TOKEN:', err);
+            }
         } else {
             console.error('DEV_TOKEN is missing.');
         }
     }, []);
 
-    const fetchResults = async (pageToken = null) => {
+    const fetchResults = useCallback(async (pageToken = null) => {
         if (!query) return;
         setLoading(true);
         setError(null);
-
+    
         try {
             const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
                 params: { query, source, pageToken },
@@ -50,7 +54,7 @@ const SearchPage = () => {
                     Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
                 },
             });
-
+    
             const { videos = [] } = response.data;
             const mappedResults = videos.map((video) => ({
                 id: video.id,
@@ -60,7 +64,7 @@ const SearchPage = () => {
                 thumbnail: video.thumbnail,
                 channelTitle: video.channelTitle,
             }));
-
+    
             setResults(pageToken ? [...results, ...mappedResults] : mappedResults);
             setNextPageToken(response.data.nextPageToken || null);
         } catch (err) {
@@ -69,7 +73,23 @@ const SearchPage = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [query, source, results]);
+    
+
+    // Debounce the fetchResults function
+    useEffect(() => {
+        const debouncedFetchResults = debounce(() => {
+            fetchResults();
+        }, 300);
+    
+        if (query) {
+            debouncedFetchResults();
+        }
+    
+        return () => {
+            debouncedFetchResults.cancel();
+        };
+    }, [query, fetchResults]); // Add fetchResults to the dependency array     
 
     const handleBid = async (song) => {
         if (!devUser) {
@@ -141,37 +161,30 @@ const SearchPage = () => {
             {error && <p className="error-message">Error: {error}</p>}
 
             <div className="results">
-                <h2>Results...</h2>
                 <ul>
-                    {results.length > 0 ? (
-                        results.map((item) => (
-                            <li key={item.id}>
-                                <div className="result-item">
-                                    <img src={item.thumbnail} alt={item.title} className="thumbnail" />
-                                    <div className="song-details">
-                                        <h4>{item.title}</h4>
-                                        <p>{item.channelTitle}</p>
-                                    </div>
-                                    <div className="bid-section">
-                                        <input
-                                            type="number"
-                                            value={bidAmount}
-                                            onChange={(e) => setBidAmount(Number(e.target.value))}
-                                        />
-                                        <button onClick={() => handleBid(item)}>+ Bid</button>
-                                    </div>
+                    {results.map((item) => (
+                        <li key={item.id}>
+                            <div className="result-item">
+                                <img src={item.thumbnail} alt={item.title} />
+                                <div>
+                                    <h4>{item.title}</h4>
+                                    <p>{item.channelTitle}</p>
                                 </div>
-                            </li>
-                        ))
-                    ) : (
-                        <p>No results found. Try a different search query.</p>
-                    )}
+                                <input
+                                    type="number"
+                                    value={bidAmount}
+                                    onChange={(e) => setBidAmount(Number(e.target.value))}
+                                />
+                                <button onClick={() => handleBid(item)}>+ Bid</button>
+                            </div>
+                        </li>
+                    ))}
                 </ul>
             </div>
 
             {nextPageToken && (
-                <button className="load-more" onClick={() => fetchResults(nextPageToken)} disabled={loading}>
-                    {loading ? 'Loading...' : 'Load More'}
+                <button onClick={() => fetchResults(nextPageToken)} disabled={loading}>
+                    Load More
                 </button>
             )}
         </div>

@@ -7,5 +7,10 @@
   "devDependencies": {
     "jest": "^29.7.0",
     "supertest": "^7.0.0"
-  }
+  },
+    "scripts": {
+      "start": "npm run start:backend & npm run start:frontend",
+      "start:backend": "cd tuneable-backend && npm start",
+      "start:frontend": "cd tuneable-frontend && npm start"
+    }
 }

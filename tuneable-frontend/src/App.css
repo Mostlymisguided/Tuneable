@@ -284,3 +284,20 @@ footer {
 .player-container h3 {
   margin-bottom: 10px;
 }
+
+.web-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.player-controls {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-controls input[type='range'] {
+  width: 100px;
+}
