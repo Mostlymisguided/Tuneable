@@ -231,6 +231,10 @@ router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
         song.bid = song.bidders.reduce((sum, bidder) => sum + bidder.amount, 0);
         await song.save();
 
+        // Sort bidders array by bid amount (descending)
+        const sortedBidders = song.bidders.sort((a, b) => b.amount - a.amount);
+        console.log('Aggregated and Sorted Bidders:', sortedBidders);
+
         // Broadcast the updated bid information
         broadcast(partyId, {
             type: 'BID_UPDATED',
@@ -238,12 +242,13 @@ router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
             bidAmount,
             userId,
             currentBid: song.bid,
+            sortedBidders,
         });
 
         res.status(200).json({
             message: 'Bid placed successfully!',
             currentBid: song.bid,
-            bidders: song.bidders,
+            bidders: sortedBidders,
         });
     } catch (err) {
         console.error('Error placing bid:', err.message);
