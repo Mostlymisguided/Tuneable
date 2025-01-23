@@ -10,17 +10,25 @@ const Parties = () => {
 
   useEffect(() => {
     const fetchParties = async () => {
+      const token = localStorage.getItem('token'); // Retrieve the token from localStorage
+
+      if (!token) {
+        setError('You are not authorized. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/parties`, {
           headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
+            Authorization: `Bearer ${token}`, // Use the actual token
           },
         });
         setParties(response.data.parties);
         setError('');
       } catch (err) {
-        setError('Failed to load parties. Please try again.');
         console.error('Error fetching parties:', err);
+        setError('Failed to load parties. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -80,7 +88,7 @@ const Parties = () => {
           >
             <div>
               <h2>{party.name}</h2>
-              <p>Host: {party.host?.username || 'Unknown User'}</p> {/* Fixed host rendering */}
+              <p>Host: {party.host?.username || 'Unknown User'}</p>
               <p>Party Code: {party.partyCode || 'No code available'}</p>
               <button
                 onClick={() => goToParty(party._id)}

@@ -1,62 +1,70 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../App.css'; // Import a CSS file for styling
+import axios from 'axios';
 
 const NavBar = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-  // Check if the user is authenticated
-  const isAuthenticated = !!localStorage.getItem('authToken');
+    // Check if the user is authenticated
+    const isAuthenticated = !!localStorage.getItem('token');
 
-  // Handle logout
-  const handleLogout = () => {
-    console.log('AuthToken before logout:', localStorage.getItem('authToken')); // Log current token
-    localStorage.removeItem('authToken'); // Clear token from localStorage
-    console.log('AuthToken after logout:', localStorage.getItem('authToken')); // Should log null
-    navigate('/login'); // Redirect to login page
-};
+    // Handle logout
+    const handleLogout = () => {
+        console.log('Token before logout:', localStorage.getItem('token')); // Log current token
+        localStorage.removeItem('token'); // Clear token from localStorage
+        delete axios.defaults.headers.common['Authorization']; // Clear global axios Authorization header
+        console.log('Token after logout:', localStorage.getItem('token')); // Should log null
+        navigate('/login'); // Redirect to login page
+    };
 
+    // Determine if a link is active
+    const isActive = (path) => (location.pathname === path ? 'active' : '');
 
-  return (
-    <nav className="navbar">
-      <ul className="nav-links">
-        <li className={location.pathname === '/' ? 'active' : ''}>
-          <Link to="/">Home</Link>
-        </li>
-        {isAuthenticated ? (
-          <>
-            <li className={location.pathname === '/parties' ? 'active' : ''}>
-              <Link to="/parties">Parties</Link>
-            </li>
-            <li className={location.pathname === '/search' ? 'active' : ''}>
-              <Link to="/search">Search</Link>
-            </li>
-            <li className={location.pathname === '/create-party' ? 'active' : ''}>
-              <Link to="/create-party">Create Party</Link>
-            </li>
-            <li className={location.pathname === '/profile' ? 'active' : ''}>
-              <Link to="/profile">Profile</Link>
-            </li>
-            <li>
-              <button className="logout-button" onClick={handleLogout}>
-                Logout
-              </button>
-            </li>
-          </>
-        ) : (
-          <>
-            <li className={location.pathname === '/register' ? 'active' : ''}>
-              <Link to="/register">Register</Link>
-            </li>
-            <li className={location.pathname === '/login' ? 'active' : ''}>
-              <Link to="/login">Login</Link>
-            </li>
-          </>
-        )}
-      </ul>
-    </nav>
-  );
+    return (
+        <nav className="navbar">
+            <ul className="nav-links">
+                <li className={isActive('/')}>
+                    <Link to="/">Home</Link>
+                </li>
+                {isAuthenticated ? (
+                    <>
+                        <li className={isActive('/parties')}>
+                            <Link to="/parties">Parties</Link>
+                        </li>
+                        <li className={isActive('/search')}>
+                            <Link to="/search">Search</Link>
+                        </li>
+                        <li className={isActive('/create-party')}>
+                            <Link to="/create-party">Create Party</Link>
+                        </li>
+                        <li className={isActive('/profile')}>
+                            <Link to="/profile">Profile</Link>
+                        </li>
+                        <li>
+                            <button
+                                className="logout-button"
+                                onClick={handleLogout}
+                                aria-label="Logout"
+                            >
+                                Logout
+                            </button>
+                        </li>
+                    </>
+                ) : (
+                    <>
+                        <li className={isActive('/register')}>
+                            <Link to="/register">Register</Link>
+                        </li>
+                        <li className={isActive('/login')}>
+                            <Link to="/login">Login</Link>
+                        </li>
+                    </>
+                )}
+            </ul>
+        </nav>
+    );
 };
 
 export default NavBar;
