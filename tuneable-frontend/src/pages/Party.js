@@ -20,13 +20,19 @@ const Party = () => {
     const fetchPartyDetails = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token') || process.env.REACT_APP_DEV_TOKEN;
+            const token = localStorage.getItem('token'); // Get the token from localStorage
+
+            if (!token) {
+                throw new Error('Unauthorized: No token provided.');
+            }
+
             const response = await axios.get(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`,
                 {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: { Authorization: `Bearer ${token}` }, // Use the token from localStorage
                 }
             );
+
             const party = response.data.party;
             console.log('Fetched Party Details:', party);
             setPartyName(party.name || 'Party');
@@ -45,16 +51,22 @@ const Party = () => {
 
     const handleJoinParty = async () => {
         try {
-            const token = localStorage.getItem('authToken') || process.env.REACT_APP_DEV_TOKEN;
+            const token = localStorage.getItem('token'); // Use the token from localStorage
+
+            if (!token) {
+                throw new Error('Unauthorized: No token provided.');
+            }
+
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/join`,
                 {},
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${token}`, // Use the token from localStorage
                     },
                 }
             );
+
             alert(response.data.message);
             setIsJoined(true);
             fetchPartyDetails();

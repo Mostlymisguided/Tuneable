@@ -101,7 +101,7 @@ router.post(
       const token = jwt.sign(
         { userId: user._id, email: user.email, username: user.username, role: 'user' },
         SECRET_KEY,
-        { expiresIn: '7d' }
+        { expiresIn: '24h' }
       );
       console.log('Generated token:', token);
 

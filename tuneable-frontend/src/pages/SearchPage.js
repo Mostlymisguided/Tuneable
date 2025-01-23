@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
 import { useSearchParams } from 'react-router-dom';
 import debounce from 'lodash.debounce';
 
@@ -14,7 +13,9 @@ const SearchPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [bidAmount, setBidAmount] = useState(0.77);
-    const [devUser, setDevUser] = useState(null);
+
+    // Fetch token from localStorage
+    const token = localStorage.getItem('token');
 
     useEffect(() => {
         console.log("Party ID:", partyId);
@@ -23,80 +24,58 @@ const SearchPage = () => {
         }
     }, [partyId]);
 
-    useEffect(() => {
-        const token = process.env.REACT_APP_DEV_TOKEN;
-        if (token) {
-            try {
-                const decoded = jwtDecode(token);
-                const devUserFromToken = {
-                    id: decoded.userId,
-                    role: decoded.role,
-                };
-                setDevUser(devUserFromToken);
-                console.log('Decoded devUser:', devUserFromToken);
-            } catch (err) {
-                console.error('Invalid DEV_TOKEN:', err);
-            }
-        } else {
-            console.error('DEV_TOKEN is missing.');
-        }
-    }, []);
+    const fetchResults = useCallback(
+        async (pageToken = null) => {
+            if (!query) return;
+            setLoading(true);
+            setError(null);
 
-    const fetchResults = useCallback(async (pageToken = null) => {
-        if (!query) return;
-        setLoading(true);
-        setError(null);
-    
-        try {
-            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
-                params: { query, source, pageToken },
-                headers: {
-                    Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
-                },
-            });
-    
-            const { videos = [] } = response.data;
-            const mappedResults = videos.map((video) => ({
-                id: video.id,
-                url: video.url || `https://www.youtube.com/watch?v=${video.id}`,
-                platform: 'youtube',
-                title: video.title,
-                thumbnail: video.thumbnail,
-                channelTitle: video.channelTitle,
-            }));
-    
-            setResults(pageToken ? [...results, ...mappedResults] : mappedResults);
-            setNextPageToken(response.data.nextPageToken || null);
-        } catch (err) {
-            console.error('Error fetching results:', err);
-            setError(err.response?.data?.error || 'Failed to fetch results. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    }, [query, source, results]);
-    
+            try {
+                const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
+                    params: { query, source, pageToken },
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                const { videos = [] } = response.data;
+                const mappedResults = videos.map((video) => ({
+                    id: video.id,
+                    url: video.url || `https://www.youtube.com/watch?v=${video.id}`,
+                    platform: 'youtube',
+                    title: video.title,
+                    thumbnail: video.thumbnail,
+                    channelTitle: video.channelTitle,
+                }));
+
+                setResults(pageToken ? [...results, ...mappedResults] : mappedResults);
+                setNextPageToken(response.data.nextPageToken || null);
+            } catch (err) {
+                console.error('Error fetching results:', err);
+                setError(err.response?.data?.error || 'Failed to fetch results. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        },
+        [query, source, results, token]
+    );
 
     // Debounce the fetchResults function
     useEffect(() => {
         const debouncedFetchResults = debounce(() => {
             fetchResults();
         }, 300);
-    
+
         if (query) {
             debouncedFetchResults();
         }
-    
+
         return () => {
             debouncedFetchResults.cancel();
         };
-    }, [query, fetchResults]); // Add fetchResults to the dependency array     
+    }, [query, fetchResults]);
 
     const handleBid = async (song) => {
-        if (!devUser) {
-            console.error('Dev user not loaded yet.');
-            return;
-        }
-
         try {
             const payload = {
                 title: song.title,
@@ -104,7 +83,6 @@ const SearchPage = () => {
                 platform: song.platform,
                 url: song.url,
                 partyId: partyId,
-                userId: devUser.id,
                 bidAmount: bidAmount,
                 timeExecuted: new Date().toISOString(),
             };
@@ -116,7 +94,7 @@ const SearchPage = () => {
                 payload,
                 {
                     headers: {
-                        Authorization: `Bearer ${process.env.REACT_APP_DEV_TOKEN}`,
+                        Authorization: `Bearer ${token}`,
                     },
                 }
             );
@@ -124,6 +102,7 @@ const SearchPage = () => {
             console.log('Song added successfully:', response.data);
         } catch (error) {
             console.error('Error adding song to queue:', error.response?.data || error.message);
+            setError('Failed to add song to the queue. Please try again.');
         }
     };
 
