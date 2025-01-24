@@ -18,11 +18,12 @@ const songSchema = new mongoose.Schema({
     },
     url: { type: String, required: true },
     bid: { type: Number, default: 0 },
-    bidders: [
+    bids: [
         {
-            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-            username: { type: String }, // Add username to bidders array
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            username: { type: String, required: true }, // Add username to bids array
             amount: { type: Number, required: true },
+            timestamp: { type: Date, default: Date.now }, // Add timestamp for bids
         },
     ],
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
