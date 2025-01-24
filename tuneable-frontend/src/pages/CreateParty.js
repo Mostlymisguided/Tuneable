@@ -18,8 +18,8 @@ const CreateParty = () => {
         }
 
         // Retrieve token from localStorage
-        const token = localStorage.getItem('authToken'); // Ensure you're using the correct key
-        console.log('AuthToken for party creation:', token); // Debug log
+        const token = localStorage.getItem('token'); // Ensure you're using the correct key
+        console.log('Token for party creation:', token); // Debug log
 
         if (!token) {
             alert('You must be logged in to create a party.');

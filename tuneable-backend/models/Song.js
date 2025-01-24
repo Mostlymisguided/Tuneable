@@ -26,6 +26,7 @@ const songSchema = new mongoose.Schema({
             timestamp: { type: Date, default: Date.now }, // Add timestamp for bids
         },
     ],
+    globalBidValue: { type: Number, default: 0 }, // Tracks total bids globally
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },
 });

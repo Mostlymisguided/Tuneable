@@ -20,8 +20,7 @@ const Party = () => {
     const fetchPartyDetails = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token'); // Get the token from localStorage
-
+            const token = localStorage.getItem('token');
             if (!token) {
                 throw new Error('Unauthorized: No token provided.');
             }
@@ -29,14 +28,22 @@ const Party = () => {
             const response = await axios.get(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`,
                 {
-                    headers: { Authorization: `Bearer ${token}` }, // Use the token from localStorage
+                    headers: { Authorization: `Bearer ${token}` },
                 }
             );
 
             const party = response.data.party;
             console.log('Fetched Party Details:', party);
+
+            if (party.songs.length > 0 && typeof party.songs[0] === 'string') {
+                console.error('Error: Songs are not populated. Ensure backend provides full song objects.');
+                throw new Error('Songs are not populated correctly.');
+            }
+
+            console.log('Fetched Songs:', party.songs);
+
             setPartyName(party.name || 'Party');
-            setSongs(party.songs || []);
+            setSongs(party.songs || []); // Ensure songs are full objects
             setAttendees(party.attendees || []);
             setCurrentSong(party.songs[0] || {});
             setIsJoined(party.attendees?.some((attendee) => attendee?._id === response.data.userId));
@@ -51,8 +58,7 @@ const Party = () => {
 
     const handleJoinParty = async () => {
         try {
-            const token = localStorage.getItem('token'); // Use the token from localStorage
-
+            const token = localStorage.getItem('token');
             if (!token) {
                 throw new Error('Unauthorized: No token provided.');
             }
@@ -61,9 +67,7 @@ const Party = () => {
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/join`,
                 {},
                 {
-                    headers: {
-                        Authorization: `Bearer ${token}`, // Use the token from localStorage
-                    },
+                    headers: { Authorization: `Bearer ${token}` },
                 }
             );
 
@@ -112,21 +116,24 @@ const Party = () => {
                     )}
                     <div className="playlist">
                         {songs.length > 0 ? (
-                            songs.map((song, index) => (
-                                <SongCard
-                                    key={song._id}
-                                    song={song}
-                                    rank={index + 1}
-                                    partyId={partyId}
-                                    onBidPlaced={(songId, bidAmount) => {
-                                        setSongs((prevSongs) =>
-                                            prevSongs.map((s) =>
-                                                s._id === songId ? { ...s, bid: bidAmount } : s
-                                            )
-                                        );
-                                    }}
-                                />
-                            ))
+                            songs.map((song, index) => {
+                                console.log('Passing song to SongCard:', song);
+                                return (
+                                    <SongCard
+                                        key={song._id} // Ensure unique key
+                                        song={song}
+                                        rank={index + 1}
+                                        partyId={partyId}
+                                        onBidPlaced={(songId, bidAmount) => {
+                                            setSongs((prevSongs) =>
+                                                prevSongs.map((s) =>
+                                                    s._id === songId ? { ...s, bid: bidAmount } : s
+                                                )
+                                            );
+                                        }}
+                                    />
+                                );
+                            })
                         ) : (
                             <p>No songs in the playlist yet. Be the first to add one!</p>
                         )}
