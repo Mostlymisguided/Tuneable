@@ -5,7 +5,7 @@ const PartySchema = new mongoose.Schema({
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   partyCode: { type: String, required: true, unique: true },
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track attendees
-  bidders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],   // Track bidders
+  bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],   // Track bids
   songs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

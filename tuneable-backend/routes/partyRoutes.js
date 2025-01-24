@@ -62,7 +62,7 @@ router.post('/', authMiddleware, async (req, res) => {
           partyCode,
           songs: [],
           attendees: [userId], // Add the host as the first attendee
-          bidders: [],
+          bids: [],
       });
 
       await party.save();
@@ -183,7 +183,7 @@ router.post('/:partyId/songs', authMiddleware, async (req, res) => {
         if (!party) return res.status(404).json({ error: 'Party not found' });
 
         // Create a new song document
-        const newSong = await Song.create({ title, artist, platform, url, bidders: [] });
+        const newSong = await Song.create({ title, artist, platform, url, bids: [] });
 
         // Add the song's ObjectId to the party's songs array
         party.songs.push(newSong._id);
@@ -207,6 +207,7 @@ router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
         const { partyId, songId } = req.params;
         const { bidAmount } = req.body;
         const userId = req.user.userId;
+        const username = req.user.username; // Assuming username is available in `req.user`
 
         // Validate IDs and bid amount
         if (!isValidObjectId(userId) || !isValidObjectId(partyId) || !isValidObjectId(songId)) {
@@ -224,16 +225,19 @@ router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
         const song = await Song.findById(songId);
         if (!song) return res.status(404).json({ error: 'Song not found' });
 
-        // Add the new bid to the bidders array
-        song.bidders.push({ userId, amount: bidAmount });
+        // Initialize the `bids` array if undefined (shouldn't happen with schema changes)
+        if (!Array.isArray(song.bids)) song.bids = [];
 
-        // Calculate and update the total bid
-        song.bid = song.bidders.reduce((sum, bidder) => sum + bidder.amount, 0);
+        // Add the new bid to the `bids` array
+        song.bids.push({ userId, username, amount: bidAmount });
+
+        // Calculate the highest bid
+        song.bid = Math.max(song.bid, bidAmount);
         await song.save();
 
-        // Sort bidders array by bid amount (descending)
-        const sortedBidders = song.bidders.sort((a, b) => b.amount - a.amount);
-        console.log('Aggregated and Sorted Bidders:', sortedBidders);
+        // Sort the bids array by bid amount (descending)
+        const sortedBids = song.bids.sort((a, b) => b.amount - a.amount);
+        console.log('Aggregated and Sorted Bids:', sortedBids);
 
         // Broadcast the updated bid information
         broadcast(partyId, {
@@ -241,14 +245,15 @@ router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
             songId: song._id,
             bidAmount,
             userId,
+            username,
             currentBid: song.bid,
-            sortedBidders,
+            sortedBids,
         });
 
         res.status(200).json({
             message: 'Bid placed successfully!',
             currentBid: song.bid,
-            bidders: sortedBidders,
+            bids: sortedBids,
         });
     } catch (err) {
         console.error('Error placing bid:', err.message);
