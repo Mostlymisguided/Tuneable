@@ -18,7 +18,6 @@ const SearchPage = () => {
     const token = localStorage.getItem('token');
 
     useEffect(() => {
-        console.log("Party ID:", partyId);
         if (!partyId) {
             alert('Party ID is missing. Please return to the previous page.');
         }
@@ -60,7 +59,6 @@ const SearchPage = () => {
         [query, source, results, token]
     );
 
-    // Debounce the fetchResults function
     useEffect(() => {
         const debouncedFetchResults = debounce(() => {
             fetchResults();
@@ -78,19 +76,17 @@ const SearchPage = () => {
     const handleBid = async (song) => {
         try {
             const payload = {
+                bidAmount, // User's bid amount
                 title: song.title,
                 artist: song.channelTitle,
                 platform: song.platform,
-                url: song.url,
-                partyId: partyId,
-                bidAmount: bidAmount,
-                timeExecuted: new Date().toISOString(),
+                url: song.url, // Use URL to identify songs globally
             };
 
             console.log('Sending payload:', payload);
 
             const response = await axios.post(
-                `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/songs`,
+                `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/songs/bid`,
                 payload,
                 {
                     headers: {
@@ -99,10 +95,13 @@ const SearchPage = () => {
                 }
             );
 
-            console.log('Song added successfully:', response.data);
+            console.log('Song added/bid placed successfully:', response.data);
+
+            // Optionally, you could update the UI to reflect the new bid here
+            setError(null); // Clear any previous error
         } catch (error) {
-            console.error('Error adding song to queue:', error.response?.data || error.message);
-            setError('Failed to add song to the queue. Please try again.');
+            console.error('Error adding song or placing bid:', error.response?.data || error.message);
+            setError('Failed to add song or place bid. Please try again.');
         }
     };
 
