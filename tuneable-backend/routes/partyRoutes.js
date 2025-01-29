@@ -4,15 +4,11 @@ const crypto = require('crypto');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const Party = require('../models/Party'); // Import the Party model
-const Song = require('../models/song'); // Import the Song model
+const Song = require('../models/Song'); // Import the Song model
 const Bid = require('../models/Bid'); // Import the Bid model
 const { isValidObjectId } = require('../utils/validators'); // Utility function to validate ObjectId
 const { broadcast } = require('../utils/broadcast'); // Utility for real-time updates via WebSocket
 
-// Generate a consistent ObjectId for the dev-user in development mode
-const devUserId = new mongoose.Types.ObjectId(
-    crypto.createHash('md5').update('dev-user').digest('hex').substring(0, 24)
-);
 
 // Centralized error handler to streamline error responses
 const handleError = (res, err, message, status = 500) => {
@@ -80,25 +76,26 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
-/**
- * Route: GET /:id/details
- */
 router.get('/:id/details', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
 
-        if (!isValidObjectId(id)) {
-            return res.status(400).json({ error: 'Invalid Party ID' });
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: 'Invalid Party ID format' });
         }
 
         const party = await Party.findById(id)
             .populate({
-                path: 'songs',
+                path: 'songs.songId',
                 model: 'Song',
-                select: 'title artist platform url totalBidValue globalBidValue bids', // Include necessary fields
+                select: 'title artist coverArt sources globalBidValue bids addedBy', // ✅ Added `addedBy`
                 populate: {
-                    path: 'bids.userId',
-                    select: 'username',
+                    path: 'bids',
+                    model: 'Bid',
+                    populate: {
+                        path: 'userId',
+                        select: 'username',
+                    },
                 },
             })
             .populate({
@@ -107,27 +104,57 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 select: 'username',
             });
 
-        if (!party) return res.status(404).json({ error: 'Party not found' });
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
 
-        // Debug: Log populated songs
-        console.log('Populated Songs:', party.songs);
+        console.log('Fetched Party Details:', JSON.stringify(party, null, 2));
 
-        // Process songs
-        party.songs = party.songs.map((song) => ({
-            ...song.toObject(),
-            totalBidValue: song.bids.reduce((sum, bid) => sum + bid.amount, 0), // Sum of all bids for this party
-        }));
+        // ✅ **Flatten `songId` structure & extract platform URLs**
+        const processedSongs = party.songs.map((entry) => {
+            if (!entry.songId) return null; // Edge case: skip invalid entries
 
-        // Sort songs by totalBidValue in descending order
-        party.songs.sort((a, b) => b.totalBidValue - a.totalBidValue);
+            // ✅ Ensure `sources` is defined to avoid `.map()` errors
+            const availablePlatforms = Object.entries(entry.songId.sources || {})
+                .filter(([key, value]) => value) // Remove null values
+                .map(([key, value]) => ({ platform: key, url: value }));
+
+            return {
+                _id: entry.songId._id,
+                title: entry.songId.title,
+                artist: entry.songId.artist,
+                coverArt: entry.songId.coverArt || '/default-cover.jpg',
+                sources: availablePlatforms, // ✅ Store platform data as an array
+                globalBidValue: entry.songId.globalBidValue || 0,
+                bids: entry.songId.bids,
+                addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
+                totalBidValue: entry.songId.bids.reduce((sum, bid) => sum + bid.amount, 0),
+            };
+        }).filter(Boolean); // ✅ Remove null entries
+
+        // ✅ Sort songs by `totalBidValue` in descending order
+        processedSongs.sort((a, b) => (b.totalBidValue || 0) - (a.totalBidValue || 0));
+
+        // ✅ **Return a cleaned response (don’t overwrite `party.songs`)**
+        const responseParty = {
+            _id: party._id,
+            name: party.name,
+            host: party.host,
+            partyCode: party.partyCode,
+            attendees: party.attendees,
+            status: party.status,
+            createdAt: party.createdAt,
+            updatedAt: party.updatedAt,
+            songs: processedSongs, // ✅ Return flattened, sorted songs
+        };
 
         res.status(200).json({
             message: 'Party details fetched successfully',
-            party,
+            party: responseParty,
         });
     } catch (err) {
         console.error('Error fetching party details:', err.message);
-        res.status(500).json({ error: 'Failed to fetch party details' });
+        res.status(500).json({ error: 'Failed to fetch party details', details: err.message });
     }
 });
 
@@ -198,52 +225,66 @@ router.post('/:partyId/songs', authMiddleware, async (req, res) => {
 
 /**
  * Route: POST /:partyId/songs/bid
- * Add or bid on a song in the party's queue.
+ * Add a new song or place a bid on an existing song in the party's queue.
  * Access: Protected (requires valid token)
  */
 router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
-        const { url, bidAmount, title, artist, platform } = req.body;
-        const userId = req.user.userId; // Retrieved from the authenticated user
+        const { songId, url, title, artist, bidAmount, platform } = req.body;
+        const userId = req.user.userId;
 
-        // Validate `partyId`
         if (!mongoose.isValidObjectId(partyId)) {
             return res.status(400).json({ error: 'Invalid partyId format' });
         }
 
-        // Validate required fields in the payload
-        if (!url || bidAmount <= 0) {
-            return res.status(400).json({ error: 'Invalid payload. URL and bidAmount are required.' });
+        if (bidAmount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than 0' });
         }
 
-        // Ensure `userId` is a valid ObjectId
-        if (!mongoose.isValidObjectId(userId)) {
-            return res.status(400).json({ error: 'Invalid userId format' });
-        }
-
-        // Find the party
         const party = await Party.findById(partyId).populate('songs.songId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Find or create the song in the global database
-        let song = await Song.findOne({ url });
-        if (!song) {
-            song = new Song({ title, artist, platform, url, addedBy: userId });
-            await song.save();
+        let song;
+        if (songId) {
+            if (!mongoose.isValidObjectId(songId)) {
+                return res.status(400).json({ error: 'Invalid songId format' });
+            }
+
+            song = await Song.findById(songId).populate({
+                path: 'bids',
+                populate: {
+                    path: 'userId',
+                    select: 'username'
+                }
+            });
+
+            if (!song) {
+                return res.status(404).json({ error: 'Song not found' });
+            }
+        } else if (url && title && artist && platform) {
+            song = await Song.findOne({ [`sources.${platform}`]: url });
+            if (!song) {
+                song = new Song({
+                    title,
+                    artist,
+                    sources: { [platform]: url }, // ✅ Store URL in `sources` instead of `platform`
+                    addedBy: userId
+                });
+                await song.save();
+            }
+
+            let songEntry = party.songs.find((entry) => entry.songId?.toString() === song._id.toString());
+            if (!songEntry) {
+                party.songs.push({ songId: song._id, addedBy: userId });
+                await party.save();
+            }
+        } else {
+            return res.status(400).json({ error: 'Either songId or song metadata (url, title, artist, platform) must be provided.' });
         }
 
-        // Check if the song is already associated with the party
-        let songEntry = party.songs.find((entry) => entry.songId?.toString() === song._id.toString());
-        if (!songEntry) {
-            // If the song is not in the party, add it
-            party.songs.push({ songId: song._id, addedBy: userId });
-            await party.save();
-        }
-
-        // Create a new bid in the Bid collection
         const bid = new Bid({
             userId,
             partyId,
@@ -252,21 +293,64 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
         });
         await bid.save();
 
-        // Add the bid's ObjectId to the song's `bids` array
         song.bids.push(bid._id);
         song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
         await song.save();
 
+        // ✅ Return the full song object with platform URLs
+        const updatedSong = await Song.findById(song._id).populate({
+            path: 'bids',
+            populate: {
+                path: 'userId',
+                select: 'username'
+            }
+        });
+
         res.status(200).json({
             message: 'Bid placed successfully!',
-            songId: song._id,
-            currentBid: song.globalBidValue,
-            bids: song.bids, // These are ObjectId references
+            song: updatedSong
         });
     } catch (err) {
         console.error('Error placing bid:', err);
         res.status(500).json({ error: 'Error placing bid', details: err.message });
     }
+});
+
+
+/**
+ * Route: POST /:partyId/songs/:songId/bid
+ * Place a bid on an existing song in the party
+ * Access: Protected (requires valid token)
+ */
+router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        const { amount } = req.body; // Bid amount
+        const userId = req.user.userId; // Retrieved from the authenticated user
+
+        // Validate `partyId` and `songId`
+        if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(songId)) {
+            return res.status(400).json({ error: 'Invalid partyId or songId format' });
+        }
+
+        if (amount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        // Check if the party exists
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if the song exists in the party
+        const song = await Song.findById
+
+    } catch (err) {
+        console.error('Error placing bid:', err);
+        res.status(500).json({ error: 'Error placing bid', details: err.message });
+    }
+
 });
 
 module.exports = router;
