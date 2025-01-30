@@ -3,15 +3,58 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import API from '../api';
 
+// ✅ Function to extract YouTube thumbnail from URL
+const getYouTubeThumbnail = (youtubeUrl) => {
+  console.log("🖼 Generating thumbnail for:", youtubeUrl);
+  if (!youtubeUrl || typeof youtubeUrl !== "string") return "/default-cover.jpg";
+
+  try {
+    const urlObj = new URL(youtubeUrl);
+    const videoId = urlObj.searchParams.get("v");
+    if (!videoId) {
+      console.error("❌ Failed to extract video ID from:", youtubeUrl);
+      return "/default-cover.jpg";
+    }
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  } catch (error) {
+    console.error("❌ Invalid YouTube URL:", youtubeUrl, error);
+    return "/default-cover.jpg";
+  }
+};
+
 const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   const [bidAmount, setBidAmount] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Debugging: Log song and partyId
+  // Debugging: Log received song
   useEffect(() => {
-    console.log('SongCard received song:', song);
-    console.log('SongCard partyId:', partyId);
+    console.log("🔍 SongCard received song:", JSON.stringify(song, null, 2));
+    console.log("🔍 SongCard partyId:", partyId);
+  
+    if (song?.sources) {
+      console.log("🎵 Sources array:", JSON.stringify(song.sources, null, 2));
+      const youtubeSource = song.sources.find((s) => s.platform === "youtube");
+      console.log("🎬 Extracted YouTube source:", youtubeSource);
+    }
   }, [song, partyId]);
+
+  // ✅ Extract YouTube URL from `sources`
+  const getYouTubeUrl = (sources) => {
+    if (!sources) return null;
+    if (Array.isArray(sources)) {
+      const youtubeSource = sources.find((s) => s.platform?.toLowerCase() === "youtube");
+      return youtubeSource?.url || null;
+    }
+    if (typeof sources === "object" && sources.youtube) {
+      return sources.youtube;
+    }
+    return null;
+  };
+
+  const youtubeUrl = getYouTubeUrl(song?.sources);
+  const cover = song?.coverArt && song.coverArt !== "/default-cover.jpg"
+    ? song.coverArt
+    : getYouTubeThumbnail(youtubeUrl);
 
   const handleBid = async () => {
     if (!partyId) {
@@ -27,35 +70,32 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
     setLoading(true);
 
     try {
-      // Create the payload dynamically
+      // ✅ Create the payload dynamically
       const payload = {
         bidAmount,
         ...(song._id
           ? { songId: song._id } // Include `songId` if the song already exists
           : {
-              url: song.url,
               title: song.title,
               artist: song.artist,
-              platform: song.sources?.[0]?.platform, // Use first available platform
+              sources: song.sources, // Include sources
             }),
       };
 
-      console.log('Sending payload:', payload);
+      console.log('📤 Sending payload:', payload);
 
       const response = await API.post(`/api/parties/${partyId}/songs/bid`, payload);
 
-      console.log(`Bid placed on song: ${song.title || song.url}`, response.data);
+      console.log(`✅ Bid placed on song: ${song.title}`, response.data);
 
-      toast.success(
-        `Your bid of £${bidAmount} for "${song.title || song.url}" was successful!`
-      );
+      toast.success(`Your bid of £${bidAmount} for "${song.title}" was successful!`);
 
       // ✅ Ensure `onBidPlaced` receives the full updated song object
       if (onBidPlaced) {
         onBidPlaced(response.data.song);
       }
     } catch (error) {
-      console.error(`Error placing bid on song: ${song.title || song.url}`, error.response?.data || error.message);
+      console.error(`❌ Error placing bid on song: ${song.title}`, error.response?.data || error.message);
       toast.error(`Oops! Couldn't place your bid. Please try again later.`);
     } finally {
       setLoading(false);
@@ -67,14 +107,16 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   const bids = song?.bids || [];
   const title = song?.title || 'Unknown Title';
   const artist = song?.artist || 'Unknown Artist';
-  const cover = song?.coverArt || '/default-cover.jpg'; // ✅ Fixed cover source
-  const totalBidValue = song?.totalBidValue || 0;
-  const globalBidValue = song?.globalBidValue || 0;
+  const totalBidValue = song?.globalBidValue || 0;
 
   return (
     <div className="song-card">
       <span>{rank || '?'}</span>
-      <img src={cover} alt={title} />
+      <img 
+        src={cover} 
+        alt={title} 
+        onError={(e) => e.target.src = "/default-cover.jpg"} // Fallback for missing images
+      />
       <div className="song-info">
         <h3>{title}</h3>
         <p>{artist}</p>
@@ -85,12 +127,14 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
         <div className="streaming-links">
           <h4>Listen on:</h4>
           <ul>
-            {song.sources.map((platformData) => (
-              <li key={platformData.platform}>
-                <a href={platformData.url} target="_blank" rel="noopener noreferrer">
-                  {platformData.platform.charAt(0).toUpperCase() + platformData.platform.slice(1)}
-                </a>
-              </li>
+            {song.sources.map(({ platform, url }) => (
+              url && (
+                <li key={platform}>
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                  </a>
+                </li>
+              )
             ))}
           </ul>
         </div>
@@ -98,7 +142,6 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
 
       <div className="bid-info">
         <p>Current Party Total Bid Value: £{totalBidValue}</p>
-        <p>Global Total Bid Value: £{globalBidValue}</p>
         {bids.length > 0 && (
           <div className="leaderboard">
             <h4>Leaderboard</h4>
