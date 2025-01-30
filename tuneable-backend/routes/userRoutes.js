@@ -36,14 +36,14 @@ router.post(
         return res.status(400).json({ error: 'Email or username already in use' });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
+/*      const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
       console.log('Original password:', password);
-      console.log('Hashed password:', hashedPassword);
+      console.log('Hashed password:', hashedPassword); */
 
       const user = new User({
         username,
         email,
-        password: hashedPassword, // Store hashed password
+        password,
         homeLocation: homeLocation || {},
       });
       await user.save();
