@@ -3,6 +3,7 @@ const db = require('./db'); // Import the database connection module
 const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
 require('dotenv').config(); // Load environment variables from .env file
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/parties', partyRoutes); // Unified party and playlist functionalit
 app.use('/api/songs', songRoutes); // Tunefeed route
 app.use('/api/parties', songRoutes); // Mount song-specific routes
 app.use('/api/payments', paymentRoutes);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 
 // Fallback for unknown routes
