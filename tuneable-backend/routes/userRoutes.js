@@ -36,10 +36,6 @@ router.post(
         return res.status(400).json({ error: 'Email or username already in use' });
       }
 
-/*      const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
-      console.log('Original password:', password);
-      console.log('Hashed password:', hashedPassword); */
-
       const user = new User({
         username,
         email,
@@ -121,48 +117,48 @@ router.post(
   }
 );
 
-// Protected profile route
-router.get('/profile', authMiddleware, async (req, res) => {
-  console.log('Fetching profile for userId:', req.user.userId); // Debug log for profile access
+  // Protected profile route
+  router.get('/profile', authMiddleware, async (req, res) => {
+    console.log('Fetching profile for userId:', req.user.userId); // Debug log for profile access
 
-  try {
-    const user = await User.findById(req.user.userId).select('-password');
-    if (!user) {
-      console.warn('User not found for userId:', req.user.userId);
-      return res.status(404).json({ error: 'User not found' });
+    try {
+      const user = await User.findById(req.user.userId).select('-password');
+      if (!user) {
+        console.warn('User not found for userId:', req.user.userId);
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json({ message: 'User profile', user });
+    } catch (error) {
+      console.error('Error fetching user profile:', error.message);
+      res.status(500).json({ error: 'Error fetching user data', details: error.message });
     }
-    res.json({ message: 'User profile', user });
-  } catch (error) {
-    console.error('Error fetching user profile:', error.message);
-    res.status(500).json({ error: 'Error fetching user data', details: error.message });
-  }
-});
+  });
 
-// Update user profile
-router.put('/profile', authMiddleware, async (req, res) => {
-  console.log('Updating profile for userId:', req.user.userId, 'with data:', req.body); // Debug log
+  // Update user profile
+  router.put('/profile', authMiddleware, async (req, res) => {
+    console.log('Updating profile for userId:', req.user.userId, 'with data:', req.body); // Debug log
 
-  try {
-    const { avatar, bio, preferences } = req.body;
+    try {
+      const { avatar, bio, preferences } = req.body;
 
-    const updatedFields = {};
-    if (avatar) updatedFields.avatar = avatar;
-    if (bio) updatedFields.bio = bio;
-    if (preferences) updatedFields.preferences = preferences;
+      const updatedFields = {};
+      if (avatar) updatedFields.avatar = avatar;
+      if (bio) updatedFields.bio = bio;
+      if (preferences) updatedFields.preferences = preferences;
 
-    const user = await User.findByIdAndUpdate(req.user.userId, updatedFields, {
-      new: true,
-    }).select('-password');
-    if (!user) {
-      console.warn('User not found for update with userId:', req.user.userId);
-      return res.status(404).json({ error: 'User not found' });
+      const user = await User.findByIdAndUpdate(req.user.userId, updatedFields, {
+        new: true,
+      }).select('-password');
+      if (!user) {
+        console.warn('User not found for update with userId:', req.user.userId);
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ message: 'Profile updated successfully', user });
+    } catch (error) {
+      console.error('Error updating profile:', error.message);
+      res.status(500).json({ error: 'Error updating profile', details: error.message });
     }
+  });
 
-    res.json({ message: 'Profile updated successfully', user });
-  } catch (error) {
-    console.error('Error updating profile:', error.message);
-    res.status(500).json({ error: 'Error updating profile', details: error.message });
-  }
-});
-
-module.exports = router;
+  module.exports = router;

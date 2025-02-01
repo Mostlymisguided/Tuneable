@@ -10,6 +10,8 @@ const userRoutes = require('./routes/userRoutes'); // Import user routes
 const partyRoutes = require('./routes/partyRoutes'); // Unified party and playlist functionality
 const searchRoutes = require('./routes/search'); // Import search routes
 const songRoutes = require('./routes/songRoutes'); // Import song routes
+const paymentRoutes = require('./routes/paymentRoutes');
+
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -63,7 +65,9 @@ console.log('Registering API routes...');
 app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parties', partyRoutes); // Unified party and playlist functionality
+app.use('/api/songs', songRoutes); // Tunefeed route
 app.use('/api/parties', songRoutes); // Mount song-specific routes
+app.use('/api/payments', paymentRoutes);
 console.log('API routes registered.');
 
 // Fallback for unknown routes
