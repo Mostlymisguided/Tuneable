@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  profilePicture: { type: String, default: null }, // Stores URL or file path
+  profilePic: { type: String, default: null }, // Stores URL or file path
   balance: { type: Number, default: 0 }, // New field for wallet balance
   homeLocation: {
     city: { type: String, default: null },
@@ -70,5 +70,7 @@ userSchema.statics.findByUserId = async function(userId) {
 userSchema.statics.findByEmail = async function(email) {
   return this.findOne({ email }).select('-password');
 };
+
+//comment to check debug restart
 
 module.exports = mongoose.model('User', userSchema);
