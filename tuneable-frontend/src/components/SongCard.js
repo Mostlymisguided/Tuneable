@@ -141,7 +141,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
       )}
 
       <div className="bid-info">
-        <p>Current Party Total Bid Value: £{totalBidValue}</p>
+        <p>Current Total Bid : £{totalBidValue}</p>
         {bids.length > 0 && (
           <div className="leaderboard">
             <h4>Leaderboard</h4>

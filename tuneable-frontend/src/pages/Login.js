@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // ✅ Import useNavigate
 
 const Login = () => {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate(); // ✅ React Router navigation hook
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,14 +32,14 @@ const Login = () => {
 
             alert('Login successful!');
 
-            // Redirect to the intended path or default to dashboard
-            const redirectPath = localStorage.getItem('redirectPath') || '/';
-            localStorage.removeItem('redirectPath'); // Clear redirectPath after use
-            window.location.href = redirectPath;
+            // Redirect user to TuneFeed after login
+            const redirectPath = localStorage.getItem('redirectPath') || '/tunefeed';
+            localStorage.removeItem('redirectPath'); // Clear it after use
+            navigate(redirectPath);
+
         } catch (err) {
             console.error('Login error:', err.response?.data || err.message);
 
-            // Set user-friendly error messages
             setError(
                 err.response?.data?.error ||
                 (err.response?.status === 401
