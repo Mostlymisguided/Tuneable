@@ -114,6 +114,7 @@ const Party = () => {
                     ) : (
                         <p>No attendees yet.</p>
                     )}
+                     {<h2>Next Up</h2>}
                     <div className="playlist">
                         {songs.length > 0 ? (
                             songs.map((song, index) => {

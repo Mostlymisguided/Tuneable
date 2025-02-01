@@ -6,9 +6,12 @@ const Register = () => {
     username: '',
     email: '',
     password: '',
-    city: '', // Add city to formData
-    country: '', // Add country to formData
+    profilePicture: null, // Changed from string to file
+    homeLocation: '',
+    city: '',
+    country: '',
   });
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -16,20 +19,30 @@ const Register = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleFileChange = (e) => {
+    setFormData({ ...formData, profilePicture: e.target.files[0] });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const data = new FormData();
+    data.append('username', formData.username);
+    data.append('email', formData.email);
+    data.append('password', formData.password);
+    data.append('homeLocation[city]', formData.city);
+    data.append('homeLocation[country]', formData.country);
+    if (formData.profilePicture) {
+      data.append('profilePic', formData.profilePicture);
+    }
+
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_BACKEND_URL}/api/users/register`,
+        data,
         {
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          homeLocation: {
-            city: formData.city,
-            country: formData.country,
-          }, // Include homeLocation
+          headers: { 'Content-Type': 'multipart/form-data' },
         }
       );
       console.log('Registration successful:', response.data);
@@ -47,7 +60,7 @@ const Register = () => {
     <div>
       <h1>Register</h1>
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} encType="multipart/form-data">
         <div>
           <label>Username:</label>
           <input
@@ -79,7 +92,16 @@ const Register = () => {
           />
         </div>
         <div>
-          <label>City (optional):</label>
+          <label>Profile Picture:</label>
+          <input
+            type="file"
+            name="profilePicture"
+            onChange={handleFileChange}
+            accept="image/*"
+          />
+        </div>
+        <div>
+          <label>Home City:</label>
           <input
             type="text"
             name="city"
@@ -88,7 +110,7 @@ const Register = () => {
           />
         </div>
         <div>
-          <label>Country (optional):</label>
+          <label>Home Country:</label>
           <input
             type="text"
             name="country"

@@ -30,14 +30,14 @@ const NavBar = () => {
                 </li>
                 {isAuthenticated ? (
                     <>
-                        <li className={isActive('/parties')}>
-                            <Link to="/parties">Parties</Link>
-                        </li>
-                        <li className={isActive('/search')}>
-                            <Link to="/search">Search</Link>
+                        <li className={isActive('/tunefeed')}>
+                            <Link to="/parties">Tunefeed</Link>
                         </li>
                         <li className={isActive('/create-party')}>
                             <Link to="/create-party">Create Party</Link>
+                        </li>
+                        <li className={isActive('/parties')}>
+                            <Link to="/parties">View Parties</Link>
                         </li>
                         <li className={isActive('/profile')}>
                             <Link to="/profile">Profile</Link>
