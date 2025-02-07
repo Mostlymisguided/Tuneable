@@ -24,8 +24,12 @@ Thumbs.db
 .vscode/
 .idea/
 
+
+tuneable-backend/data/mongodb/
 tuneable-backend/data/db/*
 !tuneable-backend/data/db/.keep
 
+
 generateToken.js
+
 
