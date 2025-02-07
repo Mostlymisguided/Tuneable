@@ -31,12 +31,25 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
     console.log("🔍 SongCard received song:", JSON.stringify(song, null, 2));
     console.log("🔍 SongCard partyId:", partyId);
   
+    if (!song || !song.sources) {
+      console.error("Song or sources are undefined:", song);
+      return null;
+  }
+ 
+  if (!Array.isArray(song.sources)) {
+    console.error("song.sources is not an array:", song.sources);
+    return null;
+}  
+
     if (song?.sources) {
       console.log("🎵 Sources array:", JSON.stringify(song.sources, null, 2));
      const youtubeSource = song.sources.find((s) => s.platform === "youtube");
       console.log("🎬 Extracted YouTube source:", youtubeSource);
     }
   }, [song, partyId]);
+
+  console.log("Song object:", song);
+
 
   // ✅ Extract YouTube URL from `sources`
   const getYouTubeUrl = (sources) => {

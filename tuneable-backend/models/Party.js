@@ -9,7 +9,12 @@ const PartySchema = new mongoose.Schema({
   },
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   partyCode: { type: String, required: true, unique: true },
-  location: { type: String, default: null },
+  location: {
+    type: String,
+    required: true,
+    minlength: [3, 'Party location must be at least 3 characters long'],
+    maxlength: [100, 'Party location cannot exceed 100 characters'],
+  },
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   songs: [

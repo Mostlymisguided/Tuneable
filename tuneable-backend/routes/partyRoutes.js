@@ -31,6 +31,10 @@ router.post('/', authMiddleware, async (req, res) => {
       if (!name) {
           return res.status(400).json({ error: 'Party name is required' });     
       }
+      const { location } = req.body;
+      if (!location) {
+          return res.status(400).json({ error: 'Party location is required' });     
+      }
 
       const userId = req.user.userId;
       if (!isValidObjectId(userId)) {
@@ -43,6 +47,7 @@ router.post('/', authMiddleware, async (req, res) => {
       const party = new Party({
           _id: objectId,
           name,
+          location,
           host: userId,
           partyCode,
           songs: [],
