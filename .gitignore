@@ -12,6 +12,7 @@ yarn-error.log*
 .env
 
 # Database files
+*.wt
 *.db
 *.sqlite
 
