@@ -33,7 +33,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   
     if (song?.sources) {
       console.log("🎵 Sources array:", JSON.stringify(song.sources, null, 2));
-      const youtubeSource = song.sources.find((s) => s.platform === "youtube");
+     const youtubeSource = song.sources.find((s) => s.platform === "youtube");
       console.log("🎬 Extracted YouTube source:", youtubeSource);
     }
   }, [song, partyId]);

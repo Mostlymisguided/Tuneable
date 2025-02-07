@@ -1,28 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { useParams, useNavigate } from 'react-router-dom';
-import SongCard from '../components/SongCard';
-import NewRequest from '../components/NewRequest';
-import Footer from '../components/Footer';
-import WebPlayer from '../components/WebPlayer';
+import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { useParams, useNavigate } from "react-router-dom";
+import SongCard from "../components/SongCard";
+import NewRequest from "../components/NewRequest";
+import Footer from "../components/Footer";
+import WebPlayer from "../components/WebPlayer";
 
 const Party = () => {
-    const [partyName, setPartyName] = useState('Party');
+    const [partyName, setPartyName] = useState("Party");
     const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
     const [attendees, setAttendees] = useState([]);
+    const [hostId, setHostId] = useState(null);
+    const [userId] = useState(localStorage.getItem("userId")); // not needed?
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isJoined, setIsJoined] = useState(false);
+    const [socket, setSocket] = useState(null);
     const { partyId } = useParams();
     const navigate = useNavigate();
 
+    // 🎵 Fetch Party Details (Initial Load)
     const fetchPartyDetails = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem("token");
             if (!token) {
-                throw new Error('Unauthorized: No token provided.');
+                throw new Error("Unauthorized: No token provided.");
             }
 
             const response = await axios.get(
@@ -33,34 +37,79 @@ const Party = () => {
             );
 
             const party = response.data.party;
-            console.log('Fetched Party Details:', party);
+            console.log("Fetched Party Details:", party);
 
-            if (party.songs.length > 0 && typeof party.songs[0] === 'string') {
-                console.error('Error: Songs are not populated. Ensure backend provides full song objects.');
-                throw new Error('Songs are not populated correctly.');
-            }
-
-            console.log('Fetched Songs:', party.songs);
-
-            setPartyName(party.name || 'Party');
-            setSongs(party.songs || []); // Ensure songs are full objects
+            setPartyName(party.name || "Party");
+            setSongs(party.songs || []);
             setAttendees(party.attendees || []);
-            setCurrentSong(party.songs[0] || {});
-            setIsJoined(party.attendees?.some((attendee) => attendee?._id === response.data.userId));
+            setCurrentSong(party.songs.length > 0 ? party.songs[0] : {});
+            setIsJoined(party.attendees?.some((attendee) => attendee?._id === userId));
+            setHostId(party.hostId);
             setErrorMessage(null);
         } catch (error) {
-            console.error('Error fetching party details:', error);
-            setErrorMessage(error.response?.data?.error || 'Failed to load party details. Please try again later.');
+            console.error("Error fetching party details:", error);
+            setErrorMessage(error.response?.data?.error || "Failed to load party details.");
         } finally {
             setLoading(false);
         }
-    }, [partyId]);
+    }, [partyId, userId]);
+
+    // 🎧 WebSocket Connection for Real-Time Queue & Playback Sync
+    useEffect(() => {
+        const ws = new WebSocket("ws://localhost:8000"); // Update with production WebSocket URL
+        setSocket(ws);
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ type: "SET_HOST", partyId, userId }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "UPDATE_QUEUE" && data.partyId === partyId) {
+                console.log("📡 Queue Updated via WebSocket:", data.queue);
+                setSongs(data.queue);
+                if (data.queue.length > 0) {
+                    setCurrentSong(data.queue[0]);
+                }
+            }
+            if (data.type === "PLAYBACK_ACTION" && data.partyId === partyId) {
+                if (data.action === "PLAY") setCurrentSong(prev => ({ ...prev, playing: true }));
+                if (data.action === "PAUSE") setCurrentSong(prev => ({ ...prev, playing: false }));
+                if (data.action === "SKIP") {
+                    setSongs(prev => prev.slice(1)); // Remove first song from queue
+                    setCurrentSong(songs[1] || {}); // Move to the next song
+                }
+            }
+        };
+
+        return () => ws.close();
+    }, [partyId, userId, songs]);
+
+    // 🎵 Handle Queue Update When Bids Change
+    const handleBidPlaced = (updatedSong) => {
+        setSongs((prevSongs) => {
+            const newQueue = prevSongs.map((s) =>
+                s._id === updatedSong._id ? updatedSong : s
+            );
+            return newQueue.sort((a, b) => b.globalBidValue - a.globalBidValue);
+        });
+
+        if (socket) {
+            socket.send(JSON.stringify({ type: "UPDATE_QUEUE", partyId, queue: songs }));
+        }
+    };
+
+    // 🎤 Host Actions (Play, Pause, Skip, Veto)
+    const sendHostAction = (action, songId = null) => {
+        if (!socket || hostId !== userId) return;
+        socket.send(JSON.stringify({ type: "PLAYBACK_ACTION", partyId, action, songId, userId }));
+    };
 
     const handleJoinParty = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem("token");
             if (!token) {
-                throw new Error('Unauthorized: No token provided.');
+                throw new Error("Unauthorized: No token provided.");
             }
 
             const response = await axios.post(
@@ -75,8 +124,8 @@ const Party = () => {
             setIsJoined(true);
             fetchPartyDetails();
         } catch (error) {
-            console.error('Error joining party:', error);
-            setErrorMessage(error.response?.data?.error || 'Failed to join the party. Please try again later.');
+            console.error("Error joining party:", error);
+            setErrorMessage(error.response?.data?.error || "Failed to join the party.");
         }
     };
 
@@ -87,14 +136,14 @@ const Party = () => {
     }, [partyId, fetchPartyDetails]);
 
     const navigateToSearch = () => {
-        localStorage.setItem('partyId', partyId);
+        localStorage.setItem("partyId", partyId);
         navigate(`/search?partyId=${partyId}`);
     };
 
     return (
         <div className="party-container">
             <h1>{partyName}</h1>
-            {errorMessage && <p className="error-message" style={{ color: 'red' }}>{errorMessage}</p>}
+            {errorMessage && <p className="error-message" style={{ color: "red" }}>{errorMessage}</p>}
             {loading ? (
                 <p>Loading party details...</p>
             ) : (
@@ -114,44 +163,34 @@ const Party = () => {
                     ) : (
                         <p>No attendees yet.</p>
                     )}
-                     {<h2>Next Up</h2>}
+                    <h2>Next Up</h2>
                     <div className="playlist">
-                        {songs.length > 0 ? (
-                            songs.map((song, index) => {
-                                console.log('Passing song to SongCard:', song);
-                                return (
-                                    <SongCard
-                                        key={song._id} // Ensure unique key
-                                        song={song}
-                                        rank={index + 1}
-                                        partyId={partyId}
-                                        onBidPlaced={(songId, bidAmount) => {
-                                            setSongs((prevSongs) =>
-                                                prevSongs.map((s) =>
-                                                    s._id === songId ? { ...s, bid: bidAmount } : s
-                                                )
-                                            );
-                                        }}
-                                    />
-                                );
-                            })
-                        ) : (
-                            <p>No songs in the playlist yet. Be the first to add one!</p>
-                        )}
+                        {songs.map((song, index) => (
+                            <SongCard
+                                key={song._id}
+                                song={song}
+                                rank={index + 1}
+                                partyId={partyId}
+                                onBidPlaced={handleBidPlaced}
+                                onVeto={() => sendHostAction("VETO", song._id)} // ✅ Veto button
+                            />
+                        ))}
                     </div>
                 </>
             )}
             <div className="actions">
                 <button onClick={navigateToSearch}>Search for Songs</button>
             </div>
-            <NewRequest refreshPlaylist={fetchPartyDetails} />
-            <Footer currentSong={currentSong} />
-            {currentSong?.url && (
-                <div className="player-container">
-                    <h3>Now Playing</h3>
-                    <WebPlayer url={currentSong.url} />
+            {isJoined && userId === hostId && (
+                <div className="host-controls">
+                    <button onClick={() => sendHostAction("PLAY")}>▶ Play</button>
+                    <button onClick={() => sendHostAction("PAUSE")}>⏸ Pause</button>
+                    <button onClick={() => sendHostAction("SKIP")}>⏭ Skip</button>
                 </div>
             )}
+            <NewRequest refreshPlaylist={fetchPartyDetails} />
+            <Footer currentSong={currentSong} />
+            {currentSong?.url && <WebPlayer url={currentSong.url} playing={currentSong.playing} />}
         </div>
     );
 };

@@ -193,3 +193,41 @@ footer {
     align-items: center;
   }
 }
+
+/* 🎵 Web Player Styling */
+.web-player-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 10px;
+  background: #111;
+  border-radius: 10px;
+}
+
+.web-player {
+  width: 100%;
+  height: 80px; /* Ensure enough height for controls */
+}
+
+.player-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.player-controls button {
+  background: #4c00ff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.player-controls button:hover {
+  background: #6a00ff;
+}

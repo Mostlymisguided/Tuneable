@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import '../App.css';
 
 const Home = () => {
@@ -8,21 +8,39 @@ const Home = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState({ time: 'this_week', location: 'all', genre: 'all' });
   const [sortBy, setSortBy] = useState('highest_paid');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const navigate = useNavigate();
+
+  const fetchSongs = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.warn("⚠️ No token found, redirecting to login...");
+       // navigate("/login");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/songs`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { ...filter, sortBy },
+      });
+
+      setSongs(response.data.songs || []);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to fetch songs");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, sortBy, navigate]);
 
   useEffect(() => {
     fetchSongs();
-  }, [filter, sortBy]);
-
-  const fetchSongs = async () => {
-    try {
-      const response = await axios.get(`/api/songs`, {
-        params: { ...filter, sortBy }
-      });
-      setSongs(response.data);
-    } catch (error) {
-      console.error('Error fetching songs:', error);
-    }
-  };
+  }, [fetchSongs]);
 
   return (
     <div className="home-container">
