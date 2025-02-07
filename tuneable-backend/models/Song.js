@@ -24,7 +24,10 @@ const songSchema = new mongoose.Schema({
 
   // Technical song metadata
   bpm: { type: Number, default: null }, // Beats Per Minute
+  pitch: { type: Number, default: null }, // Concert Pitch A4= $Hz
   key: { type: String, default: null }, // Musical key (e.g., C#m, G Major)
+  elements: {type: [String], default: []}, // instrument/element tags
+  tags: { type: [String], default: [] }, // genre/vibe tags
   timeSignature: { type: String, default: "4/4" }, // Default to 4/4
   releaseDate: { type: Date, default: null }, // Full release date
 
@@ -37,9 +40,11 @@ const songSchema = new mongoose.Schema({
   uploader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Who uploaded the MP3 (optional)
   
   uploadedAt: { type: Date, default: Date.now },
+  updatedAt: {type: Date, default: Date.now },
+
   popularity: { type: Number, default: 0 },
   lyrics: { type: String, default: "" },
-  tags: { type: [String], default: [] }, // Keywords for filtering
+
 });
 
 // Indexes for performance

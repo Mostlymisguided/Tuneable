@@ -1,28 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import '../App.css';
+import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import "../App.css";
 
 const TuneFeed = () => {
   const [songs, setSongs] = useState([]);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState({ time: 'this_week', location: 'all', genre: 'all' });
-  const [sortBy, setSortBy] = useState('highest_paid');
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState({ time: "this_week", location: "all", genre: "all" });
+  const [sortBy, setSortBy] = useState("highest_paid");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchSongs();
-  }, [filter, sortBy]);
-
-  const fetchSongs = async () => {
+  const fetchSongs = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
         console.warn("⚠️ No token found, redirecting to login...");
-        navigate('/login'); // Redirect to login if no token is found
+        navigate("/login");
         return;
       }
 
@@ -36,11 +32,15 @@ const TuneFeed = () => {
 
       setSongs(response.data.songs || []);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to fetch songs');
+      setError(err.response?.data?.error || "Failed to fetch songs");
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, sortBy, navigate]);
+
+  useEffect(() => {
+    fetchSongs();
+  }, [fetchSongs]);
 
   return (
     <div className="tunefeed-container">
@@ -73,18 +73,18 @@ const TuneFeed = () => {
           <option value="house">House</option>
           <option value="pop">Pop</option>
         </select>
-        <button className={sortBy === 'Most Bids' ? 'active' : ''} onClick={() => setSortBy('highest_paid')}>Most Bids</button>
-        <button className={sortBy === 'Most Recent' ? 'active' : ''} onClick={() => setSortBy('newest')}>Most Recent</button>
+        <button className={sortBy === "highest_paid" ? "active" : ""} onClick={() => setSortBy("highest_paid")}>Most Bids</button>
+        <button className={sortBy === "newest" ? "active" : ""} onClick={() => setSortBy("newest")}>Most Recent</button>
       </div>
 
       {loading ? (
         <p>Loading songs...</p>
       ) : error ? (
-        <p style={{ color: 'red' }}>Error: {error}</p>
+        <p style={{ color: "red" }}>Error: {error}</p>
       ) : (
         <div className="song-list">
           {songs
-            .filter(song => song.title.toLowerCase().includes(search.toLowerCase()))
+            .filter((song) => song.title.toLowerCase().includes(search.toLowerCase()))
             .map((song, index) => (
               <div key={song._id} className="song-item">
                 <span className="rank">{index + 1}</span>
