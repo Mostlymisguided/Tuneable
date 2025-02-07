@@ -16,8 +16,6 @@ const SearchPage = () => {
     const [bidAmount, setBidAmount] = useState(0.77);
 
     const navigate = useNavigate();
-
-    // Fetch token from localStorage
     const token = localStorage.getItem('token');
 
     useEffect(() => {
@@ -26,68 +24,75 @@ const SearchPage = () => {
         }
     }, [partyId]);
 
-    const fetchResults = useCallback(
-        async (pageToken = null) => {
-            if (!query) return;
-            setLoading(true);
-            setError(null);
+    // ✅ Ensure fetchResults is memoized before debouncing
+const fetchResults = useCallback(async (pageToken = null) => {
+    if (!query) return;
+    setLoading(true);
+    setError(null);
 
-            try {
-                const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
-                    params: { query, source, pageToken },
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+    try {
+        const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/search`, {
+            params: { query, source, pageToken },
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
 
-                const { videos = [] } = response.data;
-                const mappedResults = videos.map((video) => ({
-                    id: video.id,
-                    url: video.url || `https://www.youtube.com/watch?v=${video.id}`,
-                    platform: 'youtube',
-                    title: video.title,
-                    thumbnail: video.thumbnail,
-                    channelTitle: video.channelTitle,
-                }));
+        const { videos = [] } = response.data;
+        const mappedResults = videos.map((video) => ({
+            id: video.id,
+            title: video.title,
+            artist: video.channelTitle, // Assuming channel name as rights holder
+            coverArt: video.thumbnail,
+            sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` }, // ✅ Dynamic mapping
+        }));
 
-                setResults(pageToken ? [...results, ...mappedResults] : mappedResults);
-                setNextPageToken(response.data.nextPageToken || null);
-            } catch (err) {
-                console.error('Error fetching results:', err);
-                setError(err.response?.data?.error || 'Failed to fetch results. Please try again.');
-            } finally {
-                setLoading(false);
-            }
-        },
-        [query, source, results, token]
-    );
+        setResults(pageToken ? [...results, ...mappedResults] : mappedResults);
+        setNextPageToken(response.data.nextPageToken || null);
+    } catch (err) {
+        console.error('Error fetching results:', err);
+        setError(err.response?.data?.error || 'Failed to fetch results. Please try again.');
+    } finally {
+        setLoading(false);
+    }
+}, [query, source, token]); // ✅ Add dependencies to ensure correct memoization
 
-    useEffect(() => {
-        const debouncedFetchResults = debounce(() => {
-            fetchResults();
-        }, 300);
+// ✅ Memoized debounce function (this now works without ESLint warnings)
+const debouncedFetchResults = useCallback(debounce(fetchResults, 300), [fetchResults]);
 
-        if (query) {
-            debouncedFetchResults();
-        }
+useEffect(() => {
+    if (query) {
+        debouncedFetchResults();
+    }
 
-        return () => {
+    return () => {
+        // ✅ Fix: Ensure the function exists before calling `.cancel()`
+        if (typeof debouncedFetchResults?.cancel === "function") {
             debouncedFetchResults.cancel();
-        };
-    }, [query, fetchResults]);
+        }
+    };
+}, [query, debouncedFetchResults]);
+
 
     const handleBid = async (song) => {
+        console.log("🎯 handleBid called for:", song);
+    
         try {
             const payload = {
-                bidAmount, // User's bid amount
+                bidAmount,
                 title: song.title,
-                artist: song.channelTitle,
-                platform: song.platform,
-                url: song.url,
+                artist: song.artist || "Unknown Artist", // Ensure artist exists
+                rightsHolder: song.artist || "Unknown Rights Holder",
+                duration: song.duration || null,
+                coverArt: song.coverArt || null,
+                sources: { [source]: song.sources?.[source] || song.url }, // Ensure source has a URL
+                url: song.sources?.[source] || song.url, // ✅ Add explicit URL
+                platform: source, // ✅ Explicitly add platform
+                addedBy: localStorage.getItem('userId'),
             };
-
-            console.log('Sending payload:', payload);
-
+    
+            console.log("📦 Sending payload:", payload);
+    
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/songs/bid`,
                 payload,
@@ -97,17 +102,16 @@ const SearchPage = () => {
                     },
                 }
             );
-
-            console.log('Song added/bid placed successfully:', response.data);
-
-            // Optionally, you could update the UI to reflect the new bid here
-            setError(null); // Clear any previous error
+    
+            console.log("✅ Song added/bid placed successfully:", response.data);
+            setError(null);
         } catch (error) {
-            console.error('Error adding song or placing bid:', error.response?.data || error.message);
-            setError('Failed to add song or place bid. Please try again.');
+            console.error("❌ Error adding song or placing bid:", error.response?.data || error.message);
+            setError("Failed to add song or place bid. Please try again.");
         }
-        navigate("/party/[partyId]");
-    };
+    
+        navigate(`/party/${partyId}`);
+    };     
 
     return (
         <div className="search-page">
@@ -147,10 +151,10 @@ const SearchPage = () => {
                     {results.map((item) => (
                         <li key={item.id}>
                             <div className="result-item">
-                                <img src={item.thumbnail} alt={item.title} />
+                                <img src={item.coverArt} alt={item.title} />
                                 <div>
                                     <h4>{item.title}</h4>
-                                    <p>{item.channelTitle}</p>
+                                    <p>{item.artist}</p>
                                 </div>
                                 <input
                                     type="number"
