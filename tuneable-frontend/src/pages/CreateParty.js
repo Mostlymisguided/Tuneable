@@ -3,12 +3,18 @@ import axios from 'axios';
 
 const CreateParty = () => {
     const [partyName, setPartyName] = useState('');
+    const [partyLocation, setPartyLocation] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const createParty = async () => {
         if (!partyName.trim()) {
             alert('Party name cannot be empty');
+            return;
+        }
+
+        if (!partyLocation.trim()) {
+            alert('Party Location cannot be empty');
             return;
         }
 
@@ -33,7 +39,7 @@ const CreateParty = () => {
         try {
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties`,
-                { name: partyName },
+                { name: partyName, location: partyLocation },
                 {
                     headers: { Authorization: `Bearer ${token}` }, // Use the retrieved token
                 }
@@ -68,7 +74,13 @@ const CreateParty = () => {
                 placeholder="Enter party name"
                 value={partyName}
                 onChange={(e) => setPartyName(e.target.value)}
-            />
+            /> 
+            <input
+            type="text"
+            placeholder="Enter party location"
+            value={partyLocation}
+            onChange={(e) => setPartyLocation(e.target.value)}
+        />
             <button onClick={createParty} disabled={loading}>
                 {loading ? 'Creating...' : 'Create Party'}
             </button>

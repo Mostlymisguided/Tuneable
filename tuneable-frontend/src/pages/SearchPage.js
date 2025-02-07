@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import debounce from 'lodash.debounce';
 
 const SearchPage = () => {
@@ -13,6 +14,8 @@ const SearchPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [bidAmount, setBidAmount] = useState(0.77);
+
+    const navigate = useNavigate();
 
     // Fetch token from localStorage
     const token = localStorage.getItem('token');
@@ -80,7 +83,7 @@ const SearchPage = () => {
                 title: song.title,
                 artist: song.channelTitle,
                 platform: song.platform,
-                url: song.url, // Use URL to identify songs globally
+                url: song.url,
             };
 
             console.log('Sending payload:', payload);
@@ -103,6 +106,7 @@ const SearchPage = () => {
             console.error('Error adding song or placing bid:', error.response?.data || error.message);
             setError('Failed to add song or place bid. Please try again.');
         }
+        navigate("/party/[partyId]");
     };
 
     return (
