@@ -42,6 +42,9 @@ const NavBar = () => {
                         <li className={isActive('/profile')}>
                             <Link to="/profile">Profile</Link>
                         </li>
+                        <li className={isActive('/upload')}>
+                            <Link to="/upload">Upload</Link>
+                        </li>
                         <li>
                             <button
                                 className="logout-button"

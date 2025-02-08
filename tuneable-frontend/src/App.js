@@ -13,6 +13,7 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import Party from './pages/Party';
 import UserProfile from './pages/UserProfile';
+import Upload from "./pages/Upload";
 import CreateParty from './pages/CreateParty';
 import Payment from './pages/Payment';
 import axios from 'axios';
@@ -65,6 +66,7 @@ function App() {
                     <Route path="/create-party" element={<ProtectedRoute element={<CreateParty />} />} />
                     <Route path="/profile" element={<ProtectedRoute element={<UserProfile />} />} />
                     <Route path="/payment" element={<ProtectedRoute element={<Payment />} />} />
+                    <Route path="/upload" element={<Upload />} />
                 </Routes>
             </Router>
         </Elements>
