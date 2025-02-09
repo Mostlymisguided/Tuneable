@@ -106,6 +106,7 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
+// FETCH PARTY DETAILS
 router.get('/:id/details', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
