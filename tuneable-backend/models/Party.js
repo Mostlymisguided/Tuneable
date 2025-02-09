@@ -7,7 +7,14 @@ const PartySchema = new mongoose.Schema({
     minlength: [3, 'Party name must be at least 3 characters long'],
     maxlength: [100, 'Party name cannot exceed 100 characters'],
   },
+  venue: {
+    type: String,
+    required: true,
+    minlength: [3, 'Venue must be at least 3 characters long'],
+    maxlength: [100, 'Venue cannot exceed 100 characters'],
+  },
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  
   partyCode: { type: String, required: true, unique: true },
   location: {
     type: String,
@@ -23,9 +30,16 @@ const PartySchema = new mongoose.Schema({
       addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     },
   ],
+  startTime:{ type: Date, default: Date.now },
+  endTime: { type: Date, default: null},
+  availability: {
+    type: String,
+    enum: ['public', 'private', 'geocoded'],
+    default: 'public',
+  },
   status: {
     type: String,
-    enum: ['active', 'ended', 'canceled'],
+    enum: ['active', 'scheduled', 'ended', 'canceled'],
     default: 'active',
   },
   createdAt: { type: Date, default: Date.now },

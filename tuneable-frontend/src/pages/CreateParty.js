@@ -3,13 +3,19 @@ import axios from 'axios';
 
 const CreateParty = () => {
     const [partyName, setPartyName] = useState('');
+    const [partyVenue, setPartyVenue] = useState('');
     const [partyLocation, setPartyLocation] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const createParty = async () => {
         if (!partyName.trim()) {
-            alert('Party name cannot be empty');
+            alert('Party Name cannot be empty');
+            return;
+        }
+
+        if (!partyVenue.trim()) {
+            alert('Party Venue cannot be empty');
             return;
         }
 
@@ -39,7 +45,7 @@ const CreateParty = () => {
         try {
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties`,
-                { name: partyName, location: partyLocation },
+                { name: partyName, venue: partyVenue, location: partyLocation },
                 {
                     headers: { Authorization: `Bearer ${token}` }, // Use the retrieved token
                 }
