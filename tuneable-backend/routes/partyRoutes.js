@@ -1,24 +1,29 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const axios = require('axios');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
-const Party = require('../models/Party'); // Import the Party model
-const Song = require('../models/Song'); // Import the Song model
-const Bid = require('../models/Bid'); // Import the Bid model
-const { isValidObjectId } = require('../utils/validators'); // Utility function to validate ObjectId
-const { broadcast } = require('../utils/broadcast'); // Utility for real-time updates via WebSocket
+const Party = require('../models/Party');
+const Song = require('../models/Song');
+const Bid = require('../models/Bid');
+const { isValidObjectId } = require('../utils/validators');
+const { broadcast } = require('../utils/broadcast');
+require('dotenv').config(); // Load .env variables
 
+//const { What3words } = require('@what3words/api');
 
-// Centralized error handler to streamline error responses
+//const w3w = new What3words({ apiKey: process.env.WHAT3WORDS_API_KEY });
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+
+// Centralized error handler
 const handleError = (res, err, message, status = 500) => {
     console.error(`${message}:`, err.message);
     res.status(status).json({ error: message, details: err.message });
 };
 
-// Utility function to generate a unique, human-readable party code
-const deriveCodeFromPartyId = () => 
-    crypto.randomBytes(3).toString('hex').toUpperCase();
+// Generate unique party code
+const deriveCodeFromPartyId = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 
 /**
  * Route: POST /
@@ -26,42 +31,62 @@ const deriveCodeFromPartyId = () =>
  * Access: Protected (requires valid token)
  */
 router.post('/', authMiddleware, async (req, res) => {
-  try {
-      const { name } = req.body;
-      if (!name) {
-          return res.status(400).json({ error: 'Party name is required' });     
-      }
-      const { location } = req.body;
-      if (!location) {
-          return res.status(400).json({ error: 'Party location is required' });     
-      }
+    try {
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ error: 'Party name is required' });     
+        }
+        const { location } = req.body;
+        if (!location) {
+            return res.status(400).json({ error: 'Party location is required' });     
+        }
+  
+        const userId = req.user.userId;
+        if (!isValidObjectId(userId)) {
+            return res.status(400).json({ error: 'Invalid userId' });
+        }
+  
+        const objectId = new mongoose.Types.ObjectId();
+        const partyCode = deriveCodeFromPartyId();
+  
+        const party = new Party({
+            _id: objectId,
+            name,
+            location,
+            host: userId,
+            partyCode,
+            songs: [],
+            attendees: [userId],
+        });
+  
+        await party.save();
+  
+        broadcast(party._id, { message: 'New party created', party });
+  
+        res.status(201).json({ message: 'Party created successfully', party });
+    } catch (err) {
+        handleError(res, err, 'Error creating party');
+    }
+  });  
 
-      const userId = req.user.userId;
-      if (!isValidObjectId(userId)) {
-          return res.status(400).json({ error: 'Invalid userId' });
-      }
+  // Join an existing party
+router.post('/:id/join', authMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        const party = await Party.findById(id);
+        if (!party) return res.status(404).json({ error: 'Party not found' });
 
-      const objectId = new mongoose.Types.ObjectId();
-      const partyCode = deriveCodeFromPartyId();
+        if (party.attendees.includes(userId))
+            return res.status(400).json({ error: 'User already joined the party' });
 
-      const party = new Party({
-          _id: objectId,
-          name,
-          location,
-          host: userId,
-          partyCode,
-          songs: [],
-          attendees: [userId],
-      });
+        party.attendees.push(userId);
+        await party.save();
 
-      await party.save();
-
-      broadcast(party._id, { message: 'New party created', party });
-
-      res.status(201).json({ message: 'Party created successfully', party });
-  } catch (err) {
-      handleError(res, err, 'Error creating party');
-  }
+        res.status(200).json({ message: 'Successfully joined the party', party });
+    } catch (err) {
+        handleError(res, err, 'Failed to join party');
+    }
 });
 
 /**
@@ -163,38 +188,133 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     }
 });
 
-/**
- * Route: POST /:id/join
- * Join an existing party
- * Access: Protected (requires valid token)
- */
-router.post('/:id/join', authMiddleware, async (req, res) => {
-    const { id } = req.params; // Party ID
-    const userId = req.user.userId; // Authenticated user's ID
-
+// What3words: Convert lat/lon to a 3-word address
+router.post('/convert-to-3wa', async (req, res) => {
+    const { lat, lon } = req.body;
     try {
-        // Find the party by ID
-        const party = await Party.findById(id);
+        const response = await w3w.convertTo3wa({ lat, lon });
+        res.json({ what3words: response.words });
+    } catch (error) {
+        handleError(res, error, 'Error converting to What3words');
+    }
+});
+
+// What3words: Convert 3-word address to lat/lon
+router.post('/convert-to-coordinates', async (req, res) => {
+    const { words } = req.body;
+    try {
+        const response = await w3w.convertToCoordinates({ words });
+        res.json({ lat: response.coordinates.lat, lon: response.coordinates.lng });
+    } catch (error) {
+        handleError(res, error, 'Error converting from What3words');
+    }
+});
+
+// Google Maps: Convert address to lat/lon
+router.post('/geocode-address', async (req, res) => {
+    const { address } = req.body;
+    try {
+        const response = await axios.get(
+            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`
+        );
+        const location = response.data.results[0]?.geometry?.location;
+        if (!location) return res.status(400).json({ error: 'Invalid address' });
+
+        res.json({ lat: location.lat, lon: location.lng });
+    } catch (error) {
+        handleError(res, error, 'Error geocoding address');
+    }
+});
+
+// Place a bid on an existing song or add a new song with a bid
+router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const { songId, url, title, artist, bidAmount, platform } = req.body;
+        const userId = req.user.userId;
+
+        if (!mongoose.isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid partyId format' });
+        }
+
+        if (bidAmount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        const party = await Party.findById(partyId).populate('songs.songId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Check if the user is already in the attendees list
-        if (party.attendees.includes(userId)) {
-            return res.status(400).json({ error: 'User already joined the party' });
+        let song;
+        if (songId) {
+            if (!mongoose.isValidObjectId(songId)) {
+                return res.status(400).json({ error: 'Invalid songId format' });
+            }
+
+            song = await Song.findById(songId).populate({
+                path: 'bids',
+                populate: {
+                    path: 'userId',
+                    select: 'username'
+                }
+            });
+
+            if (!song) {
+                return res.status(404).json({ error: 'Song not found' });
+            }
+        } else if (url && title && artist && platform) {
+            song = await Song.findOne({ [`sources.${platform}`]: url });
+            if (!song) {
+                song = new Song({
+                    title,
+                    artist,
+                    sources: { [platform]: url },
+                    addedBy: userId
+                });
+                await song.save();
+            }
+
+            let songEntry = party.songs.find((entry) => entry.songId?.toString() === song._id.toString());
+            if (!songEntry) {
+                party.songs.push({ songId: song._id, addedBy: userId });
+                await party.save();
+            }
+        } else {
+            return res.status(400).json({ error: 'Either songId or song metadata (url, title, artist, platform) must be provided.' });
         }
 
-        // Add the user to the attendees array
-        party.attendees.push(userId);
-        await party.save();
+        const bid = new Bid({
+            userId,
+            partyId,
+            songId: song._id,
+            amount: bidAmount,
+        });
+        await bid.save();
 
-        res.status(200).json({ message: 'Successfully joined the party', party });
+        song.bids.push(bid._id);
+        song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
+        await song.save();
+
+        const updatedSong = await Song.findById(song._id).populate({
+            path: 'bids',
+            populate: {
+                path: 'userId',
+                select: 'username'
+            }
+        });
+
+        res.status(200).json({
+            message: 'Bid placed successfully!',
+            song: updatedSong
+        });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to join the party' });
+        handleError(res, err, 'Error placing bid');
     }
 });
 
 /**
+ * Route still used?
  * Route: POST /:partyId/songs
  * Add a new song to a party
  * Access: Protected (requires valid token)

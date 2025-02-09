@@ -85,7 +85,7 @@ const Upload = () => {
     setUploadProgress(0);
 
     try {
-      const token = localStorage.getItem("jwt");
+      const token = localStorage.getItem("token");
       const response = await axios.post(
         "http://localhost:8000/api/songs/upload",
         form,
@@ -150,26 +150,32 @@ const Upload = () => {
   
       {/* Standard Inputs */}
       <input type="text" name="title" placeholder="Title (Required)" value={formData.title} onChange={handleInputChange} required />
+      <br></br>
       <input type="text" name="artist" placeholder="Artist (Required)" value={formData.artist} onChange={handleInputChange} required />
+      <br></br>
       <input type="text" name="producer" placeholder="Producer" value={formData.producer} onChange={handleInputChange} />
+      <br></br>
       <input type="text" name="rightsHolder" placeholder="Rights Holder" value={formData.rightsHolder} onChange={handleInputChange} />
+      <br></br>
       <input type="text" name="album" placeholder="Album" value={formData.album} onChange={handleInputChange} />
+      <br></br>
       <input type="text" name="genre" placeholder="Genre" value={formData.genre} onChange={handleInputChange} />
+      <br></br>
       <input type="date" name="releaseDate" placeholder="Release Date" value={formData.releaseDate} onChange={handleInputChange} />
+      <label>  Release Date</label><br></br>
       <input type="number" name="duration" placeholder="Duration (Seconds)" value={formData.duration} onChange={handleInputChange} />
+      <br></br>
       <input type="url" name="coverArt" placeholder="Cover Art URL" value={formData.coverArt} onChange={handleInputChange} />
-  
-      {/* Explicit Checkbox */}
-      <label>
-        <input type="checkbox" name="explicit" checked={formData.explicit} onChange={handleCheckboxChange} />
-        Explicit Lyrics
-      </label>
-  
+      <br></br>
       {/* Metadata Inputs */}
       <input type="text" name="isrc" placeholder="ISRC" value={formData.isrc} onChange={handleInputChange} />
+      <br></br>
       <input type="text" name="upc" placeholder="UPC" value={formData.upc} onChange={handleInputChange} />
+      <br></br>
       <input type="number" name="bpm" placeholder="BPM" value={formData.bpm} onChange={handleInputChange} />
+      <br></br>
       <input type="number" name="pitch" placeholder="Pitch" value={formData.pitch} onChange={handleInputChange} />
+      <br></br>
       <input type="text" name="key" placeholder="Key" value={formData.key} onChange={handleInputChange} />
   
       {/* Multi-Entry Inputs */}
@@ -185,6 +191,13 @@ const Upload = () => {
           </div>
         </div>
       ))}
+<p>
+</p>
+       {/* Explicit Checkbox */}
+       <label>
+        <input type="checkbox" name="explicit" checked={formData.explicit} onChange={handleCheckboxChange} />
+        Explicit Lyrics?
+      </label><p></p>
   
       {/* Upload Progress */}
       {uploading && (

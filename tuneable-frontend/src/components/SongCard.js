@@ -142,24 +142,6 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
         <p>{artist}</p>
       </div>
 
-      {/* ✅ **Display available streaming sources** */}
-      {song.sources && Object.keys(song.sources).length > 0 && (
-        <div className="streaming-links">
-          <h4>Listen on:</h4>
-          <ul>
-            {Object.entries(song.sources).map(([platform, url]) => (
-              url && (
-                <li key={platform}>
-                  <a href={url} target="_blank" rel="noopener noreferrer">
-                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                  </a>
-                </li>
-              )
-            ))}
-          </ul>
-        </div>
-      )}
-
       <div className="bid-info">
         <p>Current Total Bid : £{totalBidValue}</p>
         {bids.length > 0 && (

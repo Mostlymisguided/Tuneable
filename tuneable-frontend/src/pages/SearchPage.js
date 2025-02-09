@@ -66,13 +66,24 @@ useEffect(() => {
     }
 
     return () => {
-        // ✅ Fix: Ensure the function exists before calling `.cancel()`
-        if (typeof debouncedFetchResults?.cancel === "function") {
+        if (debouncedFetchResults.cancel) {
             debouncedFetchResults.cancel();
         }
     };
 }, [query, debouncedFetchResults]);
 
+    useEffect(() => {
+        if (query) {
+            debouncedFetchResults();
+        }
+
+        return () => {
+            // ✅ Prevents "destroy is not a function" error
+            if (debouncedFetchResults.cancel) {
+                debouncedFetchResults.cancel();
+            }
+        };
+    }, [query, debouncedFetchResults]);
 
     const handleBid = async (song) => {
         console.log("🎯 handleBid called for:", song);
