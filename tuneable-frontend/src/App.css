@@ -233,6 +233,7 @@ footer {
 }
 
 .upload-container {
+  color:#000;
   max-width: 500px;
   margin: auto;
   padding: 20px;
@@ -286,3 +287,8 @@ footer {
   margin-left: 5px;
 }
 
+.actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

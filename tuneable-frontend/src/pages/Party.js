@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import SongCard from "../components/SongCard";
-import NewRequest from "../components/NewRequest";
 import Footer from "../components/Footer";
 import WebPlayer from "../components/WebPlayer";
 
@@ -164,6 +163,9 @@ const Party = () => {
                         <p>No attendees yet.</p>
                     )}
                     <h2>Next Up</h2>
+                    <div className="actions">
+                <button onClick={navigateToSearch}>Add Song</button>
+            </div>
                     <div className="playlist">
                         {songs.map((song, index) => (
                             <SongCard
@@ -178,9 +180,6 @@ const Party = () => {
                     </div>
                 </>
             )}
-            <div className="actions">
-                <button onClick={navigateToSearch}>Search for Songs</button>
-            </div>
             {isJoined && userId === hostId && (
                 <div className="host-controls">
                     <button onClick={() => sendHostAction("PLAY")}>▶ Play</button>
@@ -188,7 +187,6 @@ const Party = () => {
                     <button onClick={() => sendHostAction("SKIP")}>⏭ Skip</button>
                 </div>
             )}
-            <NewRequest refreshPlaylist={fetchPartyDetails} />
             <Footer currentSong={currentSong} />
             {currentSong?.url && <WebPlayer url={currentSong.url} playing={currentSong.playing} />}
         </div>
