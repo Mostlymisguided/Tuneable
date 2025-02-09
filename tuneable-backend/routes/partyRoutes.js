@@ -313,12 +313,12 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
     }
 });
 
-/**
+/** DEFUNCT ROUTE
  * Route still used?
  * Route: POST /:partyId/songs
  * Add a new song to a party
  * Access: Protected (requires valid token)
- */
+ *
 router.post('/:partyId/songs', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
@@ -346,14 +346,14 @@ router.post('/:partyId/songs', authMiddleware, async (req, res) => {
     } catch (err) {
         handleError(res, err, 'Error adding song to party');
     }
-});
+}); */
 
-/**
+/* DEFUNCT ROUTE
  * Route: POST /:partyId/songs/bid
  * Add a new song or place a bid on an existing song in the party's queue.
  * Access: Protected (requires valid token)
- */
-router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
+ *
+/* router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
         const { songId, url, title, artist, bidAmount, platform } = req.body;
@@ -439,14 +439,14 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
         console.error('Error placing bid:', err);
         res.status(500).json({ error: 'Error placing bid', details: err.message });
     }
-});
+}); */
 
 
-/**
+/**DEFUNCT ROUTE
  * Route: POST /:partyId/songs/:songId/bid
  * Place a bid on an existing song in the party
  * Access: Protected (requires valid token)
- */
+ *
 router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
@@ -476,6 +476,6 @@ router.post('/:partyId/songs/:songId/bid', authMiddleware, async (req, res) => {
         res.status(500).json({ error: 'Error placing bid', details: err.message });
     }
 
-});
+}); */
 
 module.exports = router;
