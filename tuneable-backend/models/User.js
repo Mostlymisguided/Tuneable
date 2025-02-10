@@ -4,8 +4,8 @@ const bcrypt = require('bcrypt');
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
-  givenName:{ type: String, required: true},
-  familyNAme:{ type: String, required: true},
+  givenName:{ type: String },
+  familyNAme:{ type: String },
   password: { type: String, required: true },
   profilePic: { type: String, default: null }, // Stores URL or file path
   balance: { type: Number, default: 0 }, // New field for wallet balance
