@@ -123,10 +123,16 @@ useEffect(() => {
     
         navigate(`/party/${partyId}`);
     };     
-
+    
     return (
         <div className="search-page">
             <header className="search-header">
+            <button
+                        className={source === 'youtube' ? 'active' : ''}
+                        onClick={navigate(`/party/${partyId}`)}
+                    >
+                        Back To Party
+                    </button>
                 <h1>New Request</h1>
                 <div className="search-options">
                     <button

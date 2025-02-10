@@ -39,8 +39,8 @@ const PartySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'scheduled', 'ended', 'canceled'],
-    default: 'active',
+    enum: ['scheduled', 'active', 'ended', 'canceled'],
+    default: 'scheduled',
   },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
