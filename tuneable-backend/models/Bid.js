@@ -25,12 +25,18 @@ const bidSchema = new mongoose.Schema({
         type: Date, 
         default: Date.now 
     },
+    status: {
+        type: String,
+        enum: ['requested', 'active', 'vetoed', 'refunded'],
+        default: 'requested'
+    },
 });
 
 // Indexes
 bidSchema.index({ userId: 1 });
 bidSchema.index({ partyId: 1 });
 bidSchema.index({ songId: 1 });
+
 
 // Populate references for convenience
 bidSchema.pre(/^find/, function(next) {
