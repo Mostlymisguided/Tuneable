@@ -50,7 +50,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { username, email, password, homeLocation } = req.body;
+      const { username, email, password, cellPhone, givenName, familyName, homeLocation } = req.body;
       
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });
       if (existingUser) {
@@ -62,7 +62,10 @@ router.post(
         username,
         email,
         password,
-        homeLocation: homeLocation || {}
+        cellPhone: cellPhone || {},
+        givenName: givenName || {},
+        familyName: familyName || {},
+        homeLocation: homeLocation || {},
       });
       await user.save();
       
@@ -79,6 +82,9 @@ router.post(
           _id: user._id,
           username: user.username,
           email: user.email,
+          cellPhone: user.cellPhone,
+          givenName: user.givenName,
+          familyName: user.familyName,
           homeLocation: user.homeLocation,
           profilePic: user.profilePic,
         },

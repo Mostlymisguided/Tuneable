@@ -9,7 +9,7 @@ const PartySchema = new mongoose.Schema({
   },
   venue: {
     type: String,
-    required: true,
+    //required: true,
     minlength: [3, 'Venue must be at least 3 characters long'],
     maxlength: [100, 'Venue cannot exceed 100 characters'],
   },

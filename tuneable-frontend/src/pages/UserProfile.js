@@ -101,7 +101,11 @@ const UserProfile = () => {
                 <img src={profilePicUrl} alt="Profile" className="profile-pic" />
                 <div className="profile-info">
                     <h1>{user.username || "Unknown User"}</h1>
-                    <p>{user.location || "Location not set"}</p>
+                    <p>{user.cellPhone || "Location not set"}</p>
+                    <p>{user.givenName || "Given Name not set"}</p>
+                    <p>{user.familyName || "Family Name not set"}</p>
+                    <p>{user.homeLocation.city || "Location not set"}</p>
+                    <p>{user.homeLocation.country || "Location not set"}</p>
                     <span>
                         {user.role || "User"} | 
                         {user.stats?.plays ?? 0} plays | 

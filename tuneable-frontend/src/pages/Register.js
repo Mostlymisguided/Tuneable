@@ -7,6 +7,9 @@ const Register = () => {
     email: '',
     password: '',
     profilePicture: null, // Changed from string to file
+    cellPhone: '',
+    givenName: '',
+    familyName: '',
     homeLocation: '',
     city: '',
     country: '',
@@ -31,6 +34,9 @@ const Register = () => {
     data.append('username', formData.username);
     data.append('email', formData.email);
     data.append('password', formData.password);
+    data.append('cellPhone', formData.cellPhone);
+    data.append('givenName', formData.givenName);
+    data.append('familyName', formData.familyName);
     data.append('homeLocation[city]', formData.city);
     data.append('homeLocation[country]', formData.country);
     if (formData.profilePicture) {
@@ -87,6 +93,36 @@ const Register = () => {
             type="password"
             name="password"
             value={formData.password}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div>
+          <label>Cell Phone:</label>
+          <input
+            type="text"
+            name="cellPhone"
+            value={formData.cellPhone}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div>
+          <label>Given Name:</label>
+          <input
+            type="text"
+            name="givenName"
+            value={formData.givenName}
+            onChange={handleChange}
+            required
+          />
+        </div>
+            <div>
+          <label>Family Name:</label>
+          <input
+            type="text"
+            name="familyName"
+            value={formData.familyName}
             onChange={handleChange}
             required
           />
