@@ -43,9 +43,8 @@ const PartySchema = new mongoose.Schema({
     default: 'scheduled',
   },
   watershed: {
-    type: String,
-    enum: ['adult', 'clean'],
-    default: 'adult',
+    type: Boolean,
+    default: true,
   },
 
   createdAt: { type: Date, default: Date.now },

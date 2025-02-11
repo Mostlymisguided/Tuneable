@@ -54,7 +54,7 @@ router.post('/', authMiddleware, async (req, res) => {
       // Generate MongoDB ObjectId manually so we can hash it for partyCode
       const objectId = new mongoose.Types.ObjectId();
       const partyCode = deriveCodeFromPartyId(objectId); // ✅ Hash the unique _id to create partyCode
-      const formattedWatershed = watershed === "clean" ? "clean" : "adult"; // ✅ Default to "adult"
+      //const formattedWatershed = watershed === "clean" ? "clean" : "adult"; // ✅ Default to "adult"
 
       const party = new Party({
         _id: objectId,
@@ -70,7 +70,7 @@ router.post('/', authMiddleware, async (req, res) => {
         endTime,
         type: type || 'public',
         status: 'scheduled',
-        watershed: formattedWatershed, // ✅ Stores "adult" instead of "explicit"
+        watershed,
       });
   
       await party.save();
@@ -193,6 +193,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             attendees: party.attendees,
             startTime: party.startTime,
             endTime: party.endTime,
+            watershed: party.watershed,
             availability: party.type,
             status: party.status,
             createdAt: party.createdAt,
