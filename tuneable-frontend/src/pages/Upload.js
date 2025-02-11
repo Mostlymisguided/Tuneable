@@ -155,7 +155,7 @@ const Upload = () => {
       <br></br>
       <input type="text" name="producer" placeholder="Producer" value={formData.producer} onChange={handleInputChange} />
       <br></br>
-      <input type="text" name="rightsHolder" placeholder="Rights Holder" value={formData.rightsHolder} onChange={handleInputChange} />
+      <input type="email" name="rightsHolder" placeholder="Rights Holder Email (Required)" value={formData.rightsHolder} onChange={handleInputChange} required />
       <br></br>
       <input type="text" name="album" placeholder="Album" value={formData.album} onChange={handleInputChange} />
       <br></br>
@@ -197,6 +197,12 @@ const Upload = () => {
        <label>
         <input type="checkbox" name="explicit" checked={formData.explicit} onChange={handleCheckboxChange} />
         Explicit Lyrics?
+      </label><p></p>
+
+         {/* Right's Holder */}
+         <label>
+        <input type="checkbox" name="rightsConfirmation" checked={formData.rightsConfirmation} onChange={handleCheckboxChange} />
+        I am the rights holder to this song
       </label><p></p>
   
       {/* Upload Progress */}

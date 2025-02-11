@@ -7,6 +7,13 @@ import WebPlayer from "../components/WebPlayer";
 
 const Party = () => {
     const [partyName, setPartyName] = useState("Party");
+    const [partyVenue, setVenue] = useState("Venue");
+    const [partyLocation, setLocation] = useState("Location");
+    const [partyStart, setStartTime] = useState("Start");
+    const [partyEnd, setEndTime] = useState("Finish");
+    const [partyType, setType] = useState("Public");
+    const [partyStatus, setStatus] = useState('Scheduled')
+    const [partyWatershed, setWatershed] = useState('Explicit')
     const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
     const [attendees, setAttendees] = useState([]);
@@ -39,6 +46,34 @@ const Party = () => {
             console.log("Fetched Party Details:", party);
 
             setPartyName(party.name || "Party");
+            setVenue(party.venue || "Venue");
+            setLocation(party.location || "Location");
+            
+            setStartTime(new Date(party.startTime).toLocaleString("en-GB", { 
+                weekday: "long", 
+                year: "numeric", 
+                month: "long", 
+                day: "numeric", 
+                hour: "2-digit", 
+                minute: "2-digit" 
+            }));
+            setEndTime(new Date(party.endTime).toLocaleString("en-GB", { 
+                weekday: "long", 
+                year: "numeric", 
+                month: "long", 
+                day: "numeric", 
+                hour: "2-digit", 
+                minute: "2-digit" 
+            }));
+
+            const watershedMaker = ["adult", "explicit"].includes(party.watershed?.toLowerCase())
+            ? "Adult Lyrics Allowed"
+            : "Clean Bars Only";
+
+            setType(party.availability || 'Public');
+            setStatus(party.status || 'Scheduled')
+            // ✅ FIXED: Ensure "explicit" is always correctly identified
+            setWatershed(watershedMaker);
             setSongs(party.songs || []);
             setAttendees(party.attendees || []);
             setCurrentSong(party.songs.length > 0 ? party.songs[0] : {});
@@ -142,6 +177,14 @@ const Party = () => {
     return (
         <div className="party-container">
             <h1>{partyName}</h1>
+            <h2>{partyVenue}</h2>
+            <h2>{partyLocation}</h2>
+            <h3>{partyStart}</h3>
+            <h3>{partyEnd}</h3>
+            <h3>{partyType}</h3>
+            <h3>{partyStatus}</h3>
+            <h3>{partyWatershed}</h3>
+
             {errorMessage && <p className="error-message" style={{ color: "red" }}>{errorMessage}</p>}
             {loading ? (
                 <p>Loading party details...</p>
