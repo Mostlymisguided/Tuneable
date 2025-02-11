@@ -5,37 +5,29 @@ const CreateParty = () => {
     const [partyName, setPartyName] = useState('');
     const [partyVenue, setPartyVenue] = useState('');
     const [partyLocation, setPartyLocation] = useState('');
+    const [partyStart, setPartyStart] = useState('');
+    const [partyEnd, setPartyEnd] = useState('');
+    const [partyType, setPartyType] = useState('public');
+    const [partyWatershed, setPartyWatershed] = useState('explicit');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const createParty = async () => {
-        if (!partyName.trim()) {
-            alert('Party Name cannot be empty');
-            return;
+        if (!partyName.trim()) return setError('Party Name cannot be empty');
+        if (!partyVenue.trim()) return setError('Party Venue cannot be empty');
+        if (!partyLocation.trim()) return setError('Party Location cannot be empty');
+        if (!partyStart) return setError('Party Start Date and Time are required');
+        if (!partyEnd) return setError('Party End Date and Time are required');
+
+        // ✅ Ensure End Time is after Start Time
+        if (new Date(partyEnd) <= new Date(partyStart)) {
+            return setError('Party End Time must be after Start Time');
         }
 
-        if (!partyVenue.trim()) {
-            alert('Party Venue cannot be empty');
-            return;
-        }
-
-        if (!partyLocation.trim()) {
-            alert('Party Location cannot be empty');
-            return;
-        }
-
-        if (partyName.trim().length > 50) {
-            alert('Party name cannot exceed 50 characters');
-            return;
-        }
-
-        // Retrieve token from localStorage
-        const token = localStorage.getItem('token'); // Ensure you're using the correct key
-        console.log('Token for party creation:', token); // Debug log
-
+        const token = localStorage.getItem('token');
         if (!token) {
             alert('You must be logged in to create a party.');
-            window.location.href = '/login'; // Redirect to login page
+            window.location.href = '/login';
             return;
         }
 
@@ -43,30 +35,34 @@ const CreateParty = () => {
         setError(null);
 
         try {
+            // ✅ Convert `datetime-local` format to ISO 8601 (`YYYY-MM-DDTHH:mm:ss.sssZ`)
+            const formattedStart = new Date(partyStart).toISOString();
+            const formattedEnd = new Date(partyEnd).toISOString();
+
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties`,
-                { name: partyName, venue: partyVenue, location: partyLocation },
                 {
-                    headers: { Authorization: `Bearer ${token}` }, // Use the retrieved token
+                    name: partyName,
+                    venue: partyVenue,
+                    location: partyLocation,
+                    startTime: formattedStart,
+                    endTime: formattedEnd,
+                    type: partyType,
+                    watershed: partyWatershed,
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
                 }
             );
 
-            const { party } = response.data; // Extract party object
-            const partyId = party._id; // Get partyId
-            const partyCode = party.partyCode; // Get the updated partyCode field
+            const { party } = response.data;
+            localStorage.setItem('partyId', party._id);
 
-            localStorage.setItem('partyId', partyId); // Store partyId in local storage
-            alert(`Party "${partyName}" created successfully! Party Code: ${partyCode}`); // Include partyCode in the alert
-            window.location.href = `/party/${partyId}`; // Redirect to the party page
+            alert(`Party "${party.name}" created successfully! Party Code: ${party.partyCode}`);
+            window.location.href = `/party/${party._id}`;
         } catch (err) {
             console.error('Error creating party:', err);
-
-            // Enhanced error handling
-            if (err.response?.data?.details?.includes('E11000 duplicate key')) {
-                setError('A unique code could not be generated for the party. Please try again.');
-            } else {
-                setError(err.response?.data?.error || 'Failed to create party. Please try again.');
-            }
+            setError(err.response?.data?.error || 'Failed to create party. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -75,22 +71,50 @@ const CreateParty = () => {
     return (
         <div>
             <h1>Create a New Party</h1>
-            <input
-                type="text"
-                placeholder="Enter party name"
-                value={partyName}
-                onChange={(e) => setPartyName(e.target.value)}
-            /> 
-            <input
-            type="text"
-            placeholder="Enter party location"
-            value={partyLocation}
-            onChange={(e) => setPartyLocation(e.target.value)}
-        />
+
+            <input type="text" placeholder="Enter Party Name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+            <p></p>
+
+            <input type="text" placeholder="Enter or Select Venue" value={partyVenue} list="venueOptions" onChange={(e) => setPartyVenue(e.target.value)} />
+            <datalist id="venueOptions">
+                <option value="Home" />
+                <option value="Club" />
+                <option value="Bar" />
+                <option value="Outdoor" />
+            </datalist>
+            <p></p>
+
+            <input type="text" placeholder="Enter Party Location" value={partyLocation} onChange={(e) => setPartyLocation(e.target.value)} />
+            <p></p>
+
+            {/* ✅ Use `datetime-local` for accurate user input */}
+            <label>Party Start</label>
+            <input type="datetime-local" value={partyStart} onChange={(e) => setPartyStart(e.target.value)} />
+            <p></p>
+
+            <label>Party End</label>
+            <input type="datetime-local" value={partyEnd} onChange={(e) => setPartyEnd(e.target.value)} />
+            <p></p>
+
+            <select value={partyType} onChange={(e) => setPartyType(e.target.value)}>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="geocoded">Geocoded</option>
+            </select>
+            <p>Party Type</p>
+
+            <select value={partyWatershed} onChange={(e) => setPartyWatershed(e.target.value)}>
+            <option value="adult">Allow Adult Content</option>  {/* ✅ Changed from "Explicit" */}
+            <option value="clean">Clean Content Only</option>
+            </select>
+            <p>Allow Adult Content?</p>
+
             <button onClick={createParty} disabled={loading}>
                 {loading ? 'Creating...' : 'Create Party'}
             </button>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
+
+            {loading && <p style={{ color: 'blue' }}>Creating your party...</p>}
+            {error && <p style={{ color: 'red', fontWeight: 'bold' }}>{error}</p>}
         </div>
     );
 };

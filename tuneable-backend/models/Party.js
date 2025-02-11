@@ -32,7 +32,7 @@ const PartySchema = new mongoose.Schema({
   ],
   startTime:{ type: Date, default: Date.now },
   endTime: { type: Date, default: null},
-  availability: {
+  type: {
     type: String,
     enum: ['public', 'private', 'geocoded'],
     default: 'public',
@@ -42,6 +42,12 @@ const PartySchema = new mongoose.Schema({
     enum: ['scheduled', 'active', 'ended', 'canceled'],
     default: 'scheduled',
   },
+  watershed: {
+    type: String,
+    enum: ['adult', 'clean'],
+    default: 'adult',
+  },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
