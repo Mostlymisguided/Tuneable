@@ -13,7 +13,7 @@ const Party = () => {
     const [partyEnd, setEndTime] = useState("Finish");
     const [partyType, setType] = useState("Public");
     const [partyStatus, setStatus] = useState('Scheduled')
-    const [partyWatershed, setWatershed] = useState('Explicit')
+    const [partyWatershed, setWatershed] = useState('true')
     const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
     const [attendees, setAttendees] = useState([]);
@@ -66,14 +66,10 @@ const Party = () => {
                 minute: "2-digit" 
             }));
 
-            const watershedMaker = ["adult", "explicit"].includes(party.watershed?.toLowerCase())
-            ? "Adult Lyrics Allowed"
-            : "Clean Bars Only";
 
             setType(party.availability || 'Public');
-            setStatus(party.status || 'Scheduled')
-            // ✅ FIXED: Ensure "explicit" is always correctly identified
-            setWatershed(watershedMaker);
+            setStatus(party.status || 'Scheduled');
+            setWatershed(party.watershed ? "Adult Lyrics Allowed" : "Clean Bars Only");
             setSongs(party.songs || []);
             setAttendees(party.attendees || []);
             setCurrentSong(party.songs.length > 0 ? party.songs[0] : {});

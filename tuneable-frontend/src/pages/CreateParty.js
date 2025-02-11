@@ -8,7 +8,7 @@ const CreateParty = () => {
     const [partyStart, setPartyStart] = useState('');
     const [partyEnd, setPartyEnd] = useState('');
     const [partyType, setPartyType] = useState('public');
-    const [partyWatershed, setPartyWatershed] = useState('explicit');
+    const [partyWatershed, setPartyWatershed] = useState('true');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -81,6 +81,7 @@ const CreateParty = () => {
                 <option value="Club" />
                 <option value="Bar" />
                 <option value="Outdoor" />
+                <option value="Boat" />
             </datalist>
             <p></p>
 
@@ -103,12 +104,16 @@ const CreateParty = () => {
             </select>
             <p>Party Type</p>
 
-            <select value={partyWatershed} onChange={(e) => setPartyWatershed(e.target.value)}>
-            <option value="adult">Allow Adult Content</option>  {/* ✅ Changed from "Explicit" */}
-            <option value="clean">Clean Content Only</option>
-            </select>
-            <p>Allow Adult Content?</p>
-
+            <label>
+            <input 
+            type="checkbox"
+            checked={partyWatershed}
+            onChange={(e) => setPartyWatershed(e.target.checked)}
+            />
+            Allow Adult Content?
+            </label>
+            <p>
+            </p>
             <button onClick={createParty} disabled={loading}>
                 {loading ? 'Creating...' : 'Create Party'}
             </button>
