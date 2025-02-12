@@ -3,37 +3,32 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import API from '../api';
 
-// ✅ Function to extract YouTube thumbnail from URL
-const getYouTubeThumbnail = (youtubeUrl) => {
-  if (!youtubeUrl || typeof youtubeUrl !== "string") return "/default-cover.jpg";
-
-  try {
-    const urlObj = new URL(youtubeUrl);
-    const videoId = urlObj.searchParams.get("v");
-    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : "/default-cover.jpg";
-  } catch {
-    return "/default-cover.jpg";
-  }
-};
-
-
 const getCoverArt = (song) => {
   console.log("🖼 Checking coverArt for song:", song);
-  if (!song) return "/default-cover.jpg"; // ✅ Prevents crashes
+  if (!song) return "/default-cover.jpg"; // ✅ Prevent crashes
 
-  if (song.coverArt && song.coverArt !== "/default-cover.jpg") {
-    console.log("✅ Using song coverArt:", song.coverArt);
-    return song.coverArt; // ✅ Correctly use coverArt if available
-  }
-
-  if (song.sources?.youtube) {
-    console.log("🔄 Falling back to YouTube thumbnail...");
-    return getYouTubeThumbnail(song.sources.youtube); // ✅ Fallback
+  if (song.coverArt && song.coverArt.startsWith("http")) {
+      console.log("✅ Using song coverArt:", song.coverArt);
+      return song.coverArt; // ✅ Use stored coverArt if available
   }
 
   console.log("❌ No coverArt found, using default.");
   return "/default-cover.jpg"; // ✅ Final fallback
 };
+
+/* ✅ Function to extract YouTube thumbnail from URL
+const getYouTubeThumbnail = (youtubeUrl) => {
+  if (!youtubeUrl || typeof youtubeUrl !== "string") return "/default-cover.jpg";
+
+  try {
+    const urlObj = new URL(youtubeUrl);
+    const videoId = urlObj.searchParams.get("v"); // ✅ Extract YouTube video ID
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : "/default-cover.jpg";
+  } catch {
+    return "/default-cover.jpg";
+  }
+}; */
+
 
 const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   const [bidAmount, setBidAmount] = useState(1);
@@ -41,6 +36,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
 
   // ✅ Get coverArt using the `song` prop inside the component
   const cover = getCoverArt(song);
+  //const cover = songCoverArt(song);
 
   useEffect(() => {
     console.log("🔍 SongCard received song:", JSON.stringify(song, null, 2));
@@ -65,16 +61,6 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
 
   console.log("Song object:", song);
 
-  // ✅ Extract YouTube URL from `sources`
-  const getYouTubeUrl = (sources) => {
-    if (!sources) return null;
-    if (typeof sources === "object" && sources.youtube) {
-      return sources.youtube;
-    }
-    return null;
-  };
-
-  const youtubeUrl = getYouTubeUrl(song?.sources);
 
   const handleBid = async () => {
     if (!partyId) {
@@ -129,17 +115,22 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   const artist = song?.artist || 'Unknown Artist';
   const totalBidValue = song?.globalBidValue || 0;
 
+  const formatDuration = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+};
+  
+
   return (
+    
     <div className="song-card">
       <span>{rank || '?'}</span>
-      <img 
-        src={cover} 
-        alt={title} 
-        onError={(e) => e.target.src = "/default-cover.jpg"} // Fallback for missing images
-      />
+      <img src={cover} alt={`${song.title} cover`} />
       <div className="song-info">
         <h3>{title}</h3>
         <p>{artist}</p>
+        <p>⏱ {formatDuration(song.duration)}</p>
       </div>
 
       <div className="bid-info">

@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   cellPhone:{ type: String }, 
   givenName:{ type: String },
-  familyNAme:{ type: String },
+  familyName:{ type: String },
   profilePic: { type: String, default: null }, // Stores URL or file path
   balance: { type: Number, default: 0 }, // New field for wallet balance
   homeLocation: {
