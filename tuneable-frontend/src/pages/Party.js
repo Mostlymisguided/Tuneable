@@ -12,13 +12,13 @@ const Party = () => {
     const [partyStart, setStartTime] = useState("Start");
     const [partyEnd, setEndTime] = useState("Finish");
     const [partyType, setType] = useState("Public");
-    const [partyStatus, setStatus] = useState('Scheduled')
-    const [partyWatershed, setWatershed] = useState('true')
+    const [partyStatus, setStatus] = useState("Scheduled");
+    const [partyWatershed, setWatershed] = useState(true);
     const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
     const [attendees, setAttendees] = useState([]);
     const [hostId, setHostId] = useState(null);
-    const [userId] = useState(localStorage.getItem("userId")); // not needed?
+    const [userId] = useState(localStorage.getItem("userId"));
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isJoined, setIsJoined] = useState(false);
@@ -48,7 +48,7 @@ const Party = () => {
             setPartyName(party.name || "Party");
             setVenue(party.venue || "Venue");
             setLocation(party.location || "Location");
-            
+
             setStartTime(new Date(party.startTime).toLocaleString("en-GB", { 
                 weekday: "long", 
                 year: "numeric", 
@@ -66,10 +66,21 @@ const Party = () => {
                 minute: "2-digit" 
             }));
 
+            setType(party.type || "Public");
 
-            setType(party.availability || 'Public');
-            setStatus(party.status || 'Scheduled');
+            // ✅ Auto-update status based on `startTime` and `endTime`
+            const now = new Date();
+            if (now < new Date(party.startTime)) {
+                setStatus("🎉 Scheduled - Starting Soon!");
+            } else if (now >= new Date(party.startTime) && now < new Date(party.endTime)) {
+                setStatus("🔥 Party is Live!");
+            } else if (now >= new Date(party.endTime)) {
+                setStatus("🎵 Party Ended - See You Next Time!");
+            }
+
+            // ✅ Ensure correct display for watershed (boolean)
             setWatershed(party.watershed ? "Adult Lyrics Allowed" : "Clean Bars Only");
+
             setSongs(party.songs || []);
             setAttendees(party.attendees || []);
             setCurrentSong(party.songs.length > 0 ? party.songs[0] : {});
@@ -86,79 +97,70 @@ const Party = () => {
 
     // 🎧 WebSocket Connection for Real-Time Queue & Playback Sync
     useEffect(() => {
-        const ws = new WebSocket("ws://localhost:8000"); // Update with production WebSocket URL
-        setSocket(ws);
-
-        ws.onopen = () => {
-            ws.send(JSON.stringify({ type: "SET_HOST", partyId, userId }));
+        let ws;
+    
+        const connectWebSocket = () => {
+            ws = new WebSocket("ws://localhost:8000"); 
+    
+            ws.onopen = () => {
+                console.log("✅ WebSocket Connected");
+                ws.send(JSON.stringify({ type: "SET_HOST", partyId, userId }));
+            };
+    
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (!data) return;
+    
+                    if (data.type === "UPDATE_QUEUE" && data.partyId === partyId) {
+                        console.log("📡 Queue Updated via WebSocket:", data.queue);
+                        setSongs(data.queue || []);
+                        if (data.queue.length > 0) {
+                            setCurrentSong(data.queue[0]);
+                        }
+                    }
+                    if (data.type === "PLAYBACK_ACTION" && data.partyId === partyId) {
+                        console.log(`🎵 Received playback action: ${data.action}`);
+    
+                        if (data.action === "PLAY") {
+                            setCurrentSong(prev => ({ ...prev, playing: true }));
+                        } else if (data.action === "PAUSE") {
+                            setCurrentSong(prev => ({ ...prev, playing: false }));
+                        } else if (data.action === "SKIP") {
+                            setSongs(prevQueue => {
+                                const newQueue = prevQueue.slice(1);
+                                setCurrentSong(newQueue[0] || {});
+                                return newQueue;
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error("🔴 Error processing WebSocket message:", error);
+                }
+            };
+    
+            ws.onerror = (error) => {
+                console.error("🔴 WebSocket Error:", error);
+            };
+    
+            ws.onclose = (event) => {
+                console.warn("⚠️ WebSocket Closed", event.code, event.reason);
+                setTimeout(() => {
+                    console.log("♻️ Reconnecting WebSocket...");
+                    connectWebSocket(); // ✅ Automatically reconnect if closed
+                }, 3000);
+            };
+    
+            setSocket(ws);
         };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === "UPDATE_QUEUE" && data.partyId === partyId) {
-                console.log("📡 Queue Updated via WebSocket:", data.queue);
-                setSongs(data.queue);
-                if (data.queue.length > 0) {
-                    setCurrentSong(data.queue[0]);
-                }
-            }
-            if (data.type === "PLAYBACK_ACTION" && data.partyId === partyId) {
-                if (data.action === "PLAY") setCurrentSong(prev => ({ ...prev, playing: true }));
-                if (data.action === "PAUSE") setCurrentSong(prev => ({ ...prev, playing: false }));
-                if (data.action === "SKIP") {
-                    setSongs(prev => prev.slice(1)); // Remove first song from queue
-                    setCurrentSong(songs[1] || {}); // Move to the next song
-                }
-            }
+    
+        connectWebSocket(); // ✅ Establish connection
+    
+        return () => {
+            if (ws) ws.close();
         };
-
-        return () => ws.close();
-    }, [partyId, userId, songs]);
-
-    // 🎵 Handle Queue Update When Bids Change
-    const handleBidPlaced = (updatedSong) => {
-        setSongs((prevSongs) => {
-            const newQueue = prevSongs.map((s) =>
-                s._id === updatedSong._id ? updatedSong : s
-            );
-            return newQueue.sort((a, b) => b.globalBidValue - a.globalBidValue);
-        });
-
-        if (socket) {
-            socket.send(JSON.stringify({ type: "UPDATE_QUEUE", partyId, queue: songs }));
-        }
-    };
-
-    // 🎤 Host Actions (Play, Pause, Skip, Veto)
-    const sendHostAction = (action, songId = null) => {
-        if (!socket || hostId !== userId) return;
-        socket.send(JSON.stringify({ type: "PLAYBACK_ACTION", partyId, action, songId, userId }));
-    };
-
-    const handleJoinParty = async () => {
-        try {
-            const token = localStorage.getItem("token");
-            if (!token) {
-                throw new Error("Unauthorized: No token provided.");
-            }
-
-            const response = await axios.post(
-                `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/join`,
-                {},
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-
-            alert(response.data.message);
-            setIsJoined(true);
-            fetchPartyDetails();
-        } catch (error) {
-            console.error("Error joining party:", error);
-            setErrorMessage(error.response?.data?.error || "Failed to join the party.");
-        }
-    };
-
+    }, [partyId, userId]);
+    
     useEffect(() => {
         if (partyId) {
             fetchPartyDetails();
@@ -169,9 +171,10 @@ const Party = () => {
         localStorage.setItem("partyId", partyId);
         navigate(`/search?partyId=${partyId}`);
     };
-
+    
     return (
         <div className="party-container">
+            {console.log("Rendering Party Page with:", partyName, partyVenue, partyLocation, partyStatus, songs)}
             <h1>{partyName}</h1>
             <h2>{partyVenue}</h2>
             <h2>{partyLocation}</h2>
@@ -180,17 +183,12 @@ const Party = () => {
             <h3>{partyType}</h3>
             <h3>{partyStatus}</h3>
             <h3>{partyWatershed}</h3>
-
+    
             {errorMessage && <p className="error-message" style={{ color: "red" }}>{errorMessage}</p>}
             {loading ? (
                 <p>Loading party details...</p>
             ) : (
                 <>
-                    {!isJoined && (
-                        <button onClick={handleJoinParty} className="join-party-button">
-                            Join Party
-                        </button>
-                    )}
                     <h2>Attendees</h2>
                     {attendees.length > 0 ? (
                         <ul>
@@ -201,10 +199,9 @@ const Party = () => {
                     ) : (
                         <p>No attendees yet.</p>
                     )}
+                   <button onClick={navigateToSearch}>Add Song</button>
+    
                     <h2>Next Up</h2>
-                    <div className="actions">
-                <button onClick={navigateToSearch}>Add Song</button>
-            </div>
                     <div className="playlist">
                         {songs.map((song, index) => (
                             <SongCard
@@ -212,24 +209,16 @@ const Party = () => {
                                 song={song}
                                 rank={index + 1}
                                 partyId={partyId}
-                                onBidPlaced={handleBidPlaced}
-                                onVeto={() => sendHostAction("VETO", song._id)} // ✅ Veto button
                             />
                         ))}
                     </div>
                 </>
             )}
-            {isJoined && userId === hostId && (
-                <div className="host-controls">
-                    <button onClick={() => sendHostAction("PLAY")}>▶ Play</button>
-                    <button onClick={() => sendHostAction("PAUSE")}>⏸ Pause</button>
-                    <button onClick={() => sendHostAction("SKIP")}>⏭ Skip</button>
-                </div>
-            )}
             <Footer currentSong={currentSong} />
             {currentSong?.url && <WebPlayer url={currentSong.url} playing={currentSong.playing} />}
         </div>
     );
+    
 };
 
 export default Party;
