@@ -41,10 +41,10 @@ const fetchResults = useCallback(async (pageToken = null) => {
         const { videos = [] } = response.data;
         const mappedResults = videos.map((video) => ({
             id: video.id,
-            title: video.title,
-            artist: video.channelTitle || 'alt artist from searchpage', // Assuming channel name as rights holder
+            title: video.title || 'fallback test',
+            artist: video.artist || 'alt artist from searchpage', // Assuming channel name as rights holder
             coverArt: video.thumbnail?.includes("http") ? video.thumbnail : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`, // ✅ Ensure valid image            
-            duration: video.duration || 2, // ✅ Ensure duration is included coverArt: video.thumbnail,
+            duration: video.duration || 222, // ✅ Ensure duration is included coverArt: video.thumbnail,
             sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` }, // ✅ Dynamic mapping
         }));
 
@@ -96,7 +96,7 @@ useEffect(() => {
                 bidAmount,
                 title: song.title,
                 artist: song.artist || "Unknown Artist from searchpage", // Ensure artist exists
-                rightsHolder: song.artist || "Unknown Rights Holder",
+                //rightsHolder: song.artist || "Unknown Rights Holder",
                 duration: song.duration !== null && !isNaN(song.duration) ? song.duration : 3, // ✅ Ensure duration is sent properly
                 coverArt: song.coverArt?.includes("http") ? song.coverArt : "https://via.placeholder.com/180",                sources: { [source]: song.sources?.[source] || song.url }, // Ensure source has a URL
                 url: song.sources?.[source] || song.url, // ✅ Add explicit URL
@@ -184,6 +184,7 @@ useEffect(() => {
                                 <div>
                                     <h4>{item.title}</h4>
                                     <p>{item.artist}</p>
+                                    <p>{item.duration}</p>
                                 </div>
                                 <input
                                     type="number"
