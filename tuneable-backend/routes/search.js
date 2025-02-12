@@ -1,66 +1,66 @@
 const express = require('express');
 const NodeCache = require('node-cache');
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
-// const musicDatabaseService = require('../services/musicDatabaseService'); // Optional additional source
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
 
 // General search route
 router.get('/', async (req, res) => {
-    console.log('Search route hit'); // Debug log to confirm route is hit
+    console.log('Search route hit');
 
     const { query, source = 'youtube', pageToken } = req.query;
 
-    // Validate query
     if (!query) {
         console.error('Query parameter is missing');
         return res.status(400).json({ error: 'Query parameter is required' });
     }
-    if (query.length > 100) {
-        console.error('Query is too long:', query);
-        return res.status(400).json({ error: 'Query parameter exceeds maximum length of 100 characters' });
-    }
 
-    console.log('Query:', query, 'Source:', source, 'PageToken:', pageToken); // Debug log query details
+    console.log('Query:', query, 'Source:', source, 'PageToken:', pageToken);
 
     const cacheKey = `${source}-${query}-${pageToken || ''}`;
     const cachedResult = cache.get(cacheKey);
 
     if (cachedResult) {
-        console.log('Returning cached result'); // Debug log for cache hit
+        console.log('Returning cached result');
         return res.json(cachedResult);
     }
 
     try {
         let result;
 
-        switch (source) {
-            case 'youtube':
-                console.log('Using YouTube service'); // Debug log for source
-                result = await youtubeService.searchYouTube(query, pageToken);
-                break;
-
-            case 'music':
-                console.log('Using Music Database service'); // Debug log for source
-                result = await musicDatabaseService.searchMusic(query);
-                break;
-
-            default:
-                console.error('Invalid source parameter:', source); // Log invalid source
-                return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
+        if (source === 'youtube') {
+            console.log('Using YouTube service');
+            result = await youtubeService.searchYouTube(query, pageToken);
+        } else {
+            console.error('Invalid source parameter:', source);
+            return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
         }
 
-        // Log service response size (optional)
         console.log(`Service returned ${result?.videos?.length || 0} items for query: "${query}"`);
 
-        // Cache the result
-        cache.set(cacheKey, result);
-        console.log('Caching result for query:', cacheKey); // Debug log for caching
+        // ✅ Add duration to returned videos
+        const formattedResults = {
+            nextPageToken: result.nextPageToken || null,
+            videos: result.videos.map(video => ({
+                id: video.id,
+                title: video.title,
+                artist: video.channelTitle || "Unknown Artist",
+                coverArt: video.coverArt?.includes("http") 
+                    ? video.coverArt 
+                    : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`, // ✅ Extracted cover art
+                duration: video.duration || 0,
+                sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` }
+            }))
+        };        
 
-        res.json(result);
+        // ✅ Cache the result
+        cache.set(cacheKey, formattedResults);
+        console.log('Caching result for query:', cacheKey);
+
+        res.json(formattedResults);
     } catch (error) {
-        console.error('Search Error:', error.message); // Log any errors
+        console.error('Search Error:', error.message);
         res.status(500).json({ error: 'Failed to perform search', details: error.message });
     }
 });

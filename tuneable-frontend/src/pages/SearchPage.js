@@ -43,9 +43,12 @@ const fetchResults = useCallback(async (pageToken = null) => {
             id: video.id,
             title: video.title,
             artist: video.channelTitle, // Assuming channel name as rights holder
-            coverArt: video.thumbnail,
+            coverArt: video.thumbnail?.includes("http") ? video.thumbnail : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`, // ✅ Ensure valid image            
+            duration: video.duration || 2, // ✅ Ensure duration is included coverArt: video.thumbnail,
             sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` }, // ✅ Dynamic mapping
         }));
+
+        console.log("🎵 Processed Search Results:", JSON.stringify(mappedResults, null, 2)); // ✅ Log processed results
 
         setResults(pageToken ? [...results, ...mappedResults] : mappedResults);
         setNextPageToken(response.data.nextPageToken || null);
@@ -94,15 +97,15 @@ useEffect(() => {
                 title: song.title,
                 artist: song.artist || "Unknown Artist", // Ensure artist exists
                 rightsHolder: song.artist || "Unknown Rights Holder",
-                duration: song.duration || null,
-                coverArt: song.coverArt || null,
-                sources: { [source]: song.sources?.[source] || song.url }, // Ensure source has a URL
+                duration: song.duration !== null && !isNaN(song.duration) ? song.duration : 3, // ✅ Ensure duration is sent properly
+                coverArt: song.coverArt?.includes("http") ? song.coverArt : "https://via.placeholder.com/180",                sources: { [source]: song.sources?.[source] || song.url }, // Ensure source has a URL
                 url: song.sources?.[source] || song.url, // ✅ Add explicit URL
                 platform: source, // ✅ Explicitly add platform
-                addedBy: localStorage.getItem('userId'),
+                addedBy: localStorage.getItem('userId') || "Unknown User", // ✅ Ensure addedBy is not null
             };
     
             console.log("📦 Sending payload:", payload);
+            console.log("📦 Sending payload:", JSON.stringify(payload, null, 2)); // ✅ Log payload before sending
     
             const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/songs/bid`,
