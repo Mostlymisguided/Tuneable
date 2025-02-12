@@ -112,7 +112,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
 
   const bids = song?.bids || [];
   const title = song?.title || 'Unknown Title';
-  const artist = song?.artist || 'Unknown Artist';
+  const artist = song?.artist || 'Unknown Artist from songcard';
   const totalBidValue = song?.globalBidValue || 0;
 
   const formatDuration = (seconds) => {

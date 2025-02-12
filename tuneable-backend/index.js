@@ -9,7 +9,7 @@ const app = express();
 
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const partyRoutes = require('./routes/partyRoutes'); // Unified party and playlist functionality
-const searchRoutes = require('./routes/search'); // Import search routes
+const searchRoutes = require('./routes/searchRoutes'); // Import search routes
 const songRoutes = require('./routes/songRoutes'); // Import song routes
 const paymentRoutes = require('./routes/paymentRoutes');
 

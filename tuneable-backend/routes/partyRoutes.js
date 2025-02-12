@@ -265,7 +265,7 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
         }
 
         // ✅ Convert duration to integer & validate
-        const extractedDuration = duration && !isNaN(duration) ? parseInt(duration, 10) : 0;
+        const extractedDuration = duration && !isNaN(duration) ? parseInt(duration, 10) : 888;
         const extractedCoverArt = req.body.coverArt && req.body.coverArt.includes("http")
     ? req.body.coverArt 
     : `https://img.youtube.com/vi/${req.body.url.split("v=")[1]}/hqdefault.jpg`; // ✅ Generate from video ID
@@ -301,7 +301,7 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                     title,
                     artist,
                     coverArt: extractedCoverArt,
-                    duration: extractedDuration || 7, // ✅ Store duration correctly
+                    duration: extractedDuration || 777, // ✅ Store duration correctly
                     sources: { [platform]: url },
                     addedBy: userId
                 });
