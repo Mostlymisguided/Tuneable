@@ -42,7 +42,7 @@ const fetchResults = useCallback(async (pageToken = null) => {
         const mappedResults = videos.map((video) => ({
             id: video.id,
             title: video.title,
-            artist: video.channelTitle, // Assuming channel name as rights holder
+            artist: video.channelTitle || 'alt artist from searchpage', // Assuming channel name as rights holder
             coverArt: video.thumbnail?.includes("http") ? video.thumbnail : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`, // ✅ Ensure valid image            
             duration: video.duration || 2, // ✅ Ensure duration is included coverArt: video.thumbnail,
             sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` }, // ✅ Dynamic mapping
@@ -95,7 +95,7 @@ useEffect(() => {
             const payload = {
                 bidAmount,
                 title: song.title,
-                artist: song.artist || "Unknown Artist", // Ensure artist exists
+                artist: song.artist || "Unknown Artist from searchpage", // Ensure artist exists
                 rightsHolder: song.artist || "Unknown Rights Holder",
                 duration: song.duration !== null && !isNaN(song.duration) ? song.duration : 3, // ✅ Ensure duration is sent properly
                 coverArt: song.coverArt?.includes("http") ? song.coverArt : "https://via.placeholder.com/180",                sources: { [source]: song.sources?.[source] || song.url }, // Ensure source has a URL
@@ -130,12 +130,21 @@ useEffect(() => {
     return (
         <div className="search-page">
             <header className="search-header">
-            <button
-                        className={source === 'youtube' ? 'active' : ''}
-                       // onClick={navigate(`/party/${partyId}`)}
-                    >
-                        Back To Party
-                    </button>
+
+                    <button
+        onClick={() => navigate(`/party/${partyId}`)}
+        style={{
+          padding: '0.5em 1em',
+          backgroundColor: '#28a745',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer',
+          marginBottom: '1em',
+        }}
+      >
+        Back To Party
+      </button>
                 <h1>New Request</h1>
                 <div className="search-options">
                     <button

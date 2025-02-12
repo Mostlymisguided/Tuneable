@@ -45,11 +45,11 @@ router.get('/', async (req, res) => {
             videos: result.videos.map(video => ({
                 id: video.id,
                 title: video.title,
-                artist: video.channelTitle || "Unknown Artist",
+                artist: video.channelTitle || "Unknown Artist from searchroutes",
                 coverArt: video.coverArt?.includes("http") 
                     ? video.coverArt 
                     : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`, // ✅ Extracted cover art
-                duration: video.duration || 0,
+                duration: video.duration || 111,
                 sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` }
             }))
         };        
