@@ -14,6 +14,7 @@ const Party = () => {
     const [partyType, setType] = useState("Public");
     const [partyStatus, setStatus] = useState("Scheduled");
     const [partyWatershed, setWatershed] = useState(true);
+    const [partyCode,setPartyCode] = useState('Lost Code')
     const [songs, setSongs] = useState([]);
     const [currentSong, setCurrentSong] = useState({});
     const [attendees, setAttendees] = useState([]);
@@ -48,6 +49,7 @@ const Party = () => {
             setPartyName(party.name || "Party");
             setVenue(party.venue || "Venue");
             setLocation(party.location || "Location");
+            setPartyCode(party.partyCode || 'Lost Code 2');
 
             setStartTime(new Date(party.startTime).toLocaleString("en-GB", { 
                 weekday: "long", 
@@ -183,6 +185,8 @@ const Party = () => {
             <h3>{partyType}</h3>
             <h3>{partyStatus}</h3>
             <h3>{partyWatershed}</h3>
+
+            <h3>Party Invite Code: {partyCode}</h3>
     
             {errorMessage && <p className="error-message" style={{ color: "red" }}>{errorMessage}</p>}
             {loading ? (
@@ -199,7 +203,7 @@ const Party = () => {
                     ) : (
                         <p>No attendees yet.</p>
                     )}
-                   <button onClick={navigateToSearch}>Add Song</button>
+                        <button onClick={navigateToSearch}>Add Song</button>
     
                     <h2>Next Up</h2>
                     <div className="playlist">
