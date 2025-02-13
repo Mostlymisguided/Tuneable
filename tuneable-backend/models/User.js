@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   givenName:{ type: String },
   familyName:{ type: String },
   profilePic: { type: String, default: null }, // Stores URL or file path
+  personalInviteCode: { type: String, required: true, unique: true },
   balance: { type: Number, default: 0 }, // New field for wallet balance
   homeLocation: {
     city: { type: String, default: null },

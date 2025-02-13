@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { check, validationResult } = require('express-validator');
 const multer = require('multer');
@@ -29,6 +30,11 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+    
+// Generate unique personal invite code
+const deriveCodeFromUserId = (userId) => {
+return crypto.createHash('md5').update(userId.toString()).digest('hex').substring(0, 5).toUpperCase();
+};
 
 // Register a new user with profile picture upload
 router.post(
@@ -58,10 +64,16 @@ router.post(
         return res.status(400).json({ error: 'Email or username already in use' });
       }
 
+      // Generate unique personal invite code
+      const userId = new mongoose.Types.ObjectId();
+      const personalInviteCode = deriveCodeFromUserId(userId);
+
       const user = new User({
+        _id: userId,
         username,
         email,
         password,
+        personalInviteCode,
         cellPhone: cellPhone || {},
         givenName: givenName || {},
         familyName: familyName || {},
@@ -82,6 +94,7 @@ router.post(
           _id: user._id,
           username: user.username,
           email: user.email,
+          personalInviteCode: user.personalInviteCode,
           cellPhone: user.cellPhone,
           givenName: user.givenName,
           familyName: user.familyName,
