@@ -10,8 +10,14 @@ const Home = () => {
   const [sortBy, setSortBy] = useState('highest_paid');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const navigate = useNavigate();
+
+  const formatDuration = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+};
 
   const fetchSongs = useCallback(async () => {
     try {
@@ -81,7 +87,7 @@ const Home = () => {
             <span className="rank">{index + 1}</span>
             <div className="song-info">
               <h3>{song.title}</h3>
-              <p>{song.artist} • {song.bpm} BPM • {song.duration}</p>
+              <p>{song.artist} • £ {song.globalBidValue} • {formatDuration(song.duration)}</p>
             </div>
           </div>
         ))}
