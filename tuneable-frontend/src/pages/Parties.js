@@ -106,7 +106,6 @@ const Parties = () => {
             <div>
               <h2>{party.name}</h2>
               <p>Host: {party.host?.username || 'Unknown User'}</p>
-              <p>Party Code: {party.partyCode || 'No code available'}</p>
               <button
                 onClick={() => goToParty(party._id)}
                 style={{
