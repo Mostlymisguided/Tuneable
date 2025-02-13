@@ -27,8 +27,8 @@ const bidSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['requested', 'active', 'vetoed', 'refunded'],
-        default: 'requested'
+        enum: ['requested', 'active', 'played', 'vetoed', 'refunded'],
+        default: 'active'
     },
 });
 

@@ -54,7 +54,6 @@ router.post('/', authMiddleware, async (req, res) => {
       // Generate MongoDB ObjectId manually so we can hash it for partyCode
       const objectId = new mongoose.Types.ObjectId();
       const partyCode = deriveCodeFromPartyId(objectId); // ✅ Hash the unique _id to create partyCode
-      //const formattedWatershed = watershed === "clean" ? "clean" : "adult"; // ✅ Default to "adult"
 
       const party = new Party({
         _id: objectId,
@@ -93,6 +92,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
         const party = await Party.findById(id);
         if (!party) return res.status(404).json({ error: 'Party not found' });
 
+       /* if (party.type === 'private' & FormData.partycode !=== partyCode)
+            return res.status(444).json({ error: 'Party Code incorrect' }); */
+
         if (party.attendees.includes(userId))
             return res.status(400).json({ error: 'User already joined the party' });
 
@@ -104,6 +106,39 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
         handleError(res, err, 'Failed to join party');
     }
 });
+
+router.post("/join/:partyId", authMiddleware, async (req, res) => {
+    const { partyId } = req.params;
+    const { inviteCode, location } = req.body;
+    const userId = req.user.id;
+
+    try {
+        const party = await Party.findById(partyId);
+        if (!party) return res.status(404).json({ message: "Party not found" });
+
+        if (party.type === "private" && party.inviteCode !== inviteCode) {
+            return res.status(403).json({ message: "Invalid invite code" });
+        }
+
+        if (party.type === "geocoded") {
+            const distance = calculateDistance(location, party.location);
+            if (distance > party.allowedRadius) {
+                return res.status(403).json({ message: "You're too far away to join" });
+            }
+        }
+
+        if (!party.attendees.includes(userId)) {
+            party.attendees.push(userId);
+            await party.save();
+        }
+
+        res.json({ message: "Joined successfully", party });
+
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+});
+
 
 /**
  * Route: GET /

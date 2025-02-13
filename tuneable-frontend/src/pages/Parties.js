@@ -8,6 +8,23 @@ const Parties = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  /*const handleJoinParty = async () => {
+    try {
+        let body = {};
+        if (party.type === "private") {
+            body.inviteCode = inviteCode; // User input
+        } else if (party.type === "geocoded") {
+            const location = await getUserLocation();
+            body.location = location;
+        }
+
+        const res = await axios.post(`${BACKEND_URL}/join/${party._id}`, body, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.data) navigate(`/party/${party._id}`);
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Failed to join party");
+    }
+}; */
+
   useEffect(() => {
     const fetchParties = async () => {
       const token = localStorage.getItem('token'); // Retrieve the token from localStorage
@@ -102,6 +119,27 @@ const Parties = () => {
                 }}
               >
                 Go to Party
+              </button>
+              <input
+              placeholder='Enter Party Code'
+              type='text'
+              name='partyCode'
+              value={FormData.partyCode}
+
+              >
+              
+              </input>
+              <button
+                 style={{
+                  padding: '0.5em 1em',
+                  backgroundColor: '#007bff',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                }}
+              >
+                Join Party
               </button>
             </div>
           </li>

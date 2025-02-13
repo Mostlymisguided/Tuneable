@@ -114,6 +114,11 @@ const UserProfile = () => {
                 </div>
             </header>
 
+            <section className="personal-invite-code">
+                <h3>Personal Invite Code</h3>
+                <h3>{user.personalInviteCode}</h3>
+            </section>
+
             <section className="profile-pic-upload">
                 <h3>Change Profile Picture</h3>
                 <input type="file" accept="image/*" onChange={handleProfilePicChange} />
