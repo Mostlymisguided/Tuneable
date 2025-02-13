@@ -18,6 +18,12 @@ const SearchPage = () => {
     const navigate = useNavigate();
     const token = localStorage.getItem('token');
 
+    const formatDuration = (seconds) => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+    };
+
     useEffect(() => {
         if (!partyId) {
             alert('Party ID is missing. Please return to the previous page.');
@@ -96,7 +102,7 @@ useEffect(() => {
                 bidAmount,
                 title: song.title,
                 artist: song.artist || "Unknown Artist from searchpage", // Ensure artist exists
-                //rightsHolder: song.artist || "Unknown Rights Holder",
+                rightsHolder: song.artist || "Unknown Rights Holder",
                 duration: song.duration !== null && !isNaN(song.duration) ? song.duration : 3, // ✅ Ensure duration is sent properly
                 coverArt: song.coverArt?.includes("http") ? song.coverArt : "https://via.placeholder.com/180",                sources: { [source]: song.sources?.[source] || song.url }, // Ensure source has a URL
                 url: song.sources?.[source] || song.url, // ✅ Add explicit URL
@@ -184,7 +190,7 @@ useEffect(() => {
                                 <div>
                                     <h4>{item.title}</h4>
                                     <p>{item.artist}</p>
-                                    <p>{item.duration}</p>
+                                    <p>{formatDuration(item.duration)}</p>
                                 </div>
                                 <input
                                     type="number"

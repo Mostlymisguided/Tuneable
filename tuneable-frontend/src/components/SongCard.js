@@ -36,7 +36,6 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
 
   // ✅ Get coverArt using the `song` prop inside the component
   const cover = getCoverArt(song);
-  //const cover = songCoverArt(song);
 
   useEffect(() => {
     console.log("🔍 SongCard received song:", JSON.stringify(song, null, 2));
@@ -84,6 +83,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
           : {
               title: song.title,
               artist: song.artist,
+              //duration: song.duration,
               sources: song.sources, // Include sources
             }),
       };
@@ -114,14 +114,14 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   const title = song?.title || 'Unknown Title';
   const artist = song?.artist || 'Unknown Artist from songcard';
   const totalBidValue = song?.globalBidValue || 0;
-
+  const duration = song?.duration || 'duration error';
+  
   const formatDuration = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
 };
   
-
   return (
     
     <div className="song-card">
@@ -130,7 +130,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
       <div className="song-info">
         <h3>{title}</h3>
         <p>{artist}</p>
-        <p>⏱ {formatDuration(song.duration)}</p>
+        <p>⏱ {formatDuration(duration)}</p>
       </div>
 
       <div className="bid-info">

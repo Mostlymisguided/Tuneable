@@ -135,7 +135,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             .populate({
                 path: 'songs.songId',
                 model: 'Song',
-                select: 'title artist coverArt sources globalBidValue bids addedBy', // ✅ Added `addedBy`
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy', // ✅ Added `addedBy`
                 populate: {
                     path: 'bids',
                     model: 'Bid',
@@ -170,6 +170,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 _id: entry.songId._id,
                 title: entry.songId.title,
                 artist: entry.songId.artist,
+                duration: entry.songId.duration || '666',
                 coverArt: entry.songId.coverArt || '/default-cover.jpg',
                 sources: availablePlatforms, // ✅ Store platform data as an array
                 globalBidValue: entry.songId.globalBidValue || 0,
