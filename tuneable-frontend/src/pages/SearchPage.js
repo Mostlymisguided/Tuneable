@@ -190,7 +190,7 @@ useEffect(() => {
                                 <div>
                                     <h4>{item.title}</h4>
                                     <p>{item.artist}</p>
-                                    <p>{formatDuration(item.duration)}</p>
+                                    <p>⏱ {formatDuration(item.duration)}</p>
                                 </div>
                                 <input
                                     type="number"

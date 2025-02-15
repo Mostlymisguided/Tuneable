@@ -17,37 +17,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Store in 'uploads/' directory
-  },
-  filename: async (req, file, cb) => {
-    try {
-      const { title, artist } = req.body;
-      if (!title || !artist) {
-        return cb(new Error("Title and artist are required for file naming."), null);
-      }
-
-      // Create a new song entry first to generate an `_id`
-      const newSong = new Song({ title, artist, addedBy: req.user._id });
-      await newSong.save();
-
-      // Generate a safe filename (remove spaces & special chars)
-      const safeTitle = title.replace(/[^a-zA-Z0-9]/g, "_");
-      const safeArtist = artist.replace(/[^a-zA-Z0-9]/g, "_");
-      const songID = newSong._id.toString();
-
-      // Construct filename: artist-title-songID.ext
-      const ext = path.extname(file.originalname);
-      const finalFilename = `${safeArtist}-${safeTitle}-${songID}${ext}`;
-
-      cb(null, finalFilename);
-    } catch (error) {
-      console.error("Error generating filename:", error);
-      cb(error, null);
-    }
-  },
-});
+const storage = multer.memoryStorage(); // Store file in memory
 
 const upload = multer({
   storage,
@@ -58,44 +28,64 @@ const upload = multer({
 // @route   POST /api/songs/upload
 // @desc    Upload a song file and store metadata
 // @access  Private (User must be logged in)
-router.post("/upload", authMiddleware, upload.single("file"), async (req, res) => {
+router.post("/upload", authMiddleware, async (req, res) => {
+   console.log("🔐 User Info from Auth Middleware:", req.user);
+  upload.single("file")(req, res, async (err) => {
+    if (err) {
+      console.error("Multer error:", err);
+      return res.status(500).json({ message: "File upload failed", error: err.message });
+    }
+
     try {
+      console.log("🔵 Upload Route Hit!");
+
       if (!req.file) {
+        console.log("⛔ No file received!");
         return res.status(400).json({ message: "No file uploaded" });
       }
-  
-      // Extract the song ID from the filename
-      const songID = req.file.filename.split("-").pop().split(".")[0];
-      let song = await Song.findById(songID);
-      
-      if (!song) {
-        return res.status(404).json({ message: "Song metadata not found." });
+
+      console.log("🟢 File Received:", req.file);
+      console.log("🟡 Form Data:", req.body);
+
+      const { title, artist } = req.body;
+      if (!title || !artist) {
+        return res.status(400).json({ message: "Title and artist are required" });
       }
-  
-      // Parse multi-value fields from JSON format (sent by frontend)
-      const { featuring, elements, tags, ...otherData } = req.body;
-  
-      const parsedData = {
-        ...otherData,
-        featuring: featuring ? JSON.parse(featuring) : [],
-        elements: elements ? JSON.parse(elements) : [],
-        tags: tags ? JSON.parse(tags) : [],
-      };
-  
+
+      // Create a new song entry first to generate an `_id`
+      const newSong = new Song({
+        title,
+        artist,
+        addedBy: req.user._id,
+      });
+      await newSong.save();
+
+      // Generate a safe filename
+      const safeTitle = title.replace(/[^a-zA-Z0-9]/g, "_");
+      const safeArtist = artist.replace(/[^a-zA-Z0-9]/g, "_");
+      const songID = newSong._id.toString();
+      const ext = path.extname(req.file.originalname);
+      const finalFilename = `${safeArtist}-${safeTitle}-${songID}${ext}`;
+
+      console.log("🟠 Final Filename:", finalFilename);
+
+      // Save the file to disk manually
+      const filePath = `uploads/${finalFilename}`;
+      require("fs").writeFileSync(filePath, req.file.buffer); // Save from memory storage
+
       // Update song metadata
-      Object.assign(song, parsedData);
-  
-      // Add local file path to `sources.local`
-      song.sources.set("local", `/uploads/${req.file.filename}`);
-  
-      await song.save();
-  
-      res.status(201).json({ message: "Song uploaded successfully", song });
+      newSong.sources.set("local", `/uploads/${finalFilename}`);
+      await newSong.save();
+
+      console.log("✅ Song successfully uploaded:", newSong);
+      return res.status(201).json({ message: "Song uploaded successfully", song: newSong });
+
     } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ message: "Server error", error: error.message });
+      console.error("🚨 Upload error:", error);
+      return res.status(500).json({ message: "Something went wrong!", error: error.message });
     }
-  });  
+  });
+});
 
 // @route   GET /api/songs
 // @desc    Fetch all songs for TuneFeed with filtering & sorting

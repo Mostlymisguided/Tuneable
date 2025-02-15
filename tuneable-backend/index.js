@@ -92,9 +92,12 @@ if (require.main === module) {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
-  // Initialize WebSocket Server
-  setWebSocketServer(server);
-  console.log('WebSocket server initialized.');
+  if (!server.listening) {
+    console.warn("⚠️ WebSocket server setup skipped: Server is not running.");
+  } else {
+    setWebSocketServer(server);
+    console.log('✅ WebSocket server initialized.');
+  }
 }
 
 // Export app and broadcast function from utils

@@ -87,7 +87,7 @@ const Home = () => {
             <span className="rank">{index + 1}</span>
             <div className="song-info">
               <h3>{song.title}</h3>
-              <p>{song.artist} • £ {song.globalBidValue} • {formatDuration(song.duration)}</p>
+              <p>{song.artist} • £ {song.globalBidValue} • ⏱ {formatDuration(song.duration)}</p>
             </div>
           </div>
         ))}

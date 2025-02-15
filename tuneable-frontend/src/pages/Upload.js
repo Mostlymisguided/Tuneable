@@ -84,6 +84,12 @@ const Upload = () => {
     setUploading(true);
     setUploadProgress(0);
 
+    console.log("Uploading File:", file);
+    console.log("File Type:", file?.type);
+    console.log("File Size:", (file?.size / 1024 / 1024).toFixed(2), "MB");
+    console.log("Form Data:", Object.fromEntries(form.entries()));
+
+
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
