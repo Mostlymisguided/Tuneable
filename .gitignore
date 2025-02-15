@@ -29,6 +29,8 @@ tuneable-backend/data/mongodb/
 tuneable-backend/data/db/*
 !tuneable-backend/data/db/.keep
 
+tuneable-backend/uploads
+
 
 generateToken.js
 

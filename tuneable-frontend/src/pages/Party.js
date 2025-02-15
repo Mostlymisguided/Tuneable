@@ -25,6 +25,8 @@ const Party = () => {
     const [isJoined, setIsJoined] = useState(false);
     const [socket, setSocket] = useState(null);
     const { partyId } = useParams();
+    console.log("🛠 Extracted partyId from URL:", partyId);
+    
     const navigate = useNavigate();
 
     // 🎵 Fetch Party Details (Initial Load)
@@ -173,6 +175,9 @@ const Party = () => {
         localStorage.setItem("partyId", partyId);
         navigate(`/search?partyId=${partyId}`);
     };
+
+    console.log("🛠 Party.js passing partyId to WebPlayer:", partyId);
+
     
     return (
         <div className="party-container">
@@ -219,7 +224,18 @@ const Party = () => {
                 </>
             )}
             <Footer currentSong={currentSong} />
-            {currentSong?.url && <WebPlayer url={currentSong.url} playing={currentSong.playing} />}
+
+            {currentSong?.url && partyId ? (
+  <WebPlayer 
+    partyId={partyId} 
+    url={currentSong.url} 
+    playing={currentSong.playing} 
+  />
+) : (
+  <p>Loading WebPlayer...</p> // Debugging message
+)}
+
+
         </div>
     );
     

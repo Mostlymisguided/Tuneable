@@ -6,6 +6,7 @@ const Register = () => {
     username: '',
     email: '',
     password: '',
+    inviteCode: '',
     profilePicture: null, // Changed from string to file
     cellPhone: '',
     givenName: '',
@@ -34,6 +35,7 @@ const Register = () => {
     data.append('username', formData.username);
     data.append('email', formData.email);
     data.append('password', formData.password);
+    data.append('inviteCode', formData.inviteCode);
     data.append('cellPhone', formData.cellPhone);
     data.append('givenName', formData.givenName);
     data.append('familyName', formData.familyName);
@@ -98,13 +100,22 @@ const Register = () => {
           />
         </div>
         <div>
+          <label>Invite Code</label>
+          <input
+            type="text"
+            name="inviteCode"
+            value={formData.inviteCode}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div>
           <label>Cell Phone:</label>
           <input
             type="text"
             name="cellPhone"
             value={formData.cellPhone}
             onChange={handleChange}
-            required
           />
         </div>
         <div>
@@ -114,7 +125,6 @@ const Register = () => {
             name="givenName"
             value={formData.givenName}
             onChange={handleChange}
-            required
           />
         </div>
             <div>
@@ -124,7 +134,6 @@ const Register = () => {
             name="familyName"
             value={formData.familyName}
             onChange={handleChange}
-            required
           />
         </div>
         <div>

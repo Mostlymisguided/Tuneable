@@ -46,7 +46,10 @@ router.post(
     check('password')
       .isLength({ min: 6 })
       .withMessage('Password must be at least 6 characters long'),
-  ],
+    check('inviteCode')
+      .isLength(4)
+      .withMessage('Invite Code must be 4 characters long'),
+    ],
   async (req, res) => {
     console.log('Incoming registration request:', req.body);
 
@@ -56,13 +59,16 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { username, email, password, cellPhone, givenName, familyName, homeLocation } = req.body;
+      const { username, email, password, inviteCode, cellPhone, givenName, familyName, homeLocation } = req.body;
       
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });
       if (existingUser) {
         console.error('Email or username already in use:', { email, username });
         return res.status(400).json({ error: 'Email or username already in use' });
       }
+      /* if (!inviteCode || !(await bcrypt.compare(password, user.password))) {
+        return res.status(401).json({ error: 'Invalid Invite Code' });
+      } */
 
       // Generate unique personal invite code
       const userId = new mongoose.Types.ObjectId();
@@ -74,6 +80,7 @@ router.post(
         email,
         password,
         personalInviteCode,
+        parentInviteCode: inviteCode,
         cellPhone: cellPhone || {},
         givenName: givenName || {},
         familyName: familyName || {},
