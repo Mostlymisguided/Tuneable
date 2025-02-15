@@ -6,40 +6,21 @@ const Parties = () => {
   const [parties, setParties] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [partyCode, setPartyCode] = useState({});
   const navigate = useNavigate();
-
-  /*const handleJoinParty = async () => {
-    try {
-        let body = {};
-        if (party.type === "private") {
-            body.inviteCode = inviteCode; // User input
-        } else if (party.type === "geocoded") {
-            const location = await getUserLocation();
-            body.location = location;
-        }
-
-        const res = await axios.post(`${BACKEND_URL}/join/${party._id}`, body, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.data) navigate(`/party/${party._id}`);
-    } catch (error) {
-        toast.error(error.response?.data?.message || "Failed to join party");
-    }
-}; */
+  const getUserLocation = useState();
 
   useEffect(() => {
     const fetchParties = async () => {
-      const token = localStorage.getItem('token'); // Retrieve the token from localStorage
-
+      const token = localStorage.getItem('token');
       if (!token) {
         setError('You are not authorized. Please log in again.');
         setLoading(false);
         return;
       }
-
       try {
         const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/parties`, {
-          headers: {
-            Authorization: `Bearer ${token}`, // Use the actual token
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
         setParties(response.data.parties);
         setError('');
@@ -50,97 +31,54 @@ const Parties = () => {
         setLoading(false);
       }
     };
-
     fetchParties();
   }, []);
 
-  const goToParty = (partyId) => {
-    navigate(`/party/${partyId}`);
+  const handleJoinParty = async (party) => {
+    try {
+      let body = {};
+      if (party.type === 'private') {
+        if (!partyCode[party._id] || partyCode[party._id] !== party.partyCode) {
+          alert('Incorrect party code');
+          return;
+        }
+        body.partyCode = partyCode[party._id]; // User enters party code
+      } else if (party.type === 'geocoded') {
+        const location = await getUserLocation(); // Fetch user location
+        body.location = location;
+      }
+
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/parties/join/${party._id}`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data) navigate(`/party/${party._id}`);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to join party');
+    }
   };
 
-  if (loading) {
-    return <div>Loading parties...</div>;
-  }
-
-  if (error) {
-    return (
-      <div style={{ color: 'red' }}>
-        {error}
-        <button onClick={() => window.location.reload()}>Retry</button>
-      </div>
-    );
-  }
-
-  if (parties.length === 0) {
-    return <div>No parties found. Create a new party to get started!</div>;
-  }
+  if (loading) return <div>Loading parties...</div>;
+  if (error) return <div style={{ color: 'red' }}>{error}</div>;
+  if (parties.length === 0) return <div>No parties found. Create one to get started!</div>;
 
   return (
     <div>
-      <button
-        onClick={() => navigate('/create-party')}
-        style={{
-          padding: '0.5em 1em',
-          backgroundColor: '#28a745',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-          marginBottom: '1em',
-        }}
-      >
-        Create New Party
-      </button>
       <h1>Parties</h1>
-      <ul style={{ listStyleType: 'none', padding: 0 }}>
+      <ul>
         {parties.map((party) => (
-          <li
-            key={party._id}
-            style={{
-              marginBottom: '1em',
-              border: '1px solid #ccc',
-              padding: '1em',
-              borderRadius: '5px',
-            }}
-          >
-            <div>
-              <h2>{party.name}</h2>
-              <p>Host: {party.host?.username || 'Unknown User'}</p>
-              <button
-                onClick={() => goToParty(party._id)}
-                style={{
-                  padding: '0.5em 1em',
-                  backgroundColor: '#007bff',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                }}
-              >
-                Go to Party
-              </button>
+          <li key={party._id}>
+            <h2>{party.name}</h2>
+            <p>Host: {party.host?.username || 'Unknown'}</p>
+            {party.type === 'private' && (
               <input
-              placeholder='Enter Party Code'
-              type='text'
-              name='partyCode'
-              value={FormData.partyCode}
-
-              >
-              
-              </input>
-              <button
-                 style={{
-                  padding: '0.5em 1em',
-                  backgroundColor: '#007bff',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                }}
-              >
-                Join Party
-              </button>
-            </div>
+                type='text'
+                placeholder='Enter Party Code'
+                value={partyCode[party._id] || ''}
+                onChange={(e) => setPartyCode({ ...partyCode, [party._id]: e.target.value })}
+              />
+            )}
+            <button onClick={() => handleJoinParty(party)}>Join Party</button>
           </li>
         ))}
       </ul>
