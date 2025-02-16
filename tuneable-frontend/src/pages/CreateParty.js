@@ -112,8 +112,7 @@ const CreateParty = () => {
             />
             Allow Adult Content?
             </label>
-            <p>
-            </p>
+            <p></p>
             <button onClick={createParty} disabled={loading}>
                 {loading ? 'Creating...' : 'Create Party'}
             </button>

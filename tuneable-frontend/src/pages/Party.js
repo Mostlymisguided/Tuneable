@@ -51,20 +51,21 @@ const Party = () => {
             setPartyName(party.name || "Party");
             setVenue(party.venue || "Venue");
             setLocation(party.location || "Location");
+            setHostId(party.host.username);
             setPartyCode(party.partyCode || 'Lost Code 2');
 
             setStartTime(new Date(party.startTime).toLocaleString("en-GB", { 
-                weekday: "long", 
+                weekday: "short", 
                 year: "numeric", 
-                month: "long", 
+                month: "short", 
                 day: "numeric", 
                 hour: "2-digit", 
                 minute: "2-digit" 
             }));
             setEndTime(new Date(party.endTime).toLocaleString("en-GB", { 
-                weekday: "long", 
+                weekday: "short", 
                 year: "numeric", 
-                month: "long", 
+                month: "short", 
                 day: "numeric", 
                 hour: "2-digit", 
                 minute: "2-digit" 
@@ -89,7 +90,6 @@ const Party = () => {
             setAttendees(party.attendees || []);
             setCurrentSong(party.songs.length > 0 ? party.songs[0] : {});
             setIsJoined(party.attendees?.some((attendee) => attendee?._id === userId));
-            setHostId(party.hostId);
             setErrorMessage(null);
         } catch (error) {
             console.error("Error fetching party details:", error);
@@ -181,15 +181,16 @@ const Party = () => {
     
     return (
         <div className="party-container">
-            {console.log("Rendering Party Page with:", partyName, partyVenue, partyLocation, partyStatus, songs)}
+            {console.log("Rendering Party Page with:", partyName, partyVenue, partyLocation, hostId, partyStatus, songs)}
             <h1>{partyName}</h1>
-            <h2>{partyVenue}</h2>
-            <h2>{partyLocation}</h2>
-            <h3>{partyStart}</h3>
-            <h3>{partyEnd}</h3>
-            <h3>{partyType}</h3>
-            <h3>{partyStatus}</h3>
-            <h3>{partyWatershed}</h3>
+            <h2>Venue: {partyVenue}</h2>
+            <h2>Location: {partyLocation}</h2>
+            <h2>Host: {hostId}</h2>
+            <h3>Start: {partyStart}</h3>
+            <h3>Finish: {partyEnd}</h3>
+            <h3>Accessibility: {partyType}</h3>
+            <h3>Status: {partyStatus}</h3>
+            <h3>Watershed: {partyWatershed}</h3>
 
             <h3>Party Invite Code: {partyCode}</h3>
     
