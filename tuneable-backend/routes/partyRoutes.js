@@ -40,9 +40,13 @@ router.post('/', authMiddleware, async (req, res) => {
   
       const { name, venue, location, startTime, endTime, type, watershed } = req.body;
   
-      if (!name || !location) {
-        console.log('❌ Missing Name or Location');
-        return res.status(400).json({ error: 'Name and location are required.' });
+      if (!name ) {
+        console.log('❌ Missing Name');
+        return res.status(400).json({ error: 'Name is required' });
+      }
+
+      if (!location ) {
+        return res.status(400).json({ message: "Location is required" });
       }
   
       const userId = req.user.userId;
@@ -84,7 +88,7 @@ router.post('/', authMiddleware, async (req, res) => {
     }
   });
   
-  // Join an existing party
+ /* // Join an existing party - defunct route?
 router.post('/:id/join', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
@@ -92,8 +96,8 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
         const party = await Party.findById(id);
         if (!party) return res.status(404).json({ error: 'Party not found' });
 
-       /* if (party.type === 'private' & FormData.partycode !=== partyCode)
-            return res.status(444).json({ error: 'Party Code incorrect' }); */
+       if (party.type === 'private' & FormData.partycode !=== partyCode)
+            return res.status(444).json({ error: 'Party Code incorrect' });
 
         if (party.attendees.includes(userId))
             return res.status(400).json({ error: 'User already joined the party' });
@@ -105,7 +109,7 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     } catch (err) {
         handleError(res, err, 'Failed to join party');
     }
-});
+}); */
 
 router.post("/join/:partyId", authMiddleware, async (req, res) => {
     const { partyId } = req.params;
@@ -182,6 +186,11 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             })
             .populate({
                 path: 'attendees',
+                model: 'User',
+                select: 'username',
+            })
+            .populate({
+                path: 'host',
                 model: 'User',
                 select: 'username',
             });

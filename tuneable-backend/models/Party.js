@@ -16,12 +16,22 @@ const PartySchema = new mongoose.Schema({
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   
   partyCode: { type: String, required: true, unique: true },
-  location: {
-    type: String,
-    required: true,
-    minlength: [3, 'Party location must be at least 3 characters long'],
-    maxlength: [100, 'Party location cannot exceed 100 characters'],
-  },
+  location: {type: String, required: true},
+  /*{
+    type: {
+      type: String,
+      enum: ["Point"],
+      required: true
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      required: true
+    },
+    address: {
+      type: String, // Formatted Google Maps address
+      required: true
+    }
+  },  */
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   songs: [
