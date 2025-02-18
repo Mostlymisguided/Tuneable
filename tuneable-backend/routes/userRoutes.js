@@ -11,7 +11,7 @@ const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
-const SECRET_KEY = process.env.JWT_SECRET || 'bananasarebluewhenpigsfly';
+const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
       cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-      const userId = req.user.userId; // Get the user's ID from the token
+      const userId = req.user?.userId || 'placeholder'; // Get the user's ID from the token
       const timestamp = Date.now();
       const fileExt = path.extname(file.originalname);
       cb(null, `${userId}-${timestamp}-profilepic${fileExt}`); // Correct naming format

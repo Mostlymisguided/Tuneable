@@ -14,6 +14,7 @@ const Upload = () => {
     producer: "",
     featuring: [],
     rightsHolder: "",
+    rightsHolderEmail: "",
     album: "",
     genre: "",
     releaseDate: "",
@@ -41,8 +42,12 @@ const Upload = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleCheckboxChange = (e) => {
+  const handleExplicitCheckboxChange = (e) => {
     setFormData({ ...formData, explicit: e.target.checked });
+  };
+
+  const handleRightsCheckboxChange = (e) => {
+    setFormData({ ...formData, rightsHolder: e.target.checked });
   };
 
   const handleTagInput = (e, field) => {
@@ -117,6 +122,7 @@ const Upload = () => {
         producer: "",
         featuring: [],
         rightsHolder: "",
+        rightsHolderEmail: "",
         album: "",
         genre: "",
         releaseDate: "",
@@ -161,7 +167,20 @@ const Upload = () => {
       <br></br>
       <input type="text" name="producer" placeholder="Producer" value={formData.producer} onChange={handleInputChange} />
       <br></br>
-      <input type="email" name="rightsHolder" placeholder="Rights Holder Email (Required)" value={formData.rightsHolder} onChange={handleInputChange} required />
+           {/* Multi-Entry Inputs */}
+           {["featuring"].map((field) => (
+        <div key={field} className="tag-input">
+          <input type="text" placeholder={`${field.toUpperCase()} (Press Enter to add)`} onKeyDown={(e) => handleTagInput(e, field)} />
+          <div className="tags">
+            {formData[field].map((item, index) => (
+              <span key={index} className="tag">
+                {item} <button onClick={() => removeTag(field, index)}>×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+      <input type="email" name="rightsHolderEmail" placeholder="Rights Holder Email (Required)" value={formData.rightsHolderEmail} onChange={handleInputChange} required />
       <br></br>
       <input type="text" name="album" placeholder="Album" value={formData.album} onChange={handleInputChange} />
       <br></br>
@@ -183,11 +202,13 @@ const Upload = () => {
       <input type="number" name="pitch" placeholder="Pitch" value={formData.pitch} onChange={handleInputChange} />
       <br></br>
       <input type="text" name="key" placeholder="Key" value={formData.key} onChange={handleInputChange} />
-  
+      <br></br>
+      <input type="text" name="timeSignature" placeholder="Time Signature" value={formData.key} onChange={handleInputChange} />
+     
       {/* Multi-Entry Inputs */}
-      {["featuring", "elements", "tags"].map((field) => (
+      {["elements", "tags"].map((field) => (
         <div key={field} className="tag-input">
-          <input type="text" placeholder={`${field} (Press Enter to add)`} onKeyDown={(e) => handleTagInput(e, field)} />
+          <input type="text" placeholder={`${field.toUpperCase()} (Press Enter to add)`} onKeyDown={(e) => handleTagInput(e, field)} />
           <div className="tags">
             {formData[field].map((item, index) => (
               <span key={index} className="tag">
@@ -201,13 +222,13 @@ const Upload = () => {
 </p>
        {/* Explicit Checkbox */}
        <label>
-        <input type="checkbox" name="explicit" checked={formData.explicit} onChange={handleCheckboxChange} />
+        <input type="checkbox" name="explicit" checked={formData.explicit} onChange={handleExplicitCheckboxChange} />
         Explicit Lyrics?
       </label><p></p>
 
          {/* Right's Holder */}
          <label>
-        <input type="checkbox" name="rightsConfirmation" checked={formData.rightsConfirmation} onChange={handleCheckboxChange} />
+        <input type="checkbox" name="rightsConfirmation" checked={formData.rightsConfirmation} onChange={handleRightsCheckboxChange} />
         I am the rights holder to this song
       </label><p></p>
   
