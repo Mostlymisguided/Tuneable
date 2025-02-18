@@ -74,6 +74,8 @@ console.log('API routes registered.');
 
 // Fallback for unknown routes
 app.use((req, res, next) => {
+  console.log(`📥 Incoming Request: ${req.method} ${req.url}`);
+    console.log("📝 Body:", req.body);
   console.error(`404 Error: Route not found - ${req.method} ${req.url}`);
   res.status(404).json({ error: 'Route not found' });
 });

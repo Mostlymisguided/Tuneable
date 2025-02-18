@@ -394,4 +394,102 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
     }
 });
 
+// test bid route from songcard
+// Place a bid on an existing song
+router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const { songId, url, title, artist, bidAmount, platform, duration } = req.body;
+        const userId = req.user.userId;
+
+        if (!mongoose.isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid partyId format' });
+        }
+
+        if (bidAmount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        // ✅ Convert duration to integer & validate
+        const extractedDuration = duration && !isNaN(duration) ? parseInt(duration, 10) : 888;
+
+        // ✅ Fetch party only once
+        const party = await Party.findById(partyId).populate('songs.songId');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        let song;
+        if (songId) {
+            // ✅ Check if song exists in DB
+            if (!mongoose.isValidObjectId(songId)) {
+                return res.status(400).json({ error: 'Invalid songId format' });
+            }
+
+            song = await Song.findById(songId).populate({
+                path: 'bids',
+                populate: { path: 'userId', select: 'username' }
+            });
+
+            if (!song) {
+                return res.status(404).json({ error: 'Song not found' });
+            }
+        } else if (url && title && artist && platform) {
+            // ✅ Try finding the song by platform URL
+            song = await Song.findOne({ [`sources.${platform}`]: url });
+
+            if (!song) {
+                // ✅ Create a new song if it doesn’t exist
+                song = new Song({
+                    title,
+                    artist,
+                    coverArt: extractedCoverArt,
+                    duration: extractedDuration || 777, // ✅ Store duration correctly
+                    sources: { [platform]: url },
+                    addedBy: userId
+                });
+
+                console.log("🎵 Saving song to database:", JSON.stringify(song, null, 2)); // ✅ Proper log
+                await song.save();
+            }
+
+            // ✅ Ensure song is added to the party's playlist if not already
+            if (!party.songs.some(entry => entry.songId?.toString() === song._id.toString())) {
+                party.songs.push({ songId: song._id, addedBy: userId });
+                await party.save();
+            }
+        } else {
+            return res.status(400).json({ error: 'Either songId or song metadata (url, title, artist, platform) must be provided.' });
+        }
+
+        // ✅ Create a new bid for the song
+        const bid = new Bid({
+            userId,
+            partyId,
+            songId: song._id,
+            amount: bidAmount,
+        });
+        await bid.save();
+
+        // ✅ Update the song with bid info
+        song.bids.push(bid._id);
+        song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
+        await song.save();
+
+        // ✅ Fetch updated song with populated bid info
+        const updatedSong = await Song.findById(song._id).populate({
+            path: 'bids',
+            populate: { path: 'userId', select: 'username' }
+        });
+
+        res.status(200).json({
+            message: 'Bid placed successfully!',
+            song: updatedSong
+        });
+    } catch (err) {
+        console.error("❌ Error placing bid:", err);
+        res.status(500).json({ error: 'Error placing bid', details: err.message });
+    }
+});
+
 module.exports = router;

@@ -1,8 +1,8 @@
 const { WebSocketServer } = require("ws");
 
 let wss = null;
-const activeRooms = {}; // Store queues per party
-const partyHosts = {}; // Track who the host is for each party
+const activeRooms = {}; // Store song queues per party
+const partyHosts = {}; // Store host per party
 
 const setWebSocketServer = (server) => {
     wss = new WebSocketServer({ server });
@@ -12,37 +12,33 @@ const setWebSocketServer = (server) => {
 
         ws.on("message", (message) => {
             try {
-                const { type, partyId, songId, action, userId } = JSON.parse(message);
-                if (!partyId) return;
+                const data = JSON.parse(message);
+                if (!data.partyId) return;
 
-                switch (type) {
-                    case "ADD_SONG":
-                        if (!activeRooms[partyId]) activeRooms[partyId] = [];
-                        activeRooms[partyId].push(songId);
-                        broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
+                switch (data.type) {
+                    case "JOIN":
+                        console.log(`👥 User joined party ${data.partyId}`);
+                        ws.partyId = data.partyId;
+                        break;
+
+                    case "UPDATE_QUEUE":
+                        activeRooms[data.partyId] = data.queue;
+                        broadcast(data.partyId, { type: "UPDATE_QUEUE", queue: data.queue });
+                        break;
+
+                    case "PLAY":
+                    case "PAUSE":
+                    case "SKIP":
+                        if (partyHosts[data.partyId] === data.userId) {
+                            handlePlaybackAction(data.partyId, data.type);
+                        } else {
+                            console.warn("⛔ Unauthorized playback action attempt.");
+                        }
                         break;
 
                     case "SET_HOST":
-                        partyHosts[partyId] = userId;
-                        break;
-
-                    case "HOST_ACTION":
-                        if (partyHosts[partyId] !== userId) {
-                            console.warn("⛔ Unauthorized host action attempt.");
-                            return;
-                        }
-                        if (action === "PLAY") {
-                            broadcast(partyId, { type: "PLAY" });
-                        }
-                        if (action === "PAUSE") {
-                            broadcast(partyId, { type: "PAUSE" });
-                        }
-                        if (action === "SKIP") {
-                            if (activeRooms[partyId]?.length > 0) {
-                                activeRooms[partyId].shift();
-                            }
-                            broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
-                        }
+                        partyHosts[data.partyId] = data.userId;
+                        console.log(`👑 ${data.userId} is now the host of party ${data.partyId}`);
                         break;
                 }
             } catch (error) {
@@ -56,13 +52,24 @@ const setWebSocketServer = (server) => {
     });
 };
 
+const handlePlaybackAction = (partyId, action) => {
+    broadcast(partyId, { type: action });
+    if (action === "SKIP") {
+        activeRooms[partyId]?.shift(); // Remove current song
+        broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
+        if (activeRooms[partyId]?.length > 0) {
+            broadcast(partyId, { type: "PLAY_NEXT", song: activeRooms[partyId][0] });
+        }
+    }
+};
+
 const broadcast = (partyId, data) => {
     if (!wss) {
         console.error("❌ WebSocket server is not initialized");
         return;
     }
     wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
+        if (client.readyState === 1 && client.partyId === partyId) {
             client.send(JSON.stringify({ partyId, ...data }));
         }
     });
