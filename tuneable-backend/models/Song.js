@@ -6,6 +6,7 @@ const songSchema = new mongoose.Schema({
   producer: { type: String },
   featuring: { type: [String], default: [] }, // Supports multiple featured artists
   rightsHolder: { type: String }, // Covers record labels, imprints, and publishing entities
+  rightsHolderEmail: { type: String },
   album: { type: String },
   genre: { type: String },
   releaseDate: { type: Date, default: null }, // Full release date
@@ -32,7 +33,7 @@ const songSchema = new mongoose.Schema({
   key: { type: String, default: null },
   elements: { type: [String], default: [] }, // Instrument/element tags
   tags: { type: [String], default: [] }, // Genre/vibe tags
-  timeSignature: { type: String, default: "4/4" }, // Default to 4/4
+  timeSignature: { type: String, default: null }, // Default to 4/4
   bitrate: { type: Number, default: null }, // kbps
   sampleRate: { type: Number, default: null }, // Hz
 

@@ -22,7 +22,7 @@ const storage = multer.memoryStorage(); // Store file in memory
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // Limit: 10MB
+  limits: { fileSize: 33 * 1024 * 1024 }, // Limit: 33MB
 });
 
 // @route   POST /api/songs/upload
@@ -52,8 +52,11 @@ router.post("/upload", authMiddleware, async (req, res) => {
         return res.status(400).json({ message: "Title and artist are required" });
       }
 
+      const objectId = new mongoose.Types.ObjectId();
+
       // Create a new song entry first to generate an `_id`
       const newSong = new Song({
+        _id: objectId,
         title,
         artist,
         addedBy: req.user._id,
