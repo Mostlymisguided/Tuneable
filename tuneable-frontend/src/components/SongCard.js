@@ -90,8 +90,8 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
 
       console.log('📤 Sending payload:', payload);
 
-      const response = await API.post(`/api/parties/${partyId}/songs/bid`, payload);
-
+      const response = await API.post(`/api/parties/${partyId}/songcardbid`, payload);
+      
       console.log(`✅ Bid placed on song: ${song.title}`, response.data);
 
       toast.success(`Your bid of £${bidAmount} for "${song.title}" was successful!`);
