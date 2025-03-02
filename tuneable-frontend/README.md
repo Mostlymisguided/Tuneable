@@ -6,6 +6,11 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 In the project directory, you can run:
 
+DB Setup:
+
+mongod --dbpath /Users/admin/tuneablelocal/development/tuneable-backend/data/db
+
+
 ### `npm start`
 
 Runs the app in the development mode.\
