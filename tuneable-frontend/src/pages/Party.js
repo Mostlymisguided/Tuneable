@@ -43,21 +43,23 @@ const Party = () => {
             if (!token) {
                 throw new Error("Unauthorized: No token provided.");
             }
-
+    
             const response = await axios.get(
                 `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-
+    
+            console.log("✅ Full API Response:", response.data); // Debugging API data
+    
             const party = response.data.party;
             console.log("Fetched Party Details:", party);
-
+    
             setPartyName(party.name || "Party");
             setVenue(party.venue || "Venue");
             setLocation(party.location || "Location");
             setHostId(party.host.username);
             setPartyCode(party.partyCode || "Lost Code 2");
-
+    
             setStartTime(new Date(party.startTime).toLocaleString("en-GB", {
                 weekday: "short",
                 year: "numeric",
@@ -74,9 +76,9 @@ const Party = () => {
                 hour: "2-digit",
                 minute: "2-digit",
             }));
-
+    
             setType(party.type || "Public");
-
+    
             // ✅ Auto-update status based on `startTime` and `endTime`
             const now = new Date();
             if (now < new Date(party.startTime)) {
@@ -86,12 +88,37 @@ const Party = () => {
             } else if (now >= new Date(party.endTime)) {
                 setStatus("🎵 Party Ended - See You Next Time!");
             }
-
+    
             setWatershed(party.watershed ? "Adult Lyrics Allowed" : "Clean Bars Only");
-
-            setSongs(party.songs || []);
+    
+            if (!party.songs || party.songs.length === 0) {
+                console.warn("⚠️ No songs found in API response.");
+                setCurrentSong({});
+            } else {
+                const firstSong = party.songs[0];
+    
+                // 🛠️ Extract YouTube URL safely from multiple nesting possibilities
+                let youtubeUrl = null;
+    
+                if (firstSong.sources?.youtube) {
+                    youtubeUrl = firstSong.sources.youtube;
+                } else if (Array.isArray(firstSong.sources)) {
+                    // Loop through sources array and extract URL if it's found
+                    firstSong.sources.forEach((source) => {
+                        if (source.platform === "youtube" && typeof source.url === "string") {
+                            youtubeUrl = source.url;
+                        } else if (typeof source.url === "object" && source.url?.sources?.youtube) {
+                            youtubeUrl = source.url.sources.youtube;
+                        }
+                    });
+                }
+    
+                console.log("🎵 Setting Current Song:", { ...firstSong, url: youtubeUrl });
+                setSongs(party.songs);
+                setCurrentSong({ ...firstSong, url: youtubeUrl });
+            }
+    
             setAttendees(party.attendees || []);
-            setCurrentSong(party.songs.length > 0 ? party.songs[0] : {});
             setIsJoined(party.attendees?.some((attendee) => attendee._id === userId));
             setErrorMessage(null);
         } catch (error) {
@@ -101,6 +128,7 @@ const Party = () => {
             setLoading(false);
         }
     }, [partyId, userId]);
+    
 
     // 🎧 WebSocket Connection (No `broadcast.js` Import Needed)
     useEffect(() => {
@@ -115,27 +143,40 @@ const Party = () => {
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log("📡 WebSocket Message Received:", data);
+        
             if (!data.partyId || data.partyId !== partyId) return;
-
+        
             if (data.type === "UPDATE_QUEUE") {
-                console.log("📡 Queue Updated via WebSocket:", data.queue);
-                setSongs(data.queue || []);
-                if (data.queue.length > 0) {
-                    setCurrentSong(data.queue[0]);
+                console.log("📡 Queue Updated:", data.queue);
+        
+                // ✅ Ensure `data.queue` is an array before accessing `.length`
+                if (Array.isArray(data.queue) && data.queue.length > 0) {
+                    setSongs(data.queue);
+        
+                    const nextSong = data.queue[0];
+                    let youtubeUrl = nextSong.sources?.youtube || null;
+        
+                    if (!youtubeUrl && Array.isArray(nextSong.sources)) {
+                        nextSong.sources.forEach((source) => {
+                            if (source.platform === "youtube" && typeof source.url === "string") {
+                                youtubeUrl = source.url;
+                            } else if (typeof source.url === "object" && source.url?.sources?.youtube) {
+                                youtubeUrl = source.url.sources.youtube;
+                            }
+                        });
+                    }
+        
+                    console.log("🎵 Updating Current Song via WebSocket:", { ...nextSong, url: youtubeUrl });
+                    setCurrentSong({ ...nextSong, url: youtubeUrl });
+                } else {
+                    console.warn("⚠️ No more songs in the queue. Clearing `currentSong`.");
+                    setSongs([]); // ✅ Ensure queue is empty
+                    setCurrentSong({}); // ✅ Prevent errors from undefined access
                 }
-            } else if (data.type === "PLAY") {
-                setCurrentSong((prev) => ({ ...prev, playing: true }));
-            } else if (data.type === "PAUSE") {
-                setCurrentSong((prev) => ({ ...prev, playing: false }));
-            } else if (data.type === "SKIP") {
-                setSongs((prevQueue) => {
-                    const newQueue = prevQueue.slice(1);
-                    setCurrentSong(newQueue[0] || {});
-                    return newQueue;
-                });
             }
-        };
-
+        };        
+        
         ws.onclose = () => {
             console.warn("⚠️ WebSocket disconnected. Reconnecting...");
             setTimeout(() => new WebSocket("ws://localhost:8000"), 3000);

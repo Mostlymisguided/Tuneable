@@ -178,7 +178,7 @@ router.get("/:partyId/songs/:songId", authMiddleware, async (req, res) => {
     const party = await Party.findById(partyId);
     if (!party) return res.status(404).json({ error: "Party not found" });
 
-    // Fetch the song details with populated bid info
+    //  the song details with populated bid info
     const song = await Song.findById(songId)
       .populate({
         path: "bids",
@@ -198,10 +198,10 @@ router.get("/:partyId/songs/:songId", authMiddleware, async (req, res) => {
 
     if (!song) return res.status(404).json({ error: "Song not found" });
 
-    res.status(200).json({ message: "Song details fetched successfully!", song });
+    res.status(200).json({ message: "Song details ed successfully!", song });
   } catch (err) {
-    console.error("Error fetching song details:", err.message);
-    res.status(500).json({ error: "Error fetching song details", details: err.message });
+    console.error("Error ing song details:", err.message);
+    res.status(500).json({ error: "Error ing song details", details: err.message });
   }
 });
 

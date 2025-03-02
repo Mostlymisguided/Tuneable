@@ -42,6 +42,22 @@ const TuneFeed = () => {
     fetchSongs();
   }, [fetchSongs]);
 
+  const formatDuration = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  const formatUploadedAt = (uploadedAt) =>
+(Date(uploadedAt).toLocaleString("en-GB", {
+  weekday: "short",
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+ // hour: "2-digit",
+ // minute: "2-digit",
+  }));
+
   return (
     <div className="tunefeed-container">
       <header className="hero">
@@ -90,7 +106,7 @@ const TuneFeed = () => {
                 <span className="rank">{index + 1}</span>
                 <div className="song-info">
                   <h3>{song.title}</h3>
-                  <p>{song.artist} • {song.bpm} BPM • {song.uploadedAt} • £{song.globalBidValue} </p>
+                  <p>{song.artist} • ⏱ {formatDuration(song.duration)} • {formatUploadedAt(song.uploadedAt)} • £{song.globalBidValue} </p>
                 </div>
               </div>
             ))}
