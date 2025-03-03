@@ -4,6 +4,7 @@ const connectDB = async () => {
   try {
     // Use the MONGO_URI from environment variables if available, otherwise default to localhost
     const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/tuneable';
+    console.log('Connecting to MongoDB with URI:', mongoURI);
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
