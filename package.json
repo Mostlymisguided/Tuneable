@@ -9,7 +9,7 @@
     "supertest": "^7.0.0"
   },
   "scripts": {
-    "start": "npm run start:backend & npm run start:frontend",
+    "start": "npm run start:backend",
     "start:backend": "cd tuneable-backend && npm start",
     "start:frontend": "cd tuneable-frontend && npm start",
     "debug": "nodemon --inspect index.js"
