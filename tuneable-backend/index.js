@@ -1,7 +1,8 @@
 const express = require('express');
 const db = require('./db'); // Import the database connection module
 const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
-require('dotenv').config(); // Load environment variables from .env file
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
+require('dotenv').config({ path: envFile });
 const cors = require('cors');
 const path = require('path');
 
