@@ -3,6 +3,10 @@ const db = require('./db'); // Import the database connection module
 const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 require('dotenv').config({ path: envFile });
+
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('MONGO_URI:', process.env.MONGO_URI);
+
 const cors = require('cors');
 const path = require('path');
 
