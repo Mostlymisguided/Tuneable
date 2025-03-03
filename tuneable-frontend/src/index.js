@@ -4,8 +4,7 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
-console.log('Dev Token:', process.env.REACT_APP_BACKEND_URL);
-
+console.log('Backend', process.env.REACT_APP_BACKEND_URL);
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>

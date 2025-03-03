@@ -30,17 +30,18 @@ db.connectDB()
   });
 
 // Allowed origins: development and production
-const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com'];
+const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com'];
 
 // Define CORS options
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log('CORS check for origin:', origin);
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('Not allowed by CORS'), false);
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -48,7 +49,7 @@ const corsOptions = {
   credentials: true,
 };
 
-// Apply CORS middleware globally and explicitly handle pre-flight OPTIONS requests
+// Apply CORS middleware globally and handle pre-flight OPTIONS requests
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 
@@ -95,9 +96,12 @@ app.use((req, res, next) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Centralized error handling middleware
+// Centralized error handling middleware (with CORS headers on error responses)
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
+  // Ensure CORS headers are set even in error responses
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
@@ -106,7 +110,7 @@ let server;
 if (require.main === module) {
   console.log(`Node.js version: ${process.version}`);
   server = app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on PORT ${PORT}`);
   });
 
   if (!server.listening) {
