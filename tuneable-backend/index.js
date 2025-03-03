@@ -13,7 +13,6 @@ const searchRoutes = require('./routes/searchRoutes'); // Import search routes
 const songRoutes = require('./routes/songRoutes'); // Import song routes
 const paymentRoutes = require('./routes/paymentRoutes');
 
-
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
 
@@ -30,14 +29,30 @@ db.connectDB()
     //process.exit(1);
   });
 
-// Explicit CORS configuration
-app.use(cors({
-  origin: 'http://localhost:3000', // Allow only frontend requests
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
-  credentials: true, // Allow credentials if needed
-}));
-console.log('CORS enabled for http://localhost:3000');
+// Allowed origins: development and production
+const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com'];
+
+// Define CORS options
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+
+// Apply CORS middleware globally and explicitly handle pre-flight OPTIONS requests
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
+
+console.log('CORS enabled for allowed origins:', allowedOrigins);
 
 // Middleware to parse JSON bodies
 app.use(express.json());
@@ -75,7 +90,7 @@ console.log('API routes registered.');
 // Fallback for unknown routes
 app.use((req, res, next) => {
   console.log(`📥 Incoming Request: ${req.method} ${req.url}`);
-    console.log("📝 Body:", req.body);
+  console.log("📝 Body:", req.body);
   console.error(`404 Error: Route not found - ${req.method} ${req.url}`);
   res.status(404).json({ error: 'Route not found' });
 });
