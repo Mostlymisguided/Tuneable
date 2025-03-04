@@ -17,30 +17,35 @@ const setWebSocketServer = (server) => {
 
                 switch (data.type) {
                     case "JOIN":
-                        console.log(`👥 User joined party ${data.partyId}`);
-                        ws.partyId = data.partyId;
-                        break;
-
+                      console.log(`👥 User joined party ${data.partyId}`);
+                      ws.partyId = data.partyId;
+                      break;
+                  
                     case "UPDATE_QUEUE":
-                        activeRooms[data.partyId] = data.queue;
-                        broadcast(data.partyId, { type: "UPDATE_QUEUE", queue: data.queue });
-                        break;
-
-                    case "PLAY":
-                    case "PAUSE":
+                      activeRooms[data.partyId] = data.queue;
+                      broadcast(data.partyId, { type: "UPDATE_QUEUE", queue: data.queue });
+                      break;
+                  
                     case "SKIP":
-                        if (partyHosts[data.partyId] === data.userId) {
-                            handlePlaybackAction(data.partyId, data.type);
-                        } else {
-                            console.warn("⛔ Unauthorized playback action attempt.");
-                        }
-                        break;
-
+                      // Manual skip by host only.
+                      if (partyHosts[data.partyId] === data.userId) {
+                        handlePlaybackAction(data.partyId, data.type);
+                      } else {
+                        console.warn("⛔ Unauthorized playback action attempt.");
+                      }
+                      break;
+                  
+                    case "TRANSITION_SONG":
+                      // Auto transition when a song ends; user agnostic.
+                      handlePlaybackAction(data.partyId, data.type);
+                      break;
+                  
                     case "SET_HOST":
-                        partyHosts[data.partyId] = data.userId;
-                        console.log(`👑 ${data.userId} is now the host of party ${data.partyId}`);
-                        break;
-                }
+                      partyHosts[data.partyId] = data.userId;
+                      console.log(`👑 ${data.userId} is now the host of party ${data.partyId}`);
+                      break;
+                  }
+                  
             } catch (error) {
                 console.error("❌ WebSocket Error:", error);
             }
@@ -54,14 +59,15 @@ const setWebSocketServer = (server) => {
 
 const handlePlaybackAction = (partyId, action) => {
     broadcast(partyId, { type: action });
-    if (action === "SKIP") {
-        activeRooms[partyId]?.shift(); // Remove current song
-        broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
-        if (activeRooms[partyId]?.length > 0) {
-            broadcast(partyId, { type: "PLAY_NEXT", song: activeRooms[partyId][0] });
-        }
+    if (action === "SKIP" || action === "TRANSITION_SONG") {
+      activeRooms[partyId]?.shift(); // Remove current song
+      broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
+      if (activeRooms[partyId]?.length > 0) {
+        broadcast(partyId, { type: "PLAY_NEXT", song: activeRooms[partyId][0] });
+      }
     }
-};
+  };
+
 
 const broadcast = (partyId, data) => {
     if (!wss) {
