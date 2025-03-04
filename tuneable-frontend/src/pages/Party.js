@@ -25,6 +25,8 @@ const Party = () => {
   const [isJoined, setIsJoined] = useState(false);
   const { partyId: paramPartyId } = useParams();
   const navigate = useNavigate();
+  const WS_URL = process.env.REACT_APP_WEBSOCKET_URL || "ws://localhost:8000";
+
 
   // Create a ref for the WebSocket connection
   const wsRef = useRef(null);
@@ -141,7 +143,7 @@ const Party = () => {
   // WebSocket Connection
   useEffect(() => {
     if (!partyId) return;
-    const ws = new WebSocket("ws://localhost:8000");
+    const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
     ws.onopen = () => {
       console.log("✅ WebSocket Connected");
