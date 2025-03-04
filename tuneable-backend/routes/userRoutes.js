@@ -7,6 +7,7 @@ const { check, validationResult } = require('express-validator');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const geoip = require('geoip-lite'); // Added geoip-lite
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -22,10 +23,10 @@ const storage = multer.diskStorage({
       cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-      const userId = req.user?.userId || 'placeholder'; // Get the user's ID from the token
+      const userId = req.user?.userId || 'placeholder';
       const timestamp = Date.now();
       const fileExt = path.extname(file.originalname);
-      cb(null, `${userId}-${timestamp}-profilepic${fileExt}`); // Correct naming format
+      cb(null, `${userId}-${timestamp}-profilepic${fileExt}`);
   }
 });
 
@@ -33,7 +34,7 @@ const upload = multer({ storage: storage });
     
 // Generate unique personal invite code
 const deriveCodeFromUserId = (userId) => {
-return crypto.createHash('md5').update(userId.toString()).digest('hex').substring(0, 5).toUpperCase();
+  return crypto.createHash('md5').update(userId.toString()).digest('hex').substring(0, 5).toUpperCase();
 };
 
 // Register a new user with profile picture upload
@@ -49,7 +50,7 @@ router.post(
     check('inviteCode')
       .isLength(4)
       .withMessage('Invite Code must be 4 characters long'),
-    ],
+  ],
   async (req, res) => {
     console.log('Incoming registration request:', req.body);
 
@@ -61,19 +62,43 @@ router.post(
     try {
       const { username, email, password, inviteCode, cellPhone, givenName, familyName, homeLocation } = req.body;
       
+      // Extract IP address using x-forwarded-for if available, otherwise fallback to connection IP
+      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      // Lookup geolocation based on IP address
+      const geo = geoip.lookup(ip);
+      console.log(`Registration IP: ${ip}, Geo: ${JSON.stringify(geo)}`);
+      
+      // Determine homeLocation with fallback logic:
+      const defaultLocation = { city: 'Antarctica', country: 'Antarctica' };
+      let locationInfo;
+      // Check if a homeLocation object was provided and has keys
+      if (homeLocation && Object.keys(homeLocation).length > 0) {
+        // If both city and country are empty strings, use the default Antarctica location
+        if (
+          (!homeLocation.city || homeLocation.city.trim() === '') &&
+          (!homeLocation.country || homeLocation.country.trim() === '')
+        ) {
+          locationInfo = defaultLocation;
+        } else {
+          locationInfo = homeLocation;
+        }
+      } else if (geo) {
+        locationInfo = geo;
+      } else {
+        locationInfo = defaultLocation;
+      }
+      
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });
       if (existingUser) {
         console.error('Email or username already in use:', { email, username });
         return res.status(400).json({ error: 'Email or username already in use' });
       }
-      /* if (!inviteCode || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ error: 'Invalid Invite Code' });
-      } */
-
+      
       // Generate unique personal invite code
       const userId = new mongoose.Types.ObjectId();
       const personalInviteCode = deriveCodeFromUserId(userId);
-
+      
+      // Default string fields to empty string if falsy
       const user = new User({
         _id: userId,
         username,
@@ -81,15 +106,17 @@ router.post(
         password,
         personalInviteCode,
         parentInviteCode: inviteCode,
-        cellPhone: cellPhone || {},
-        givenName: givenName || {},
-        familyName: familyName || {},
-        homeLocation: homeLocation || {},
+        cellPhone: cellPhone || '',
+        givenName: givenName || '',
+        familyName: familyName || '',
+        homeLocation: locationInfo,
       });
       await user.save();
       
       const timestamp = Date.now();
-      const profilePic = req.file ? `/uploads/${user._id}-${timestamp}-profilepic${req.file.originalname.substring(req.file.originalname.lastIndexOf('.'))}` : null;
+      const profilePic = req.file 
+        ? `/uploads/${user._id}-${timestamp}-profilepic${req.file.originalname.substring(req.file.originalname.lastIndexOf('.'))}` 
+        : null;
       user.profilePic = profilePic;
       await user.save();
       
@@ -182,8 +209,8 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
 
       const user = await User.findByIdAndUpdate(
           req.user.userId,
-          { $set: { profilePic: profilePicPath } }, // ✅ Ensure update is using `$set`
-          { new: true, projection: { profilePic: 1, _id: 1 } } // ✅ Ensure only needed fields are returned
+          { $set: { profilePic: profilePicPath } },
+          { new: true, projection: { profilePic: 1, _id: 1 } }
       );
 
       if (!user) {
@@ -198,6 +225,5 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
       res.status(500).json({ error: 'Error updating profile picture', details: error.message });
   }
 });
-
 
 module.exports = router;
