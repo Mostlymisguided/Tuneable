@@ -43,14 +43,20 @@ const WebPlayer = ({ partyId, currentSong }) => {
     <div className="web-player-container">
       {currentSong?.url ? (
         <ReactPlayer
-          url={currentSong.url}
-          playing={playing}
-          controls={true}
-          volume={0.8}
-          onEnded={handleEnded}
-          width="100%"  
-          height="60px"
-        />
+        url={currentSong.url}
+        playing={playing}
+        controls={true}
+        volume={0.8}
+        onEnded={handleEnded}
+        width="100%"
+        height="60px"
+        config={{
+          youtube: {
+            playerVars: { origin: window.location.origin }
+          }
+        }}
+      />
+   
       ) : (
         <p>No song selected.</p>
       )}
