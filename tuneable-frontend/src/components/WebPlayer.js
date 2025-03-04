@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
 
+const WS_URL = process.env.REACT_APP_WEBSOCKET_URL || "ws://localhost:8000";
+
 const WebPlayer = ({ partyId, currentSong }) => {
   const [playing, setPlaying] = useState(true);
   const wsRef = useRef(null);
 
   useEffect(() => {
     if (!partyId) return;
-
-    wsRef.current = new WebSocket("ws://localhost:8000");
+    wsRef.current = new WebSocket(WS_URL);
 
     wsRef.current.onopen = () => {
       wsRef.current.send(JSON.stringify({ type: "JOIN", partyId }));
@@ -25,8 +26,8 @@ const WebPlayer = ({ partyId, currentSong }) => {
 
     wsRef.current.onclose = () => {
       console.warn("WebSocket disconnected, reconnecting...");
-      setTimeout(() => new WebSocket("ws://localhost:8000"), 3000);
-    };
+      setTimeout(() => new WebSocket(WS_URL), 3000);
+        };
 
     return () => wsRef.current?.close();
   }, [partyId]);
