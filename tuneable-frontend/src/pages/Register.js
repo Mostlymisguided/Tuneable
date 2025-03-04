@@ -109,7 +109,7 @@ const Register = () => {
             required
           />
         </div>
-        <div>
+       /* <div>
           <label>Cell Phone:</label>
           <input
             type="text"
@@ -153,7 +153,7 @@ const Register = () => {
             value={formData.city}
             onChange={handleChange}
           />
-        </div>
+        </div> */
         <div>
           <label>Home Country:</label>
           <input
