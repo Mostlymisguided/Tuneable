@@ -32,31 +32,33 @@ const WebPlayer = ({ partyId, currentSong }) => {
   }, [partyId]);
 
   const handleEnded = () => {
-    wsRef.current?.send(JSON.stringify({ type: "SKIP", partyId }));
+    // For auto-transition, the event is user agnostic.
+    wsRef.current?.send(JSON.stringify({ 
+      type: "TRANSITION_SONG", 
+      partyId,
+      // Optionally, you can include the userId if needed for logging,
+      // but it won't affect authorization for auto transitions.
+      userId: localStorage.getItem("userId")
+    }));
   };
-
-  console.log("🎵 WebPlayer received currentSong:", currentSong);
-
-  console.log (currentSong?.url || currentSong || 'no url')
 
   return (
     <div className="web-player-container">
       {currentSong?.url ? (
         <ReactPlayer
-        url={currentSong.url}
-        playing={playing}
-        controls={true}
-        volume={0.8}
-        onEnded={handleEnded}
-        width="100%"
-        height="60px"
-        config={{
-          youtube: {
-            playerVars: { origin: window.location.origin }
-          }
-        }}
-      />
-   
+          url={currentSong.url}
+          playing={playing}
+          controls={true}
+          volume={0.8}
+          onEnded={handleEnded}
+          width="100%"  
+          height="60px"
+          config={{
+            youtube: {
+              playerVars: { origin: window.location.origin }
+            }
+          }}
+        />
       ) : (
         <p>No song selected.</p>
       )}
