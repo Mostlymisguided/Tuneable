@@ -109,7 +109,7 @@ const Register = () => {
             required
           />
         </div>
-       /* <div>
+       {/* <div>
           <label>Cell Phone:</label>
           <input
             type="text"
@@ -144,7 +144,7 @@ const Register = () => {
             onChange={handleFileChange}
             accept="image/*"
           />
-        </div>
+        </div> */}
         <div>
           <label>Home City:</label>
           <input
@@ -153,8 +153,8 @@ const Register = () => {
             value={formData.city}
             onChange={handleChange}
           />
-        </div> */
-        <div>
+        </div>
+        {/* <div>
           <label>Home Country:</label>
           <input
             type="text"
@@ -162,7 +162,7 @@ const Register = () => {
             value={formData.country}
             onChange={handleChange}
           />
-        </div>
+        </div> */}
         <button type="submit">Register</button>
       </form>
     </div>
