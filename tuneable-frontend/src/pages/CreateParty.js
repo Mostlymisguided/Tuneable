@@ -70,7 +70,7 @@ const CreateParty = () => {
 
     return (
         <div>
-            <h1>Create a New Party</h1>
+            <h1>New Party</h1>
 
             <input type="text" placeholder="Enter Party Name" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
             <p></p>
