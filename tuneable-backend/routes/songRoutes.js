@@ -101,11 +101,11 @@ router.get("/", authMiddleware, async (req, res) => {
 
     let query = {};
 
-    // Apply filters (e.g., genre, BPM range, etc.)
+    // Apply filters (e.g., tag, BPM range, etc.)
     if (filterBy) {
       try {
         const filters = JSON.parse(filterBy); // Expecting JSON in query
-        if (filters.genre) query.genre = filters.genre;
+        if (filters.tag) query.tag = filters.tag;
         if (filters.bpmMin && filters.bpmMax) {
           query.bpm = { $gte: filters.bpmMin, $lte: filters.bpmMax };
         }
@@ -116,7 +116,7 @@ router.get("/", authMiddleware, async (req, res) => {
 
     let sortCriteria = {};
     switch (sortBy) {
-      case "highestPaid":
+      case "highestBid":
         sortCriteria = { globalBidValue: -1 };
         break;
       case "newest":

@@ -6,8 +6,8 @@ import '../App.css';
 const Home = () => {
   const [songs, setSongs] = useState([]);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState({ time: 'this_week', location: 'all', genre: 'all' });
-  const [sortBy, setSortBy] = useState('highest_paid');
+  const [filter, setFilter] = useState({ time: 'this_week', location: 'all', tag: 'all' });
+  const [sortBy, setSortBy] = useState('highest_bid');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -72,13 +72,13 @@ const Home = () => {
           <option value="berlin">Berlin</option>
           <option value="london">London</option>
         </select>
-        <select onChange={(e) => setFilter({ ...filter, genre: e.target.value })}>
-          <option value="all">All Genres</option>
+        <select onChange={(e) => setFilter({ ...filter, tag: e.target.value })}>
+          <option value="all">All Tags</option>
           <option value="jazz">Jazz</option>
           <option value="house">House</option>
           <option value="pop">Pop</option>
         </select>
-        <button className={sortBy === 'highest_paid' ? 'active' : ''} onClick={() => setSortBy('highest_paid')}>Highest Paid</button>
+        <button className={sortBy === 'highest_bid' ? 'active' : ''} onClick={() => setSortBy('highest_bid')}>Highest Bid</button>
         <button className={sortBy === 'newest' ? 'active' : ''} onClick={() => setSortBy('newest')}>Newest</button>
       </div>
       <div className="song-list">

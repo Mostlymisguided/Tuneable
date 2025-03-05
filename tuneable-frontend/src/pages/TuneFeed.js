@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
@@ -6,13 +6,14 @@ import "../App.css";
 const TuneFeed = () => {
   const [songs, setSongs] = useState([]);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState({ time: "this_week", location: "all", genre: "all" });
-  const [sortBy, setSortBy] = useState("highest_paid");
+  const [filter, setFilter] = useState({ time: "this_week", location: "all", tag: "all" });
+  const [sortBy, setSortBy] = useState("highest_bid");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const navigate = useNavigate();
 
+  // Fetch songs based on filters and sortBy
   const fetchSongs = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
@@ -38,9 +39,17 @@ const TuneFeed = () => {
     }
   }, [filter, sortBy, navigate]);
 
+  // Fetch songs on filter or sort change
   useEffect(() => {
     fetchSongs();
   }, [fetchSongs]);
+
+  // Memoize client-side search filtering for performance
+  const filteredSongs = useMemo(() => {
+    return songs.filter(song =>
+      song.title.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [songs, search]);
 
   const formatDuration = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -48,15 +57,15 @@ const TuneFeed = () => {
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  const formatUploadedAt = (uploadedAt) =>
-(Date(uploadedAt).toLocaleString("en-GB", {
-  weekday: "short",
-  year: "numeric",
-  month: "short",
-  day: "numeric",
- // hour: "2-digit",
- // minute: "2-digit",
-  }));
+  const formatUploadedAt = (uploadedAt) => {
+    const date = new Date(uploadedAt);
+    return date.toLocaleString("en-GB", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="tunefeed-container">
@@ -72,25 +81,46 @@ const TuneFeed = () => {
       </header>
 
       <div className="filters">
-        <select onChange={(e) => setFilter((prev) => ({ ...prev, time: e.target.value }))}>
+        <select
+          value={filter.time}
+          onChange={(e) => setFilter(prev => ({ ...prev, time: e.target.value }))}
+        >
           <option value="this_week">This Week</option>
           <option value="this_month">This Month</option>
           <option value="this_year">This Year</option>
         </select>
-        <select onChange={(e) => setFilter((prev) => ({ ...prev, location: e.target.value }))}>
+        <select
+          value={filter.location}
+          onChange={(e) => setFilter(prev => ({ ...prev, location: e.target.value }))}
+        >
           <option value="all">All Locations</option>
-          <option value="bucharest">Bucharest</option>
-          <option value="berlin">Berlin</option>
+          <option value="global">Global</option>
+          <option value="antarctica">Antarctica</option>
           <option value="london">London</option>
         </select>
-        <select onChange={(e) => setFilter((prev) => ({ ...prev, genre: e.target.value }))}>
-          <option value="all">All Genres</option>
-          <option value="jazz">Jazz</option>
-          <option value="house">House</option>
-          <option value="pop">Pop</option>
+        <select
+          value={filter.tag}
+          onChange={(e) => setFilter(prev => ({ ...prev, tag: e.target.value }))}
+        >
+          <option value="all">All Tags</option>
+          <option value="music">Music</option>
+          <option value="electronic">Electronic</option>
+          <option value="healing">Healing</option>
         </select>
-        <button className={sortBy === "highest_paid" ? "active" : ""} onClick={() => setSortBy("highest_paid")}>Most Bids</button>
-        <button className={sortBy === "newest" ? "active" : ""} onClick={() => setSortBy("newest")}>Most Recent</button>
+        <div className="sort-buttons">
+          <button
+            className={sortBy === "highest_bid" ? "active" : ""}
+            onClick={() => setSortBy("highest_bid")}
+          >
+            Most Bids
+          </button>
+          <button
+            className={sortBy === "newest" ? "active" : ""}
+            onClick={() => setSortBy("newest")}
+          >
+            Most Recent
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -99,17 +129,17 @@ const TuneFeed = () => {
         <p style={{ color: "red" }}>Error: {error}</p>
       ) : (
         <div className="song-list">
-          {songs
-            .filter((song) => song.title.toLowerCase().includes(search.toLowerCase()))
-            .map((song, index) => (
-              <div key={song._id} className="song-item">
-                <span className="rank">{index + 1}</span>
-                <div className="song-info">
-                  <h3>{song.title}</h3>
-                  <p>{song.artist} • ⏱ {formatDuration(song.duration)} • {formatUploadedAt(song.uploadedAt)} • £{song.globalBidValue} </p>
-                </div>
+          {filteredSongs.map((song, index) => (
+            <div key={song._id} className="song-item">
+              <span className="rank">{index + 1}</span>
+              <div className="song-info">
+                <h3>{song.title}</h3>
+                <p>
+                  {song.artist} • ⏱ {formatDuration(song.duration)} • {formatUploadedAt(song.uploadedAt)} • £{song.globalBidValue}
+                </p>
               </div>
-            ))}
+            </div>
+          ))}
         </div>
       )}
     </div>
