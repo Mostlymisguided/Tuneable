@@ -93,12 +93,15 @@ app.use('/api/payments', paymentRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 
-// Fallback for unknown routes
-app.use((req, res, next) => {
-  console.log(`📥 Incoming Request: ${req.method} ${req.url}`);
-  console.log("📝 Body:", req.body);
-  console.error(`404 Error: Route not found - ${req.method} ${req.url}`);
-  res.status(404).json({ error: 'Route not found' });
+// Serve static files from the React build directory
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Catch-all route for non-API requests to serve React's index.html
+app.get('*', (req, res) => {
+  if (req.url.startsWith('/api')) {
+    return res.status(404).json({ error: 'Route not found' });
+  }
+  res.sendFile(path.join(__dirname, 'web', 'index.html'));
 });
 
 // Centralized error handling middleware (with CORS headers on error responses)
