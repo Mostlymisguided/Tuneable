@@ -93,8 +93,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 
-// Serve static files from the React build directory
-app.use(express.static(path.join(__dirname, 'build')));
+// Serve static files from the React web directory
+app.use(express.static(path.join(__dirname, 'web')));
 
 // Catch-all route for non-API requests to serve React's index.html
 app.get('*', (req, res) => {
