@@ -110,7 +110,7 @@ const CreateParty = () => {
             checked={partyWatershed}
             onChange={(e) => setPartyWatershed(e.target.checked)}
             />
-            Allow Adult Content?
+            Use Real Money?
             </label>
             <p></p>
             <button onClick={createParty} disabled={loading}>

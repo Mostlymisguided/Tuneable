@@ -33,14 +33,14 @@ const NavBar = () => {
                         <li className={isActive('/tunefeed')}>
                             <Link to="/tunefeed">Tunefeed</Link>
                         </li>
-                        <li className={isActive('/create-party')}>
-                            <Link to="/create-party">Create Party</Link>
-                        </li>
                         <li className={isActive('/parties')}>
-                            <Link to="/parties">View Parties</Link>
+                            <Link to="/parties">Parties</Link>
                         </li>
                         <li className={isActive('/profile')}>
                             <Link to="/profile">Profile</Link>
+                        </li>
+                        <li className={isActive('/create-party')}>
+                            <Link to="/create-party">Create Party</Link>
                         </li>
                         <li className={isActive('/upload')}>
                             <Link to="/upload">Upload</Link>
