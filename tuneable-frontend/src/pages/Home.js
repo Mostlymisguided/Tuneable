@@ -68,15 +68,15 @@ const Home = () => {
         </select>
         <select onChange={(e) => setFilter({ ...filter, location: e.target.value })}>
           <option value="all">All Locations</option>
-          <option value="bucharest">Bucharest</option>
-          <option value="berlin">Berlin</option>
+          <option value="global">Global</option>
+          <option value="antarctica">Antarctica</option>
           <option value="london">London</option>
         </select>
         <select onChange={(e) => setFilter({ ...filter, tag: e.target.value })}>
           <option value="all">All Tags</option>
-          <option value="jazz">Jazz</option>
-          <option value="house">House</option>
-          <option value="pop">Pop</option>
+          <option value="music">Music</option>
+          <option value="electronic">Electronic</option>
+          <option value="healing">Healing</option>
         </select>
         <button className={sortBy === 'highest_bid' ? 'active' : ''} onClick={() => setSortBy('highest_bid')}>Highest Bid</button>
         <button className={sortBy === 'newest' ? 'active' : ''} onClick={() => setSortBy('newest')}>Newest</button>
