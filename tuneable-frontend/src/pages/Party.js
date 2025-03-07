@@ -27,9 +27,10 @@ const Party = ({ userId }) => {
   const navigate = useNavigate();
   const WS_URL = process.env.REACT_APP_WEBSOCKET_URL || "ws://localhost:8000";
 
-  // Create a ref for the WebSocket connection
+  // Use a ref to store the WebSocket instance
   const wsRef = useRef(null);
 
+  // Set partyId from URL parameters
   useEffect(() => {
     if (paramPartyId) {
       console.log("✅ Setting Party ID:", paramPartyId);
@@ -44,11 +45,8 @@ const Party = ({ userId }) => {
   const fetchPartyDetails = useCallback(async () => {
     setLoading(true);
     try {
-      // We still get token from localStorage
       const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("Unauthorized: No token provided.");
-      }
+      if (!token) throw new Error("Unauthorized: No token provided.");
       console.log("Token:", token);
       console.log("userId in fetchPartyDetails (prop):", userId);
 
@@ -56,7 +54,6 @@ const Party = ({ userId }) => {
         `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       console.log("✅ Full API Response:", response.data);
 
       const party = response.data.party;
@@ -65,7 +62,7 @@ const Party = ({ userId }) => {
       setPartyName(party.name || "Party");
       setVenue(party.venue || "Venue");
       setLocation(party.location || "Location");
-      // Assume party.host.userId is the host's user id
+      // Adjust property as needed (e.g. party.host.userId or party.host.username)
       setHostId(party.host.userId);
       setPartyCode(party.partyCode || "Lost Code 2");
 
@@ -89,18 +86,14 @@ const Party = ({ userId }) => {
           minute: "2-digit",
         })
       );
-
       setType(party.type || "Public");
 
       // Auto-update status based on startTime and endTime
       const now = new Date();
-      if (now < new Date(party.startTime)) {
-        setStatus("🎉 Scheduled - Starting Soon!");
-      } else if (now >= new Date(party.startTime) && now < new Date(party.endTime)) {
+      if (now < new Date(party.startTime)) setStatus("🎉 Scheduled - Starting Soon!");
+      else if (now >= new Date(party.startTime) && now < new Date(party.endTime))
         setStatus("🔥 Party is Live!");
-      } else if (now >= new Date(party.endTime)) {
-        setStatus("🎵 Party Ended - See You Next Time!");
-      }
+      else if (now >= new Date(party.endTime)) setStatus("🎵 Party Ended - See You Next Time!");
 
       setWatershed(party.watershed ? "Adult Lyrics Allowed" : "Clean Bars Only");
 
@@ -110,7 +103,6 @@ const Party = ({ userId }) => {
       } else {
         const firstSong = party.songs[0];
         let youtubeUrl = null;
-
         if (firstSong.sources?.youtube) {
           youtubeUrl = firstSong.sources.youtube;
         } else if (Array.isArray(firstSong.sources)) {
@@ -122,13 +114,12 @@ const Party = ({ userId }) => {
             }
           });
         }
-
         console.log("🎵 Setting Current Song:", { ...firstSong, url: youtubeUrl });
         setSongs(party.songs);
         setCurrentSong({ ...firstSong, url: youtubeUrl });
 
-        // Initialize the server queue via WebSocket
-        if (wsRef.current && wsRef.current.readyState === 1) {
+        // If the WebSocket is already connected, send the initial UPDATE_QUEUE message.
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(
             JSON.stringify({
               type: "UPDATE_QUEUE",
@@ -140,20 +131,17 @@ const Party = ({ userId }) => {
       }
 
       setAttendees(party.attendees || []);
-      // Compute isJoined using the prop userId
       setIsJoined(party.attendees?.some((attendee) => attendee._id === userId));
       setErrorMessage(null);
     } catch (error) {
       console.error("Error fetching party details:", error);
-      setErrorMessage(
-        error.response?.data?.error || "Failed to load party details."
-      );
+      setErrorMessage(error.response?.data?.error || "Failed to load party details.");
     } finally {
       setLoading(false);
     }
   }, [partyId, userId]);
 
-  // WebSocket Connection (unchanged)
+  // Establish a single WebSocket connection when partyId is available.
   useEffect(() => {
     if (!partyId) return;
     const ws = new WebSocket(WS_URL);
@@ -161,18 +149,24 @@ const Party = ({ userId }) => {
     ws.onopen = () => {
       console.log("✅ WebSocket Connected");
       ws.send(JSON.stringify({ type: "JOIN", partyId }));
+      // If songs are already loaded, send an initial UPDATE_QUEUE message.
+      if (songs && songs.length > 0) {
+        console.log("Sending initial UPDATE_QUEUE with songs:", songs);
+        ws.send(JSON.stringify({ type: "UPDATE_QUEUE", partyId, queue: songs }));
+      }
+      // Optionally, if this client is the host, you might also send a SET_HOST message here.
+      if (userId && userId === hostId) {
+        ws.send(JSON.stringify({ type: "SET_HOST", partyId, userId }));
+      }
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       console.log("📡 WebSocket Message Received:", data);
-
       if (!data.partyId || data.partyId !== partyId) return;
-
       if (data.type === "UPDATE_QUEUE") {
         console.log("📡 Queue Updated:", data.queue);
         if (Array.isArray(data.queue) && data.queue.length > 0) {
-          setSongs(data.queue);
           const nextSong = data.queue[0];
           let youtubeUrl = nextSong.sources?.youtube || null;
           if (!youtubeUrl && Array.isArray(nextSong.sources)) {
@@ -184,10 +178,9 @@ const Party = ({ userId }) => {
               }
             });
           }
-          console.log("🎵 Updating Current Song via WebSocket:", { ...nextSong, url: youtubeUrl });
           setCurrentSong({ ...nextSong, url: youtubeUrl });
         } else {
-          console.warn("⚠️ No more songs in the queue. Clearing `currentSong`.");
+          console.warn("⚠️ No more songs in the queue. Clearing currentSong.");
           setSongs([]);
           setCurrentSong({});
         }
@@ -196,13 +189,29 @@ const Party = ({ userId }) => {
 
     ws.onclose = () => {
       console.warn("⚠️ WebSocket disconnected. Reconnecting...");
+      // You might want to implement more robust reconnection logic.
       setTimeout(() => new WebSocket(WS_URL), 3000);
     };
 
     return () => ws.close();
-  }, [partyId]);
+  }, [partyId, songs, hostId, userId]);
 
-  // Fetch party details when partyId changes.
+  // Separate effect to send an UPDATE_QUEUE whenever songs change.
+  useEffect(() => {
+    if (
+      wsRef.current &&
+      wsRef.current.readyState === WebSocket.OPEN &&
+      songs &&
+      songs.length > 0
+    ) {
+      console.log("Sending updated queue on songs change:", songs);
+      wsRef.current.send(
+        JSON.stringify({ type: "UPDATE_QUEUE", partyId, queue: songs })
+      );
+    }
+  }, [songs, partyId]);
+
+  // Fetch party details when partyId is set.
   useEffect(() => {
     if (partyId) {
       console.log("🔄 Fetching party details...");
@@ -233,7 +242,6 @@ const Party = ({ userId }) => {
       <h3>Status: {partyStatus}</h3>
       <h3>Watershed: {partyWatershed}</h3>
       <h3>Party Invite Code: {partyCode}</h3>
-
       {errorMessage && (
         <p className="error-message" style={{ color: "red" }}>
           {errorMessage}
@@ -256,28 +264,16 @@ const Party = ({ userId }) => {
             <p>No attendees yet.</p>
           )}
           <button onClick={navigateToSearch}>Add Song</button>
-
           <h2>Next Up</h2>
           <div className="playlist">
             {songs.map((song, index) => (
-              <SongCard
-                key={song._id}
-                song={song}
-                rank={index + 1}
-                partyId={partyId}
-              />
+              <SongCard key={song._id} song={song} rank={index + 1} partyId={partyId} />
             ))}
           </div>
         </>
       )}
-
-      {/* Forward the computed isHost and userId to Footer */}
-      <Footer
-        currentSong={currentSong}
-        partyId={partyId}
-        isHost={isHost}
-        userId={userId}
-      />
+      {/* Forward computed isHost and userId to Footer */}
+      <Footer currentSong={currentSong} partyId={partyId} isHost={isHost} userId={userId} />
     </div>
   );
 };
