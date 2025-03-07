@@ -90,6 +90,72 @@ router.post("/upload", authMiddleware, async (req, res) => {
   });
 });
 
+// @route   GET /api/songs/public
+// @desc    Fetch public songs for TuneFeed without authentication
+// @access  Public
+router.get("/public", async (req, res) => {
+  try {
+    const { sortBy, filterBy, limit = 50 } = req.query;
+
+    let query = {};
+    // Apply filters if provided (e.g., tag, BPM range)
+    if (filterBy) {
+      try {
+        const filters = JSON.parse(filterBy);
+        if (filters.tag) query.tag = filters.tag;
+        if (filters.bpmMin && filters.bpmMax) {
+          query.bpm = { $gte: filters.bpmMin, $lte: filters.bpmMax };
+        }
+      } catch (error) {
+        return res.status(400).json({ error: "Invalid filter format" });
+      }
+    }
+
+    let sortCriteria = {};
+    switch (sortBy) {
+      case "highestBid":
+        sortCriteria = { globalBidValue: -1 };
+        break;
+      case "newest":
+        sortCriteria = { uploadedAt: -1 };
+        break;
+      case "mostPlayed":
+        sortCriteria = { popularity: -1 };
+        break;
+      default:
+        sortCriteria = { uploadedAt: -1 };
+    }
+
+    // Fetch songs with filtering and sorting applied
+    const songs = await Song.find(query)
+      .populate({
+        path: "bids",
+        populate: {
+          path: "userId",
+          model: "User",
+          select: "username",
+        },
+      })
+      .populate({
+        path: "addedBy",
+        model: "User",
+        select: "username",
+      })
+      .sort(sortCriteria)
+      .limit(Number(limit));
+
+    console.log("Fetched public songs:", JSON.stringify(songs, null, 2));
+    res.status(200).json({
+      message: "Public songs fetched successfully!",
+      songs,
+    });
+  } catch (err) {
+    console.error("Error fetching public songs:", err.message);
+    res.status(500).json({ error: "Error fetching public songs", details: err.message });
+  }
+});
+
+
 // @route   GET /api/songs
 // @desc    Fetch all songs for TuneFeed with filtering & sorting
 // @access  Private
