@@ -109,6 +109,7 @@ const SongCard = ({ song, rank, partyId, onBidPlaced }) => {
   };
 
   const currentUserId = localStorage.getItem('userId');
+  console.log('currentuserid:', currentUserId)
 
   const bids = song?.bids || [];
   const title = song?.title || 'Unknown Title';
