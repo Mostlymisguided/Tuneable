@@ -2,7 +2,7 @@ const { WebSocketServer } = require("ws");
 
 let wss = null;
 const activeRooms = {}; // Store song queues per party
-const partyHosts = {}; // Store host per party
+const partyHosts = {};  // Store host per party
 
 const setWebSocketServer = (server) => {
   wss = new WebSocketServer({ server });
@@ -32,7 +32,6 @@ const setWebSocketServer = (server) => {
             break;
 
           case "SKIP":
-            // Manual skip: only the host can trigger it.
             if (partyHosts[data.partyId] === data.userId) {
               handlePlaybackAction(data.partyId, data.type);
             } else {
@@ -41,7 +40,6 @@ const setWebSocketServer = (server) => {
             break;
 
           case "TRANSITION_SONG":
-            // Auto transition: only triggered by the host.
             if (partyHosts[data.partyId] === data.userId) {
               handlePlaybackAction(data.partyId, data.type);
             } else {
@@ -50,7 +48,6 @@ const setWebSocketServer = (server) => {
             break;
 
           case "PLAY":
-            // Only the host is allowed to play.
             if (partyHosts[data.partyId] === data.userId) {
               broadcast(data.partyId, { type: "PLAY" });
             } else {
@@ -59,7 +56,6 @@ const setWebSocketServer = (server) => {
             break;
 
           case "PAUSE":
-            // Only the host is allowed to pause.
             if (partyHosts[data.partyId] === data.userId) {
               broadcast(data.partyId, { type: "PAUSE" });
             } else {
@@ -95,7 +91,6 @@ const handlePlaybackAction = (partyId, action) => {
     broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
     if (activeRooms[partyId].length > 0) {
       broadcast(partyId, { type: "PLAY_NEXT", song: activeRooms[partyId][0] });
-      // Ensure the clients start playback of the next song.
       broadcast(partyId, { type: "PLAY" });
     }
   }
