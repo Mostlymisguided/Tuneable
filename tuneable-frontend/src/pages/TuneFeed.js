@@ -118,7 +118,7 @@ const TuneFeed = () => {
             className={sortBy === "newest" ? "active" : ""}
             onClick={() => setSortBy("newest")}
           >
-            Most Recent
+            Newest
           </button>
         </div>
   
