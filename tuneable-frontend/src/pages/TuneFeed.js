@@ -72,14 +72,14 @@ const TuneFeed = () => {
       <header className="hero">
         <h1>TUNEABLE</h1>
         <h2>The Group Music App</h2>
-        <input 
+       {/*  <input 
           type="text" 
           placeholder="Search..." 
           value={search} 
           onChange={(e) => setSearch(e.target.value)} 
-        />
+        /> */}
       </header>
-
+        {/*}
       <div className="filters">
         <select
           value={filter.time}
@@ -106,7 +106,7 @@ const TuneFeed = () => {
           <option value="music">Music</option>
           <option value="electronic">Electronic</option>
           <option value="healing">Healing</option>
-        </select>
+        </select> */}
         <div className="sort-buttons">
           <button
             className={sortBy === "highest_bid" ? "active" : ""}
@@ -121,7 +121,7 @@ const TuneFeed = () => {
             Most Recent
           </button>
         </div>
-      </div>
+  
 
       {loading ? (
         <p>Loading songs...</p>
