@@ -22,8 +22,13 @@ const setWebSocketServer = (server) => {
             break;
 
           case "UPDATE_QUEUE":
-            activeRooms[data.partyId] = data.queue;
-            broadcast(data.partyId, { type: "UPDATE_QUEUE", queue: data.queue });
+            if (Array.isArray(data.queue)) {
+              activeRooms[data.partyId] = data.queue;
+              console.log(`Queue for party ${data.partyId} updated:`, data.queue);
+            } else {
+              console.warn(`Invalid queue received for party ${data.partyId}`);
+            }
+            broadcast(data.partyId, { type: "UPDATE_QUEUE", queue: activeRooms[data.partyId] });
             break;
 
           case "SKIP":
@@ -81,11 +86,16 @@ const setWebSocketServer = (server) => {
 const handlePlaybackAction = (partyId, action) => {
   broadcast(partyId, { type: action });
   if (action === "SKIP" || action === "TRANSITION_SONG") {
-    activeRooms[partyId]?.shift(); // Remove current song
+    if (!activeRooms[partyId] || !Array.isArray(activeRooms[partyId])) {
+      console.warn(`No active queue available for party ${partyId}.`);
+      return;
+    }
+    // Remove the current song.
+    activeRooms[partyId].shift();
     broadcast(partyId, { type: "UPDATE_QUEUE", queue: activeRooms[partyId] });
-    if (activeRooms[partyId]?.length > 0) {
+    if (activeRooms[partyId].length > 0) {
       broadcast(partyId, { type: "PLAY_NEXT", song: activeRooms[partyId][0] });
-      // Broadcast PLAY to ensure the next song autoplays
+      // Ensure the clients start playback of the next song.
       broadcast(partyId, { type: "PLAY" });
     }
   }
