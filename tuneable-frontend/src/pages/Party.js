@@ -63,7 +63,7 @@ const Party = ({ userId }) => {
       setVenue(party.venue || "Venue");
       setLocation(party.location || "Location");
       // Adjust property as needed (e.g. party.host.userId or party.host.username)
-      setHostId(party.host.userId);
+      setHostId(party.host.username);
       setPartyCode(party.partyCode || "Lost Code 2");
 
       setStartTime(

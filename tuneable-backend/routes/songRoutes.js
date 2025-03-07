@@ -112,19 +112,20 @@ router.get("/public", async (req, res) => {
     }
 
     let sortCriteria = {};
-    switch (sortBy) {
-      case "highestBid":
-        sortCriteria = { globalBidValue: -1 };
-        break;
-      case "newest":
-        sortCriteria = { uploadedAt: -1 };
-        break;
-      case "mostPlayed":
-        sortCriteria = { popularity: -1 };
-        break;
-      default:
-        sortCriteria = { uploadedAt: -1 };
-    }
+switch (sortBy) {
+  case "highestBid":
+  case "highest_bid":  // Optional: support both naming conventions
+    sortCriteria = { globalBidValue: -1 };
+    break;
+  case "newest":
+    sortCriteria = { updatedAt: -1 }; // Sort by updatedAt field
+    break;
+  case "mostPlayed":
+    sortCriteria = { popularity: -1 };
+    break;
+  default:
+    sortCriteria = { updatedAt: -1 }; // Default to newest
+}
 
     // Fetch songs with filtering and sorting applied
     const songs = await Song.find(query)
@@ -181,19 +182,21 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 
     let sortCriteria = {};
-    switch (sortBy) {
-      case "highestBid":
-        sortCriteria = { globalBidValue: -1 };
-        break;
-      case "newest":
-        sortCriteria = { uploadedAt: -1 };
-        break;
-      case "mostPlayed":
-        sortCriteria = { popularity: -1 };
-        break;
-      default:
-        sortCriteria = { uploadedAt: -1 };
-    }
+switch (sortBy) {
+  case "highestBid":
+  case "highest_bid":  // Optional: support both naming conventions
+    sortCriteria = { globalBidValue: -1 };
+    break;
+  case "newest":
+    sortCriteria = { updatedAt: -1 }; // Sort by updatedAt field
+    break;
+  case "mostPlayed":
+    sortCriteria = { popularity: -1 };
+    break;
+  default:
+    sortCriteria = { updatedAt: -1 }; // Default to newest
+}
+
 
     // Fetch songs with sorting and filtering applied
     const songs = await Song.find(query)
