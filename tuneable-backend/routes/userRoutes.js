@@ -158,6 +158,7 @@ router.post(
         return res.status(401).json({ error: 'Invalid email or password' });
       }
       const token = jwt.sign({ userId: user._id, email: user.email, username: user.username }, SECRET_KEY, { expiresIn: '24h' });
+
       res.json({ message: 'Login successful!', token, user });
     } catch (error) {
       res.status(500).json({ error: 'Error logging in', details: error.message });

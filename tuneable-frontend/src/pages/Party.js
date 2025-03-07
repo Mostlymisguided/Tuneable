@@ -1,10 +1,11 @@
+// Party.js
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import SongCard from "../components/SongCard";
 import Footer from "../components/Footer";
 
-const Party = () => {
+const Party = ({ userId }) => {
   const [partyId, setPartyId] = useState(null);
   const [partyName, setPartyName] = useState("Party");
   const [partyVenue, setVenue] = useState("Venue");
@@ -19,14 +20,12 @@ const Party = () => {
   const [currentSong, setCurrentSong] = useState({});
   const [attendees, setAttendees] = useState([]);
   const [hostId, setHostId] = useState(null);
-  const [userId] = useState(localStorage.getItem("userId"));
   const [errorMessage, setErrorMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const { partyId: paramPartyId } = useParams();
   const navigate = useNavigate();
   const WS_URL = process.env.REACT_APP_WEBSOCKET_URL || "ws://localhost:8000";
-
 
   // Create a ref for the WebSocket connection
   const wsRef = useRef(null);
@@ -39,15 +38,19 @@ const Party = () => {
   }, [paramPartyId]);
 
   console.log("🛠 Extracted partyId from URL:", partyId);
+  console.log("Received userId (prop):", userId);
 
   // Fetch Party Details (Initial Load)
   const fetchPartyDetails = useCallback(async () => {
     setLoading(true);
     try {
+      // We still get token from localStorage
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("Unauthorized: No token provided.");
       }
+      console.log("Token:", token);
+      console.log("userId in fetchPartyDetails (prop):", userId);
 
       const response = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/parties/${partyId}/details`,
@@ -62,25 +65,30 @@ const Party = () => {
       setPartyName(party.name || "Party");
       setVenue(party.venue || "Venue");
       setLocation(party.location || "Location");
-      setHostId(party.host.username);
+      // Assume party.host.userId is the host's user id
+      setHostId(party.host.userId);
       setPartyCode(party.partyCode || "Lost Code 2");
 
-      setStartTime(new Date(party.startTime).toLocaleString("en-GB", {
-        weekday: "short",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }));
-      setEndTime(new Date(party.endTime).toLocaleString("en-GB", {
-        weekday: "short",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }));
+      setStartTime(
+        new Date(party.startTime).toLocaleString("en-GB", {
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      );
+      setEndTime(
+        new Date(party.endTime).toLocaleString("en-GB", {
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      );
 
       setType(party.type || "Public");
 
@@ -121,26 +129,31 @@ const Party = () => {
 
         // Initialize the server queue via WebSocket
         if (wsRef.current && wsRef.current.readyState === 1) {
-          wsRef.current.send(JSON.stringify({
-            type: "UPDATE_QUEUE",
-            partyId,
-            queue: party.songs
-          }));
+          wsRef.current.send(
+            JSON.stringify({
+              type: "UPDATE_QUEUE",
+              partyId,
+              queue: party.songs,
+            })
+          );
         }
       }
 
       setAttendees(party.attendees || []);
+      // Compute isJoined using the prop userId
       setIsJoined(party.attendees?.some((attendee) => attendee._id === userId));
       setErrorMessage(null);
     } catch (error) {
       console.error("Error fetching party details:", error);
-      setErrorMessage(error.response?.data?.error || "Failed to load party details.");
+      setErrorMessage(
+        error.response?.data?.error || "Failed to load party details."
+      );
     } finally {
       setLoading(false);
     }
   }, [partyId, userId]);
 
-  // WebSocket Connection
+  // WebSocket Connection (unchanged)
   useEffect(() => {
     if (!partyId) return;
     const ws = new WebSocket(WS_URL);
@@ -183,13 +196,13 @@ const Party = () => {
 
     ws.onclose = () => {
       console.warn("⚠️ WebSocket disconnected. Reconnecting...");
-      setTimeout(() => new WebSocket("ws://localhost:8000"), 3000);
+      setTimeout(() => new WebSocket(WS_URL), 3000);
     };
 
     return () => ws.close();
   }, [partyId]);
 
-  // Fetch Party Details on partyId Change
+  // Fetch party details when partyId changes.
   useEffect(() => {
     if (partyId) {
       console.log("🔄 Fetching party details...");
@@ -201,6 +214,12 @@ const Party = () => {
     localStorage.setItem("partyId", partyId);
     navigate(`/search?partyId=${partyId}`);
   };
+
+  // Compute isHost: compare current user's ID (from prop) with the host's ID.
+  const isHost = userId === hostId;
+  console.log("Computed isHost:", isHost);
+  console.log("userId in Party:", userId);
+  console.log("hostId in Party:", hostId);
 
   return (
     <div className="party-container">
@@ -215,7 +234,11 @@ const Party = () => {
       <h3>Watershed: {partyWatershed}</h3>
       <h3>Party Invite Code: {partyCode}</h3>
 
-      {errorMessage && <p className="error-message" style={{ color: "red" }}>{errorMessage}</p>}
+      {errorMessage && (
+        <p className="error-message" style={{ color: "red" }}>
+          {errorMessage}
+        </p>
+      )}
       {loading ? (
         <p>Loading party details...</p>
       ) : (
@@ -224,7 +247,9 @@ const Party = () => {
           {attendees.length > 0 ? (
             <ul>
               {attendees.map((attendee) => (
-                <li key={attendee._id}>{attendee.username || attendee._id}</li>
+                <li key={attendee._id}>
+                  {attendee.username || attendee._id}
+                </li>
               ))}
             </ul>
           ) : (
@@ -235,14 +260,24 @@ const Party = () => {
           <h2>Next Up</h2>
           <div className="playlist">
             {songs.map((song, index) => (
-              <SongCard key={song._id} song={song} rank={index + 1} partyId={partyId} />
+              <SongCard
+                key={song._id}
+                song={song}
+                rank={index + 1}
+                partyId={partyId}
+              />
             ))}
           </div>
         </>
       )}
 
-      {/* Footer manages WebPlayer */}
-      <Footer currentSong={currentSong} partyId={partyId} />
+      {/* Forward the computed isHost and userId to Footer */}
+      <Footer
+        currentSong={currentSong}
+        partyId={partyId}
+        isHost={isHost}
+        userId={userId}
+      />
     </div>
   );
 };
