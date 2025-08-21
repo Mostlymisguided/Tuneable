@@ -20,6 +20,7 @@ const Party = ({ userId }) => {
   const [currentSong, setCurrentSong] = useState({});
   const [attendees, setAttendees] = useState([]);
   const [hostId, setHostId] = useState(null);
+  const [hostName, setHostName] = useState("");
   const [errorMessage, setErrorMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
@@ -62,8 +63,9 @@ const Party = ({ userId }) => {
       setPartyName(party.name || "Party");
       setVenue(party.venue || "Venue");
       setLocation(party.location || "Location");
-      // Adjust property as needed (e.g. party.host.userId or party.host.username)
-      setHostId(party.host.username);
+      // Store the actual host ID, not the username
+      setHostId(party.host._id || party.host);
+      setHostName(party.host.username || "");
       setPartyCode(party.partyCode || "Lost Code 2");
 
       setStartTime(
@@ -225,7 +227,7 @@ const Party = ({ userId }) => {
   };
 
   // Compute isHost: compare current user's ID (from prop) with the host's ID.
-  const isHost = userId === hostId;
+  const isHost = userId === hostId || userId === hostId?._id;
   console.log("Computed isHost:", isHost);
   console.log("userId in Party:", userId);
   console.log("hostId in Party:", hostId);
@@ -235,7 +237,7 @@ const Party = ({ userId }) => {
       <h1>{partyName}</h1>
       <h2>Venue: {partyVenue}</h2>
       <h2>Location: {partyLocation}</h2>
-      <h2>Host: {hostId}</h2>
+      <h2>Host: {hostName || hostId}</h2>
       <h3>Start: {partyStart}</h3>
       <h3>Finish: {partyEnd}</h3>
       <h3>Accessibility: {partyType}</h3>
