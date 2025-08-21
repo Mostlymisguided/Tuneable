@@ -37,7 +37,22 @@ const Home = () => {
       <header className="hero">
         <h1>TUNEABLE</h1>
         <h2>The Group Music App</h2>
+         <h3 style={{ fontWeight: 400, fontSize: '1.2rem', color: '#888' }}>Private Beta</h3>
       </header>
+      <div className="carousel-placeholder" style={{ margin: '2rem auto', maxWidth: '960px' }}>
+        <img
+          src="/images/hero_image.png"
+          alt="How Tuneable Works: Create/Join Party, Add a Song, Bid to Boost It"
+          style={{
+            width: '50%',
+            display: 'block',
+            margin: '0 auto',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            opacity: 0.8
+          }}
+        />
+      </div>
       {loading ? (
         <p>Loading songs...</p>
       ) : error ? (
