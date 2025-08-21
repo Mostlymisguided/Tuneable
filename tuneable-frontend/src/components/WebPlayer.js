@@ -4,7 +4,7 @@ import ReactPlayer from "react-player";
 const WS_URL = process.env.REACT_APP_WEBSOCKET_URL || "ws://localhost:8000";
 
 const WebPlayer = ({ partyId, currentSong, isHost, userId }) => {
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const wsRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -74,29 +74,40 @@ const WebPlayer = ({ partyId, currentSong, isHost, userId }) => {
     return () => clearTimeout(timerRef.current);
   }, [currentSong, playing, isHost]);
 
+  // Extract YouTube URL from currentSong.sources
+ const youtubeUrl = currentSong?.sources?.find(s => s.platform === "youtube")?.url || currentSong?.url;
+
+console.log("🎧 WebPlayer using URL:", youtubeUrl);
+
+  console.log("🎧 WebPlayer using URL:", youtubeUrl);
+
+  if (!currentSong || Object.keys(currentSong).length === 0 || !youtubeUrl) {
+    console.warn("❌ No valid currentSong or YouTube URL:", currentSong);
+    return null;
+  }
+
   return (
     <div className="web-player-container">
-      {currentSong?.url ? (
-        <ReactPlayer
-          key={`${partyId}-${isHost}`}
-          url={currentSong.url}
-          playing={playing}
-          controls={true}
-          volume={0.8}
-          onEnded={handleEnded}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          width="100%"
-          height="60px"
-          config={{
-            youtube: {
-              playerVars: { origin: window.location.origin },
-            },
-          }}
-        />
-      ) : (
-        <p>No song selected.</p>
-      )}
+       {!playing && isHost && (
+      <button onClick={() => setPlaying(true)}>▶ Start Player</button>
+    )}
+      <ReactPlayer
+        key={`${partyId}-${isHost}`}
+        url={youtubeUrl}
+        playing={playing}
+        controls={true}
+        volume={0.8}
+        onEnded={handleEnded}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        width="100%"
+        height="60px"
+        config={{
+          youtube: {
+            playerVars: { origin: window.location.origin },
+          },
+        }}
+      />
     </div>
   );
 };
