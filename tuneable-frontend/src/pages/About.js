@@ -87,7 +87,7 @@ const About = () => {
       <section className="about-cta">
         <h3>Want to help us test, invest, or jam?</h3>
         <p><a href="mailto:mostlymisguided@icloud.com">📧 Get in touch</a></p>
-        <p><a href="https://www.tuneable.com/pitch" target="_blank" rel="noreferrer">📄 See the pitch deck</a></p>
+        <p><a href="https://www.tuneable.com/pitch-deck.pdf" target="_blank" rel="noreferrer">📄 See the pitch deck</a></p>
         <p><a href="/parties">🎉 Join a party</a></p>
       </section>
     </div>
