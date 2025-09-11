@@ -42,9 +42,11 @@ const WebPlayer = ({ partyId, currentSong, isHost, userId }) => {
     };
   }, [partyId, isHost, userId]);
 
+  const [showWarning, setShowWarning] = useState(false);
   const sendPlaybackAction = (type) => {
     if (!isHost) {
       console.warn("Only the host can trigger playback actions.");
+      setShowWarning(true);
       return;
     }
     wsRef.current?.send(
