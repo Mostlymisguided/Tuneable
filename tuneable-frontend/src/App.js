@@ -7,6 +7,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import 'react-toastify/dist/ReactToastify.css';
 import NavBar from './components/NavBar';
 import Home from './pages/Home';
+import About from './pages/About';
 import TuneFeed from './pages/TuneFeed';
 import Parties from './pages/Parties';
 import SearchPage from './pages/SearchPage';
@@ -71,6 +72,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login setUserId={setUserId} />} />
 

@@ -63,6 +63,9 @@ const NavBar = () => {
                         <li className={isActive('/login')}>
                             <Link to="/login">Login</Link>
                         </li>
+                         <li className={isActive('/about')}>
+                            <Link to="/about">About</Link>
+                        </li>
                     </>
                 )}
             </ul>
