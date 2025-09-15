@@ -17,6 +17,7 @@ const partyRoutes = require('./routes/partyRoutes'); // Unified party and playli
 const searchRoutes = require('./routes/searchRoutes'); // Import search routes
 const songRoutes = require('./routes/songRoutes'); // Import song routes
 const paymentRoutes = require('./routes/paymentRoutes');
+const youtubeRoutes = require('./routes/youtube');
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -90,6 +91,7 @@ app.use('/api/parties', partyRoutes); // Unified party and playlist functionalit
 app.use('/api/songs', songRoutes); // Tunefeed route
 app.use('/api/parties', songRoutes); // Mount song-specific routes
 app.use('/api/payments', paymentRoutes);
+app.use('/api/youtube', youtubeRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 
