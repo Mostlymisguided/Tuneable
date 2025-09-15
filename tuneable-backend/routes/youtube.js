@@ -9,7 +9,6 @@ const cache = new NodeCache({ stdTTL: 600 }); // Cache results for 10 minutes
 router.get('/search', async (req, res) => {
     const { query, pageToken } = req.query;
 
-    // Validate query
     if (!query) {
         return res.status(400).json({ error: 'Query parameter is required' });
     }
@@ -33,39 +32,32 @@ router.get('/search', async (req, res) => {
                 type: 'video',
                 key: YOUTUBE_API_KEY,
                 maxResults: 10,
-                pageToken, // Include the page token if provided
+                pageToken,
             },
         });
 
         const result = {
-            nextPageToken: response.data.nextPageToken, // Pagination token for frontend
+            nextPageToken: response.data.nextPageToken,
             videos: response.data.items.map(video => ({
                 id: video.id.videoId,
                 title: video.snippet.title,
-                description: video.snippet.description,
                 thumbnail: video.snippet.thumbnails.high.url,
-                channelTitle: video.snippet.channelTitle,
-                publishedAt: video.snippet.publishedAt,
             })),
         };
 
-        // Cache the result
         cache.set(cacheKey, result);
         res.json(result);
     } catch (error) {
         console.error('YouTube API error:');
         if (error.response) {
-            // API responded but with an error
             const statusCode = error.response.status;
             const message = error.response.data.error?.message || 'YouTube API error';
             console.error('Status:', statusCode, 'Message:', message);
             return res.status(statusCode).json({ error: message });
         } else if (error.request) {
-            // No response received
             console.error('No response received:', error.request);
             return res.status(500).json({ error: 'No response received from YouTube API' });
         } else {
-            // General error
             console.error('Error message:', error.message);
             return res.status(500).json({ error: 'Internal server error' });
         }
