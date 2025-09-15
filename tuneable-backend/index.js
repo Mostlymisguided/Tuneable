@@ -38,18 +38,9 @@ db.connectDB()
 // Allowed origins: development and production
 const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com'];
 
-// Define CORS options
+// Define CORS options (temporary: allow all origins for MVP + Base44 integration)
 const corsOptions = {
-  origin: function (origin, callback) {
-    console.log('CORS check for origin:', origin);
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'), false);
-    }
-  },
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
