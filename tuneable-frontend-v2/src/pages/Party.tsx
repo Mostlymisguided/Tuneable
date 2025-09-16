@@ -3,9 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
+import PlayerWarningModal from '../components/PlayerWarningModal';
 import '../types/youtube'; // Import YouTube types
 
 // Define types directly to avoid import issues
@@ -55,12 +57,18 @@ const Party: React.FC = () => {
   const [selectedSong, setSelectedSong] = useState<any>(null);
   const [isBidding, setIsBidding] = useState(false);
 
+  // Player warning system
+  const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
+
   // Use global WebPlayer store
   const {
     setCurrentSong,
     setIsHost,
     setQueue,
     setWebSocketSender,
+    setCurrentPartyId,
+    setGlobalPlayerActive,
+    currentPartyId,
   } = useWebPlayerStore();
 
   const { isConnected, sendMessage } = useWebSocket({
@@ -74,47 +82,53 @@ const Party: React.FC = () => {
           if (message.queue) {
             setParty((prev: any) => prev ? { ...prev, songs: message.queue! } : null);
             
-            // Update global queue
-            const cleanedQueue = message.queue.map((song: any) => {
-              const actualSong = song.songId || song;
-              let youtubeUrl = null;
-              
-              if (actualSong.sources) {
-                if (Array.isArray(actualSong.sources)) {
-                  for (const source of actualSong.sources) {
-                    if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                      if (source.url.sources.youtube) {
-                        youtubeUrl = source.url.sources.youtube;
+            // Only update global queue if this is the currently active party
+            console.log('WebSocket UPDATE_QUEUE - currentPartyId:', currentPartyId, 'partyId:', partyId, 'match:', currentPartyId === partyId);
+            if (currentPartyId === partyId) {
+              console.log('Updating global queue for active party');
+              const cleanedQueue = message.queue.map((song: any) => {
+                const actualSong = song.songId || song;
+                let youtubeUrl = null;
+                
+                if (actualSong.sources) {
+                  if (Array.isArray(actualSong.sources)) {
+                    for (const source of actualSong.sources) {
+                      if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                        if (source.url.sources.youtube) {
+                          youtubeUrl = source.url.sources.youtube;
+                          break;
+                        }
+                      } else if (source && source.platform === 'youtube' && source.url) {
+                        youtubeUrl = source.url;
                         break;
                       }
-                    } else if (source && source.platform === 'youtube' && source.url) {
-                      youtubeUrl = source.url;
-                      break;
                     }
+                  } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
+                    youtubeUrl = actualSong.sources.youtube;
                   }
-                } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-                  youtubeUrl = actualSong.sources.youtube;
                 }
-              }
+                
+                return {
+                  _id: actualSong._id,
+                  title: actualSong.title,
+                  artist: actualSong.artist,
+                  duration: actualSong.duration,
+                  coverArt: actualSong.coverArt,
+                  sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
+                  globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
+                  bids: actualSong.bids,
+                  addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy,
+                  totalBidValue: typeof actualSong.totalBidValue === 'number' ? actualSong.totalBidValue : 0
+                };
+              });
               
-              return {
-                _id: actualSong._id,
-                title: actualSong.title,
-                artist: actualSong.artist,
-                duration: actualSong.duration,
-                coverArt: actualSong.coverArt,
-                sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
-                globalBidValue: actualSong.globalBidValue,
-                bids: actualSong.bids,
-                addedBy: actualSong.addedBy,
-                totalBidValue: actualSong.totalBidValue
-              };
-            });
-            
-            setQueue(cleanedQueue);
-            
-            if (cleanedQueue.length > 0) {
-              setCurrentSong(cleanedQueue[0], 0);
+              setQueue(cleanedQueue);
+              
+              if (cleanedQueue.length > 0) {
+                setCurrentSong(cleanedQueue[0], 0);
+              }
+            } else {
+              console.log('Not updating global queue - different party is active');
             }
           }
           break;
@@ -144,48 +158,59 @@ const Party: React.FC = () => {
 
   // Set current song and host status when party loads
   useEffect(() => {
+    console.log('Party useEffect triggered - party:', !!party, 'songs:', party?.songs?.length, 'currentPartyId:', currentPartyId, 'partyId:', partyId);
+    
     if (party && party.songs.length > 0) {
-      // Clean and set the queue in global store
-      const cleanedQueue = party.songs.map((song: any) => {
-        const actualSong = song.songId || song;
-        let youtubeUrl = null;
+      // Only update the global player if this is a new party or no party is currently active
+      if (currentPartyId !== partyId) {
+        console.log('New party detected, updating global player queue');
         
-        if (actualSong.sources) {
-          if (Array.isArray(actualSong.sources)) {
-            for (const source of actualSong.sources) {
-              if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                if (source.url.sources.youtube) {
-                  youtubeUrl = source.url.sources.youtube;
+        // Clean and set the queue in global store
+        const cleanedQueue = party.songs.map((song: any) => {
+          const actualSong = song.songId || song;
+          let youtubeUrl = null;
+          
+          if (actualSong.sources) {
+            if (Array.isArray(actualSong.sources)) {
+              for (const source of actualSong.sources) {
+                if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                  if (source.url.sources.youtube) {
+                    youtubeUrl = source.url.sources.youtube;
+                    break;
+                  }
+                } else if (source && source.platform === 'youtube' && source.url) {
+                  youtubeUrl = source.url;
                   break;
                 }
-              } else if (source && source.platform === 'youtube' && source.url) {
-                youtubeUrl = source.url;
-                break;
               }
+            } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
+              youtubeUrl = actualSong.sources.youtube;
             }
-          } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-            youtubeUrl = actualSong.sources.youtube;
           }
-        }
+          
+          return {
+            _id: actualSong._id,
+            title: actualSong.title,
+            artist: actualSong.artist,
+            duration: actualSong.duration,
+            coverArt: actualSong.coverArt,
+            sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
+            globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
+            bids: actualSong.bids,
+            addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy,
+            totalBidValue: typeof actualSong.totalBidValue === 'number' ? actualSong.totalBidValue : 0
+          };
+        });
         
-        return {
-          _id: actualSong._id,
-          title: actualSong.title,
-          artist: actualSong.artist,
-          duration: actualSong.duration,
-          coverArt: actualSong.coverArt,
-          sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
-          globalBidValue: actualSong.globalBidValue,
-          bids: actualSong.bids,
-          addedBy: actualSong.addedBy,
-          totalBidValue: actualSong.totalBidValue
-        };
-      });
-      
-      setQueue(cleanedQueue);
-      
-      if (cleanedQueue.length > 0) {
-        setCurrentSong(cleanedQueue[0], 0);
+        setQueue(cleanedQueue);
+        setCurrentPartyId(partyId!);
+        setGlobalPlayerActive(true);
+        
+        if (cleanedQueue.length > 0) {
+          setCurrentSong(cleanedQueue[0], 0);
+        }
+      } else {
+        console.log('Same party, not updating global player queue');
       }
     }
     
@@ -193,84 +218,15 @@ const Party: React.FC = () => {
       const hostId = typeof party.host === 'string' ? party.host : party.host._id;
       setIsHost(user._id === hostId);
     }
-  }, [party, user, setQueue, setCurrentSong, setIsHost]);
+  }, [party, user, partyId, currentPartyId, setQueue, setCurrentSong, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
+
 
   const fetchPartyDetails = async () => {
     try {
       const response = await partyAPI.getPartyDetails(partyId!);
       setParty(response.party);
-      if (response.party.songs.length > 0) {
-        // Extract the actual song data from songId property
-        const firstSong = response.party.songs[0].songId || response.party.songs[0];
-        
-        // Clean the song data to remove Mongoose metadata
-        if (firstSong && typeof firstSong === 'object') {
-          // Check if the song has a nested songId property (from party songs)
-          const actualSong = (firstSong as any).songId || firstSong;
-          
-          // Extract YouTube URL from the actual song data
-          let youtubeUrl = null;
-          console.log('fetchPartyDetails - actualSong.sources type:', typeof actualSong.sources);
-          console.log('fetchPartyDetails - actualSong.sources:', actualSong.sources);
-          console.log('fetchPartyDetails - actualSong.sources.youtube:', actualSong.sources?.youtube);
-          
-          if (actualSong.sources) {
-            if (Array.isArray(actualSong.sources)) {
-              console.log('fetchPartyDetails - Sources is array, searching for YouTube...');
-              console.log('fetchPartyDetails - Array contents:', actualSong.sources);
-              
-              // Check if this is Mongoose metadata corruption
-              // Look for $__parent with actual song data in url property
-              for (let i = 0; i < actualSong.sources.length; i++) {
-                const source = actualSong.sources[i];
-                console.log(`fetchPartyDetails - sources[${i}]:`, source);
-                console.log(`fetchPartyDetails - sources[${i}].platform:`, source?.platform);
-                console.log(`fetchPartyDetails - sources[${i}].url:`, source?.url);
-                
-                if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                  // This is Mongoose metadata corruption - extract from nested structure
-                  console.log('fetchPartyDetails - Found Mongoose metadata corruption, extracting from nested structure');
-                  if (source.url.sources.youtube) {
-                    youtubeUrl = source.url.sources.youtube;
-                    console.log('fetchPartyDetails - Found YouTube URL in nested structure:', youtubeUrl);
-                    break;
-                  }
-                } else if (source && source.platform === 'youtube' && source.url) {
-                  // Normal array format: [{platform: "youtube", url: "..."}]
-                  youtubeUrl = source.url;
-                  console.log('fetchPartyDetails - Found YouTube URL in array:', youtubeUrl);
-                  break;
-                }
-              }
-            } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-              // Handle object format: {youtube: "..."}
-              youtubeUrl = actualSong.sources.youtube;
-              console.log('fetchPartyDetails - Found YouTube URL in sources.youtube:', youtubeUrl);
-            } else {
-              console.log('fetchPartyDetails - Sources is object but no youtube property found');
-            }
-          } else {
-            console.log('fetchPartyDetails - No sources found');
-          }
-          
-          console.log('fetchPartyDetails - Final youtubeUrl:', youtubeUrl);
-          
-          const cleanSong = {
-            _id: actualSong._id,
-            title: actualSong.title,
-            artist: actualSong.artist,
-            duration: actualSong.duration,
-            coverArt: actualSong.coverArt,
-            sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
-            globalBidValue: actualSong.globalBidValue,
-            bids: actualSong.bids,
-            addedBy: actualSong.addedBy,
-            totalBidValue: actualSong.totalBidValue
-          };
-          
-          setCurrentSong(cleanSong);
-        }
-      }
+      // Note: Song setting is now handled by the useEffect hook
+      // to prevent interference with global player state
     } catch (error) {
       console.error('Error fetching party details:', error);
       toast.error('Failed to load party details');
@@ -343,6 +299,13 @@ const Party: React.FC = () => {
     });
   };
 
+  const handleNavigateWithWarning = (path: string, action: string) => {
+    showWarning(
+      action,
+      () => navigate(path)
+    );
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -374,7 +337,7 @@ const Party: React.FC = () => {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Party not found</h1>
           <p className="text-gray-600 mb-6">The party you're looking for doesn't exist or has been removed.</p>
-          <button onClick={() => navigate('/parties')} className="btn-primary">
+          <button onClick={() => handleNavigateWithWarning('/parties', 'navigate to parties list')} className="btn-primary">
             Back to Parties
           </button>
         </div>
@@ -439,9 +402,9 @@ const Party: React.FC = () => {
           {/* Song Queue */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Queue</h2>
+              <h2 className="text-xl font-semibold text-white">Queue</h2>
               <button
-                onClick={() => navigate(`/search?partyId=${partyId}`)}
+                onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
                 className="btn-primary flex items-center space-x-2"
               >
                 <Plus className="h-4 w-4" />
@@ -458,33 +421,55 @@ const Party: React.FC = () => {
                 <div
                   key={songData._id || `song-${index}`}
                   className={`flex items-center space-x-4 p-3 rounded-lg ${
-                    index === 0 ? 'bg-primary-50 border border-primary-200' : 'bg-gray-50'
+                    index === 0 ? 'bg-purple-900 border border-purple-400' : 'bg-gray-800'
                   }`}
                 >
-                  <span className="text-sm font-medium text-gray-500 w-8">
+                  <span className="text-sm font-medium text-gray-400 w-8">
                     {index + 1}
                   </span>
                   <img
                     src={songData.coverArt || '/default-cover.jpg'}
                     alt={songData.title || 'Unknown Song'}
-                    className="w-10 h-10 rounded object-cover"
+                    className="w-20 h-20 rounded object-cover"
+                    width="80"
+                    height="80"
                   />
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{songData.title || 'Unknown Song'}</h4>
-                    <p className="text-sm text-gray-600">{songData.artist || 'Unknown Artist'}</p>
+                    <h4 className="font-medium text-white">{songData.title || 'Unknown Song'}</h4>
+                    <p className="text-sm text-gray-400">{songData.artist || 'Unknown Artist'}</p>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">
-                        £{songData.globalBidValue?.toFixed(2) || '0.00'}
+                    <div className="text-right min-w-[120px]">
+                      <p className="text-sm font-medium text-white">
+                        £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {songData.bids?.length || 0} bids
+                      <p className="text-xs text-gray-400">
+                        {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
                       </p>
+                      {/* Show individual bids if available */}
+                      {Array.isArray(songData.bids) && songData.bids.length > 0 && (
+                        <div className="mt-1 space-y-1">
+                          {songData.bids.slice(0, 3).map((bid: any, bidIndex: number) => (
+                            <div key={bidIndex} className="flex items-center justify-between text-xs">
+                              <span className="text-gray-400 truncate max-w-[60px]">
+                                {typeof bid.userId === 'object' ? bid.userId?.username || 'Unknown' : 'User'}
+                              </span>
+                              <span className="text-white font-medium">
+                                £{typeof bid.amount === 'number' ? bid.amount.toFixed(2) : '0.00'}
+                              </span>
+                            </div>
+                          ))}
+                          {songData.bids.length > 3 && (
+                            <p className="text-xs text-gray-500">
+                              +{songData.bids.length - 3} more
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => handleBidClick(song)}
-                      className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-md transition-colors"
+                      className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-gradient-button text-white rounded-md transition-colors hover:opacity-90"
                       disabled={isBidding}
                     >
                       <PoundSterling className="h-3 w-3" />
@@ -500,7 +485,7 @@ const Party: React.FC = () => {
                 <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">No songs in queue</p>
                 <button
-                  onClick={() => navigate(`/search?partyId=${partyId}`)}
+                  onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
                   className="btn-primary mt-4"
                 >
                   Add First Song
@@ -567,6 +552,16 @@ const Party: React.FC = () => {
         songArtist={selectedSong?.artist || ''}
         currentBid={selectedSong?.globalBidValue || 0}
         isLoading={isBidding}
+      />
+
+      {/* Player Warning Modal */}
+      <PlayerWarningModal
+        isOpen={isWarningOpen}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        action={warningAction}
+        currentSongTitle={currentSongTitle}
+        currentSongArtist={currentSongArtist}
       />
     </div>
   );

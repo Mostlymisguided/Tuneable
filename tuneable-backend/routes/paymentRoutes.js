@@ -30,6 +30,116 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   }
 });
 
+// Create Stripe Checkout Session for Wallet Top-up
+router.post('/create-checkout-session', authMiddleware, async (req, res) => {
+  try {
+    const { amount, currency = 'gbp' } = req.body;
+    const userId = req.user.userId;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: 'Tuneable Wallet Top-up',
+              description: `Add £${amount} to your Tuneable wallet`,
+            },
+            unit_amount: Math.round(amount * 100), // Convert to pence
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/wallet?success=true&amount=${amount}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/wallet?canceled=true`,
+      metadata: {
+        userId: userId,
+        amount: amount.toString(),
+        type: 'wallet_topup'
+      },
+    });
+
+    res.json({ sessionId: session.id, url: session.url });
+  } catch (error) {
+    console.error('Stripe Checkout Session Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Webhook to handle successful payments
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.log(`Webhook signature verification failed.`, err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the checkout.session.completed event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    
+    if (session.metadata.type === 'wallet_topup') {
+      try {
+        const userId = session.metadata.userId;
+        const amount = parseFloat(session.metadata.amount);
+
+        // Update user balance
+        const user = await User.findByIdAndUpdate(
+          userId,
+          { $inc: { balance: amount } },
+          { new: true }
+        );
+
+        if (user) {
+          console.log(`Wallet top-up successful: User ${userId} added £${amount}, new balance: £${user.balance}`);
+        }
+      } catch (error) {
+        console.error('Error updating user balance from webhook:', error.message);
+      }
+    }
+  }
+
+  res.json({ received: true });
+});
+
+// Development endpoint to manually update balance (for testing)
+router.post('/update-balance', authMiddleware, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const userId = req.user.userId;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Update user balance
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $inc: { balance: amount } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Balance updated successfully', balance: user.balance });
+  } catch (error) {
+    console.error('Error updating balance:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Confirm Payment & Update User Balance
 router.post('/confirm-payment', authMiddleware, async (req, res) => {
   try {

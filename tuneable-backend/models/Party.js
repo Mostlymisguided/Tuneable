@@ -38,6 +38,8 @@ const PartySchema = new mongoose.Schema({
     {
       songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', required: true },
       addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      partyBidValue: { type: Number, default: 0 }, // Party-specific total bid value
+      partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
     },
   ],
   startTime:{ type: Date, default: Date.now },

@@ -25,9 +25,9 @@ interface Party {
   name: string;
   venue?: string;
   location: string;
-  host: string;
+  host: string | { _id: string; username: string; userId: string; id: string };
   partyCode: string;
-  attendees: string[];
+  attendees: (string | { _id: string; username: string; userId: string; id: string })[];
   songs: PartySong[];
   startTime: string;
   endTime?: string;
@@ -109,6 +109,39 @@ export const authAPI = {
   },
 };
 
+// Payment API
+export const paymentAPI = {
+  createCheckoutSession: async (amount: number, currency: string = 'gbp') => {
+    const response = await api.post('/payments/create-checkout-session', {
+      amount,
+      currency,
+    });
+    return response.data;
+  },
+  
+  createPaymentIntent: async (amount: number, currency: string = 'gbp') => {
+    const response = await api.post('/payments/create-payment-intent', {
+      amount,
+      currency,
+    });
+    return response.data;
+  },
+  
+  confirmPayment: async (amount: number) => {
+    const response = await api.post('/payments/confirm-payment', {
+      amount,
+    });
+    return response.data;
+  },
+  
+  updateBalance: async (amount: number) => {
+    const response = await api.post('/payments/update-balance', {
+      amount,
+    });
+    return response.data;
+  },
+};
+
 // Party API
 export const partyAPI = {
   createParty: async (partyData: any) => {
@@ -185,17 +218,5 @@ export const searchAPI = {
   },
 };
 
-// Payment API
-export const paymentAPI = {
-  createPaymentIntent: async (amount: number, currency: string = 'gbp') => {
-    const response = await api.post('/payments/create-payment-intent', { amount, currency });
-    return response.data;
-  },
-  
-  confirmPayment: async (amount: number) => {
-    const response = await api.post('/payments/confirm-payment', { amount });
-    return response.data;
-  },
-};
 
 export default api;

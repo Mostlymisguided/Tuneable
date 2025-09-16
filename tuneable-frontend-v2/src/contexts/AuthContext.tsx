@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { authAPI } from '../lib/api';
 
 // Define types directly to avoid import issues
@@ -41,6 +41,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -125,12 +126,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user');
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await authAPI.getProfile();
+      setUser(response.user);
+      localStorage.setItem('user', JSON.stringify(response.user));
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
     login,
     register,
     logout,
+    refreshUser,
     isLoading,
   };
 

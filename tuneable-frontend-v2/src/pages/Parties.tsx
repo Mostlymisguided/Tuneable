@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
+import { usePlayerWarning } from '../hooks/usePlayerWarning';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
+import PlayerWarningModal from '../components/PlayerWarningModal';
 import { Music, Users, MapPin, Clock } from 'lucide-react';
 
 // Define types directly to avoid import issues
@@ -9,9 +12,9 @@ interface PartyType {
   name: string;
   venue?: string;
   location: string;
-  host: string;
+  host: string | { _id: string; username: string; userId: string; id: string };
   partyCode: string;
-  attendees: string[];
+  attendees: (string | { _id: string; username: string; userId: string; id: string })[];
   songs: any[];
   startTime: string;
   endTime?: string;
@@ -25,6 +28,9 @@ interface PartyType {
 const Parties: React.FC = () => {
   const [parties, setParties] = useState<PartyType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
+  const { currentPartyId } = useWebPlayerStore();
 
   useEffect(() => {
     const fetchParties = async () => {
@@ -40,6 +46,21 @@ const Parties: React.FC = () => {
 
     fetchParties();
   }, []);
+
+  const handleJoinParty = (partyId: string, partyName: string) => {
+    // Check if this is a different party than the current one
+    const isDifferentParty = currentPartyId && currentPartyId !== partyId;
+    
+    if (isDifferentParty) {
+      showWarning(
+        `join "${partyName}"`,
+        () => navigate(`/party/${partyId}`)
+      );
+    } else {
+      // Same party or no current party, navigate directly
+      navigate(`/party/${partyId}`);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -57,7 +78,7 @@ const Parties: React.FC = () => {
       case 'active':
         return 'bg-green-100 text-green-800';
       case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-purple-200 text-purple-900';
       case 'ended':
         return 'bg-gray-100 text-gray-800';
       case 'canceled':
@@ -133,25 +154,34 @@ const Parties: React.FC = () => {
 
                 <div className="flex items-center text-sm text-gray-600">
                   <Users className="h-4 w-4 mr-2" />
-                  <span>{party.attendees.length} attendees</span>
+                  <span>{Array.isArray(party.attendees) ? party.attendees.length : 0} attendees</span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-500">
-                  Host: {party.host.username}
+                  Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
-                <Link
-                  to={`/party/${party._id}`}
+                <button
+                  onClick={() => handleJoinParty(party._id, party.name)}
                   className="btn-primary text-sm"
                 >
                   Join Party
-                </Link>
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <PlayerWarningModal
+        isOpen={isWarningOpen}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        action={warningAction}
+        currentSongTitle={currentSongTitle}
+        currentSongArtist={currentSongArtist}
+      />
     </div>
   );
 };
