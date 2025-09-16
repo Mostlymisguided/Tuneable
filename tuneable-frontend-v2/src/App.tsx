@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import PersistentWebPlayer from './components/PersistentWebPlayer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -98,6 +99,7 @@ const AppContent = () => {
             />
           </Routes>
         </main>
+        <PersistentWebPlayer />
         <ToastContainer
           position="top-right"
           autoClose={5000}

@@ -1,0 +1,179 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface Song {
+  _id: string;
+  title: string;
+  artist: string;
+  duration: number;
+  coverArt: string;
+  sources: any;
+  globalBidValue: number;
+  bids: any[];
+  addedBy: any;
+  totalBidValue: number;
+}
+
+interface WebPlayerState {
+  // Player state
+  isPlaying: boolean;
+  currentSong: Song | null;
+  currentSongIndex: number;
+  volume: number;
+  isMuted: boolean;
+  isHost: boolean;
+  
+  // Player actions
+  setCurrentSong: (song: Song | null, index?: number) => void;
+  play: () => void;
+  pause: () => void;
+  togglePlayPause: () => void;
+  next: () => void;
+  previous: () => void;
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
+  setIsHost: (isHost: boolean) => void;
+  
+  // Queue management
+  queue: Song[];
+  setQueue: (queue: Song[]) => void;
+  addToQueue: (song: Song) => void;
+  removeFromQueue: (songId: string) => void;
+  moveToNext: () => void;
+  
+  // WebSocket actions
+  sendWebSocketMessage: (message: any) => void;
+  setWebSocketSender: (sender: (message: any) => void) => void;
+}
+
+export const useWebPlayerStore = create<WebPlayerState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      isPlaying: false,
+      currentSong: null,
+      currentSongIndex: 0,
+      volume: 50,
+      isMuted: false,
+      isHost: false,
+      queue: [],
+      sendWebSocketMessage: () => {},
+      
+      // Actions
+      setCurrentSong: (song, index = 0) => {
+        set({ 
+          currentSong: song, 
+          currentSongIndex: index,
+          isPlaying: false // Reset play state when song changes
+        });
+      },
+      
+      play: () => {
+        set({ isPlaying: true });
+        const { sendWebSocketMessage, isHost } = get();
+        if (isHost && sendWebSocketMessage) {
+          sendWebSocketMessage({ type: 'PLAY' });
+        }
+      },
+      
+      pause: () => {
+        set({ isPlaying: false });
+        const { sendWebSocketMessage, isHost } = get();
+        if (isHost && sendWebSocketMessage) {
+          sendWebSocketMessage({ type: 'PAUSE' });
+        }
+      },
+      
+      togglePlayPause: () => {
+        const { isPlaying, play, pause } = get();
+        if (isPlaying) {
+          pause();
+        } else {
+          play();
+        }
+      },
+      
+      next: () => {
+        const { queue, currentSongIndex, isPlaying, sendWebSocketMessage, isHost } = get();
+        if (queue.length > 0) {
+          const nextIndex = (currentSongIndex + 1) % queue.length;
+          // Maintain the playing state when moving to next song
+          set({ 
+            currentSong: queue[nextIndex], 
+            currentSongIndex: nextIndex,
+            isPlaying: isPlaying // Keep the current playing state
+          });
+          
+          if (isHost && sendWebSocketMessage) {
+            sendWebSocketMessage({ type: 'NEXT' });
+          }
+        }
+      },
+      
+      previous: () => {
+        const { queue, currentSongIndex, isPlaying, sendWebSocketMessage, isHost } = get();
+        if (queue.length > 0) {
+          const prevIndex = currentSongIndex === 0 ? queue.length - 1 : currentSongIndex - 1;
+          // Maintain the playing state when moving to previous song
+          set({ 
+            currentSong: queue[prevIndex], 
+            currentSongIndex: prevIndex,
+            isPlaying: isPlaying // Keep the current playing state
+          });
+          
+          if (isHost && sendWebSocketMessage) {
+            sendWebSocketMessage({ type: 'PREVIOUS' });
+          }
+        }
+      },
+      
+      setVolume: (volume) => {
+        set({ volume: Math.max(0, Math.min(100, volume)) });
+      },
+      
+      toggleMute: () => {
+        set((state) => ({ isMuted: !state.isMuted }));
+      },
+      
+      setIsHost: (isHost) => {
+        set({ isHost });
+      },
+      
+      setQueue: (queue) => {
+        set({ queue });
+      },
+      
+      addToQueue: (song) => {
+        set((state) => ({ 
+          queue: [...state.queue, song] 
+        }));
+      },
+      
+      removeFromQueue: (songId) => {
+        set((state) => ({
+          queue: state.queue.filter(song => song._id !== songId)
+        }));
+      },
+      
+      moveToNext: () => {
+        const { next } = get();
+        next();
+      },
+      
+      setWebSocketSender: (sender) => {
+        set({ sendWebSocketMessage: sender });
+      },
+    }),
+    {
+      name: 'webplayer-storage',
+      // Only persist essential state, not functions
+      partialize: (state) => ({
+        volume: state.volume,
+        isMuted: state.isMuted,
+        currentSong: state.currentSong,
+        currentSongIndex: state.currentSongIndex,
+        queue: state.queue,
+      }),
+    }
+  )
+);
