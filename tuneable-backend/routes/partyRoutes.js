@@ -201,7 +201,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
         console.log('Fetched Party Details:', JSON.stringify(party, null, 2));
 
-        // ✅ **Flatten `songId` structure & extract platform URLs**
+        // ✅ **Flatten `songId` structure & extract platform URLs with PARTY-SPECIFIC bid values**
         const processedSongs = party.songs.map((entry) => {
             if (!entry.songId) return null; // Edge case: skip invalid entries
 
@@ -217,14 +217,15 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 duration: entry.songId.duration || '666',
                 coverArt: entry.songId.coverArt || '/default-cover.jpg',
                 sources: availablePlatforms, // ✅ Store platform data as an array
-                globalBidValue: entry.songId.globalBidValue || 0,
-                bids: entry.songId.bids,
+                globalBidValue: entry.songId.globalBidValue || 0, // Keep for analytics
+                partyBidValue: entry.partyBidValue || 0, // ✅ Use party-specific bid value
+                bids: entry.partyBids || [], // ✅ Use party-specific bids
                 addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
-                totalBidValue: entry.songId.bids.reduce((sum, bid) => sum + bid.amount, 0),
+                totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
             };
         }).filter(Boolean); // ✅ Remove null entries
 
-        // ✅ Sort songs by `totalBidValue` in descending order
+        // ✅ Sort songs by PARTY-SPECIFIC `totalBidValue` in descending order
         processedSongs.sort((a, b) => (b.totalBidValue || 0) - (a.totalBidValue || 0));
 
         // ✅ **Return a cleaned response (don’t overwrite `party.songs`)**
@@ -414,58 +415,67 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
         const extractedDuration = duration && !isNaN(duration) ? parseInt(duration, 10) : 888;
         const extractedCoverArt = req.body.coverArt && req.body.coverArt.includes("http")
             ? req.body.coverArt 
-            : `https://img.youtube.com/vi/${req.body.url.split("v=")[1]}/hqdefault.jpg`; // ✅ Generate from video ID
+            : `https://img.youtube.com/vi/${req.body.url.split("v=")[1]}/hqdefault.jpg`;
 
-        // ✅ Fetch party only once
+        // ✅ Fetch party with populated songs
         const party = await Party.findById(partyId).populate('songs.songId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
 
         let song;
+        let partySongEntry = null;
+
         if (songId) {
             // ✅ Check if song exists in DB
             if (!mongoose.isValidObjectId(songId)) {
                 return res.status(400).json({ error: 'Invalid songId format' });
             }
 
-            song = await Song.findById(songId).populate({
-                path: 'bids',
-                populate: { path: 'userId', select: 'username' }
-            });
-
+            song = await Song.findById(songId);
             if (!song) {
                 return res.status(404).json({ error: 'Song not found' });
+            }
+
+            // Find the party-specific song entry
+            partySongEntry = party.songs.find(entry => entry.songId._id.toString() === songId);
+            if (!partySongEntry) {
+                return res.status(404).json({ error: 'Song not found in this party' });
             }
         } else if (url && title && artist && platform) {
             // ✅ Try finding the song by platform URL
             song = await Song.findOne({ [`sources.${platform}`]: url });
 
             if (!song) {
-                // ✅ Create a new song if it doesn’t exist
+                // ✅ Create a new song if it doesn't exist
                 song = new Song({
                     title,
                     artist,
                     coverArt: extractedCoverArt,
-                    duration: extractedDuration || 777, // ✅ Store duration correctly
+                    duration: extractedDuration || 777,
                     sources: { [platform]: url },
                     addedBy: userId
                 });
-
-                console.log("🎵 Saving song to database:", JSON.stringify(song, null, 2)); // ✅ Proper log
                 await song.save();
             }
 
-            // ✅ Ensure song is added to the party's playlist if not already
-            if (!party.songs.some(entry => entry.songId?.toString() === song._id.toString())) {
-                party.songs.push({ songId: song._id, addedBy: userId });
-                await party.save();
+            // Find or create party-specific song entry
+            partySongEntry = party.songs.find(entry => entry.songId._id.toString() === song._id.toString());
+            if (!partySongEntry) {
+                // Add song to party with initial party-specific bid values
+                partySongEntry = {
+                    songId: song._id,
+                    addedBy: userId,
+                    partyBidValue: 0,
+                    partyBids: []
+                };
+                party.songs.push(partySongEntry);
             }
         } else {
             return res.status(400).json({ error: 'Either songId or song metadata (url, title, artist, platform) must be provided.' });
         }
 
-        // ✅ Create a new bid for the song
+        // ✅ Create a new bid
         const bid = new Bid({
             userId,
             partyId,
@@ -474,20 +484,42 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
         });
         await bid.save();
 
-        // ✅ Update the song with bid info
-        song.bids.push(bid._id);
+        // ✅ Update GLOBAL song bid info (for analytics)
+        song.globalBids = song.globalBids || [];
+        song.globalBids.push(bid._id);
         song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
+        
+        // Keep legacy bids field for backward compatibility
+        song.bids = song.bids || [];
+        song.bids.push(bid._id);
+        
         await song.save();
 
-        // ✅ Fetch updated song with populated bid info
+        // ✅ Update PARTY-SPECIFIC song bid info (for queue ordering)
+        partySongEntry.partyBids = partySongEntry.partyBids || [];
+        partySongEntry.partyBids.push(bid._id);
+        partySongEntry.partyBidValue = (partySongEntry.partyBidValue || 0) + bidAmount;
+        
+        await party.save();
+
+        // ✅ Fetch updated song with populated bid info for response
         const updatedSong = await Song.findById(song._id).populate({
-            path: 'bids',
+            path: 'globalBids',
             populate: { path: 'userId', select: 'username' }
         });
 
+        // ✅ Get party-specific bid info
+        const partyBids = await Bid.find({ 
+            _id: { $in: partySongEntry.partyBids } 
+        }).populate('userId', 'username');
+
         res.status(200).json({
             message: 'Bid placed successfully!',
-            song: updatedSong
+            song: {
+                ...updatedSong.toObject(),
+                partyBidValue: partySongEntry.partyBidValue,
+                partyBids: partyBids
+            }
         });
     } catch (err) {
         console.error("❌ Error placing bid:", err);

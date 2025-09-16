@@ -17,6 +17,7 @@ import CreateParty from './pages/CreateParty';
 import Profile from './pages/Profile';
 import Payment from './pages/Payment';
 import Search from './pages/Search';
+import Wallet from './pages/Wallet';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -34,7 +35,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppContent = () => {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen">
         <Navbar />
         <main>
           <Routes>
@@ -94,6 +95,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <Payment />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/wallet" 
+              element={
+                <ProtectedRoute>
+                  <Wallet />
                 </ProtectedRoute>
               } 
             />

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { Music, MapPin, Calendar, Users, Shield } from 'lucide-react';
+import { Music, Calendar, Shield } from 'lucide-react';
 
 const CreateParty: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -18,7 +18,7 @@ const CreateParty: React.FC = () => {
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     
     if (name === 'watershed') {
       setFormData({

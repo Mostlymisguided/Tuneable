@@ -16,9 +16,12 @@ const songSchema = new mongoose.Schema({
   isrc: { type: String, default: null }, // International Standard Recording Code
   upc: { type: String, default: null }, // Universal Product Code
 
-  // Bidding system
+  // Global bidding system (for analytics across all parties)
+  globalBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
+  globalBidValue: { type: Number, default: 0 }, // Tracks total bid amount across all parties (for analytics)
+  
+  // Legacy field for backward compatibility (deprecated)
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
-  globalBidValue: { type: Number, default: 0 }, // Tracks total bid amount
 
   // Platform-specific URLs (Flexible Map)
   sources: {

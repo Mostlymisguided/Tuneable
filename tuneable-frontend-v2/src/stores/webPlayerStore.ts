@@ -41,9 +41,17 @@ interface WebPlayerState {
   removeFromQueue: (songId: string) => void;
   moveToNext: () => void;
   
+  // Party management
+  currentPartyId: string | null;
+  setCurrentPartyId: (partyId: string | null) => void;
+  
   // WebSocket actions
   sendWebSocketMessage: (message: any) => void;
   setWebSocketSender: (sender: (message: any) => void) => void;
+  
+  // Global player control
+  isGlobalPlayerActive: boolean;
+  setGlobalPlayerActive: (active: boolean) => void;
 }
 
 export const useWebPlayerStore = create<WebPlayerState>()(
@@ -57,6 +65,8 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       isMuted: false,
       isHost: false,
       queue: [],
+      currentPartyId: null,
+      isGlobalPlayerActive: false,
       sendWebSocketMessage: () => {},
       
       // Actions
@@ -163,6 +173,16 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       setWebSocketSender: (sender) => {
         set({ sendWebSocketMessage: sender });
       },
+      
+      // Party management
+      setCurrentPartyId: (partyId) => {
+        set({ currentPartyId: partyId });
+      },
+      
+      // Global player control
+      setGlobalPlayerActive: (active) => {
+        set({ isGlobalPlayerActive: active });
+      },
     }),
     {
       name: 'webplayer-storage',
@@ -173,6 +193,8 @@ export const useWebPlayerStore = create<WebPlayerState>()(
         currentSong: state.currentSong,
         currentSongIndex: state.currentSongIndex,
         queue: state.queue,
+        currentPartyId: state.currentPartyId,
+        isGlobalPlayerActive: state.isGlobalPlayerActive,
       }),
     }
   )

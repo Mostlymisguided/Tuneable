@@ -9,63 +9,81 @@ html {
   font-family: 'Inter', system-ui, sans-serif;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
 body {
-  background-color: #f9fafb;
-  color: #111827;
+  background: linear-gradient(135deg, #1A1A2E 0%, #4A2C81 50%, #3A1C71 100%);
+  background-attachment: fixed;
+  color: #E5E7EB;
   line-height: 1.5;
+  min-height: 100vh;
 }
 
 /* Utility classes */
 .btn-primary {
-  background-color: #2563eb;
+  background: linear-gradient(90deg, #EC4899 0%, #A855F7 100%);
   color: white;
   font-weight: 500;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   border: none;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .btn-primary:hover {
-  background-color: #1d4ed8;
+  background: linear-gradient(90deg, #F472B6 0%, #C084FC 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
 }
 
 .btn-secondary {
-  background-color: #e5e7eb;
-  color: #111827;
+  background-color: #2D1A4E;
+  color: #E5E7EB;
   font-weight: 500;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  border: none;
+  border: 1px solid #37245B;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .btn-secondary:hover {
-  background-color: #d1d5db;
+  background-color: #37245B;
+  border-color: #C084FC;
 }
 
 .card {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  background-color: #2D1A4E;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  border: 1px solid #37245B;
   padding: 1.5rem;
 }
 
 .input {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  background-color: #37245B;
+  border: 1px solid #4A3070;
   border-radius: 0.5rem;
+  color: #E5E7EB;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.input::placeholder {
+  color: #9CA3AF;
+}
+
 .input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #C084FC;
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.2);
 }
 
 /* Layout utilities */
@@ -163,23 +181,31 @@ body {
 }
 
 .text-gray-900 {
-  color: #111827;
+  color: #FFFFFF;
 }
 
 .text-gray-600 {
-  color: #4b5563;
+  color: #D1D5DB;
 }
 
 .text-gray-500 {
-  color: #6b7280;
+  color: #9CA3AF;
 }
 
 .text-gray-400 {
-  color: #9ca3af;
+  color: #6B7280;
 }
 
 .text-white {
-  color: white;
+  color: #FFFFFF;
+}
+
+.text-purple-400 {
+  color: #C084FC;
+}
+
+.text-purple-500 {
+  color: #A855F7;
 }
 
 /* Flexbox utilities */
@@ -427,35 +453,80 @@ body {
 }
 
 .bg-primary-50 {
-  background-color: #eff6ff;
+  background-color: #2D1A4E;
 }
 
 .bg-primary-100 {
-  background-color: #dbeafe;
+  background-color: #37245B;
 }
 
 .bg-primary-600 {
-  background-color: #2563eb;
+  background-color: #A855F7;
 }
 
 .bg-primary-700 {
-  background-color: #1d4ed8;
+  background-color: #9333EA;
 }
 
 .bg-gray-50 {
-  background-color: #f9fafb;
+  background-color: #2D1A4E;
 }
 
 .bg-gray-100 {
-  background-color: #f3f4f6;
+  background-color: #37245B;
 }
 
 .bg-gray-200 {
-  background-color: #e5e7eb;
+  background-color: #4A3070;
 }
 
 .bg-white {
-  background-color: white;
+  background-color: #2D1A4E;
+}
+
+.bg-purple-200 {
+  background-color: #DDD6FE;
+}
+
+.bg-purple-600 {
+  background-color: #A855F7;
+}
+
+.bg-purple-700 {
+  background-color: #9333EA;
+}
+
+.text-purple-900 {
+  color: #581C87;
+}
+
+.bg-green-500 {
+  background-color: #10B981;
+}
+
+.text-green-500 {
+  color: #10B981;
+}
+
+.bg-blue-600 {
+  background-color: #2563EB;
+}
+
+.hover\\:bg-blue-700:hover {
+  background-color: #1D4ED8;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .bg-green-100 {
@@ -479,19 +550,23 @@ body {
 }
 
 .border-gray-200 {
-  border-color: #e5e7eb;
+  border-color: #4A3070;
 }
 
 .border-primary-200 {
-  border-color: #bfdbfe;
+  border-color: #C084FC;
+}
+
+.border-purple-400 {
+  border-color: #C084FC;
 }
 
 .text-primary-600 {
-  color: #2563eb;
+  color: #A855F7;
 }
 
 .text-primary-700 {
-  color: #1d4ed8;
+  color: #9333EA;
 }
 
 .text-green-600 {
@@ -535,31 +610,31 @@ body {
 }
 
 .hover\\:bg-primary-100:hover {
-  background-color: #dbeafe;
+  background-color: #37245B;
 }
 
 .hover\\:bg-primary-200:hover {
-  background-color: #bfdbfe;
+  background-color: #4A3070;
 }
 
 .hover\\:bg-primary-700:hover {
-  background-color: #1d4ed8;
+  background-color: #9333EA;
 }
 
 .hover\\:bg-gray-100:hover {
-  background-color: #f3f4f6;
+  background-color: #37245B;
 }
 
 .hover\\:bg-gray-200:hover {
-  background-color: #e5e7eb;
+  background-color: #4A3070;
 }
 
 .hover\\:text-gray-900:hover {
-  color: #111827;
+  color: #FFFFFF;
 }
 
 .hover\\:text-primary-600:hover {
-  color: #2563eb;
+  color: #A855F7;
 }
 
 .hover\\:text-red-600:hover {
@@ -704,4 +779,68 @@ body {
     padding-left: 2rem;
     padding-right: 2rem;
   }
+}
+
+/* Dark theme specific utilities */
+.bg-gradient-purple {
+  background: linear-gradient(135deg, #1A1A2E 0%, #3A1C71 100%);
+}
+
+.bg-gradient-button {
+  background: linear-gradient(90deg, #EC4899 0%, #A855F7 100%);
+}
+
+.text-accent-purple {
+  color: #C084FC;
+}
+
+.bg-card-dark {
+  background-color: #2D1A4E;
+}
+
+.bg-input-dark {
+  background-color: #37245B;
+}
+
+.border-purple-glow {
+  border-color: #C084FC;
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.2);
+}
+
+/* Status badge colors for dark theme */
+.bg-yellow-100 {
+  background-color: #FACC15;
+  color: #1A1A2E;
+}
+
+.text-yellow-800 {
+  color: #1A1A2E;
+}
+
+/* Custom slider styles for dark theme */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #4B5563;
+  outline: none;
+  border-radius: 0.5rem;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #C084FC;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #C084FC;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
 }
