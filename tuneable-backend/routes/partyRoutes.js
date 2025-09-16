@@ -114,7 +114,7 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
 router.post("/join/:partyId", authMiddleware, async (req, res) => {
     const { partyId } = req.params;
     const { inviteCode, location } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     try {
         const party = await Party.findById(partyId);
@@ -412,6 +412,9 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
 
         // ✅ Convert duration to integer & validate
         const extractedDuration = duration && !isNaN(duration) ? parseInt(duration, 10) : 888;
+        const extractedCoverArt = req.body.coverArt && req.body.coverArt.includes("http")
+            ? req.body.coverArt 
+            : `https://img.youtube.com/vi/${req.body.url.split("v=")[1]}/hqdefault.jpg`; // ✅ Generate from video ID
 
         // ✅ Fetch party only once
         const party = await Party.findById(partyId).populate('songs.songId');
