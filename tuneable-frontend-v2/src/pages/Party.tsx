@@ -5,6 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import WebPlayer from '../components/WebPlayer';
+import BidModal from '../components/BidModal';
 import '../types/youtube'; // Import YouTube types
 
 // Define types directly to avoid import issues
@@ -38,7 +39,8 @@ import {
   Clock, 
   Plus,
   Copy,
-  Share2
+  Share2,
+  PoundSterling
 } from 'lucide-react';
 
 const Party: React.FC = () => {
@@ -51,6 +53,11 @@ const Party: React.FC = () => {
   const [currentSong, setCurrentSong] = useState<any>(null);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [isHost, setIsHost] = useState(false);
+  
+  // Bid modal state
+  const [bidModalOpen, setBidModalOpen] = useState(false);
+  const [selectedSong, setSelectedSong] = useState<any>(null);
+  const [isBidding, setIsBidding] = useState(false);
 
   const { isConnected, sendMessage } = useWebSocket({
     partyId: partyId || '',
@@ -65,7 +72,50 @@ const Party: React.FC = () => {
             if (message.queue.length > 0) {
               // Extract the actual song data from songId property
               const firstSong = message.queue[0].songId || message.queue[0];
-              setCurrentSong(firstSong);
+              
+              // Apply the same cleaning logic as in useEffect and fetchPartyDetails
+              if (firstSong && typeof firstSong === 'object') {
+                const actualSong = (firstSong as any).songId || firstSong;
+                
+                // Extract YouTube URL from the actual song data
+                let youtubeUrl = null;
+                if (actualSong.sources) {
+                  if (Array.isArray(actualSong.sources)) {
+                    // Check if this is Mongoose metadata corruption
+                    for (const source of actualSong.sources) {
+                      if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                        // This is Mongoose metadata corruption - extract from nested structure
+                        if (source.url.sources.youtube) {
+                          youtubeUrl = source.url.sources.youtube;
+                          break;
+                        }
+                      } else if (source && source.platform === 'youtube' && source.url) {
+                        // Normal array format: [{platform: "youtube", url: "..."}]
+                        youtubeUrl = source.url;
+                        break;
+                      }
+                    }
+                  } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
+                    // Handle object format: {youtube: "..."}
+                    youtubeUrl = actualSong.sources.youtube;
+                  }
+                }
+                
+                const cleanSong = {
+                  _id: actualSong._id,
+                  title: actualSong.title,
+                  artist: actualSong.artist,
+                  duration: actualSong.duration,
+                  coverArt: actualSong.coverArt,
+                  sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
+                  globalBidValue: actualSong.globalBidValue,
+                  bids: actualSong.bids,
+                  addedBy: actualSong.addedBy,
+                  totalBidValue: actualSong.totalBidValue
+                };
+                
+                setCurrentSong(cleanSong);
+              }
             }
           }
           break;
@@ -102,6 +152,55 @@ const Party: React.FC = () => {
       if (firstSong && typeof firstSong === 'object') {
         // Check if the song has a nested songId property (from party songs)
         const actualSong = (firstSong as any).songId || firstSong;
+        console.log('actualSong:', actualSong);
+        console.log('actualSong.sources:', actualSong.sources);
+        
+        // Extract YouTube URL from the actual song data
+        let youtubeUrl = null;
+        console.log('actualSong.sources type:', typeof actualSong.sources);
+        console.log('actualSong.sources:', actualSong.sources);
+        console.log('actualSong.sources.youtube:', actualSong.sources?.youtube);
+        
+        if (actualSong.sources) {
+          if (Array.isArray(actualSong.sources)) {
+            console.log('Sources is array, searching for YouTube...');
+            console.log('Array contents:', actualSong.sources);
+            
+            // Check if this is Mongoose metadata corruption
+            // Look for $__parent with actual song data in url property
+            for (let i = 0; i < actualSong.sources.length; i++) {
+              const source = actualSong.sources[i];
+              console.log(`sources[${i}]:`, source);
+              console.log(`sources[${i}].platform:`, source?.platform);
+              console.log(`sources[${i}].url:`, source?.url);
+              
+              if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                // This is Mongoose metadata corruption - extract from nested structure
+                console.log('Found Mongoose metadata corruption, extracting from nested structure');
+                if (source.url.sources.youtube) {
+                  youtubeUrl = source.url.sources.youtube;
+                  console.log('Found YouTube URL in nested structure:', youtubeUrl);
+                  break;
+                }
+              } else if (source && source.platform === 'youtube' && source.url) {
+                // Normal array format: [{platform: "youtube", url: "..."}]
+                youtubeUrl = source.url;
+                console.log('Found YouTube URL in array:', youtubeUrl);
+                break;
+              }
+            }
+          } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
+            // Handle object format: {youtube: "..."}
+            youtubeUrl = actualSong.sources.youtube;
+            console.log('Found YouTube URL in sources.youtube:', youtubeUrl);
+          } else {
+            console.log('Sources is object but no youtube property found');
+          }
+        } else {
+          console.log('No sources found');
+        }
+        
+        console.log('Final youtubeUrl:', youtubeUrl);
         
         const cleanSong = {
           _id: actualSong._id,
@@ -109,9 +208,7 @@ const Party: React.FC = () => {
           artist: actualSong.artist,
           duration: actualSong.duration,
           coverArt: actualSong.coverArt,
-          sources: actualSong.sources && typeof actualSong.sources === 'object' && !Array.isArray(actualSong.sources) 
-            ? actualSong.sources 
-            : { youtube: null }, // Fallback if sources is corrupted
+          sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
           globalBidValue: actualSong.globalBidValue,
           bids: actualSong.bids,
           addedBy: actualSong.addedBy,
@@ -144,15 +241,60 @@ const Party: React.FC = () => {
           // Check if the song has a nested songId property (from party songs)
           const actualSong = (firstSong as any).songId || firstSong;
           
+          // Extract YouTube URL from the actual song data
+          let youtubeUrl = null;
+          console.log('fetchPartyDetails - actualSong.sources type:', typeof actualSong.sources);
+          console.log('fetchPartyDetails - actualSong.sources:', actualSong.sources);
+          console.log('fetchPartyDetails - actualSong.sources.youtube:', actualSong.sources?.youtube);
+          
+          if (actualSong.sources) {
+            if (Array.isArray(actualSong.sources)) {
+              console.log('fetchPartyDetails - Sources is array, searching for YouTube...');
+              console.log('fetchPartyDetails - Array contents:', actualSong.sources);
+              
+              // Check if this is Mongoose metadata corruption
+              // Look for $__parent with actual song data in url property
+              for (let i = 0; i < actualSong.sources.length; i++) {
+                const source = actualSong.sources[i];
+                console.log(`fetchPartyDetails - sources[${i}]:`, source);
+                console.log(`fetchPartyDetails - sources[${i}].platform:`, source?.platform);
+                console.log(`fetchPartyDetails - sources[${i}].url:`, source?.url);
+                
+                if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                  // This is Mongoose metadata corruption - extract from nested structure
+                  console.log('fetchPartyDetails - Found Mongoose metadata corruption, extracting from nested structure');
+                  if (source.url.sources.youtube) {
+                    youtubeUrl = source.url.sources.youtube;
+                    console.log('fetchPartyDetails - Found YouTube URL in nested structure:', youtubeUrl);
+                    break;
+                  }
+                } else if (source && source.platform === 'youtube' && source.url) {
+                  // Normal array format: [{platform: "youtube", url: "..."}]
+                  youtubeUrl = source.url;
+                  console.log('fetchPartyDetails - Found YouTube URL in array:', youtubeUrl);
+                  break;
+                }
+              }
+            } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
+              // Handle object format: {youtube: "..."}
+              youtubeUrl = actualSong.sources.youtube;
+              console.log('fetchPartyDetails - Found YouTube URL in sources.youtube:', youtubeUrl);
+            } else {
+              console.log('fetchPartyDetails - Sources is object but no youtube property found');
+            }
+          } else {
+            console.log('fetchPartyDetails - No sources found');
+          }
+          
+          console.log('fetchPartyDetails - Final youtubeUrl:', youtubeUrl);
+          
           const cleanSong = {
             _id: actualSong._id,
             title: actualSong.title,
             artist: actualSong.artist,
             duration: actualSong.duration,
             coverArt: actualSong.coverArt,
-            sources: actualSong.sources && typeof actualSong.sources === 'object' && !Array.isArray(actualSong.sources) 
-              ? actualSong.sources 
-              : { youtube: null }, // Fallback if sources is corrupted
+            sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
             globalBidValue: actualSong.globalBidValue,
             bids: actualSong.bids,
             addedBy: actualSong.addedBy,
@@ -224,6 +366,39 @@ const Party: React.FC = () => {
     } else {
       copyPartyCode();
     }
+  };
+
+  // Bid handling functions
+  const handleBidClick = (song: any) => {
+    const songData = song.songId || song;
+    setSelectedSong(songData);
+    setBidModalOpen(true);
+  };
+
+  const handleBidConfirm = async (bidAmount: number) => {
+    if (!selectedSong || !partyId) return;
+
+    setIsBidding(true);
+    try {
+      await partyAPI.placeBid(partyId, selectedSong, bidAmount);
+      toast.success(`Bid of £${bidAmount.toFixed(2)} placed successfully!`);
+      
+      // Refresh party data to get updated bid information
+      await fetchPartyDetails();
+      
+      setBidModalOpen(false);
+      setSelectedSong(null);
+    } catch (error: any) {
+      console.error('Error placing bid:', error);
+      toast.error(error.response?.data?.error || 'Failed to place bid');
+    } finally {
+      setIsBidding(false);
+    }
+  };
+
+  const handleBidModalClose = () => {
+    setBidModalOpen(false);
+    setSelectedSong(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -376,13 +551,23 @@ const Party: React.FC = () => {
                     <h4 className="font-medium text-gray-900">{songData.title || 'Unknown Song'}</h4>
                     <p className="text-sm text-gray-600">{songData.artist || 'Unknown Artist'}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">
-                      £{songData.globalBidValue?.toFixed(2) || '0.00'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {songData.bids?.length || 0} bids
-                    </p>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">
+                        £{songData.globalBidValue?.toFixed(2) || '0.00'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {songData.bids?.length || 0} bids
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleBidClick(song)}
+                      className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-md transition-colors"
+                      disabled={isBidding}
+                    >
+                      <PoundSterling className="h-3 w-3" />
+                      <span>Bid</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -450,6 +635,17 @@ const Party: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Bid Modal */}
+      <BidModal
+        isOpen={bidModalOpen}
+        onClose={handleBidModalClose}
+        onConfirm={handleBidConfirm}
+        songTitle={selectedSong?.title || ''}
+        songArtist={selectedSong?.artist || ''}
+        currentBid={selectedSong?.globalBidValue || 0}
+        isLoading={isBidding}
+      />
     </div>
   );
 };
