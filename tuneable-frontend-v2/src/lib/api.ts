@@ -1,0 +1,217 @@
+import axios from 'axios';
+
+// Define types directly to avoid import issues
+interface User {
+  _id: string;
+  username: string;
+  email: string;
+  profilePic?: string;
+  personalInviteCode: string;
+  balance: number;
+  homeLocation: {
+    city: string;
+    country: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  };
+  role: string[];
+  isActive: boolean;
+}
+
+interface Party {
+  _id: string;
+  name: string;
+  venue?: string;
+  location: string;
+  host: string;
+  partyCode: string;
+  attendees: string[];
+  songs: PartySong[];
+  startTime: string;
+  endTime?: string;
+  type: 'public' | 'private' | 'geocoded';
+  status: 'scheduled' | 'active' | 'ended' | 'canceled';
+  watershed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PartySong {
+  songId: string;
+  addedBy: string;
+}
+
+interface Song {
+  _id: string;
+  title: string;
+  artist: string;
+  producer?: string;
+  featuring?: string[];
+  rightsHolder?: string;
+  album?: string;
+  genre?: string;
+  releaseDate?: string;
+  duration: number;
+  coverArt?: string;
+  explicit: boolean;
+  sources: Record<string, string>;
+  globalBidValue: number;
+  addedBy: string;
+  uploadedAt: string;
+  updatedAt: string;
+  playCount: number;
+  popularity: number;
+  lyrics?: string;
+}
+
+interface SearchResult {
+  id: string;
+  title: string;
+  artist: string;
+  coverArt: string;
+  duration: number;
+  sources: Record<string, string>;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+
+// Create axios instance with base configuration
+const api = axios.create({
+  baseURL: `${API_BASE_URL}/api`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor to handle auth errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const authAPI = {
+  login: async (email: string, password: string) => {
+    const response = await api.post('/users/login', { email, password });
+    return response.data;
+  },
+  
+  register: async (userData: any) => {
+    const response = await api.post('/users/register', userData);
+    return response.data;
+  },
+  
+  getProfile: async (): Promise<{ user: User }> => {
+    const response = await api.get('/users/profile');
+    return response.data;
+  },
+  
+  updateProfile: async (userData: Partial<User>) => {
+    const response = await api.put('/users/profile', userData);
+    return response.data;
+  },
+  
+  uploadProfilePic: async (file: File) => {
+    const formData = new FormData();
+    formData.append('profilePic', file);
+    const response = await api.put('/users/profile-pic', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+};
+
+// Party API
+export const partyAPI = {
+  createParty: async (partyData: any) => {
+    const response = await api.post('/parties', partyData);
+    return response.data;
+  },
+  
+  getParties: async (): Promise<{ parties: Party[] }> => {
+    const response = await api.get('/parties');
+    return response.data;
+  },
+  
+  getPartyDetails: async (partyId: string): Promise<{ party: Party }> => {
+    const response = await api.get(`/parties/${partyId}/details`);
+    return response.data;
+  },
+  
+  joinParty: async (partyId: string, inviteCode?: string, location?: any) => {
+    const response = await api.post(`/parties/join/${partyId}`, { inviteCode, location });
+    return response.data;
+  },
+  
+  addSongToParty: async (partyId: string, songData: any) => {
+    const response = await api.post(`/parties/${partyId}/songs/bid`, songData);
+    return response.data;
+  },
+};
+
+// Song API
+export const songAPI = {
+  getSongs: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
+    const response = await api.get('/songs', { params });
+    return response.data;
+  },
+  
+  getPublicSongs: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
+    const response = await api.get('/songs/public', { params });
+    return response.data;
+  },
+  
+  uploadSong: async (file: File, metadata: { title: string; artist: string }) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', metadata.title);
+    formData.append('artist', metadata.artist);
+    const response = await api.post('/songs/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+};
+
+// Search API
+export const searchAPI = {
+  search: async (query: string, source: string = 'youtube', pageToken?: string) => {
+    const response = await api.get('/search', {
+      params: { query, source, pageToken },
+    });
+    return response.data;
+  },
+};
+
+// Payment API
+export const paymentAPI = {
+  createPaymentIntent: async (amount: number, currency: string = 'gbp') => {
+    const response = await api.post('/payments/create-payment-intent', { amount, currency });
+    return response.data;
+  },
+  
+  confirmPayment: async (amount: number) => {
+    const response = await api.post('/payments/confirm-payment', { amount });
+    return response.data;
+  },
+};
+
+export default api;
