@@ -80,7 +80,6 @@ app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parties', partyRoutes); // Unified party and playlist functionality
 app.use('/api/songs', songRoutes); // Tunefeed route
-app.use('/api/parties', songRoutes); // Mount song-specific routes
 app.use('/api/payments', paymentRoutes);
 app.use('/api/youtube', youtubeRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
