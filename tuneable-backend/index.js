@@ -111,14 +111,11 @@ if (require.main === module) {
   console.log(`Node.js version: ${process.version}`);
   server = app.listen(PORT, () => {
     console.log(`Server running on PORT ${PORT}`);
-  });
-
-  if (!server.listening) {
-    console.warn("⚠️ WebSocket server setup skipped: Server is not running.");
-  } else {
+    
+    // Set up WebSocket server after the HTTP server is ready
     setWebSocketServer(server);
     console.log('✅ WebSocket server initialized.');
-  }
+  });
 }
 
 // Export app and broadcast function from utils
