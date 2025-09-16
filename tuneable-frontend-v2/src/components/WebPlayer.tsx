@@ -42,12 +42,29 @@ const WebPlayer: React.FC<WebPlayerProps> = ({
     if (Array.isArray(currentSong?.sources)) {
       console.log('Searching through sources array...');
       for (let i = 0; i < currentSong.sources.length; i++) {
-        console.log(`sources[${i}]:`, currentSong.sources[i]);
-        console.log(`sources[${i}] keys:`, Object.keys(currentSong.sources[i] || {}));
-        console.log(`sources[${i}].youtube:`, currentSong.sources[i]?.youtube);
-        if (currentSong.sources[i]?.youtube) {
-          youtubeUrl = currentSong.sources[i].youtube;
+        const source = currentSong.sources[i];
+        console.log(`sources[${i}]:`, source);
+        console.log(`sources[${i}] keys:`, Object.keys(source || {}));
+        console.log(`sources[${i}].youtube:`, source?.youtube);
+        
+        // Check if this is Mongoose metadata corruption
+        if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+          // This is Mongoose metadata corruption - extract from nested structure
+          console.log('Found Mongoose metadata corruption in WebPlayer, extracting from nested structure');
+          if (source.url.sources.youtube) {
+            youtubeUrl = source.url.sources.youtube;
+            console.log('Found YouTube URL in nested structure:', youtubeUrl);
+            break;
+          }
+        } else if (source && source.platform === 'youtube' && source.url) {
+          // Normal array format: [{platform: "youtube", url: "..."}]
+          youtubeUrl = source.url;
           console.log('Found YouTube URL in sources array:', youtubeUrl);
+          break;
+        } else if (source?.youtube) {
+          // Fallback: direct youtube property
+          youtubeUrl = source.youtube;
+          console.log('Found YouTube URL in direct property:', youtubeUrl);
           break;
         }
       }

@@ -43,37 +43,7 @@ interface PartySong {
   addedBy: string;
 }
 
-interface Song {
-  _id: string;
-  title: string;
-  artist: string;
-  producer?: string;
-  featuring?: string[];
-  rightsHolder?: string;
-  album?: string;
-  genre?: string;
-  releaseDate?: string;
-  duration: number;
-  coverArt?: string;
-  explicit: boolean;
-  sources: Record<string, string>;
-  globalBidValue: number;
-  addedBy: string;
-  uploadedAt: string;
-  updatedAt: string;
-  playCount: number;
-  popularity: number;
-  lyrics?: string;
-}
-
-interface SearchResult {
-  id: string;
-  title: string;
-  artist: string;
-  coverArt: string;
-  duration: number;
-  sources: Record<string, string>;
-}
+// Unused interfaces removed to fix linting warnings
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
 
@@ -163,6 +133,20 @@ export const partyAPI = {
   
   addSongToParty: async (partyId: string, songData: any) => {
     const response = await api.post(`/parties/${partyId}/songs/bid`, songData);
+    return response.data;
+  },
+  
+  placeBid: async (partyId: string, song: any, bidAmount: number) => {
+    const response = await api.post(`/parties/${partyId}/songcardbid`, {
+      songId: song._id,
+      bidAmount,
+      url: song.sources?.youtube || '',
+      title: song.title,
+      artist: song.artist,
+      platform: 'youtube',
+      duration: song.duration || 888,
+      coverArt: song.coverArt || '',
+    });
     return response.data;
   },
 };
