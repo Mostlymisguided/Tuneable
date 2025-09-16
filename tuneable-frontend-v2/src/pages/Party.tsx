@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import WebPlayer from '../components/WebPlayer';
 import BidModal from '../components/BidModal';
 import '../types/youtube'; // Import YouTube types
 
@@ -49,15 +49,19 @@ const Party: React.FC = () => {
   const navigate = useNavigate();
   const [party, setParty] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentSong, setCurrentSong] = useState<any>(null);
-  const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [isHost, setIsHost] = useState(false);
   
   // Bid modal state
   const [bidModalOpen, setBidModalOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState<any>(null);
   const [isBidding, setIsBidding] = useState(false);
+
+  // Use global WebPlayer store
+  const {
+    setCurrentSong,
+    setIsHost,
+    setQueue,
+    setWebSocketSender,
+  } = useWebPlayerStore();
 
   const { isConnected, sendMessage } = useWebSocket({
     partyId: partyId || '',
@@ -69,69 +73,67 @@ const Party: React.FC = () => {
         case 'UPDATE_QUEUE':
           if (message.queue) {
             setParty((prev: any) => prev ? { ...prev, songs: message.queue! } : null);
-            if (message.queue.length > 0) {
-              // Extract the actual song data from songId property
-              const firstSong = message.queue[0].songId || message.queue[0];
+            
+            // Update global queue
+            const cleanedQueue = message.queue.map((song: any) => {
+              const actualSong = song.songId || song;
+              let youtubeUrl = null;
               
-              // Apply the same cleaning logic as in useEffect and fetchPartyDetails
-              if (firstSong && typeof firstSong === 'object') {
-                const actualSong = (firstSong as any).songId || firstSong;
-                
-                // Extract YouTube URL from the actual song data
-                let youtubeUrl = null;
-                if (actualSong.sources) {
-                  if (Array.isArray(actualSong.sources)) {
-                    // Check if this is Mongoose metadata corruption
-                    for (const source of actualSong.sources) {
-                      if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                        // This is Mongoose metadata corruption - extract from nested structure
-                        if (source.url.sources.youtube) {
-                          youtubeUrl = source.url.sources.youtube;
-                          break;
-                        }
-                      } else if (source && source.platform === 'youtube' && source.url) {
-                        // Normal array format: [{platform: "youtube", url: "..."}]
-                        youtubeUrl = source.url;
+              if (actualSong.sources) {
+                if (Array.isArray(actualSong.sources)) {
+                  for (const source of actualSong.sources) {
+                    if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                      if (source.url.sources.youtube) {
+                        youtubeUrl = source.url.sources.youtube;
                         break;
                       }
+                    } else if (source && source.platform === 'youtube' && source.url) {
+                      youtubeUrl = source.url;
+                      break;
                     }
-                  } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-                    // Handle object format: {youtube: "..."}
-                    youtubeUrl = actualSong.sources.youtube;
                   }
+                } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
+                  youtubeUrl = actualSong.sources.youtube;
                 }
-                
-                const cleanSong = {
-                  _id: actualSong._id,
-                  title: actualSong.title,
-                  artist: actualSong.artist,
-                  duration: actualSong.duration,
-                  coverArt: actualSong.coverArt,
-                  sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
-                  globalBidValue: actualSong.globalBidValue,
-                  bids: actualSong.bids,
-                  addedBy: actualSong.addedBy,
-                  totalBidValue: actualSong.totalBidValue
-                };
-                
-                setCurrentSong(cleanSong);
               }
+              
+              return {
+                _id: actualSong._id,
+                title: actualSong.title,
+                artist: actualSong.artist,
+                duration: actualSong.duration,
+                coverArt: actualSong.coverArt,
+                sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
+                globalBidValue: actualSong.globalBidValue,
+                bids: actualSong.bids,
+                addedBy: actualSong.addedBy,
+                totalBidValue: actualSong.totalBidValue
+              };
+            });
+            
+            setQueue(cleanedQueue);
+            
+            if (cleanedQueue.length > 0) {
+              setCurrentSong(cleanedQueue[0], 0);
             }
           }
           break;
         case 'PLAY':
-          setIsPlaying(true);
-          break;
         case 'PAUSE':
-          setIsPlaying(false);
-          break;
+        case 'SKIP':
         case 'PLAY_NEXT':
-          if (message.song) {
-            setCurrentSong(message.song);
-          }
+          // Global store will handle these
           break;
       }
     },
+    onConnect: () => {
+      console.log('WebSocket connected');
+      // Set up WebSocket sender in global store
+      setWebSocketSender(sendMessage);
+    },
+    onDisconnect: () => {
+      console.log('WebSocket disconnected');
+    }
   });
 
   useEffect(() => {
@@ -143,66 +145,30 @@ const Party: React.FC = () => {
   // Set current song and host status when party loads
   useEffect(() => {
     if (party && party.songs.length > 0) {
-      // Extract the actual song data from songId property
-      const firstSong = party.songs[0].songId || party.songs[0];
-      console.log('Setting current song:', firstSong);
-      console.log('First song sources:', firstSong.sources);
-      
-      // Clean the song data to remove Mongoose metadata
-      if (firstSong && typeof firstSong === 'object') {
-        // Check if the song has a nested songId property (from party songs)
-        const actualSong = (firstSong as any).songId || firstSong;
-        console.log('actualSong:', actualSong);
-        console.log('actualSong.sources:', actualSong.sources);
-        
-        // Extract YouTube URL from the actual song data
+      // Clean and set the queue in global store
+      const cleanedQueue = party.songs.map((song: any) => {
+        const actualSong = song.songId || song;
         let youtubeUrl = null;
-        console.log('actualSong.sources type:', typeof actualSong.sources);
-        console.log('actualSong.sources:', actualSong.sources);
-        console.log('actualSong.sources.youtube:', actualSong.sources?.youtube);
         
         if (actualSong.sources) {
           if (Array.isArray(actualSong.sources)) {
-            console.log('Sources is array, searching for YouTube...');
-            console.log('Array contents:', actualSong.sources);
-            
-            // Check if this is Mongoose metadata corruption
-            // Look for $__parent with actual song data in url property
-            for (let i = 0; i < actualSong.sources.length; i++) {
-              const source = actualSong.sources[i];
-              console.log(`sources[${i}]:`, source);
-              console.log(`sources[${i}].platform:`, source?.platform);
-              console.log(`sources[${i}].url:`, source?.url);
-              
+            for (const source of actualSong.sources) {
               if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                // This is Mongoose metadata corruption - extract from nested structure
-                console.log('Found Mongoose metadata corruption, extracting from nested structure');
                 if (source.url.sources.youtube) {
                   youtubeUrl = source.url.sources.youtube;
-                  console.log('Found YouTube URL in nested structure:', youtubeUrl);
                   break;
                 }
               } else if (source && source.platform === 'youtube' && source.url) {
-                // Normal array format: [{platform: "youtube", url: "..."}]
                 youtubeUrl = source.url;
-                console.log('Found YouTube URL in array:', youtubeUrl);
                 break;
               }
             }
           } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-            // Handle object format: {youtube: "..."}
             youtubeUrl = actualSong.sources.youtube;
-            console.log('Found YouTube URL in sources.youtube:', youtubeUrl);
-          } else {
-            console.log('Sources is object but no youtube property found');
           }
-        } else {
-          console.log('No sources found');
         }
         
-        console.log('Final youtubeUrl:', youtubeUrl);
-        
-        const cleanSong = {
+        return {
           _id: actualSong._id,
           title: actualSong.title,
           artist: actualSong.artist,
@@ -214,19 +180,20 @@ const Party: React.FC = () => {
           addedBy: actualSong.addedBy,
           totalBidValue: actualSong.totalBidValue
         };
-        
-        console.log('Clean song sources:', cleanSong.sources);
-        setCurrentSong(cleanSong);
+      });
+      
+      setQueue(cleanedQueue);
+      
+      if (cleanedQueue.length > 0) {
+        setCurrentSong(cleanedQueue[0], 0);
       }
-      setCurrentSongIndex(0);
     }
+    
     if (user && party) {
-      // Handle both string and object host types
       const hostId = typeof party.host === 'string' ? party.host : party.host._id;
-      console.log('User ID:', user._id, 'Host ID:', hostId, 'Is Host:', user._id === hostId);
       setIsHost(user._id === hostId);
     }
-  }, [party, user]);
+  }, [party, user, setQueue, setCurrentSong, setIsHost]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -312,42 +279,6 @@ const Party: React.FC = () => {
     }
   };
 
-  const handlePlayPause = () => {
-    const hostId = typeof party?.host === 'string' ? party.host : party?.host?._id;
-    console.log('handlePlayPause called - User ID:', user?._id, 'Host ID:', hostId, 'Is Host:', user?._id === hostId);
-    if (user?._id === hostId) {
-      const action = isPlaying ? 'PAUSE' : 'PLAY';
-      console.log('Sending WebSocket message:', action);
-      sendMessage({ type: action });
-      // Also update local state immediately for better UX
-      setIsPlaying(!isPlaying);
-    } else {
-      console.log('User is not the host, cannot control playback');
-    }
-  };
-
-
-  const handleNext = () => {
-    const hostId = typeof party?.host === 'string' ? party.host : party?.host?._id;
-    if (user?._id === hostId && party && party.songs.length > 0) {
-      const nextIndex = (currentSongIndex + 1) % party.songs.length;
-      setCurrentSongIndex(nextIndex);
-      const nextSong = party.songs[nextIndex].songId || party.songs[nextIndex];
-      setCurrentSong(nextSong);
-      sendMessage({ type: 'PLAY_NEXT' });
-    }
-  };
-
-  const handlePrevious = () => {
-    const hostId = typeof party?.host === 'string' ? party.host : party?.host?._id;
-    if (user?._id === hostId && party && party.songs.length > 0) {
-      const prevIndex = currentSongIndex === 0 ? party.songs.length - 1 : currentSongIndex - 1;
-      setCurrentSongIndex(prevIndex);
-      const prevSong = party.songs[prevIndex].songId || party.songs[prevIndex];
-      setCurrentSong(prevSong);
-      sendMessage({ type: 'PLAY_NEXT' }); // Reuse the same message type
-    }
-  };
 
   const copyPartyCode = () => {
     if (party?.partyCode) {
@@ -503,17 +434,8 @@ const Party: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Current Song & Controls */}
+        {/* Song Queue */}
         <div className="lg:col-span-2">
-          <WebPlayer
-            currentSong={currentSong}
-            isPlaying={isPlaying}
-            onPlayPause={handlePlayPause}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            isHost={isHost}
-          />
-
           {/* Song Queue */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
