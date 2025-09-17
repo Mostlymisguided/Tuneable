@@ -197,7 +197,7 @@ const Party: React.FC = () => {
         // Filter to only include queued songs for the WebPlayer
         const queuedSongs = party.songs.filter((song: any) => song.status === 'queued');
         console.log('Queued songs for WebPlayer:', queuedSongs.length);
-        console.log('All party songs statuses:', party.songs.map(s => ({ title: s.songId?.title, status: s.status })));
+        console.log('All party songs statuses:', party.songs.map((s: any) => ({ title: s.songId?.title, status: s.status })));
         
         // Clean and set the queue in global store
         const cleanedQueue = queuedSongs.map((song: any) => {

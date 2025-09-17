@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Music, User, LogOut, Plus, Home } from 'lucide-react';
+import { Music, User, LogOut, Plus, Home, Users } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -39,6 +39,13 @@ const Navbar: React.FC = () => {
                 >
                   <Plus className="h-4 w-4" />
                   <span>Create Party</span>
+                </Link>
+                <Link
+                  to="/parties"
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Parties</span>
                 </Link>
                 <Link
                   to="/wallet"

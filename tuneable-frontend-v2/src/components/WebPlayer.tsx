@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, SkipForward, Volume2, VolumeX, Maximize } from 'lucide-react';
-himport { partyAPI } from '../lib/api';
+import { partyAPI } from '../lib/api';
 
 interface WebPlayerProps {
   currentSong: any;
