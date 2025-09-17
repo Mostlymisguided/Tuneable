@@ -104,7 +104,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       },
       
       next: () => {
-        const { queue, currentSongIndex, isPlaying, sendWebSocketMessage, isHost } = get();
+        const { queue, currentSongIndex, sendWebSocketMessage, isHost } = get();
         if (queue.length > 0) {
           const nextIndex = currentSongIndex + 1;
           

@@ -40,9 +40,27 @@ const PersistentWebPlayer: React.FC = () => {
             partyAPI.getPartyDetails(currentPartyId)
               .then(response => {
                 // Handle both response.songs and response.party.songs structures
-                const songs = response.songs || response.party?.songs || [];
+                const songs = response.party?.songs || [];
                 const queuedSongs = songs.filter((song: any) => song.status === 'queued');
-                setQueue(queuedSongs);
+                
+                // Map to the expected Song format
+                const mappedSongs = queuedSongs.map((song: any) => {
+                  const actualSong = song.songId || song;
+                  return {
+                    _id: actualSong._id,
+                    title: actualSong.title,
+                    artist: actualSong.artist,
+                    duration: actualSong.duration,
+                    coverArt: actualSong.coverArt,
+                    sources: actualSong.sources,
+                    globalBidValue: actualSong.globalBidValue || 0,
+                    bids: actualSong.bids || [],
+                    addedBy: actualSong.addedBy,
+                    totalBidValue: actualSong.totalBidValue || 0
+                  };
+                });
+                
+                setQueue(mappedSongs);
                 
                 // If no queued songs, stop the player
                 if (queuedSongs.length === 0) {

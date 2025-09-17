@@ -1,5 +1,5 @@
 import React from 'react';
-import { Music, AlertTriangle, X } from 'lucide-react';
+import { Music, AlertTriangle } from 'lucide-react';
 
 interface PlayerWarningModalProps {
   isOpen: boolean;
@@ -21,60 +21,57 @@ const PlayerWarningModal: React.FC<PlayerWarningModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6 text-yellow-600" />
-            </div>
+    <div className="fixed top-4 right-4 z-[9999] max-w-sm" style={{ zIndex: 9999 }} data-warning-popup>
+      <div className="bg-gray-800 border-2 border-yellow-500 rounded-lg shadow-2xl p-4 animate-slide-in animate-pulse animate-highlight" style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)' }}>
+        {/* Header */}
+        <div className="flex items-center space-x-3 mb-3">
+          <div className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="h-4 w-4 text-white" />
           </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Music Playing Warning
-            </h3>
-          </div>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h3 className="text-lg font-bold text-white">
+            Music Playing Warning
+          </h3>
         </div>
 
-        <div className="mb-6">
-          <div className="flex items-center space-x-3 mb-3">
-            <Music className="w-5 h-5 text-gray-500" />
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">Currently playing:</span>
-              <br />
-              <span className="text-gray-900">
-                {currentSongTitle && currentSongArtist 
-                  ? `${currentSongTitle} by ${currentSongArtist}`
-                  : 'Unknown song'
-                }
-              </span>
+        {/* Current Song Info */}
+        <div className="bg-gray-700 rounded-lg p-3 mb-3">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <Music className="h-4 w-4 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-gray-300 mb-1">Currently playing:</p>
+              <p className="text-sm font-medium text-white truncate">
+                {currentSongTitle || 'Unknown song'}
+              </p>
+              {currentSongArtist && (
+                <p className="text-xs text-gray-400 truncate">by {currentSongArtist}</p>
+              )}
             </div>
           </div>
-          
-          <p className="text-gray-700">
-            You're about to <span className="font-medium">{action}</span>, which will 
-            change your current music context. This may interrupt your listening experience.
+        </div>
+
+        {/* Warning Message */}
+        <div className="mb-4">
+          <p className="text-sm text-gray-300">
+            You're about to <span className="font-semibold text-purple-400">{action}</span>, which will 
+            change your current music context.
           </p>
         </div>
 
-        <div className="flex justify-end space-x-3">
+        {/* Action Buttons */}
+        <div className="flex space-x-2">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+            className="flex-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+            className="flex-1 px-3 py-2 text-sm bg-gradient-button text-white rounded-lg font-medium hover:opacity-90 transition-all"
           >
-            Continue Anyway
+            Continue
           </button>
         </div>
       </div>
