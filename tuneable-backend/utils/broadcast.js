@@ -108,4 +108,6 @@ const broadcast = (partyId, data) => {
   });
 };
 
-module.exports = { setWebSocketServer, broadcast };
+const broadcastToParty = broadcast;
+
+module.exports = { setWebSocketServer, broadcast, broadcastToParty };

@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 
 // Define types directly to avoid import issues
 interface WebSocketMessage {
-  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT';
+  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT' | 'SONG_STARTED' | 'SONG_COMPLETED' | 'SONG_VETOED';
   partyId?: string;
   userId?: string;
   queue?: any[];
   song?: any;
+  songId?: string;
+  playedAt?: string;
+  completedAt?: string;
+  vetoedAt?: string;
+  vetoedBy?: string;
 }
 
 interface UseWebSocketOptions {
@@ -35,6 +40,7 @@ export const useWebSocket = ({
     }
 
     const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8000';
+    console.log('WebSocket connecting to:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -57,8 +63,12 @@ export const useWebSocket = ({
     ws.onmessage = (event) => {
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
+        console.log('WebSocket message received:', message);
         if (message.partyId === partyId) {
+          console.log('Message matches partyId, calling onMessage');
           onMessage?.(message);
+        } else {
+          console.log('Message partyId does not match:', message.partyId, 'expected:', partyId);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);

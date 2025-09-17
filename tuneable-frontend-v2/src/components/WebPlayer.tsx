@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, SkipForward, Volume2, VolumeX, Maximize } from 'lucide-react';
+himport { partyAPI } from '../lib/api';
 
 interface WebPlayerProps {
   currentSong: any;
@@ -8,6 +9,7 @@ interface WebPlayerProps {
   onNext: () => void;
   onPrevious: () => void;
   isHost: boolean;
+  partyId?: string;
 }
 
 const WebPlayer: React.FC<WebPlayerProps> = ({
@@ -16,7 +18,8 @@ const WebPlayer: React.FC<WebPlayerProps> = ({
   onPlayPause,
   onNext,
   onPrevious,
-  isHost
+  isHost,
+  partyId
 }) => {
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<any>(null);
@@ -147,8 +150,29 @@ const WebPlayer: React.FC<WebPlayerProps> = ({
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
                 // Handle player state changes
-                if (event.data === window.YT.PlayerState.ENDED) {
-                  onNext();
+                if (event.data === window.YT.PlayerState.PLAYING) {
+                  // Note: We don't call /play endpoint here because the WebPlayer
+                  // automatically starts playing songs that are already in the queue.
+                  // The /complete endpoint can handle both "queued" and "playing" songs.
+                  console.log('Song started playing in WebPlayer');
+                } else if (event.data === window.YT.PlayerState.ENDED) {
+                  // Notify backend that song completed
+                  if (partyId && currentSong?._id && isHost) {
+                    console.log('Notifying backend that song completed');
+                    partyAPI.completeSong(partyId, currentSong._id)
+                      .then(() => {
+                        console.log('Song completion confirmed, advancing to next song');
+                        onNext();
+                      })
+                      .catch(error => {
+                        console.error('Error notifying song completion:', error);
+                        // Still advance to next song even if completion fails
+                        onNext();
+                      });
+                  } else {
+                    // If not host or no party/song, just advance
+                    onNext();
+                  }
                 }
               },
               onError: (event: any) => {

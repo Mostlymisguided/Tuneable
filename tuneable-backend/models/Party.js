@@ -40,6 +40,20 @@ const PartySchema = new mongoose.Schema({
       addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
       partyBidValue: { type: Number, default: 0 }, // Party-specific total bid value
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
+      
+      // Song status within this party
+      status: { 
+        type: String, 
+        enum: ['queued', 'playing', 'played', 'vetoed'], 
+        default: 'queued' 
+      },
+      
+      // Timing information
+      queuedAt: { type: Date, default: Date.now }, // When added to queue
+      playedAt: { type: Date, default: null }, // When started playing
+      completedAt: { type: Date, default: null }, // When finished playing
+      vetoedAt: { type: Date, default: null }, // When vetoed
+      vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who vetoed it
     },
   ],
   startTime:{ type: Date, default: Date.now },

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Maximize } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Maximize, Music } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
+import { partyAPI } from '../lib/api';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const PersistentWebPlayer: React.FC = () => {
   const playerRef = useRef<HTMLDivElement>(null);
@@ -15,12 +17,59 @@ const PersistentWebPlayer: React.FC = () => {
     isMuted,
     isHost,
     isGlobalPlayerActive,
+    currentPartyId,
     togglePlayPause,
     next,
     previous,
     setVolume,
     toggleMute,
+    setQueue,
   } = useWebPlayerStore();
+
+  // WebSocket connection for real-time updates
+  useWebSocket({
+    partyId: currentPartyId || '',
+    onMessage: (message) => {
+      console.log('PersistentWebPlayer received WebSocket message:', message);
+      
+      switch (message.type) {
+        case 'SONG_COMPLETED':
+          console.log('Song completed via WebSocket, refreshing queue');
+          // Refresh the queue to get updated song statuses
+          if (currentPartyId) {
+            partyAPI.getPartyDetails(currentPartyId)
+              .then(response => {
+                // Handle both response.songs and response.party.songs structures
+                const songs = response.songs || response.party?.songs || [];
+                const queuedSongs = songs.filter((song: any) => song.status === 'queued');
+                setQueue(queuedSongs);
+                
+                // If no queued songs, stop the player
+                if (queuedSongs.length === 0) {
+                  useWebPlayerStore.getState().setCurrentSong(null);
+                }
+              })
+              .catch(error => {
+                console.error('Error refreshing queue after song completion:', error);
+              });
+          }
+          break;
+          
+        case 'UPDATE_QUEUE':
+          console.log('Queue updated via WebSocket');
+          if (message.queue) {
+            const queuedSongs = message.queue.filter((song: any) => song.status === 'queued');
+            setQueue(queuedSongs);
+            
+            // If no queued songs, stop the player
+            if (queuedSongs.length === 0) {
+              useWebPlayerStore.getState().setCurrentSong(null);
+            }
+          }
+          break;
+      }
+    }
+  });
 
   // Extract YouTube video ID from URL
   const getYouTubeVideoId = (url: string): string | null => {
@@ -146,8 +195,29 @@ const PersistentWebPlayer: React.FC = () => {
               },
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
-                if (event.data === window.YT.PlayerState.ENDED) {
-                  next();
+                if (event.data === window.YT.PlayerState.PLAYING) {
+                  // Note: We don't call /play endpoint here because the WebPlayer
+                  // automatically starts playing songs that are already in the queue.
+                  // The /complete endpoint can handle both "queued" and "playing" songs.
+                  console.log('Song started playing in WebPlayer');
+                } else if (event.data === window.YT.PlayerState.ENDED) {
+                  // Notify backend that song completed
+                  if (currentPartyId && currentSong?._id && isHost) {
+                    console.log('Notifying backend that song completed');
+                    partyAPI.completeSong(currentPartyId, currentSong._id)
+                      .then(() => {
+                        console.log('Song completion confirmed, advancing to next song');
+                        next();
+                      })
+                      .catch(error => {
+                        console.error('Error notifying song completion:', error);
+                        // Still advance to next song even if completion fails
+                        next();
+                      });
+                  } else {
+                    // If not host or no party/song, just advance
+                    next();
+                  }
                 }
               },
               onError: (event: any) => {
@@ -187,9 +257,9 @@ const PersistentWebPlayer: React.FC = () => {
     if (youtubePlayerRef.current && isPlayerReady) {
       console.log('Updating player state, isPlaying:', isPlaying);
       try {
-        if (isPlaying) {
+        if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
           youtubePlayerRef.current.playVideo();
-        } else {
+        } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
           youtubePlayerRef.current.pauseVideo();
         }
       } catch (error) {
@@ -228,8 +298,8 @@ const PersistentWebPlayer: React.FC = () => {
     }
   };
 
-  // Don't render if no current song or player is not globally active
-  if (!currentSong || !isGlobalPlayerActive) {
+  // Don't render if player is not globally active
+  if (!isGlobalPlayerActive) {
     return null;
   }
 
@@ -239,29 +309,47 @@ const PersistentWebPlayer: React.FC = () => {
         <div className="flex items-center space-x-4">
           {/* Song Info */}
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <div className="w-12 h-12 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
-              <img
-                src={currentSong.coverArt || '/default-cover.jpg'}
-                alt={currentSong.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="text-sm font-medium text-white truncate">
-                {currentSong.title}
-              </h4>
-              <p className="text-xs text-gray-400 truncate">
-                {currentSong.artist}
-              </p>
-            </div>
+            {currentSong ? (
+              <>
+                <div className="w-12 h-12 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+                  <img
+                    src={currentSong.coverArt || '/default-cover.jpg'}
+                    alt={currentSong.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-medium text-white truncate">
+                    {currentSong.title}
+                  </h4>
+                  <p className="text-xs text-gray-400 truncate">
+                    {currentSong.artist}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  <Music className="h-6 w-6 text-gray-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-medium text-gray-400 truncate">
+                    No songs in queue
+                  </h4>
+                  <p className="text-xs text-gray-500 truncate">
+                    Add songs to start playing
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Player Controls */}
           <div className="flex items-center space-x-2">
             <button
               onClick={previous}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
-              disabled={!isHost}
+              className="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+              disabled={!isHost || !currentSong}
             >
               <SkipBack className="h-5 w-5" />
             </button>
@@ -269,7 +357,7 @@ const PersistentWebPlayer: React.FC = () => {
             <button
               onClick={togglePlayPause}
               className="p-2 bg-gradient-button text-white rounded-full hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!isHost}
+              disabled={!isHost || !currentSong}
             >
               {isPlaying ? (
                 <Pause className="h-5 w-5" />
@@ -280,8 +368,8 @@ const PersistentWebPlayer: React.FC = () => {
             
             <button
               onClick={next}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
-              disabled={!isHost}
+              className="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+              disabled={!isHost || !currentSong}
             >
               <SkipForward className="h-5 w-5" />
             </button>

@@ -201,7 +201,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
         console.log('Fetched Party Details:', JSON.stringify(party, null, 2));
 
-        // ✅ **Flatten `songId` structure & extract platform URLs with PARTY-SPECIFIC bid values**
+        // ✅ **Flatten `songId` structure & extract platform URLs with PARTY-SPECIFIC bid values and status**
         const processedSongs = party.songs.map((entry) => {
             if (!entry.songId) return null; // Edge case: skip invalid entries
 
@@ -222,11 +222,28 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 bids: entry.partyBids || [], // ✅ Use party-specific bids
                 addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
                 totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
+                
+                // ✅ NEW: Song status and timing information
+                status: entry.status || 'queued',
+                queuedAt: entry.queuedAt,
+                playedAt: entry.playedAt,
+                completedAt: entry.completedAt,
+                vetoedAt: entry.vetoedAt,
+                vetoedBy: entry.vetoedBy,
             };
         }).filter(Boolean); // ✅ Remove null entries
 
-        // ✅ Sort songs by PARTY-SPECIFIC `totalBidValue` in descending order
-        processedSongs.sort((a, b) => (b.totalBidValue || 0) - (a.totalBidValue || 0));
+        // ✅ Sort songs by status and then by bid value
+        processedSongs.sort((a, b) => {
+            // First sort by status priority: playing > queued > played > vetoed
+            const statusPriority = { playing: 0, queued: 1, played: 2, vetoed: 3 };
+            const statusDiff = statusPriority[a.status] - statusPriority[b.status];
+            
+            if (statusDiff !== 0) return statusDiff;
+            
+            // Within same status, sort by bid value (highest first)
+            return (b.totalBidValue || 0) - (a.totalBidValue || 0);
+        });
 
         // ✅ **Return a cleaned response (don’t overwrite `party.songs`)**
         const responseParty = {
@@ -524,6 +541,263 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error("❌ Error placing bid:", err);
         res.status(500).json({ error: 'Error placing bid', details: err.message });
+    }
+});
+
+// Mark song as playing (called by web player when song starts)
+router.post('/:partyId/songs/:songId/play', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        const userId = req.user.userId;
+
+        if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
+            return res.status(400).json({ error: 'Invalid partyId or songId format' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can start songs' });
+        }
+
+        const songIndex = party.songs.findIndex(song => song.songId.toString() === songId);
+        if (songIndex === -1) {
+            return res.status(404).json({ error: 'Song not found in this party' });
+        }
+
+        const songEntry = party.songs[songIndex];
+        
+        // Can only play queued songs
+        if (songEntry.status !== 'queued') {
+            return res.status(400).json({ error: 'Can only play queued songs' });
+        }
+
+        // Mark all other songs as queued
+        party.songs.forEach((song, index) => {
+            if (index !== songIndex && song.status === 'playing') {
+                song.status = 'queued';
+            }
+        });
+
+        // Mark this song as playing
+        songEntry.status = 'playing';
+        songEntry.playedAt = new Date();
+
+        await party.save();
+
+        // Broadcast play event via WebSocket
+        const { broadcastToParty } = require('../utils/broadcast');
+        broadcastToParty(partyId, {
+            type: 'SONG_STARTED',
+            songId: songId,
+            playedAt: songEntry.playedAt
+        });
+
+        res.json({
+            message: 'Song started playing',
+            songId: songId,
+            playedAt: songEntry.playedAt
+        });
+    } catch (err) {
+        console.error('Error starting song:', err);
+        res.status(500).json({ error: 'Error starting song', details: err.message });
+    }
+});
+
+// Reset all songs to queued status (for testing/development)
+router.post('/:partyId/songs/reset', authMiddleware, async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const userId = req.user.userId;
+
+        if (!isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid partyId format' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can reset songs' });
+        }
+
+        // Reset all songs to queued status
+        party.songs.forEach(song => {
+            song.status = 'queued';
+            song.playedAt = null;
+            song.completedAt = null;
+            song.vetoedAt = null;
+            song.vetoedBy = null;
+        });
+
+        await party.save();
+
+        res.json({
+            message: 'All songs reset to queued status',
+            songsCount: party.songs.length
+        });
+    } catch (err) {
+        console.error('Error resetting songs:', err);
+        res.status(500).json({ error: 'Error resetting songs', details: err.message });
+    }
+});
+
+// Mark song as played (called by web player when song finishes)
+router.post('/:partyId/songs/:songId/complete', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        const userId = req.user.userId;
+
+        if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
+            return res.status(400).json({ error: 'Invalid partyId or songId format' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can complete songs' });
+        }
+
+        const songIndex = party.songs.findIndex(song => song.songId.toString() === songId);
+        if (songIndex === -1) {
+            return res.status(404).json({ error: 'Song not found in this party' });
+        }
+
+        const songEntry = party.songs[songIndex];
+        
+        console.log(`Attempting to complete song ${songId} with status: ${songEntry.status}`);
+        
+        // Can complete playing songs or queued songs (for auto-playback)
+        if (songEntry.status !== 'playing' && songEntry.status !== 'queued') {
+            console.log(`Song ${songId} is in status '${songEntry.status}', cannot complete`);
+            return res.status(400).json({ error: 'Can only complete playing or queued songs' });
+        }
+
+        // Mark song as played
+        songEntry.status = 'played';
+        songEntry.completedAt = new Date();
+
+        await party.save();
+
+        // Broadcast completion event via WebSocket
+        const { broadcastToParty } = require('../utils/broadcast');
+        console.log(`Broadcasting SONG_COMPLETED for song ${songId} in party ${partyId}`);
+        broadcastToParty(partyId, {
+            type: 'SONG_COMPLETED',
+            songId: songId,
+            completedAt: songEntry.completedAt
+        });
+
+        res.json({
+            message: 'Song completed',
+            songId: songId,
+            completedAt: songEntry.completedAt
+        });
+    } catch (err) {
+        console.error('Error completing song:', err);
+        res.status(500).json({ error: 'Error completing song', details: err.message });
+    }
+});
+
+// Get songs by status
+router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, status } = req.params;
+        const validStatuses = ['queued', 'playing', 'played', 'vetoed'];
+
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status. Must be one of: ' + validStatuses.join(', ') });
+        }
+
+        const party = await Party.findById(partyId).populate('songs.songId').populate('songs.addedBy', 'username');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        const songsWithStatus = party.songs.filter(song => song.status === status);
+        
+        // Sort by bid value (highest first) for all statuses
+        songsWithStatus.sort((a, b) => (b.partyBidValue || 0) - (a.partyBidValue || 0));
+
+        res.json({
+            status: status,
+            songs: songsWithStatus,
+            count: songsWithStatus.length
+        });
+    } catch (err) {
+        console.error('Error fetching songs by status:', err);
+        res.status(500).json({ error: 'Error fetching songs by status', details: err.message });
+    }
+});
+
+// Veto a song (host only)
+router.post('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        const { reason } = req.body;
+        const userId = req.user.userId;
+
+        if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
+            return res.status(400).json({ error: 'Invalid partyId or songId format' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can veto songs' });
+        }
+
+        const songIndex = party.songs.findIndex(song => song.songId.toString() === songId);
+        if (songIndex === -1) {
+            return res.status(404).json({ error: 'Song not found in this party' });
+        }
+
+        const songEntry = party.songs[songIndex];
+        
+        // Can only veto queued songs
+        if (songEntry.status !== 'queued') {
+            return res.status(400).json({ error: 'Can only veto queued songs' });
+        }
+
+        songEntry.status = 'vetoed';
+        songEntry.vetoedAt = new Date();
+        songEntry.vetoedBy = userId;
+
+        await party.save();
+
+        // Broadcast veto via WebSocket
+        const { broadcastToParty } = require('../utils/broadcast');
+        broadcastToParty(partyId, {
+            type: 'SONG_VETOED',
+            songId: songId,
+            vetoedBy: userId,
+            reason: reason,
+            vetoedAt: songEntry.vetoedAt
+        });
+
+        res.json({
+            message: 'Song vetoed successfully',
+            songId: songId,
+            reason: reason
+        });
+    } catch (err) {
+        console.error('Error vetoing song:', err);
+        res.status(500).json({ error: 'Error vetoing song', details: err.message });
     }
 });
 
