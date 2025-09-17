@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import '../types/youtube'; // Import YouTube types
+import { Play, CheckCircle, X, Music, Users, MapPin, Clock, Plus, PoundSterling, Copy, Share2 } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -28,22 +29,17 @@ interface PartySong {
 
 
 interface WebSocketMessage {
-  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT';
+  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT' | 'SONG_STARTED' | 'SONG_COMPLETED' | 'SONG_VETOED';
   partyId?: string;
   userId?: string;
   queue?: PartySong[];
   song?: PartySong;
+  songId?: string;
+  playedAt?: string;
+  completedAt?: string;
+  vetoedAt?: string;
+  vetoedBy?: string;
 }
-import { 
-  Music, 
-  Users, 
-  MapPin, 
-  Clock, 
-  Plus,
-  Copy,
-  Share2,
-  PoundSterling
-} from 'lucide-react';
 
 const Party: React.FC = () => {
   const { partyId } = useParams<{ partyId: string }>();
@@ -63,6 +59,7 @@ const Party: React.FC = () => {
   // Use global WebPlayer store
   const {
     setCurrentSong,
+    isHost,
     setIsHost,
     setQueue,
     setWebSocketSender,
@@ -82,54 +79,10 @@ const Party: React.FC = () => {
           if (message.queue) {
             setParty((prev: any) => prev ? { ...prev, songs: message.queue! } : null);
             
-            // Only update global queue if this is the currently active party
-            console.log('WebSocket UPDATE_QUEUE - currentPartyId:', currentPartyId, 'partyId:', partyId, 'match:', currentPartyId === partyId);
-            if (currentPartyId === partyId) {
-              console.log('Updating global queue for active party');
-              const cleanedQueue = message.queue.map((song: any) => {
-                const actualSong = song.songId || song;
-                let youtubeUrl = null;
-                
-                if (actualSong.sources) {
-                  if (Array.isArray(actualSong.sources)) {
-                    for (const source of actualSong.sources) {
-                      if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                        if (source.url.sources.youtube) {
-                          youtubeUrl = source.url.sources.youtube;
-                          break;
-                        }
-                      } else if (source && source.platform === 'youtube' && source.url) {
-                        youtubeUrl = source.url;
-                        break;
-                      }
-                    }
-                  } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-                    youtubeUrl = actualSong.sources.youtube;
-                  }
-                }
-                
-                return {
-                  _id: actualSong._id,
-                  title: actualSong.title,
-                  artist: actualSong.artist,
-                  duration: actualSong.duration,
-                  coverArt: actualSong.coverArt,
-                  sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
-                  globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
-                  bids: actualSong.bids,
-                  addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy,
-                  totalBidValue: typeof actualSong.totalBidValue === 'number' ? actualSong.totalBidValue : 0
-                };
-              });
-              
-              setQueue(cleanedQueue);
-              
-              if (cleanedQueue.length > 0) {
-                setCurrentSong(cleanedQueue[0], 0);
-              }
-            } else {
-              console.log('Not updating global queue - different party is active');
-            }
+            // Note: WebSocket UPDATE_QUEUE messages don't contain song status information,
+            // so we don't update the global player queue here. The queue is managed
+            // by the party data from the API calls which include proper status information.
+            console.log('WebSocket UPDATE_QUEUE received but not updating global queue (no status info)');
           }
           break;
         case 'PLAY':
@@ -137,6 +90,82 @@ const Party: React.FC = () => {
         case 'SKIP':
         case 'PLAY_NEXT':
           // Global store will handle these
+          break;
+          
+        case 'SONG_STARTED':
+          console.log('WebSocket SONG_STARTED received');
+          if (message.songId) {
+            setParty((prev: any) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                songs: prev.songs.map((song: any) => {
+                  const songData = song.songId || song;
+                  if (songData._id === message.songId) {
+                    return {
+                      ...song,
+                      status: 'playing',
+                      playedAt: message.playedAt || new Date()
+                    };
+                  }
+                  // Mark other playing songs as queued
+                  if (song.status === 'playing') {
+                    return { ...song, status: 'queued' };
+                  }
+                  return song;
+                })
+              };
+            });
+          }
+          break;
+          
+        case 'SONG_COMPLETED':
+          console.log('WebSocket SONG_COMPLETED received for songId:', message.songId);
+          if (message.songId) {
+            setParty((prev: any) => {
+              if (!prev) return null;
+              console.log('Updating party state for completed song:', message.songId);
+              return {
+                ...prev,
+                songs: prev.songs.map((song: any) => {
+                  const songData = song.songId || song;
+                  if (songData._id === message.songId) {
+                    console.log('Found song to mark as played:', songData.title);
+                    return {
+                      ...song,
+                      status: 'played',
+                      completedAt: message.completedAt || new Date()
+                    };
+                  }
+                  return song;
+                })
+              };
+            });
+          }
+          break;
+          
+        case 'SONG_VETOED':
+          console.log('WebSocket SONG_VETOED received');
+          if (message.songId) {
+            setParty((prev: any) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                songs: prev.songs.map((song: any) => {
+                  const songData = song.songId || song;
+                  if (songData._id === message.songId) {
+                    return {
+                      ...song,
+                      status: 'vetoed',
+                      vetoedAt: message.vetoedAt || new Date(),
+                      vetoedBy: message.vetoedBy
+                    };
+                  }
+                  return song;
+                })
+              };
+            });
+          }
           break;
       }
     },
@@ -161,12 +190,17 @@ const Party: React.FC = () => {
     console.log('Party useEffect triggered - party:', !!party, 'songs:', party?.songs?.length, 'currentPartyId:', currentPartyId, 'partyId:', partyId);
     
     if (party && party.songs.length > 0) {
-      // Only update the global player if this is a new party or no party is currently active
-      if (currentPartyId !== partyId) {
-        console.log('New party detected, updating global player queue');
+      // Always update the global player queue when party data loads
+      // This ensures the queue is updated even if it's the "same" party (e.g., on page reload)
+      console.log('Updating global player queue for party:', partyId);
+        
+        // Filter to only include queued songs for the WebPlayer
+        const queuedSongs = party.songs.filter((song: any) => song.status === 'queued');
+        console.log('Queued songs for WebPlayer:', queuedSongs.length);
+        console.log('All party songs statuses:', party.songs.map(s => ({ title: s.songId?.title, status: s.status })));
         
         // Clean and set the queue in global store
-        const cleanedQueue = party.songs.map((song: any) => {
+        const cleanedQueue = queuedSongs.map((song: any) => {
           const actualSong = song.songId || song;
           let youtubeUrl = null;
           
@@ -206,11 +240,13 @@ const Party: React.FC = () => {
         setCurrentPartyId(partyId!);
         setGlobalPlayerActive(true);
         
-        if (cleanedQueue.length > 0) {
-          setCurrentSong(cleanedQueue[0], 0);
-        }
+      if (cleanedQueue.length > 0) {
+        console.log('Setting current song to:', cleanedQueue[0].title);
+        setCurrentSong(cleanedQueue[0], 0, true); // Auto-play for jukebox experience
       } else {
-        console.log('Same party, not updating global player queue');
+        // If no queued songs, clear the current song to stop the WebPlayer
+        console.log('No queued songs, clearing WebPlayer');
+        setCurrentSong(null, 0);
       }
     }
     
@@ -225,6 +261,11 @@ const Party: React.FC = () => {
     try {
       const response = await partyAPI.getPartyDetails(partyId!);
       setParty(response.party);
+      
+      // Check if current user is the host
+      const hostId = typeof response.party.host === 'object' ? response.party.host._id : response.party.host;
+      setIsHost(user?._id === hostId);
+      
       // Note: Song setting is now handled by the useEffect hook
       // to prevent interference with global player state
     } catch (error) {
@@ -235,6 +276,8 @@ const Party: React.FC = () => {
     }
   };
 
+  // Alias for consistency
+  const fetchParty = fetchPartyDetails;
 
   const copyPartyCode = () => {
     if (party?.partyCode) {
@@ -260,6 +303,49 @@ const Party: React.FC = () => {
     const songData = song.songId || song;
     setSelectedSong(songData);
     setBidModalOpen(true);
+  };
+
+  const handleVetoClick = async (song: any) => {
+    if (!isHost) {
+      toast.error('Only the host can veto songs');
+      return;
+    }
+
+    const songData = song.songId || song;
+    const confirmed = window.confirm(`Are you sure you want to veto "${songData.title}" by ${songData.artist}?`);
+    
+    if (!confirmed) return;
+
+    try {
+      await partyAPI.vetoSong(partyId!, songData._id);
+      toast.success('Song vetoed successfully');
+      // Refresh party data
+      fetchParty();
+    } catch (error: any) {
+      console.error('Error vetoing song:', error);
+      toast.error(error.response?.data?.error || 'Failed to veto song');
+    }
+  };
+
+  const handleResetSongs = async () => {
+    if (!isHost) {
+      toast.error('Only the host can reset songs');
+      return;
+    }
+
+    const confirmed = window.confirm('Are you sure you want to reset all songs to queued status? This will clear all play history.');
+    
+    if (!confirmed) return;
+
+    try {
+      await partyAPI.resetSongs(partyId!);
+      toast.success('All songs reset to queued status');
+      // Refresh party data
+      fetchParty();
+    } catch (error: any) {
+      console.error('Error resetting songs:', error);
+      toast.error(error.response?.data?.error || 'Failed to reset songs');
+    }
   };
 
   const handleBidConfirm = async (bidAmount: number) => {
@@ -397,88 +483,229 @@ const Party: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Song Queue */}
+        {/* Song Management */}
         <div className="lg:col-span-2">
-          {/* Song Queue */}
           <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Queue</h2>
-              <button
-                onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-                className="btn-primary flex items-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Song</span>
-              </button>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-white">Music Queue</h2>
+              <div className="flex items-center space-x-3">
+                {isHost && (
+                  <button
+                    onClick={handleResetSongs}
+                    className="flex items-center space-x-2 px-3 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors"
+                  >
+                    <Clock className="h-4 w-4" />
+                    <span>Reset Songs</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
+                  className="btn-primary flex items-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Song</span>
+                </button>
+              </div>
             </div>
             
             {party.songs.length > 0 ? (
-              <div className="space-y-3">
-            {party.songs.map((song: any, index: number) => {
-              // Extract the actual song data from songId property
-              const songData = song.songId || song;
-              return (
-                <div
-                  key={songData._id || `song-${index}`}
-                  className={`flex items-center space-x-4 p-3 rounded-lg ${
-                    index === 0 ? 'bg-purple-900 border border-purple-400' : 'bg-gray-800'
-                  }`}
-                >
-                  <span className="text-sm font-medium text-gray-400 w-8">
-                    {index + 1}
-                  </span>
-                  <img
-                    src={songData.coverArt || '/default-cover.jpg'}
-                    alt={songData.title || 'Unknown Song'}
-                    className="w-20 h-20 rounded object-cover"
-                    width="80"
-                    height="80"
-                  />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-white">{songData.title || 'Unknown Song'}</h4>
-                    <p className="text-sm text-gray-400">{songData.artist || 'Unknown Artist'}</p>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right min-w-[120px]">
-                      <p className="text-sm font-medium text-white">
-                        £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
-                      </p>
-                      {/* Show individual bids if available */}
-                      {Array.isArray(songData.bids) && songData.bids.length > 0 && (
-                        <div className="mt-1 space-y-1">
-                          {songData.bids.slice(0, 3).map((bid: any, bidIndex: number) => (
-                            <div key={bidIndex} className="flex items-center justify-between text-xs">
-                              <span className="text-gray-400 truncate max-w-[60px]">
-                                {typeof bid.userId === 'object' ? bid.userId?.username || 'Unknown' : 'User'}
-                              </span>
-                              <span className="text-white font-medium">
-                                £{typeof bid.amount === 'number' ? bid.amount.toFixed(2) : '0.00'}
-                              </span>
+              <div className="space-y-6">
+                {/* Currently Playing */}
+                {party.songs.filter((song: any) => song.status === 'playing').length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-purple-400 mb-3 flex items-center">
+                      <Play className="h-5 w-5 mr-2" />
+                      Currently Playing
+                    </h3>
+                    <div className="space-y-3">
+                      {party.songs
+                        .filter((song: any) => song.status === 'playing')
+                        .map((song: any, index: number) => {
+                          const songData = song.songId || song;
+                          return (
+                            <div
+                              key={songData._id || `playing-${index}`}
+                              className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
+                            >
+                              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+                                <Play className="h-6 w-6 text-white" />
+                              </div>
+                              <img
+                                src={songData.coverArt || '/default-cover.jpg'}
+                                alt={songData.title || 'Unknown Song'}
+                                className="w-16 h-16 rounded object-cover"
+                                width="64"
+                                height="64"
+                              />
+                              <div className="flex-1">
+                                <h4 className="font-medium text-white text-lg">{songData.title || 'Unknown Song'}</h4>
+                                <p className="text-sm text-gray-400">{songData.artist || 'Unknown Artist'}</p>
+                                <p className="text-xs text-purple-300">
+                                  Started: {song.playedAt ? new Date(song.playedAt).toLocaleTimeString() : 'Now'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-white">
+                                  £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
+                                </p>
+                              </div>
                             </div>
-                          ))}
-                          {songData.bids.length > 3 && (
-                            <p className="text-xs text-gray-500">
-                              +{songData.bids.length - 3} more
-                            </p>
-                          )}
-                        </div>
-                      )}
+                          );
+                        })}
                     </div>
-                    <button
-                      onClick={() => handleBidClick(song)}
-                      className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-gradient-button text-white rounded-md transition-colors hover:opacity-90"
-                      disabled={isBidding}
-                    >
-                      <PoundSterling className="h-3 w-3" />
-                      <span>Bid</span>
-                    </button>
                   </div>
-                </div>
-              );
-            })}
+                )}
+
+                {/* Queue */}
+                {party.songs.filter((song: any) => song.status === 'queued').length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-white mb-3 flex items-center">
+                      <Music className="h-5 w-5 mr-2" />
+                      Queue ({party.songs.filter((song: any) => song.status === 'queued').length})
+                    </h3>
+                    <div className="space-y-2">
+                      {party.songs
+                        .filter((song: any) => song.status === 'queued')
+                        .map((song: any, index: number) => {
+                          const songData = song.songId || song;
+                          return (
+                            <div
+                              key={songData._id || `queued-${index}`}
+                              className="flex items-center space-x-4 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+                            >
+                              <span className="text-sm font-medium text-gray-400 w-8">
+                                {index + 1}
+                              </span>
+                              <img
+                                src={songData.coverArt || '/default-cover.jpg'}
+                                alt={songData.title || 'Unknown Song'}
+                                className="w-12 h-12 rounded object-cover"
+                                width="48"
+                                height="48"
+                              />
+                              <div className="flex-1">
+                                <h4 className="font-medium text-white">{songData.title || 'Unknown Song'}</h4>
+                                <p className="text-sm text-gray-400">{songData.artist || 'Unknown Artist'}</p>
+                              </div>
+                              <div className="flex items-center space-x-3">
+                                <div className="text-right min-w-[100px]">
+                                  <p className="text-sm font-medium text-white">
+                                    £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => handleBidClick(song)}
+                                  className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-gradient-button text-white rounded-md transition-colors hover:opacity-90"
+                                  disabled={isBidding}
+                                >
+                                  <PoundSterling className="h-3 w-3" />
+                                  <span>Bid</span>
+                                </button>
+                                {isHost && (
+                                  <button
+                                    onClick={() => handleVetoClick(song)}
+                                    className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-md transition-colors hover:bg-red-700"
+                                  >
+                                    <X className="h-3 w-3" />
+                                    <span>Veto</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Previously Played */}
+                {party.songs.filter((song: any) => song.status === 'played').length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Previously Played ({party.songs.filter((song: any) => song.status === 'played').length})
+                    </h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {party.songs
+                        .filter((song: any) => song.status === 'played')
+                        .map((song: any, index: number) => {
+                          const songData = song.songId || song;
+                          return (
+                            <div
+                              key={songData._id || `played-${index}`}
+                              className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700"
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
+                              <img
+                                src={songData.coverArt || '/default-cover.jpg'}
+                                alt={songData.title || 'Unknown Song'}
+                                className="w-10 h-10 rounded object-cover"
+                                width="40"
+                                height="40"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
+                                <p className="text-xs text-gray-500 truncate">{songData.artist || 'Unknown Artist'}</p>
+                                <p className="text-xs text-gray-600">
+                                  {song.completedAt ? new Date(song.completedAt).toLocaleTimeString() : 'Completed'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs font-medium text-gray-400">
+                                  £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Vetoed Songs */}
+                {party.songs.filter((song: any) => song.status === 'vetoed').length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-red-400 mb-3 flex items-center">
+                      <X className="h-5 w-5 mr-2" />
+                      Vetoed ({party.songs.filter((song: any) => song.status === 'vetoed').length})
+                    </h3>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {party.songs
+                        .filter((song: any) => song.status === 'vetoed')
+                        .map((song: any, index: number) => {
+                          const songData = song.songId || song;
+                          return (
+                            <div
+                              key={songData._id || `vetoed-${index}`}
+                              className="flex items-center space-x-3 p-2 rounded-lg bg-red-900/20 border border-red-800/30"
+                            >
+                              <X className="h-4 w-4 text-red-400 flex-shrink-0" />
+                              <img
+                                src={songData.coverArt || '/default-cover.jpg'}
+                                alt={songData.title || 'Unknown Song'}
+                                className="w-10 h-10 rounded object-cover"
+                                width="40"
+                                height="40"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
+                                <p className="text-xs text-gray-500 truncate">{songData.artist || 'Unknown Artist'}</p>
+                                <p className="text-xs text-red-400">
+                                  Vetoed {song.vetoedAt ? new Date(song.vetoedAt).toLocaleTimeString() : 'recently'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8">

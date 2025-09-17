@@ -182,6 +182,26 @@ export const partyAPI = {
     });
     return response.data;
   },
+  
+  vetoSong: async (partyId: string, songId: string) => {
+    const response = await api.post(`/parties/${partyId}/songs/${songId}/veto`);
+    return response.data;
+  },
+  
+  playSong: async (partyId: string, songId: string) => {
+    const response = await api.post(`/parties/${partyId}/songs/${songId}/play`);
+    return response.data;
+  },
+  
+  completeSong: async (partyId: string, songId: string) => {
+    const response = await api.post(`/parties/${partyId}/songs/${songId}/complete`);
+    return response.data;
+  },
+  
+  resetSongs: async (partyId: string) => {
+    const response = await api.post(`/parties/${partyId}/songs/reset`);
+    return response.data;
+  },
 };
 
 // Song API
