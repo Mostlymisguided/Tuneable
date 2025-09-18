@@ -28,31 +28,49 @@ const Navbar: React.FC = () => {
               <>
                 <Link
                   to="/dashboard"
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
                 >
-                  <Home className="h-4 w-4" />
-                  <span>Home</span>
+                  Home
                 </Link>
                 <Link
                   to="/create-party"
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  style={{ 
+                    textDecoration: 'none',
+                    ':hover': { backgroundColor: '#4B5563' }
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Create Party</span>
+                  Create Party
                 </Link>
                 <Link
                   to="/parties"
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
-                  <Users className="h-4 w-4" />
-                  <span>Parties</span>
+                  Parties
                 </Link>
                 <Link
                   to="/wallet"
-                  className="flex items-center space-x-2 px-4 py-2 text-white hover:text-purple-400 transition-colors"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
-                  <Music className="h-4 w-4" />
-                  <span>Wallet</span>
+                  Wallet
+                </Link>
+                <Link
+                  to="/about"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                >
+                  About
                 </Link>
                 <div className="flex items-center space-x-3 ml-4">
                   <span className="text-sm text-gray-300">
@@ -60,17 +78,27 @@ const Navbar: React.FC = () => {
                   </span>
                   <Link
                     to="/profile"
-                    className="flex items-center space-x-2 px-4 py-2 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+                    className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                    style={{ textDecoration: 'none' }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   >
-                    <User className="h-4 w-4" />
-                    <span>{user.username}</span>
+                    {user.username}
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-red-400 transition-colors"
+                    className="px-3 py-2 text-gray-300 rounded-lg font-medium transition-colors"
+                    style={{ textDecoration: 'none' }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#4B5563';
+                      e.target.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                      e.target.style.color = '#D1D5DB';
+                    }}
                   >
-                    <LogOut className="h-4 w-4" />
-                    <span>Logout</span>
+                    Logout
                   </button>
                 </div>
               </>
@@ -78,13 +106,25 @@ const Navbar: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                  className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#4B5563';
+                    e.target.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#D1D5DB';
+                  }}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#7C3AED'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#9333EA'}
                 >
                   Sign Up
                 </Link>

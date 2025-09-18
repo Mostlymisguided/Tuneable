@@ -32,7 +32,7 @@ interface Party {
   startTime: string;
   endTime?: string;
   type: 'public' | 'private' | 'geocoded';
-  status: 'scheduled' | 'active' | 'ended' | 'canceled';
+  status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   createdAt: string;
   updatedAt: string;
@@ -200,6 +200,10 @@ export const partyAPI = {
   
   resetSongs: async (partyId: string) => {
     const response = await api.post(`/parties/${partyId}/songs/reset`);
+    return response.data;
+  },
+  updateStatuses: async () => {
+    const response = await api.post('/parties/update-statuses');
     return response.data;
   },
 };

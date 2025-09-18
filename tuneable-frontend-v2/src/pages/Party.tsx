@@ -259,6 +259,10 @@ const Party: React.FC = () => {
 
   const fetchPartyDetails = async () => {
     try {
+      // First update party statuses based on current time
+      await partyAPI.updateStatuses();
+      
+      // Then fetch the updated party details
       const response = await partyAPI.getPartyDetails(partyId!);
       setParty(response.party);
       
