@@ -275,4 +275,51 @@ router.get("/:partyId/songs/:songId", authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/songs/tunechart
+// @desc    Get top songs by global bid value for TuneChart
+// @access  Public
+router.get('/tunechart', async (req, res) => {
+  try {
+    const { sortBy = 'globalBidValue', limit = 10 } = req.query;
+    
+    // Validate sortBy parameter
+    const validSortFields = ['globalBidValue', 'title', 'artist', 'duration', 'uploadedAt'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'globalBidValue';
+    
+    // Validate limit parameter
+    const limitNum = Math.min(parseInt(limit) || 10, 50); // Max 50 songs
+    
+    // Build sort object
+    let sortObj = {};
+    if (sortField === 'globalBidValue') {
+      sortObj[sortField] = -1; // Descending for bid value
+    } else if (sortField === 'title' || sortField === 'artist') {
+      sortObj[sortField] = 1; // Ascending for text fields
+    } else {
+      sortObj[sortField] = -1; // Descending for duration and date
+    }
+    
+    const songs = await Song.find({ globalBidValue: { $gt: 0 } }) // Only songs with bids
+      .sort(sortObj)
+      .limit(limitNum)
+      .select('title artist duration coverArt globalBidValue uploadedAt')
+      .lean();
+    
+    res.json({
+      success: true,
+      songs: songs,
+      total: songs.length,
+      sortBy: sortField,
+      limit: limitNum
+    });
+  } catch (err) {
+    console.error('Error fetching TuneChart songs:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error fetching TuneChart songs', 
+      details: err.message 
+    });
+  }
+});
+
 module.exports = router;

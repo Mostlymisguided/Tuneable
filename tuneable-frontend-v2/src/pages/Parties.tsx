@@ -10,7 +10,6 @@ import { Music, Users, MapPin, Clock } from 'lucide-react';
 interface PartyType {
   _id: string;
   name: string;
-  venue?: string;
   location: string;
   host: string | { _id: string; username: string; userId: string; id: string };
   partyCode: string;
@@ -145,12 +144,6 @@ const Parties: React.FC = () => {
                   <span>{party.location}</span>
                 </div>
                 
-                {party.venue && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Music className="h-4 w-4 mr-2" />
-                    <span>{party.venue}</span>
-                  </div>
-                )}
 
                 <div className="flex items-center text-sm text-gray-600">
                   <Clock className="h-4 w-4 mr-2" />

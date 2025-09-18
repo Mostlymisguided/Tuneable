@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Music, User, LogOut, Plus, Home, Users } from 'lucide-react';
+import { Music } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -36,12 +36,9 @@ const Navbar: React.FC = () => {
                 <Link
                   to="/create-party"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                  style={{ 
-                    textDecoration: 'none',
-                    ':hover': { backgroundColor: '#4B5563' }
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   Create Party
                 </Link>
@@ -49,17 +46,26 @@ const Navbar: React.FC = () => {
                   to="/parties"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   Parties
+                </Link>
+                <Link
+                  to="/tunechart"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
+                >
+                  TuneChart
                 </Link>
                 <Link
                   to="/wallet"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   Wallet
                 </Link>
@@ -67,8 +73,8 @@ const Navbar: React.FC = () => {
                   to="/about"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   About
                 </Link>
@@ -80,8 +86,8 @@ const Navbar: React.FC = () => {
                     to="/profile"
                     className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                     style={{ textDecoration: 'none' }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                   >
                     {user.username}
                   </Link>
@@ -90,12 +96,12 @@ const Navbar: React.FC = () => {
                     className="px-3 py-2 text-gray-300 rounded-lg font-medium transition-colors"
                     style={{ textDecoration: 'none' }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#4B5563';
-                      e.target.style.color = 'white';
+                      (e.target as HTMLElement).style.backgroundColor = '#4B5563';
+                      (e.target as HTMLElement).style.color = 'white';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                      e.target.style.color = '#D1D5DB';
+                      (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                      (e.target as HTMLElement).style.color = '#D1D5DB';
                     }}
                   >
                     Logout
@@ -109,12 +115,12 @@ const Navbar: React.FC = () => {
                   className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#4B5563';
-                    e.target.style.color = 'white';
+                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
+                    (e.target as HTMLElement).style.color = 'white';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                    e.target.style.color = '#D1D5DB';
+                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                    (e.target as HTMLElement).style.color = '#D1D5DB';
                   }}
                 >
                   Login
@@ -123,8 +129,8 @@ const Navbar: React.FC = () => {
                   to="/register"
                   className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#7C3AED'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#9333EA'}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#7C3AED'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = '#9333EA'}
                 >
                   Sign Up
                 </Link>

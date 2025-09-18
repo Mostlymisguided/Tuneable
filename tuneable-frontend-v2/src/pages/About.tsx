@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Globe, Music, Users, Zap, Shield, Waves } from 'lucide-react';
+import { Heart, Globe, Music, Users, Shield, Waves } from 'lucide-react';
 
 const About: React.FC = () => {
   const aims = [

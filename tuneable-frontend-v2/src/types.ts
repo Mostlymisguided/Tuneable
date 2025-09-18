@@ -82,7 +82,6 @@ export interface PartySong {
 export interface Party {
   _id: string;
   name: string;
-  venue?: string;
   location: string;
   host: string;
   partyCode: string;
