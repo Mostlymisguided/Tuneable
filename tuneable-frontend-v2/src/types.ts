@@ -91,7 +91,7 @@ export interface Party {
   startTime: string;
   endTime?: string;
   type: 'public' | 'private' | 'geocoded';
-  status: 'scheduled' | 'active' | 'ended' | 'canceled';
+  status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   createdAt: string;
   updatedAt: string;

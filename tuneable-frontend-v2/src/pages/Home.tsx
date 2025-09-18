@@ -6,27 +6,43 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-primary-600 to-primary-800 text-white">
+      <section className="bg-gradient-to-b from-indigo-900 via-purple-900 to-indigo-800 text-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Welcome to Tuneable
+            
+            {/* Social Music Democracy Badge */}
+            <div className="flex justify-center mb-8" style={{ marginTop: '20px' }}>
+              <div className="bg-gradient-to-r from-purple-700 to-purple-800 px-6 py-3 rounded-full flex items-center space-x-2 shadow-lg">
+                <Zap className="h-5 w-5 text-yellow-400" />
+                <span className="text-white font-semibold">Social Music Democracy</span>
+              </div>
+            </div>
+            
+            {/* Main Title */}
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+              <span className="text-white">Let The Crowd</span>
+              <br />
+              <span className="text-pink-400">Control The Vibe</span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-primary-100">
-              The social music platform where you control the playlist
+            
+            {/* Description */}
+            <p className="text-xl md:text-2xl mb-12 text-gray-200 max-w-3xl mx-auto leading-relaxed" style={{ marginTop: '20px' }}>
+              The Social Music App - Bid To Boost Songs - Democratically Shape The Party
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            
+            {/* CTA Button */}
+            <div className="flex justify-center">
               <Link
                 to="/register"
-                className="bg-white text-primary-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+                className="bg-white text-white rounded-lg font-semibold hover:bg-gray-100 transition-colors text-lg"
+                style={{ 
+                  textDecoration: 'none', 
+                  padding: '10px 24px',
+                  marginTop: '20px',
+                  marginBottom: '20px'
+                }}
               >
                 Get Started
-              </Link>
-              <Link
-                to="/login"
-                className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-primary-600 transition-colors"
-              >
-                Sign In
               </Link>
             </div>
           </div>
@@ -34,7 +50,7 @@ const Home: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section className="bg-white" style={{ paddingTop: '4rem', paddingBottom: '5rem' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">

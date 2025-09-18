@@ -19,7 +19,7 @@ interface PartyType {
   startTime: string;
   endTime?: string;
   type: 'public' | 'private' | 'geocoded';
-  status: 'scheduled' | 'active' | 'ended' | 'canceled';
+  status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +35,10 @@ const Parties: React.FC = () => {
   useEffect(() => {
     const fetchParties = async () => {
       try {
+        // First update party statuses based on current time
+        await partyAPI.updateStatuses();
+        
+        // Then fetch the updated parties
         const response = await partyAPI.getParties();
         setParties(response.parties);
       } catch (error) {
@@ -80,9 +84,7 @@ const Parties: React.FC = () => {
       case 'scheduled':
         return 'bg-purple-200 text-purple-900';
       case 'ended':
-        return 'bg-gray-100 text-gray-800';
-      case 'canceled':
-        return 'bg-red-100 text-red-800';
+        return 'bg-pink-400 text-white font-bold';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -129,7 +131,10 @@ const Parties: React.FC = () => {
             <div key={party._id} className="card hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">{party.name}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(party.status)}`}>
+                <span 
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(party.status)}`}
+                  style={party.status === 'ended' ? { backgroundColor: '#ec4899', color: 'white', fontWeight: 'bold' } : {}}
+                >
                   {party.status}
                 </span>
               </div>

@@ -801,4 +801,18 @@ router.post('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => 
     }
 });
 
+// Update all party statuses based on current time
+router.post('/update-statuses', async (req, res) => {
+    try {
+        const updatedCount = await Party.updateAllStatuses();
+        res.json({ 
+            message: 'Party statuses updated successfully', 
+            updatedCount: updatedCount 
+        });
+    } catch (err) {
+        console.error('Error updating party statuses:', err);
+        res.status(500).json({ error: 'Error updating party statuses', details: err.message });
+    }
+});
+
 module.exports = router;

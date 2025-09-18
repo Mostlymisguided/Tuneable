@@ -65,7 +65,7 @@ const PartySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['scheduled', 'active', 'ended', 'canceled'],
+    enum: ['scheduled', 'active', 'ended'],
     default: 'scheduled',
   },
   watershed: {
@@ -82,6 +82,49 @@ PartySchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
+
+// Method to calculate party status based on current time
+PartySchema.methods.calculateStatus = function() {
+  const now = new Date();
+  
+  // If party has ended
+  if (this.endTime && now >= this.endTime) {
+    return 'ended';
+  }
+  
+  // If party has started
+  if (now >= this.startTime) {
+    return 'active';
+  }
+  
+  // Party is still scheduled
+  return 'scheduled';
+};
+
+// Static method to update all party statuses
+PartySchema.statics.updateAllStatuses = async function() {
+  const parties = await this.find({});
+  const updates = [];
+  
+  for (const party of parties) {
+    const newStatus = party.calculateStatus();
+    if (party.status !== newStatus) {
+      updates.push({
+        updateOne: {
+          filter: { _id: party._id },
+          update: { status: newStatus }
+        }
+      });
+    }
+  }
+  
+  if (updates.length > 0) {
+    await this.bulkWrite(updates);
+    console.log(`Updated ${updates.length} party statuses`);
+  }
+  
+  return updates.length;
+};
 
 // Automatically populate `songs` and nested `bids` when querying parties
 const autoPopulateSongs = function (next) {
