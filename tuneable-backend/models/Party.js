@@ -7,12 +7,6 @@ const PartySchema = new mongoose.Schema({
     minlength: [3, 'Party name must be at least 3 characters long'],
     maxlength: [100, 'Party name cannot exceed 100 characters'],
   },
-  venue: {
-    type: String,
-    //required: true,
-    minlength: [3, 'Venue must be at least 3 characters long'],
-    maxlength: [100, 'Venue cannot exceed 100 characters'],
-  },
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   
   partyCode: { type: String, required: true, unique: true },

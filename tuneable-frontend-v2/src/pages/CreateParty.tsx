@@ -7,12 +7,10 @@ import { Music, Calendar, Shield } from 'lucide-react';
 const CreateParty: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
-    venue: '',
     location: '',
     startTime: '',
     endTime: '',
-    type: 'public' as 'public' | 'private' | 'geocoded',
-    watershed: true,
+    type: 'public' as 'public' | 'private',
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -94,30 +92,16 @@ const CreateParty: React.FC = () => {
                 name="name"
                 required
                 className="input mt-1"
-                placeholder="Enter party name"
+                placeholder="Enter Party Name"
                 value={formData.name}
                 onChange={handleChange}
               />
             </div>
 
-            <div>
-              <label htmlFor="venue" className="block text-sm font-medium text-gray-700">
-                Venue
-              </label>
-              <input
-                type="text"
-                id="venue"
-                name="venue"
-                className="input mt-1"
-                placeholder="Enter venue name"
-                value={formData.venue}
-                onChange={handleChange}
-              />
-            </div>
 
             <div>
               <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location *
+                Location / Venue *
               </label>
               <input
                 type="text"
@@ -125,7 +109,7 @@ const CreateParty: React.FC = () => {
                 name="location"
                 required
                 className="input mt-1"
-                placeholder="Enter location (address, city, etc.)"
+                placeholder="Enter Location Address / Venue Name"
                 value={formData.location}
                 onChange={handleChange}
               />
@@ -189,25 +173,11 @@ const CreateParty: React.FC = () => {
                 value={formData.type}
                 onChange={handleChange}
               >
-                <option value="public">Public - Anyone can join</option>
-                <option value="private">Private - Invite only</option>
-                <option value="geocoded">Geocoded - Location-based</option>
+                <option value="public">Public - Anyone Can Join</option>
+                <option value="private">Private - Invite Code Required</option>
               </select>
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="watershed"
-                name="watershed"
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                checked={formData.watershed}
-                onChange={handleChange}
-              />
-              <label htmlFor="watershed" className="ml-2 block text-sm text-gray-700">
-                Allow explicit content (18+)
-              </label>
-            </div>
           </div>
         </div>
 

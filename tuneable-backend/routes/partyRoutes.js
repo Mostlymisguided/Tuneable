@@ -38,7 +38,7 @@ router.post('/', authMiddleware, async (req, res) => {
       console.log('🔥 Create Party Request Received:', req.body);
       console.log('🔑 Authenticated User:', req.user);
   
-      const { name, venue, location, startTime, endTime, type, watershed } = req.body;
+      const { name, location, startTime, endTime, type, watershed } = req.body;
   
       if (!name ) {
         console.log('❌ Missing Name');
@@ -62,7 +62,6 @@ router.post('/', authMiddleware, async (req, res) => {
       const party = new Party({
         _id: objectId,
         name,
-        venue,
         location,
         host: userId,
         partyCode,
@@ -249,7 +248,6 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
         const responseParty = {
             _id: party._id,
             name: party.name,
-            venue: party.venue,
             location: party.location,
             host: party.host,
             partyCode: party.partyCode,

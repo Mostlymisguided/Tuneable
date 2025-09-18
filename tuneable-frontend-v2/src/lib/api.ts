@@ -23,7 +23,6 @@ interface User {
 interface Party {
   _id: string;
   name: string;
-  venue?: string;
   location: string;
   host: string | { _id: string; username: string; userId: string; id: string };
   partyCode: string;
@@ -237,6 +236,16 @@ export const searchAPI = {
   search: async (query: string, source: string = 'youtube', pageToken?: string) => {
     const response = await api.get('/search', {
       params: { query, source, pageToken },
+    });
+    return response.data;
+  },
+};
+
+// TuneChart API
+export const tuneChartAPI = {
+  getTuneChart: async (sortBy: string = 'globalBidValue', limit: number = 10) => {
+    const response = await api.get('/songs/tunechart', {
+      params: { sortBy, limit },
     });
     return response.data;
   },
