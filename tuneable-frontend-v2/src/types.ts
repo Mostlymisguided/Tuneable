@@ -88,10 +88,12 @@ export interface Party {
   attendees: string[];
   songs: PartySong[];
   startTime: string;
+  musicSource: 'youtube' | 'spotify' | 'direct_upload';
   endTime?: string;
   type: 'public' | 'private' | 'geocoded';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
+  minimumBid: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -205,6 +205,11 @@ export const partyAPI = {
     const response = await api.post('/parties/update-statuses');
     return response.data;
   },
+  
+  endParty: async (partyId: string) => {
+    const response = await api.post(`/parties/${partyId}/end`);
+    return response.data;
+  },
 };
 
 // Song API
@@ -233,10 +238,12 @@ export const songAPI = {
 
 // Search API
 export const searchAPI = {
-  search: async (query: string, source: string = 'youtube', pageToken?: string) => {
-    const response = await api.get('/search', {
-      params: { query, source, pageToken },
-    });
+  search: async (query: string, source: string = 'youtube', pageToken?: string, accessToken?: string) => {
+    const params: any = { query, source, pageToken };
+    if (accessToken) {
+      params.accessToken = accessToken;
+    }
+    const response = await api.get('/search', { params });
     return response.data;
   },
 };
