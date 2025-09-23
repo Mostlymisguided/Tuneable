@@ -4,11 +4,23 @@ import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Maximize, Music }
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { spotifyService } from '../services/spotifyService';
+
+// Extend Window interface to include Spotify
+declare global {
+  interface Window {
+    Spotify: any;
+    onSpotifyWebPlaybackSDKReady: () => void;
+  }
+}
 
 const PersistentWebPlayer: React.FC = () => {
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
+  const spotifyPlayerRef = useRef<any>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const [musicSource, setMusicSource] = useState<'youtube' | 'spotify' | null>(null);
+  const [isManualControl, setIsManualControl] = useState(false);
 
   const {
     isPlaying,
@@ -18,6 +30,8 @@ const PersistentWebPlayer: React.FC = () => {
     isHost,
     isGlobalPlayerActive,
     currentPartyId,
+    play,
+    pause,
     togglePlayPause,
     next,
     previous,
@@ -111,8 +125,10 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
-    // Extract YouTube URL from the song data
-    let youtubeUrl = null;
+    // Determine music source and extract appropriate URL
+    let musicSource: 'youtube' | 'spotify' | null = null;
+    let sourceUrl: string | null = null;
+    
     if (currentSong.sources) {
       if (Array.isArray(currentSong.sources)) {
         console.log('Searching through sources array...');
@@ -123,38 +139,81 @@ const PersistentWebPlayer: React.FC = () => {
           if (source && source.platform === '$__parent' && source.url && source.url.sources) {
             console.log('Found Mongoose metadata corruption, extracting from nested structure');
             if (source.url.sources.youtube) {
-              youtubeUrl = source.url.sources.youtube;
-              console.log('Found YouTube URL in nested structure:', youtubeUrl);
+              musicSource = 'youtube';
+              sourceUrl = source.url.sources.youtube;
+              console.log('Found YouTube URL in nested structure:', sourceUrl);
+              break;
+            } else if (source.url.sources.spotify) {
+              musicSource = 'spotify';
+              sourceUrl = source.url.sources.spotify;
+              console.log('Found Spotify URI in nested structure:', sourceUrl);
               break;
             }
           } else if (source && source.platform === 'youtube' && source.url) {
-            youtubeUrl = source.url;
-            console.log('Found YouTube URL in sources array:', youtubeUrl);
+            musicSource = 'youtube';
+            sourceUrl = source.url;
+            console.log('Found YouTube URL in sources array:', sourceUrl);
+            break;
+          } else if (source && source.platform === 'spotify' && source.url) {
+            musicSource = 'spotify';
+            sourceUrl = source.url;
+            console.log('Found Spotify URI in sources array:', sourceUrl);
             break;
           } else if (source?.youtube) {
-            youtubeUrl = source.youtube;
-            console.log('Found YouTube URL in direct property:', youtubeUrl);
+            musicSource = 'youtube';
+            sourceUrl = source.youtube;
+            console.log('Found YouTube URL in direct property:', sourceUrl);
+            break;
+          } else if (source?.spotify) {
+            musicSource = 'spotify';
+            sourceUrl = source.spotify;
+            console.log('Found Spotify URI in direct property:', sourceUrl);
             break;
           }
         }
-      } else if (typeof currentSong.sources === 'object' && currentSong.sources.youtube) {
-        youtubeUrl = currentSong.sources.youtube;
-        console.log('Found YouTube URL in sources.youtube:', youtubeUrl);
+      } else if (typeof currentSong.sources === 'object') {
+        if (currentSong.sources.youtube) {
+          musicSource = 'youtube';
+          sourceUrl = currentSong.sources.youtube;
+          console.log('Found YouTube URL in sources.youtube:', sourceUrl);
+        } else if (currentSong.sources.spotify) {
+          musicSource = 'spotify';
+          sourceUrl = currentSong.sources.spotify;
+          console.log('Found Spotify URI in sources.spotify:', sourceUrl);
+        }
       }
     }
     
-    console.log('YouTube URL found:', youtubeUrl);
+    console.log('Music source detected:', musicSource);
+    console.log('Source URL found:', sourceUrl);
     
-    if (!youtubeUrl) {
-      console.log('No YouTube source available');
+    if (!musicSource || !sourceUrl) {
+      console.log('No valid music source available');
       return;
     }
 
-    const videoId = getYouTubeVideoId(youtubeUrl);
-    if (!videoId) {
-      console.log('No valid YouTube video ID found for:', youtubeUrl);
-      return;
+    setMusicSource(musicSource);
+
+    if (musicSource === 'youtube') {
+      const videoId = getYouTubeVideoId(sourceUrl);
+      if (!videoId) {
+        console.log('No valid YouTube video ID found for:', sourceUrl);
+        return;
+      }
+      initializeYouTubePlayer(videoId);
+    } else if (musicSource === 'spotify') {
+      // If we already have a Spotify player, just change the track
+      if (spotifyPlayerRef.current && isPlayerReady) {
+        console.log('Changing Spotify track to:', sourceUrl);
+        // Use Web API to change track (SDK doesn't have play method)
+        playSpotifyTrack(sourceUrl);
+      } else {
+        initializeSpotifyPlayer(sourceUrl);
+      }
     }
+  }, [currentSong, isPlaying, isGlobalPlayerActive]);
+
+  const initializeYouTubePlayer = (videoId: string) => {
 
     console.log('Initializing YouTube player with video ID:', videoId);
 
@@ -260,61 +319,423 @@ const PersistentWebPlayer: React.FC = () => {
       window.onYouTubeIframeAPIReady = initializePlayer;
     }
 
-    return () => {
-      if (youtubePlayerRef.current) {
-        console.log('Destroying YouTube player');
-        youtubePlayerRef.current.destroy();
-        youtubePlayerRef.current = null;
-        setIsPlayerReady(false);
+  };
+
+  const initializeSpotifyPlayer = async (spotifyUri: string) => {
+    console.log('Initializing Spotify player with URI:', spotifyUri);
+    
+    try {
+      // Get valid access token (refresh if needed)
+      const accessToken = await spotifyService.getValidAccessToken();
+      
+      // Check if user has Spotify Premium (required for Web Playback SDK)
+      const response = await fetch('https://api.spotify.com/v1/me', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to check Spotify profile');
       }
-    };
-  }, [currentSong, volume, isMuted, next]);
+      
+      const profile = await response.json();
+      if (profile.product !== 'premium') {
+        alert('Spotify Premium is required to play music. Please upgrade your account.');
+        return;
+      }
+      
+      createSpotifyPlayer(spotifyUri, accessToken);
+    } catch (error: any) {
+      console.error('Error initializing Spotify player:', error);
+      if (error.message === 'REFRESH_TOKEN_EXPIRED') {
+        alert('Spotify session expired. Please reconnect your account.');
+        // Clear tokens and redirect to search page
+        localStorage.removeItem('spotify_access_token');
+        localStorage.removeItem('spotify_refresh_token');
+        localStorage.removeItem('spotify_token_expires');
+      } else {
+        alert('Error connecting to Spotify. Please try reconnecting your account.');
+      }
+    }
+  };
+
+  const createSpotifyPlayer = (spotifyUri: string, accessToken: string) => {
+    // Check if Spotify SDK is already loaded
+    if (window.Spotify) {
+      initializeSpotifyPlayerInstance(spotifyUri, accessToken);
+    } else {
+      // Set up callback for when SDK loads
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        initializeSpotifyPlayerInstance(spotifyUri, accessToken);
+      };
+    }
+  };
+
+  const initializeSpotifyPlayerInstance = (spotifyUri: string, accessToken: string) => {
+    try {
+      // Clear any existing player
+      if (spotifyPlayerRef.current) {
+        spotifyPlayerRef.current.disconnect();
+      }
+
+      const player = new window.Spotify.Player({
+        name: 'Tuneable Web Player',
+        getOAuthToken: (cb: (token: string) => void) => {
+          cb(accessToken);
+        },
+        volume: volume / 100
+      });
+
+      // Error handling
+      player.addListener('initialization_error', ({ message }: { message: string }) => {
+        console.error('Failed to initialize Spotify player:', message);
+        alert('Failed to initialize Spotify player. Please make sure you have Spotify Premium and try again.');
+      });
+
+      player.addListener('authentication_error', ({ message }: { message: string }) => {
+        console.error('Failed to authenticate with Spotify:', message);
+        alert('Spotify authentication failed. Please reconnect your Spotify account.');
+      });
+
+      player.addListener('account_error', ({ message }: { message: string }) => {
+        console.error('Failed to validate Spotify account:', message);
+        alert('Spotify account validation failed. Please make sure you have Spotify Premium.');
+      });
+
+      player.addListener('playback_error', ({ message }: { message: string }) => {
+        console.error('Failed to perform playback:', message);
+        if (message.includes('Premium')) {
+          alert('Spotify Premium is required to play music. Please upgrade your account.');
+        }
+      });
+
+      // Playback status updates
+      player.addListener('player_state_changed', (state: any) => {
+        if (!state) return;
+        console.log('Spotify player state changed:', {
+          paused: state.paused,
+          position: state.position,
+          duration: state.duration,
+          track: state.track_window?.current_track?.name,
+          context: state.context?.uri,
+          restrictions: state.restrictions,
+          disallows: state.disallows,
+          loading: state.loading
+        });
+        
+        // Only sync state if we're not in manual control mode and there's a significant change
+        if (state.paused !== undefined && !isManualControl) {
+          const spotifyIsPaused = state.paused;
+          const ourStateIsPlaying = isPlaying;
+          
+          // Add a delay to prevent rapid state changes from causing issues
+          setTimeout(() => {
+            // Check again after delay to make sure state is stable
+            // Also check if the track is actually progressing (position > 0)
+            const isActuallyPlaying = !spotifyIsPaused && state.position > 0;
+            
+            if (spotifyIsPaused && ourStateIsPlaying) {
+              console.log('Spotify is paused, updating our state to match (delayed)');
+              pause();
+            } else if (isActuallyPlaying && !ourStateIsPlaying) {
+              console.log('Spotify is actually playing (position > 0), updating our state to match (delayed)');
+              play();
+            } else if (!spotifyIsPaused && !ourStateIsPlaying && state.position === 0) {
+              console.log('Spotify says playing but position is 0, waiting to see if it starts...');
+              // Don't update state yet, wait to see if position increases
+            }
+          }, 1000); // Increased delay to 1 second
+        }
+      });
+
+      // Ready
+      player.addListener('ready', ({ device_id }: { device_id: string }) => {
+        console.log('Spotify player is ready with Device ID:', device_id);
+        spotifyPlayerRef.current = player;
+        setIsPlayerReady(true);
+        
+        // Try to use the SDK's built-in methods first
+        console.log('Attempting to use SDK methods...');
+        try {
+          // The SDK doesn't have a direct play method, but we can try to set the volume and then use Web API
+          player.setVolume(volume / 100);
+          
+          // Wait a moment for the device to be fully ready, then try Web API
+          setTimeout(() => {
+            waitForDeviceAndPlay(device_id, spotifyUri);
+          }, 2000);
+        } catch (error) {
+          console.error('Error with SDK methods:', error);
+          // Fallback to Web API approach
+          waitForDeviceAndPlay(device_id, spotifyUri);
+        }
+      });
+
+      // Not Ready
+      player.addListener('not_ready', ({ device_id }: { device_id: string }) => {
+        console.log('Spotify player has gone offline with Device ID:', device_id);
+        setIsPlayerReady(false);
+      });
+
+      // Connect to the player
+      player.connect();
+    } catch (error) {
+      console.error('Error creating Spotify player:', error);
+    }
+  };
 
   // Update player state when isPlaying changes
   useEffect(() => {
-    if (youtubePlayerRef.current && isPlayerReady) {
-      console.log('Updating player state, isPlaying:', isPlaying);
+    if (isPlayerReady) {
+      console.log('Updating player state, isPlaying:', isPlaying, 'musicSource:', musicSource);
       try {
-        if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
-          youtubePlayerRef.current.playVideo();
-        } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
-          youtubePlayerRef.current.pauseVideo();
+        if (musicSource === 'youtube' && youtubePlayerRef.current) {
+          if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
+            youtubePlayerRef.current.playVideo();
+          } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
+            youtubePlayerRef.current.pauseVideo();
+          }
+        } else if (musicSource === 'spotify' && spotifyPlayerRef.current) {
+          if (isPlaying) {
+            // Use the SDK's resume method
+            spotifyPlayerRef.current.resume().then(() => {
+              console.log('Spotify playback resumed via SDK');
+            }).catch((error: any) => {
+              console.error('Error resuming Spotify playback:', error);
+              // If SDK fails, try Web API as fallback
+              resumeSpotifyPlayback();
+            });
+          } else {
+            // Use the SDK's pause method
+            spotifyPlayerRef.current.pause().then(() => {
+              console.log('Spotify playback paused via SDK');
+            }).catch((error: any) => {
+              console.error('Error pausing Spotify playback:', error);
+              // If SDK fails, try Web API as fallback
+              pauseSpotifyPlayback();
+            });
+          }
         }
       } catch (error) {
-        console.error('Error controlling YouTube player:', error);
+        console.error('Error controlling player:', error);
       }
     }
-  }, [isPlaying, isPlayerReady]);
+  }, [isPlaying, isPlayerReady, musicSource]);
 
   // Update volume when it changes
   useEffect(() => {
-    if (youtubePlayerRef.current && isPlayerReady) {
+    if (isPlayerReady) {
       try {
-        youtubePlayerRef.current.setVolume(volume);
-        if (isMuted) {
-          youtubePlayerRef.current.mute();
-        } else {
-          youtubePlayerRef.current.unMute();
+        if (musicSource === 'youtube' && youtubePlayerRef.current) {
+          youtubePlayerRef.current.setVolume(volume);
+          if (isMuted) {
+            youtubePlayerRef.current.mute();
+          } else {
+            youtubePlayerRef.current.unMute();
+          }
+        } else if (musicSource === 'spotify' && spotifyPlayerRef.current) {
+          spotifyPlayerRef.current.setVolume(volume / 100);
         }
       } catch (error) {
         console.error('Error updating volume:', error);
       }
     }
-  }, [volume, isMuted, isPlayerReady]);
+  }, [volume, isMuted, isPlayerReady, musicSource]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.destroy();
+        youtubePlayerRef.current = null;
+      }
+      if (spotifyPlayerRef.current) {
+        spotifyPlayerRef.current.disconnect();
+        spotifyPlayerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setVolume(parseInt(e.target.value));
   };
 
   const handleFullscreen = () => {
-    if (youtubePlayerRef.current && isPlayerReady) {
+    if (isPlayerReady) {
       try {
-        youtubePlayerRef.current.getIframe().requestFullscreen();
+        if (musicSource === 'youtube' && youtubePlayerRef.current) {
+          youtubePlayerRef.current.getIframe().requestFullscreen();
+        } else if (musicSource === 'spotify' && spotifyPlayerRef.current) {
+          // Spotify Web Playback SDK doesn't support fullscreen
+          console.log('Fullscreen not supported for Spotify player');
+        }
       } catch (error) {
         console.error('Error entering fullscreen:', error);
       }
     }
   };
+
+  const playSpotifyTrack = async (spotifyUri: string) => {
+    try {
+      const accessToken = await spotifyService.getValidAccessToken();
+      
+      // Try without device_id first (this often works better)
+      console.log('Playing track without device_id...');
+      const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          uris: [spotifyUri]
+        })
+      });
+      
+      if (response.ok) {
+        console.log('Spotify track started playing');
+      } else {
+        const errorText = await response.text();
+        console.error('Error playing Spotify track:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('Error playing Spotify track:', error);
+    }
+  };
+
+  const resumeSpotifyPlayback = async () => {
+    try {
+      const accessToken = await spotifyService.getValidAccessToken();
+      const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (response.ok) {
+        console.log('Spotify playback resumed via Web API');
+      } else {
+        console.error('Error resuming Spotify playback via Web API:', response.status);
+      }
+    } catch (error) {
+      console.error('Error resuming Spotify playback via Web API:', error);
+    }
+  };
+
+  const pauseSpotifyPlayback = async () => {
+    try {
+      const accessToken = await spotifyService.getValidAccessToken();
+      const response = await fetch('https://api.spotify.com/v1/me/player/pause', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (response.ok) {
+        console.log('Spotify playback paused via Web API');
+      } else {
+        console.error('Error pausing Spotify playback via Web API:', response.status);
+      }
+    } catch (error) {
+      console.error('Error pausing Spotify playback via Web API:', error);
+    }
+  };
+
+  const waitForDeviceAndPlay = async (deviceId: string, spotifyUri: string, maxRetries = 5) => {
+    console.log('Attempting to play track with device ID:', deviceId);
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const accessToken = await spotifyService.getValidAccessToken();
+        
+        console.log(`Attempt ${attempt}: Trying to play track...`);
+        
+        // First, try to transfer playback to our device
+        console.log('Attempting to transfer playback to our device...');
+        const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            device_ids: [deviceId],
+            play: false
+          })
+        });
+        
+        if (transferResponse.ok) {
+          console.log('Playback transferred to our device');
+        } else {
+          console.log('Transfer failed, continuing with play attempt...');
+        }
+        
+        // Wait a moment for transfer to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Try to play the track directly with device_id
+        const playResponse = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            uris: [spotifyUri]
+          })
+        });
+        
+        if (playResponse.ok) {
+          console.log('Spotify track started playing successfully!');
+          return;
+        } else {
+          const errorText = await playResponse.text();
+          console.error(`Play attempt ${attempt} failed:`, playResponse.status, errorText);
+          
+          // If device not found, try without device_id as fallback
+          if (playResponse.status === 404) {
+            console.log('Device not found, trying without device_id...');
+            const fallbackResponse = await fetch('https://api.spotify.com/v1/me/player/play', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({
+                uris: [spotifyUri]
+              })
+            });
+            
+            if (fallbackResponse.ok) {
+              console.log('Spotify track started playing via fallback method!');
+              return;
+            } else {
+              const fallbackError = await fallbackResponse.text();
+              console.error('Fallback also failed:', fallbackResponse.status, fallbackError);
+            }
+          }
+        }
+        
+        // Wait before next attempt
+        if (attempt < maxRetries) {
+          console.log(`Waiting 3 seconds before attempt ${attempt + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        
+      } catch (error) {
+        console.error(`Error in attempt ${attempt}:`, error);
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+    }
+    
+    console.error('Failed to play track after all attempts');
+  };
+
 
   // Don't render if player is not globally active
   if (!isGlobalPlayerActive) {
@@ -337,9 +758,20 @@ const PersistentWebPlayer: React.FC = () => {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-medium text-white truncate">
-                    {currentSong.title}
-                  </h4>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-sm font-medium text-white truncate">
+                      {currentSong.title}
+                    </h4>
+                    {musicSource && (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        musicSource === 'youtube' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {musicSource === 'youtube' ? 'YouTube' : 'Spotify'}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 truncate">
                     {currentSong.artist}
                   </p>
@@ -373,7 +805,35 @@ const PersistentWebPlayer: React.FC = () => {
             </button>
             
             <button
-              onClick={togglePlayPause}
+              onClick={() => {
+                console.log('Play/pause button clicked, current state:', isPlaying);
+                setIsManualControl(true);
+                togglePlayPause();
+                
+                // For Spotify, also trigger Web API calls to ensure playback
+                if (musicSource === 'spotify') {
+                  setTimeout(() => {
+                    const newState = !isPlaying; // This will be the new state after togglePlayPause
+                    console.log('Triggering Spotify Web API for state:', newState);
+                    
+                    if (newState) {
+                      resumeSpotifyPlayback();
+                    } else {
+                      pauseSpotifyPlayback();
+                    }
+                    
+                    // Re-enable automatic state sync after a delay
+                    setTimeout(() => {
+                      setIsManualControl(false);
+                    }, 1000);
+                  }, 200);
+                } else {
+                  // For non-Spotify, just re-enable after a short delay
+                  setTimeout(() => {
+                    setIsManualControl(false);
+                  }, 500);
+                }
+              }}
               className="p-2 bg-gradient-button text-white rounded-full hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!isHost || !currentSong}
             >

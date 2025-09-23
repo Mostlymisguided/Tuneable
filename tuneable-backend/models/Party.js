@@ -11,6 +11,17 @@ const PartySchema = new mongoose.Schema({
   
   partyCode: { type: String, required: true, unique: true },
   location: {type: String, required: true},
+  musicSource: {
+    type: String,
+    enum: ['youtube', 'spotify', 'direct_upload'],
+    default: 'youtube',
+    required: true
+  },
+  minimumBid: {
+    type: Number,
+    default: 0.33,
+    min: [0.01, 'Minimum bid must be at least £0.01']
+  },
   /*{
     type: {
       type: String,

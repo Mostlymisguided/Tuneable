@@ -19,7 +19,10 @@ interface PartySong {
   coverArt?: string;
   duration?: number;
   sources?: {
-    youtube: string;
+    youtube?: string;
+    spotify?: string;
+    spotifyId?: string;
+    spotifyUrl?: string;
   };
   globalBidValue?: number;
   bids?: any[];
@@ -29,7 +32,7 @@ interface PartySong {
 
 
 interface WebSocketMessage {
-  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT' | 'SONG_STARTED' | 'SONG_COMPLETED' | 'SONG_VETOED';
+  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT' | 'SONG_STARTED' | 'SONG_COMPLETED' | 'SONG_VETOED' | 'PARTY_ENDED';
   partyId?: string;
   userId?: string;
   queue?: PartySong[];
@@ -39,6 +42,7 @@ interface WebSocketMessage {
   completedAt?: string;
   vetoedAt?: string;
   vetoedBy?: string;
+  endedAt?: string;
 }
 
 const Party: React.FC = () => {
@@ -52,6 +56,10 @@ const Party: React.FC = () => {
   const [bidModalOpen, setBidModalOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState<any>(null);
   const [isBidding, setIsBidding] = useState(false);
+
+  // End party modal state
+  const [endPartyModalOpen, setEndPartyModalOpen] = useState(false);
+  const [isEndingParty, setIsEndingParty] = useState(false);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
@@ -167,6 +175,15 @@ const Party: React.FC = () => {
             });
           }
           break;
+          
+        case 'PARTY_ENDED':
+          console.log('WebSocket PARTY_ENDED received');
+          toast.info('This party has been ended by the host');
+          // Redirect to parties list after a short delay
+          setTimeout(() => {
+            navigate('/parties');
+          }, 2000);
+          break;
       }
     },
     onConnect: () => {
@@ -202,23 +219,28 @@ const Party: React.FC = () => {
         // Clean and set the queue in global store
         const cleanedQueue = queuedSongs.map((song: any) => {
           const actualSong = song.songId || song;
-          let youtubeUrl = null;
+          let sources = {};
           
           if (actualSong.sources) {
             if (Array.isArray(actualSong.sources)) {
               for (const source of actualSong.sources) {
                 if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                  if (source.url.sources.youtube) {
-                    youtubeUrl = source.url.sources.youtube;
-                    break;
-                  }
-                } else if (source && source.platform === 'youtube' && source.url) {
-                  youtubeUrl = source.url;
+                  // Handle Mongoose metadata corruption
+                  sources = source.url.sources;
                   break;
+                } else if (source && source.platform === 'youtube' && source.url) {
+                  sources.youtube = source.url;
+                } else if (source && source.platform === 'spotify' && source.url) {
+                  sources.spotify = source.url;
+                } else if (source?.youtube) {
+                  sources.youtube = source.youtube;
+                } else if (source?.spotify) {
+                  sources.spotify = source.spotify;
                 }
               }
-            } else if (typeof actualSong.sources === 'object' && actualSong.sources.youtube) {
-              youtubeUrl = actualSong.sources.youtube;
+            } else if (typeof actualSong.sources === 'object') {
+              // Preserve the original sources object
+              sources = actualSong.sources;
             }
           }
           
@@ -228,7 +250,7 @@ const Party: React.FC = () => {
             artist: actualSong.artist,
             duration: actualSong.duration,
             coverArt: actualSong.coverArt,
-            sources: youtubeUrl ? { youtube: youtubeUrl } : { youtube: null },
+            sources: sources,
             globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
             bids: actualSong.bids,
             addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy,
@@ -396,6 +418,24 @@ const Party: React.FC = () => {
     );
   };
 
+  const handleEndParty = async () => {
+    if (!party || !isHost) return;
+    
+    setIsEndingParty(true);
+    try {
+      // Call API to end the party
+      await partyAPI.endParty(partyId!);
+      toast.success('Party ended successfully');
+      navigate('/parties');
+    } catch (error: any) {
+      console.error('Error ending party:', error);
+      toast.error(error.response?.data?.error || 'Failed to end party');
+    } finally {
+      setIsEndingParty(false);
+      setEndPartyModalOpen(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -494,13 +534,22 @@ const Party: React.FC = () => {
               <h2 className="text-xl font-semibold text-white">Music Queue</h2>
               <div className="flex items-center space-x-3">
                 {isHost && (
-                  <button
-                    onClick={handleResetSongs}
-                    className="flex items-center space-x-2 px-3 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors"
-                  >
-                    <Clock className="h-4 w-4" />
-                    <span>Reset Songs</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={handleResetSongs}
+                      className="flex items-center space-x-2 px-3 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors"
+                    >
+                      <Clock className="h-4 w-4" />
+                      <span>Reset Songs</span>
+                    </button>
+                    <button
+                      onClick={() => setEndPartyModalOpen(true)}
+                      className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                      <span>End Party</span>
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
@@ -794,6 +843,39 @@ const Party: React.FC = () => {
         currentSongTitle={currentSongTitle}
         currentSongArtist={currentSongArtist}
       />
+
+      {/* End Party Confirmation Modal */}
+      {endPartyModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                <X className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">End Party</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to end this party? This action cannot be undone and all attendees will be notified.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setEndPartyModalOpen(false)}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={isEndingParty}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEndParty}
+                disabled={isEndingParty}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isEndingParty ? 'Ending...' : 'End Party'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

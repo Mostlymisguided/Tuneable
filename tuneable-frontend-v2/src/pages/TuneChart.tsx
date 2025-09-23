@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { tuneChartAPI } from '../lib/api';
-import { ArrowUpDown, Music, Clock, DollarSign } from 'lucide-react';
+import { ArrowUpDown, Music } from 'lucide-react';
 
 interface TuneChartSong {
   _id: string;

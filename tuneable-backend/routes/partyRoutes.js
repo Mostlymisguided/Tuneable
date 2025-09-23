@@ -38,7 +38,7 @@ router.post('/', authMiddleware, async (req, res) => {
       console.log('🔥 Create Party Request Received:', req.body);
       console.log('🔑 Authenticated User:', req.user);
   
-      const { name, location, startTime, endTime, type, watershed } = req.body;
+      const { name, location, startTime, type, musicSource, minimumBid } = req.body;
   
       if (!name ) {
         console.log('❌ Missing Name');
@@ -68,11 +68,11 @@ router.post('/', authMiddleware, async (req, res) => {
         attendees: [userId],
         songs: [],
         bids: [],
-        startTime,
-        endTime,
+        startTime: startTime || new Date(), // Use provided startTime or current time for automatic
         type: type || 'public',
-        status: 'scheduled',
-        watershed,
+        status: startTime ? 'scheduled' : 'active', // If no startTime provided, party starts immediately
+        musicSource: musicSource || 'youtube',
+        minimumBid: minimumBid || 0.33,
       });
   
       await party.save();
@@ -257,6 +257,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             watershed: party.watershed,
             availability: party.type,
             status: party.status,
+            musicSource: party.musicSource,
             createdAt: party.createdAt,
             updatedAt: party.updatedAt,
             songs: processedSongs, // ✅ Return flattened, sorted songs
@@ -810,6 +811,55 @@ router.post('/update-statuses', async (req, res) => {
     } catch (err) {
         console.error('Error updating party statuses:', err);
         res.status(500).json({ error: 'Error updating party statuses', details: err.message });
+    }
+});
+
+// End a party (host only)
+router.post('/:partyId/end', authMiddleware, async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const userId = req.user.userId;
+
+        if (!isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid partyId format' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can end the party' });
+        }
+
+        // Check if party is already ended
+        if (party.status === 'ended') {
+            return res.status(400).json({ error: 'Party is already ended' });
+        }
+
+        // Update party status to ended
+        party.status = 'ended';
+        party.endTime = new Date();
+        await party.save();
+
+        // Broadcast party ended event via WebSocket
+        const { broadcastToParty } = require('../utils/broadcast');
+        broadcastToParty(partyId, {
+            type: 'PARTY_ENDED',
+            partyId: partyId,
+            endedAt: party.endTime
+        });
+
+        res.json({
+            message: 'Party ended successfully',
+            partyId: partyId,
+            endedAt: party.endTime
+        });
+    } catch (err) {
+        console.error('Error ending party:', err);
+        res.status(500).json({ error: 'Error ending party', details: err.message });
     }
 });
 
