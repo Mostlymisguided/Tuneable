@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { Music, Calendar, Shield, Clock, ArrowLeft } from 'lucide-react';
+import { Music, Calendar, Shield, ArrowLeft } from 'lucide-react';
 
 // Slider styles
 const sliderStyles = `

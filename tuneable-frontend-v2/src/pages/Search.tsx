@@ -25,7 +25,7 @@ const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [bidAmount, setBidAmount] = useState(1.00);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [party, setParty] = useState<any>(null);
+  const [, setParty] = useState<any>(null);
   const [musicSource, setMusicSource] = useState<'youtube' | 'spotify'>('youtube');
   const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
@@ -42,11 +42,11 @@ const SearchPage: React.FC = () => {
       try {
         const response = await partyAPI.getPartyDetails(partyId);
         setParty(response.party);
-        setMusicSource(response.party.musicSource || 'youtube');
+        setMusicSource((response.party as any).musicSource || 'youtube');
         
         // Check if user has Spotify token stored
         const storedToken = localStorage.getItem('spotify_access_token');
-        if (storedToken && response.party.musicSource === 'spotify') {
+        if (storedToken && (response.party as any).musicSource === 'spotify') {
           setSpotifyToken(storedToken);
           setIsSpotifyConnected(true);
         }

@@ -7,6 +7,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const Party = require('../models/Party');
 const Song = require('../models/Song');
 const Bid = require('../models/Bid');
+const User = require('../models/User');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 require('dotenv').config(); // Load .env variables
@@ -427,6 +428,20 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Bid amount must be greater than 0' });
         }
 
+        // ✅ Check user balance before processing bid
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.balance < bidAmount) {
+            return res.status(400).json({ 
+                error: 'Insufficient funds', 
+                currentBalance: user.balance,
+                requiredAmount: bidAmount 
+            });
+        }
+
         // ✅ Convert duration to integer & validate
         const extractedDuration = duration && !isNaN(duration) ? parseInt(duration, 10) : 888;
         const extractedCoverArt = req.body.coverArt && req.body.coverArt.includes("http")
@@ -500,6 +515,10 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
         });
         await bid.save();
 
+        // ✅ Deduct bid amount from user balance
+        user.balance -= bidAmount;
+        await user.save();
+
         // ✅ Update GLOBAL song bid info (for analytics)
         song.globalBids = song.globalBids || [];
         song.globalBids.push(bid._id);
@@ -535,7 +554,8 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
                 ...updatedSong.toObject(),
                 partyBidValue: partySongEntry.partyBidValue,
                 partyBids: partyBids
-            }
+            },
+            updatedBalance: user.balance
         });
     } catch (err) {
         console.error("❌ Error placing bid:", err);

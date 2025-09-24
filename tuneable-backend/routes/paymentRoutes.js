@@ -56,8 +56,8 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/wallet?success=true&amount=${amount}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/wallet?canceled=true`,
+      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?success=true&amount=${amount}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?canceled=true`,
       metadata: {
         userId: userId,
         amount: amount.toString(),

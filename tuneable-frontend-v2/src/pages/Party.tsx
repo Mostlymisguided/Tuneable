@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, MapPin, Clock, Plus, PoundSterling, Copy, Share2 } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, ArrowLeft, Coins } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -47,7 +47,7 @@ interface WebSocketMessage {
 
 const Party: React.FC = () => {
   const { partyId } = useParams<{ partyId: string }>();
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
   const [party, setParty] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,7 +76,7 @@ const Party: React.FC = () => {
     currentPartyId,
   } = useWebPlayerStore();
 
-  const { isConnected, sendMessage } = useWebSocket({
+  const { sendMessage } = useWebSocket({
     partyId: partyId || '',
     userId: user?._id,
     onMessage: (message: WebSocketMessage) => {
@@ -229,13 +229,13 @@ const Party: React.FC = () => {
                   sources = source.url.sources;
                   break;
                 } else if (source && source.platform === 'youtube' && source.url) {
-                  sources.youtube = source.url;
+                  (sources as any).youtube = source.url;
                 } else if (source && source.platform === 'spotify' && source.url) {
-                  sources.spotify = source.url;
+                  (sources as any).spotify = source.url;
                 } else if (source?.youtube) {
-                  sources.youtube = source.youtube;
+                  (sources as any).youtube = source.youtube;
                 } else if (source?.spotify) {
-                  sources.spotify = source.spotify;
+                  (sources as any).spotify = source.spotify;
                 }
               }
             } else if (typeof actualSong.sources === 'object') {
@@ -337,21 +337,16 @@ const Party: React.FC = () => {
       return;
     }
 
-    const songData = song.songId || song;
-    const confirmed = window.confirm(`Are you sure you want to veto "${songData.title}" by ${songData.artist}?`);
-    
-    if (!confirmed) return;
-
     try {
-      await partyAPI.vetoSong(partyId!, songData._id);
-      toast.success('Song vetoed successfully');
-      // Refresh party data
-      fetchParty();
-    } catch (error: any) {
+      // Remove the song from the party
+      await partyAPI.removeSong(partyId!, song._id);
+      toast.success('Song vetoed and removed from queue');
+    } catch (error) {
       console.error('Error vetoing song:', error);
-      toast.error(error.response?.data?.error || 'Failed to veto song');
+      toast.error('Failed to veto song');
     }
   };
+
 
   const handleResetSongs = async () => {
     if (!isHost) {
@@ -379,8 +374,13 @@ const Party: React.FC = () => {
 
     setIsBidding(true);
     try {
-      await partyAPI.placeBid(partyId, selectedSong, bidAmount);
+      const response = await partyAPI.placeBid(partyId, selectedSong, bidAmount);
       toast.success(`Bid of £${bidAmount.toFixed(2)} placed successfully!`);
+      
+      // Update user balance if provided in response
+      if (response.updatedBalance !== undefined) {
+        updateBalance(response.updatedBalance);
+      }
       
       // Refresh party data to get updated bid information
       await fetchPartyDetails();
@@ -389,7 +389,11 @@ const Party: React.FC = () => {
       setSelectedSong(null);
     } catch (error: any) {
       console.error('Error placing bid:', error);
-      toast.error(error.response?.data?.error || 'Failed to place bid');
+      if (error.response?.data?.error === 'Insufficient funds') {
+        toast.error(`Insufficient funds. You have £${error.response.data.currentBalance.toFixed(2)} but need £${error.response.data.requiredAmount.toFixed(2)}`);
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to place bid');
+      }
     } finally {
       setIsBidding(false);
     }
@@ -436,20 +440,45 @@ const Party: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
-      case 'ended':
-        return 'bg-gray-100 text-gray-800';
-      case 'canceled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handlePlaySong = async (songId: string) => {
+    try {
+      // This would typically call an API to start playing the song
+      console.log('Playing song:', songId);
+      toast.success('Starting song...');
+    } catch (error) {
+      console.error('Error playing song:', error);
+      toast.error('Failed to play song');
     }
   };
+
+
+  const formatDuration = (duration: number | string | undefined) => {
+    if (!duration) return '3:00';
+    
+    // If it's already in MM:SS format, return as is
+    if (typeof duration === 'string' && duration.includes(':')) {
+      return duration;
+    }
+    
+    // Convert seconds to MM:SS format
+    const totalSeconds = typeof duration === 'string' ? parseInt(duration) : duration;
+    if (isNaN(totalSeconds)) return '3:00';
+    
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const calculateTotalBids = () => {
+    if (!party?.songs) return 0;
+    
+    return party.songs.reduce((total: number, song: any) => {
+      const songData = song.songId || song;
+      const bidValue = songData.partyBidValue || songData.totalBidValue || 0;
+      return total + (typeof bidValue === 'number' ? bidValue : 0);
+    }, 0);
+  };
+
 
   if (isLoading) {
     return (
@@ -476,91 +505,170 @@ const Party: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{party.name}</h1>
-            <div className="flex items-center space-x-4 mt-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(party.status)}`}>
-                {party.status}
-              </span>
-              <div className="flex items-center text-sm text-gray-600">
-                <div className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                {isConnected ? 'Connected' : 'Disconnected'}
+    <div className="min-h-screen bg-gray-900">
+      {/* Party Header */}
+      <div className="bg-purple-800 px-6 py-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <div>
+                <h1 className="text-3xl font-bold text-white">{party.name}</h1>
+                <div className="flex items-center space-x-4 mt-1">
+                  <span className="text-gray-300">
+                    {party.location}
+                  </span>
+                  <span className="px-2 py-1 text-white text-xs font-medium rounded-full" style={{backgroundColor: 'rgba(5, 150, 105, 0.5)'}}>
+                    {party.status}
+                  </span>
+                </div>
+                <div className="mt-1">
+                  <span className="text-gray-400 text-sm">
+                    Host: {typeof party.host === 'object' ? party.host.username : 'Unknown Host'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={copyPartyCode}
-              className="flex items-center space-x-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <Copy className="h-4 w-4" />
-              <span>{party.partyCode}</span>
-            </button>
-            <button
-              onClick={shareParty}
-              className="flex items-center space-x-1 px-3 py-2 text-sm bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-lg transition-colors"
-            >
-              <Share2 className="h-4 w-4" />
-              <span>Share</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex items-center text-gray-600">
-            <MapPin className="h-5 w-5 mr-2" />
-            <span>{party.location}</span>
-          </div>
-          <div className="flex items-center text-gray-600">
-            <Clock className="h-5 w-5 mr-2" />
-            <span>{formatDate(party.startTime)}</span>
-          </div>
-          <div className="flex items-center text-gray-600">
-            <Users className="h-5 w-5 mr-2" />
-            <span>{party.attendees.length} attendees</span>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={copyPartyCode}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
+              >
+                <Copy className="h-4 w-4" />
+                <span>{party.partyCode}</span>
+              </button>
+              <button
+                onClick={shareParty}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
+              >
+                <Share2 className="h-4 w-4" />
+                <span>Share</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Song Management */}
-        <div className="lg:col-span-2">
-          <div className="card">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Music Queue</h2>
-              <div className="flex items-center space-x-3">
-                {isHost && (
-                  <>
-                    <button
-                      onClick={handleResetSongs}
-                      className="flex items-center space-x-2 px-3 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors"
-                    >
-                      <Clock className="h-4 w-4" />
-                      <span>Reset Songs</span>
-                    </button>
-                    <button
-                      onClick={() => setEndPartyModalOpen(true)}
-                      className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                      <span>End Party</span>
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-                  className="btn-primary flex items-center space-x-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Song</span>
-                </button>
+      {/* Metrics Cards */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-4">
+              <Music className="h-6 w-6 text-white" />
+              <div>
+                <div className="text-2xl font-bold text-white">
+                  {party.songs.filter((song: any) => song.status === 'queued').length}
+                </div>
+                <div className="text-sm text-gray-300">In Queue</div>
               </div>
             </div>
-            
+          </div>
+          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-4">
+              <Clock className="h-6 w-6 text-white" />
+              <div>
+                <div className="text-2xl font-bold text-white">
+                  {party.songs.filter((song: any) => song.status === 'played').length}
+                </div>
+                <div className="text-sm text-gray-300">Played</div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-4">
+              <Users className="h-6 w-6 text-white" />
+              <div>
+                <div className="text-2xl font-bold text-white">{party.attendees.length}</div>
+                <div className="text-sm text-gray-300">Contributors</div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-4">
+              <Coins className="h-6 w-6 text-yellow-400" />
+              <div>
+                <div className="text-2xl font-bold text-white">£{calculateTotalBids().toFixed(2)}</div>
+                <div className="text-sm text-gray-300">Total Bids</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 mb-6">
+          <button className="px-4 py-2 shadow-sm bg-black/20 border-white/20 border border-gray-500 text-white rounded-lg font-medium" style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}>
+            Now Playing
+          </button>
+          <button className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium" style={{backgroundColor: '#9333EA'}}>
+            Queue ({party.songs.filter((song: any) => song.status === 'queued').length})
+          </button>
+          <button 
+            onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
+            className="px-4 py-2 shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
+          >
+            Add Songs
+          </button>
+          <button 
+            onClick={() => {
+              const element = document.getElementById('previously-played');
+              element?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-2 shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium" 
+            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
+          >
+            Previously Played
+          </button>
+        </div>
+
+        {/* Wallet Balance */}
+        <div className="bg-purple-800 p-4 rounded-lg mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-white font-medium">Wallet Balance: £{user?.balance?.toFixed(2) || '0.00'}</span>
+            </div>
+            <button 
+              onClick={() => navigate('/wallet')}
+              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Top Up</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Song Queue */}
+        <div className="lg:col-span-2">
+          {/* Host Controls */}
+          {isHost && (
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleResetSongs}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>Reset Songs</span>
+                </button>
+                <button
+                  onClick={() => setEndPartyModalOpen(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                  <span>End Party</span>
+                </button>
+              </div>
+              <button
+                onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Song</span>
+              </button>
+            </div>
+          )}
+          
+          <div className="space-y-3">
             {party.songs.length > 0 ? (
               <div className="space-y-6">
                 {/* Currently Playing */}
@@ -614,112 +722,93 @@ const Party: React.FC = () => {
 
                 {/* Queue */}
                 {party.songs.filter((song: any) => song.status === 'queued').length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-white mb-3 flex items-center">
-                      <Music className="h-5 w-5 mr-2" />
-                      Queue ({party.songs.filter((song: any) => song.status === 'queued').length})
-                    </h3>
-                    <div className="space-y-2">
-                      {party.songs
-                        .filter((song: any) => song.status === 'queued')
-                        .map((song: any, index: number) => {
-                          const songData = song.songId || song;
-                          return (
-                            <div
-                              key={songData._id || `queued-${index}`}
-                              className="flex items-center space-x-4 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-                            >
-                              <span className="text-sm font-medium text-gray-400 w-8">
-                                {index + 1}
-                              </span>
-                              <img
-                                src={songData.coverArt || '/default-cover.jpg'}
-                                alt={songData.title || 'Unknown Song'}
-                                className="w-12 h-12 rounded object-cover"
-                                width="48"
-                                height="48"
-                              />
-                              <div className="flex-1">
-                                <h4 className="font-medium text-white">{songData.title || 'Unknown Song'}</h4>
-                                <p className="text-sm text-gray-400">{songData.artist || 'Unknown Artist'}</p>
-                              </div>
-                              <div className="flex items-center space-x-3">
-                                <div className="text-right min-w-[100px]">
-                                  <p className="text-sm font-medium text-white">
-                                    £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
-                                  </p>
+                  <div className="space-y-3">
+                    {party.songs
+                      .filter((song: any) => song.status === 'queued')
+                      .map((song: any, index: number) => {
+                        const songData = song.songId || song;
+                        return (
+                          <div
+                            key={songData._id || `queued-${index}`}
+                            className="bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
+                          >
+                            {/* Number Badge */}
+                            <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-bold text-sm">{index + 1}</span>
+                            </div>
+                            
+                            {/* Song Thumbnail */}
+                            <img
+                              src={songData.coverArt || '/default-cover.jpg'}
+                              alt={songData.title || 'Unknown Song'}
+                              className="w-16 h-16 rounded object-cover flex-shrink-0"
+                              width="64"
+                              height="64"
+                            />
+                            
+                            {/* Song Details */}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-white text-lg truncate">
+                                {songData.title || 'Unknown Song'}
+                              </h4>
+                              <div className="flex items-center space-x-4 mt-1">
+                                <div className="flex items-center space-x-1">
+                                  <div className="w-4 h-4 bg-red-500 rounded flex items-center justify-center">
+                                    <span className="text-xs text-white">▶</span>
+                                  </div>
+                                  <span className="text-sm text-gray-300">YouTube</span>
                                 </div>
+                                <div className="flex items-center space-x-1">
+                                  <Clock className="h-4 w-4 text-gray-400" />
+                                  <span className="text-sm text-gray-300">{formatDuration(songData.duration)}</span>
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-400 mt-1">
+                                Added by: {(() => {
+                                  if (!songData.addedBy) return 'Unknown';
+                                  if (typeof songData.addedBy === 'object') {
+                                    return songData.addedBy.username || songData.addedBy.name || 'Unknown';
+                                  }
+                                  if (typeof songData.addedBy === 'string') {
+                                    // If it's a string, it might be an ObjectId, try to find the user
+                                    const user = party.attendees.find((attendee: any) => attendee._id === songData.addedBy);
+                                    return user?.username || user?.name || 'Unknown';
+                                  }
+                                  return 'Unknown';
+                                })()}
+                              </p>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex flex-col space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="px-3 py-1 bg-gray-700 text-white rounded-lg text-sm">
+                                  £ {song.partyBidValue || 0.30}
+                                </span>
                                 <button
                                   onClick={() => handleBidClick(song)}
-                                  className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-gradient-button text-white rounded-md transition-colors hover:opacity-90"
+                                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
                                   disabled={isBidding}
                                 >
-                                  <PoundSterling className="h-3 w-3" />
                                   <span>Bid</span>
                                 </button>
                                 {isHost && (
                                   <button
                                     onClick={() => handleVetoClick(song)}
-                                    className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-md transition-colors hover:bg-red-700"
+                                    className="px-4 py-2 bg-transparent hover:bg-red-600 text-red-600 hover:text-white rounded-lg font-medium transition-colors flex items-center space-x-2 border border-red-600"
                                   >
-                                    <X className="h-3 w-3" />
+                                    <X className="h-4 w-4" />
                                     <span>Veto</span>
                                   </button>
                                 )}
                               </div>
                             </div>
-                          );
-                        })}
-                    </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
 
-                {/* Previously Played */}
-                {party.songs.filter((song: any) => song.status === 'played').length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      Previously Played ({party.songs.filter((song: any) => song.status === 'played').length})
-                    </h3>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {party.songs
-                        .filter((song: any) => song.status === 'played')
-                        .map((song: any, index: number) => {
-                          const songData = song.songId || song;
-                          return (
-                            <div
-                              key={songData._id || `played-${index}`}
-                              className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700"
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
-                              <img
-                                src={songData.coverArt || '/default-cover.jpg'}
-                                alt={songData.title || 'Unknown Song'}
-                                className="w-10 h-10 rounded object-cover"
-                                width="40"
-                                height="40"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
-                                <p className="text-xs text-gray-500 truncate">{songData.artist || 'Unknown Artist'}</p>
-                                <p className="text-xs text-gray-600">
-                                  {song.completedAt ? new Date(song.completedAt).toLocaleTimeString() : 'Completed'}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs font-medium text-gray-400">
-                                  £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
 
                 {/* Vetoed Songs */}
                 {party.songs.filter((song: any) => song.status === 'vetoed').length > 0 && (
@@ -772,6 +861,50 @@ const Party: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {/* Previously Played Songs */}
+            {party.songs.filter((song: any) => song.status === 'played').length > 0 && (
+              <div id="previously-played" className="mt-8">
+                <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
+                  <CheckCircle className="h-5 w-5 mr-2" />
+                  Previously Played ({party.songs.filter((song: any) => song.status === 'played').length})
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {party.songs
+                    .filter((song: any) => song.status === 'played')
+                    .map((song: any, index: number) => {
+                      const songData = song.songId || song;
+                      return (
+                        <div
+                          key={songData._id || `played-${index}`}
+                          className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700"
+                        >
+                          <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
+                          <img
+                            src={songData.coverArt || '/default-cover.jpg'}
+                            alt={songData.title || 'Unknown Song'}
+                            className="w-10 h-10 rounded object-cover"
+                            width="40"
+                            height="40"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
+                            <p className="text-xs text-gray-500 truncate">{songData.artist || 'Unknown Artist'}</p>
+                            <p className="text-xs text-gray-600">
+                              {song.completedAt ? new Date(song.completedAt).toLocaleTimeString() : 'Completed'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs font-medium text-gray-400">
+                              £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -803,24 +936,29 @@ const Party: React.FC = () => {
           </div>
 
           {/* Party Info */}
-          <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Party Info</h3>
+          <div className="bg-purple-800 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold text-white mb-4">Party Info</h3>
             <div className="space-y-3 text-sm">
-              <div>
-                <span className="text-gray-600">Type:</span>
-                <span className="ml-2 capitalize">{party.type}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Type:</span>
+                <span className="text-white capitalize">{party.type}</span>
               </div>
-              <div>
-                <span className="text-gray-600">Content:</span>
-                <span className="ml-2">{party.watershed ? '18+' : 'All ages'}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Location:</span>
+                <span className="text-white">{party.location}</span>
               </div>
-              <div>
-                <span className="text-gray-600">Created:</span>
-                <span className="ml-2">{formatDate(party.createdAt)}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Created:</span>
+                <span className="text-white">{formatDate(party.createdAt)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-300">Status:</span>
+                <span className="text-green-400 capitalize">{party.status}</span>
               </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Bid Modal */}
@@ -831,6 +969,7 @@ const Party: React.FC = () => {
         songTitle={selectedSong?.title || ''}
         songArtist={selectedSong?.artist || ''}
         currentBid={selectedSong?.globalBidValue || 0}
+        userBalance={user?.balance || 0}
         isLoading={isBidding}
       />
 
@@ -860,7 +999,7 @@ const Party: React.FC = () => {
             <div className="flex space-x-3">
               <button
                 onClick={() => setEndPartyModalOpen(false)}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 px-4 py-2 text-white bg-transparent rounded-lg hover:bg-gray-100 transition-colors border border-gray-300"
                 disabled={isEndingParty}
               >
                 Cancel
@@ -876,6 +1015,15 @@ const Party: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <div className="bg-gray-800 border-t border-gray-700 mt-12">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-center text-gray-400 text-sm">
+            <span>6,968 songs • 35.5 days • 105.72 GB</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

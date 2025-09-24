@@ -293,6 +293,7 @@ const PersistentWebPlayer: React.FC = () => {
                       });
                   } else {
                     // If not host or no party/song, just advance
+                    console.log('Not host or no party/song, just advancing to next song');
                     next();
                   }
                 }
