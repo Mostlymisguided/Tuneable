@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { ArrowLeft, Wallet as WalletIcon, Zap, ChevronUp, ChevronDown, Loader } from 'lucide-react';
 
 const Wallet: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const { user, refreshUser, updateBalance } = useAuth();
   const [customAmount, setCustomAmount] = useState('0.30');
   const [autoTopUp, setAutoTopUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,13 +23,18 @@ const Wallet: React.FC = () => {
 
     if (success === 'true' && amount) {
       // Manually update balance since webhook might not work in development
-      const updateBalance = async () => {
+      const updateUserBalance = async () => {
         try {
-          await paymentAPI.updateBalance(parseFloat(amount));
+          const response = await paymentAPI.updateBalance(parseFloat(amount));
           toast.success(`Successfully added £${amount} to your wallet!`);
-          // Refresh user data to get updated balance
-          if (refreshUser) {
-            refreshUser();
+          // Update balance in context
+          if (response.balance !== undefined) {
+            updateBalance(response.balance);
+          } else {
+            // Fallback: refresh user data
+            if (refreshUser) {
+              refreshUser();
+            }
           }
         } catch (error) {
           console.error('Failed to update balance:', error);
@@ -35,7 +42,7 @@ const Wallet: React.FC = () => {
         }
       };
       
-      updateBalance();
+      updateUserBalance();
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (canceled === 'true') {
@@ -43,7 +50,7 @@ const Wallet: React.FC = () => {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [refreshUser]);
+  }, [refreshUser, updateBalance]);
 
   const handleTopUp = async (amount: number) => {
     if (isLoading) return;
@@ -89,7 +96,10 @@ const Wallet: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center mb-8">
-        <button className="p-2 rounded-full bg-gray-600 hover:bg-gray-500 transition-colors mr-4">
+        <button 
+          onClick={() => navigate(-1)}
+          className="p-2 rounded-full bg-gray-600 hover:bg-gray-500 transition-colors mr-4"
+        >
           <ArrowLeft className="h-5 w-5 text-white" />
         </button>
         <div>

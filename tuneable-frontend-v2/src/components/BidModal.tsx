@@ -8,6 +8,7 @@ interface BidModalProps {
   songTitle: string;
   songArtist: string;
   currentBid: number;
+  userBalance?: number;
   isLoading?: boolean;
 }
 
@@ -18,6 +19,7 @@ const BidModal: React.FC<BidModalProps> = ({
   songTitle,
   songArtist,
   currentBid,
+  userBalance = 0,
   isLoading = false,
 }) => {
   const [bidAmount, setBidAmount] = useState('');
@@ -35,6 +37,11 @@ const BidModal: React.FC<BidModalProps> = ({
     
     if (amount < 0.01) {
       setError('Minimum bid amount is £0.01');
+      return;
+    }
+    
+    if (amount > userBalance) {
+      setError(`Insufficient funds. You have £${userBalance.toFixed(2)} but need £${amount.toFixed(2)}`);
       return;
     }
     
