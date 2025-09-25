@@ -44,7 +44,7 @@ const Dashboard: React.FC = () => {
             </Link>
 
             <Link
-              to="/payment"
+              to="/wallet"
               className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <DollarSign className="h-5 w-5 text-gray-600 mr-3" />

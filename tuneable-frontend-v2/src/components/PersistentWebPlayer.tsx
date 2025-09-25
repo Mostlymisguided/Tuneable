@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Maximize, Music } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Music, X } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -34,7 +34,6 @@ const PersistentWebPlayer: React.FC = () => {
     pause,
     togglePlayPause,
     next,
-    previous,
     setVolume,
     toggleMute,
     setQueue,
@@ -738,20 +737,33 @@ const PersistentWebPlayer: React.FC = () => {
   };
 
 
+  // Veto function for host to remove current song
+  const handleVetoCurrentSong = async () => {
+    if (!currentSong || !currentPartyId || !isHost) return;
+    
+    try {
+      await partyAPI.removeSong(currentPartyId, currentSong._id);
+      console.log('Song vetoed successfully');
+      // The song will be removed from the queue and next song will start automatically
+    } catch (error) {
+      console.error('Error vetoing song:', error);
+    }
+  };
+
   // Don't render if player is not globally active
   if (!isGlobalPlayerActive) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-purple-400 shadow-lg z-50">
-      <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center space-x-4">
+    <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-xl border-t border-gray-700/50 shadow-2xl z-50">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
           {/* Song Info */}
-          <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <div className="flex items-center space-x-4 flex-1 min-w-0">
             {currentSong ? (
               <>
-                <div className="w-12 h-12 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+                <div className="w-14 h-14 bg-gray-800/50 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
                   <img
                     src={currentSong.coverArt || '/default-cover.jpg'}
                     alt={currentSong.title}
@@ -759,35 +771,35 @@ const PersistentWebPlayer: React.FC = () => {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="text-sm font-medium text-white truncate">
-                      {currentSong.title}
-                    </h4>
-                    {musicSource && (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  <h4 className="text-base font-semibold text-white truncate mb-1">
+                    {currentSong.title}
+                  </h4>
+                  <p className="text-sm text-gray-300 truncate">
+                    {currentSong.artist}
+                  </p>
+                  {musicSource && (
+                    <div className="mt-1">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         musicSource === 'youtube' 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-green-100 text-green-800'
+                          ? 'bg-red-500/20 text-red-300' 
+                          : 'bg-green-500/20 text-green-300'
                       }`}>
                         {musicSource === 'youtube' ? 'YouTube' : 'Spotify'}
                       </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 truncate">
-                    {currentSong.artist}
-                  </p>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
               <>
-                <div className="w-12 h-12 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-                  <Music className="h-6 w-6 text-gray-400" />
+                <div className="w-14 h-14 bg-gray-800/50 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center shadow-lg">
+                  <Music className="h-7 w-7 text-gray-400" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-medium text-gray-400 truncate">
+                  <h4 className="text-base font-semibold text-gray-300 truncate mb-1">
                     No songs in queue
                   </h4>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-sm text-gray-500 truncate">
                     Add songs to start playing
                   </p>
                 </div>
@@ -795,16 +807,37 @@ const PersistentWebPlayer: React.FC = () => {
             )}
           </div>
 
-          {/* Player Controls */}
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={previous}
-              className="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-              disabled={!isHost || !currentSong}
-            >
-              <SkipBack className="h-5 w-5" />
-            </button>
-            
+          {/* iOS-Style Player Controls */}
+          <div className="flex items-center justify-center space-x-6">
+            {/* Volume Control */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={toggleMute}
+                className="p-2 text-gray-300 hover:text-white transition-colors rounded-full hover:bg-white/10"
+              >
+                {isMuted ? (
+                  <VolumeX className="h-4 w-4" />
+                ) : (
+                  <Volume2 className="h-4 w-4" />
+                )}
+              </button>
+              
+              <div className="relative">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  className="w-24 h-1 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb"
+                  style={{
+                    background: `linear-gradient(to right, #9333ea 0%, #9333ea ${volume}%, rgba(75, 85, 99, 0.5) ${volume}%, rgba(75, 85, 99, 0.5) 100%)`
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Main Play/Pause Button */}
             <button
               onClick={() => {
                 console.log('Play/pause button clicked, current state:', isPlaying);
@@ -835,55 +868,35 @@ const PersistentWebPlayer: React.FC = () => {
                   }, 500);
                 }
               }}
-              className="p-2 bg-gradient-button text-white rounded-full hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               disabled={!isHost || !currentSong}
             >
               {isPlaying ? (
-                <Pause className="h-5 w-5" />
+                <Pause className="h-6 w-6 ml-0.5" />
               ) : (
-                <Play className="h-5 w-5" />
+                <Play className="h-6 w-6 ml-1" />
               )}
             </button>
-            
+
+            {/* Veto Button - Only visible to host when song is playing */}
+            {isHost && currentSong && (
+              <button
+                onClick={handleVetoCurrentSong}
+                className="w-10 h-10 bg-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/30 transition-all duration-200 rounded-full flex items-center justify-center"
+                title="Veto this song (emergency only)"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+
+            {/* Fullscreen Button */}
             <button
-              onClick={next}
-              className="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-              disabled={!isHost || !currentSong}
+              onClick={handleFullscreen}
+              className="p-2 text-gray-300 hover:text-white transition-colors rounded-full hover:bg-white/10"
             >
-              <SkipForward className="h-5 w-5" />
+              <Maximize className="h-4 w-4" />
             </button>
           </div>
-
-          {/* Volume Controls */}
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={toggleMute}
-              className="p-1 text-gray-400 hover:text-white transition-colors"
-            >
-              {isMuted ? (
-                <VolumeX className="h-4 w-4" />
-              ) : (
-                <Volume2 className="h-4 w-4" />
-              )}
-            </button>
-            
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={volume}
-              onChange={handleVolumeChange}
-              className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
-            />
-          </div>
-
-          {/* Fullscreen */}
-          <button
-            onClick={handleFullscreen}
-            className="p-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <Maximize className="h-4 w-4" />
-          </button>
         </div>
 
         {/* YouTube Player (Hidden) */}

@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, ArrowLeft, Coins } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -440,16 +440,6 @@ const Party: React.FC = () => {
     }
   };
 
-  const handlePlaySong = async (songId: string) => {
-    try {
-      // This would typically call an API to start playing the song
-      console.log('Playing song:', songId);
-      toast.success('Starting song...');
-    } catch (error) {
-      console.error('Error playing song:', error);
-      toast.error('Failed to play song');
-    }
-  };
 
 
   const formatDuration = (duration: number | string | undefined) => {
@@ -939,20 +929,20 @@ const Party: React.FC = () => {
           <div className="bg-purple-800 p-6 rounded-lg">
             <h3 className="text-lg font-semibold text-white mb-4">Party Info</h3>
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-300">Type:</span>
+              <div className="flex items-center">
+                <span className="text-gray-300 mr-2">Type:</span>
                 <span className="text-white capitalize">{party.type}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Location:</span>
+              <div className="flex items-center">
+                <span className="text-gray-300 mr-2">Location:</span>
                 <span className="text-white">{party.location}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Created:</span>
+              <div className="flex items-center">
+                <span className="text-gray-300 mr-2">Created:</span>
                 <span className="text-white">{formatDate(party.createdAt)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-300">Status:</span>
+              <div className="flex items-center">
+                <span className="text-gray-300 mr-2">Status:</span>
                 <span className="text-green-400 capitalize">{party.status}</span>
               </div>
             </div>
