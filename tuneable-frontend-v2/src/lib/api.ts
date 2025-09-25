@@ -197,6 +197,11 @@ export const partyAPI = {
     return response.data;
   },
   
+  removeSong: async (partyId: string, songId: string) => {
+    const response = await api.delete(`/parties/${partyId}/songs/${songId}`);
+    return response.data;
+  },
+  
   resetSongs: async (partyId: string) => {
     const response = await api.post(`/parties/${partyId}/songs/reset`);
     return response.data;

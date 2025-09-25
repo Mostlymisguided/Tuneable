@@ -256,7 +256,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             startTime: party.startTime,
             endTime: party.endTime,
             watershed: party.watershed,
-            availability: party.type,
+            type: party.type,
             status: party.status,
             musicSource: party.musicSource,
             createdAt: party.createdAt,
