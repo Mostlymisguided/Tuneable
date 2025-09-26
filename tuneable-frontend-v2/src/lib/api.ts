@@ -243,20 +243,23 @@ export const songAPI = {
 
 // Search API
 export const searchAPI = {
-  search: async (query: string, source: string = 'youtube', pageToken?: string, accessToken?: string) => {
+  search: async (query: string, source: string = 'youtube', pageToken?: string, accessToken?: string, forceExternal?: boolean) => {
     const params: any = { query, source, pageToken };
     if (accessToken) {
       params.accessToken = accessToken;
+    }
+    if (forceExternal) {
+      params.forceExternal = 'true';
     }
     const response = await api.get('/search', { params });
     return response.data;
   },
 };
 
-// TuneChart API
-export const tuneChartAPI = {
-  getTuneChart: async (sortBy: string = 'globalBidValue', limit: number = 10) => {
-    const response = await api.get('/songs/tunechart', {
+// Top Tunes API
+export const topTunesAPI = {
+  getTopTunes: async (sortBy: string = 'globalBidValue', limit: number = 10) => {
+    const response = await api.get('/songs/top-tunes', {
       params: { sortBy, limit },
     });
     return response.data;

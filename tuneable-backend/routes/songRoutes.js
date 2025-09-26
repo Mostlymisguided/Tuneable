@@ -275,10 +275,10 @@ router.get("/:partyId/songs/:songId", authMiddleware, async (req, res) => {
   }
 });
 
-// @route   GET /api/songs/tunechart
-// @desc    Get top songs by global bid value for TuneChart
+// @route   GET /api/songs/top-tunes
+// @desc    Get top songs by global bid value for Top Tunes
 // @access  Public
-router.get('/tunechart', async (req, res) => {
+router.get('/top-tunes', async (req, res) => {
   try {
     const { sortBy = 'globalBidValue', limit = 10 } = req.query;
     
@@ -287,7 +287,7 @@ router.get('/tunechart', async (req, res) => {
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'globalBidValue';
     
     // Validate limit parameter
-    const limitNum = Math.min(parseInt(limit) || 10, 50); // Max 50 songs
+    const limitNum = Math.min(parseInt(limit) || 10, 100); // Max 100 songs
     
     // Build sort object
     let sortObj = {};
@@ -313,10 +313,10 @@ router.get('/tunechart', async (req, res) => {
       limit: limitNum
     });
   } catch (err) {
-    console.error('Error fetching TuneChart songs:', err);
+    console.error('Error fetching Top Tunes songs:', err);
     res.status(500).json({ 
       success: false, 
-      error: 'Error fetching TuneChart songs', 
+      error: 'Error fetching Top Tunes songs', 
       details: err.message 
     });
   }

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { tuneChartAPI } from '../lib/api';
+import { topTunesAPI } from '../lib/api';
 import { ArrowUpDown, Music } from 'lucide-react';
 
-interface TuneChartSong {
+interface TopTunesSong {
   _id: string;
   title: string;
   artist: string;
@@ -12,25 +12,25 @@ interface TuneChartSong {
   uploadedAt: string;
 }
 
-const TuneChart: React.FC = () => {
-  const [songs, setSongs] = useState<TuneChartSong[]>([]);
+const TopTunes: React.FC = () => {
+  const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('globalBidValue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    fetchTuneChart();
+    fetchTopTunes();
   }, [sortBy]);
 
-  const fetchTuneChart = async () => {
+  const fetchTopTunes = async () => {
     try {
       setLoading(true);
-      const response = await tuneChartAPI.getTuneChart(sortBy, 10);
+      const response = await topTunesAPI.getTopTunes(sortBy, 100);
       if (response.success) {
         setSongs(response.songs);
       }
     } catch (error) {
-      console.error('Error fetching TuneChart:', error);
+      console.error('Error fetching Top Tunes:', error);
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ const TuneChart: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Music className="h-12 w-12 text-gray-400 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading TuneChart...</p>
+          <p className="text-gray-600">Loading Top Tunes...</p>
         </div>
       </div>
     );
@@ -73,7 +73,7 @@ const TuneChart: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-4">
-              TuneChart
+              Top Tunes
             </h1>
             <p className="text-xl text-purple-100">
               The most bid-for songs on Tuneable
@@ -85,15 +85,6 @@ const TuneChart: React.FC = () => {
       {/* Chart Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {/* Chart Header */}
-          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Top Songs</h2>
-              <div className="text-sm text-gray-600">
-                Showing {songs.length} songs
-              </div>
-            </div>
-          </div>
 
           {/* Chart Table */}
           <div className="overflow-x-auto">
@@ -194,4 +185,4 @@ const TuneChart: React.FC = () => {
   );
 };
 
-export default TuneChart;
+export default TopTunes;

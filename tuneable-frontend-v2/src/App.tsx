@@ -9,7 +9,7 @@ import Navbar from './components/Navbar';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import Home from './pages/Home';
 import About from './pages/About';
-import TuneChart from './pages/TuneChart';
+import TopTunes from './pages/TopTunes';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -43,7 +43,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
-            <Route path="/tunechart" element={<TuneChart />} />
+            <Route path="/top-tunes" element={<TopTunes />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route 

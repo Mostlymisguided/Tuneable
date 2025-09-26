@@ -52,13 +52,13 @@ const Navbar: React.FC = () => {
                   Parties
                 </Link>
                 <Link
-                  to="/tunechart"
+                  to="/top-tunes"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  TuneChart
+                  Top Tunes
                 </Link>
                 <Link
                   to="/wallet"

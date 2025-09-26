@@ -63,7 +63,8 @@ const PlayerWarningModal: React.FC<PlayerWarningModalProps> = ({
         <div className="flex space-x-2">
           <button
             onClick={onCancel}
-            className="flex-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
+            className="flex-1 px-3 py-2 text-sm shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
           >
             Cancel
           </button>

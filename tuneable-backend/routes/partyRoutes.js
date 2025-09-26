@@ -359,7 +359,7 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
             song = await Song.findOne({ [`sources.${platform}`]: url });
 
             if (!song) {
-                // ✅ Create a new song if it doesn’t exist
+                // ✅ Create a new song if it doesn't exist
                 song = new Song({
                     title,
                     artist,
@@ -373,8 +373,43 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                 await song.save();
             }
 
-            // ✅ Ensure song is added to the party's playlist if not already
-            if (!party.songs.some(entry => entry.songId?.toString() === song._id.toString())) {
+            // ✅ Check if song is already in the party's queue
+            const existingPartySong = party.songs.find(entry => entry.songId?.toString() === song._id.toString());
+            if (existingPartySong) {
+                // Song already exists in party - just add the bid amount to existing song
+                console.log("🎵 Song already in party queue, adding bid to existing song");
+                
+                // Create a new bid for the existing song
+                const bid = new Bid({
+                    userId,
+                    partyId,
+                    songId: song._id,
+                    amount: bidAmount,
+                });
+                await bid.save();
+
+                // Update the song with bid info
+                song.bids.push(bid._id);
+                song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
+                await song.save();
+
+                // Update the party-specific bid value
+                existingPartySong.partyBidValue = (existingPartySong.partyBidValue || 0) + bidAmount;
+                await party.save();
+
+                // Fetch updated song with populated bid info
+                const updatedSong = await Song.findById(song._id).populate({
+                    path: 'bids',
+                    populate: { path: 'userId', select: 'username' }
+                });
+
+                return res.status(200).json({
+                    message: 'Bid added to existing song in queue!',
+                    song: updatedSong,
+                    isDuplicate: true
+                });
+            } else {
+                // ✅ Song not in party yet - add it to the party's playlist
                 party.songs.push({ songId: song._id, addedBy: userId });
                 await party.save();
             }

@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { ArrowLeft, Wallet as WalletIcon, Zap, ChevronUp, ChevronDown, Loader } from 'lucide-react';
+import { ArrowLeft, Wallet as WalletIcon, Loader } from 'lucide-react';
 
 const Wallet: React.FC = () => {
   const navigate = useNavigate();
   const { user, refreshUser, updateBalance } = useAuth();
   const [customAmount, setCustomAmount] = useState('0.30');
-  const [autoTopUp, setAutoTopUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const quickTopUpAmounts = [5, 10, 20, 50];
@@ -86,11 +85,6 @@ const Wallet: React.FC = () => {
     handleTopUp(amount);
   };
 
-  const adjustAmount = (increment: boolean) => {
-    const currentAmount = parseFloat(customAmount);
-    const newAmount = increment ? currentAmount + 0.10 : Math.max(0.30, currentAmount - 0.10);
-    setCustomAmount(newAmount.toFixed(2));
-  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
