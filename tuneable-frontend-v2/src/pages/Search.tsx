@@ -13,6 +13,9 @@ interface SearchResult {
   coverArt: string;
   duration: number;
   sources: Record<string, string>;
+  globalBidValue?: number;
+  addedBy?: string;
+  isLocal?: boolean;
 }
 
 const SearchPage: React.FC = () => {
@@ -29,6 +32,8 @@ const SearchPage: React.FC = () => {
   const [musicSource, setMusicSource] = useState<'youtube' | 'spotify'>('youtube');
   const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
+  const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
+  const [hasMoreExternal, setHasMoreExternal] = useState(false);
 
   useEffect(() => {
     if (!partyId) {
@@ -59,6 +64,40 @@ const SearchPage: React.FC = () => {
     fetchPartyDetails();
   }, [partyId, navigate]);
 
+  const handleShowMore = async () => {
+    if (!query.trim()) return;
+    
+    setIsLoading(true);
+    try {
+      let response;
+      
+      if (musicSource === 'spotify') {
+        if (!spotifyToken) {
+          toast.error('Please connect your Spotify account first');
+          setIsLoading(false);
+          return;
+        }
+        response = await searchAPI.search(query, 'spotify', undefined, spotifyToken, true);
+      } else {
+        response = await searchAPI.search(query, 'youtube', undefined, undefined, true);
+      }
+      
+      // Track the source of results
+      setSearchSource(response.source || 'external');
+      setHasMoreExternal(false); // Hide the button after showing external results
+      
+      setResults(response.videos);
+      setNextPageToken(response.nextPageToken || null);
+      
+      toast.info(`Found ${response.videos.length} additional songs from ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`);
+    } catch (error) {
+      console.error('Show more error:', error);
+      toast.error('Failed to load more results. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSearch = async (searchQuery: string, pageToken?: string) => {
     if (!searchQuery.trim()) return;
     
@@ -72,43 +111,26 @@ const SearchPage: React.FC = () => {
           setIsLoading(false);
           return;
         }
-        try {
-          // Use spotifyService directly for better token management
-          const spotifyResults = await spotifyService.searchTracks(searchQuery, 20, 0);
-          response = {
-            nextPageToken: spotifyResults.tracks.next ? 'spotify-next' : null,
-            videos: spotifyResults.tracks.items.map(track => ({
-              id: track.id,
-              title: track.name,
-              artist: track.artists.map(a => a.name).join(', '),
-              coverArt: track.album.images[0]?.url || '',
-              duration: Math.floor(track.duration_ms / 1000),
-              sources: { 
-                spotify: track.uri,
-                spotifyId: track.id,
-                spotifyUrl: track.external_urls.spotify
-              }
-            }))
-          };
-        } catch (error: any) {
-          if (error.message === 'REFRESH_TOKEN_EXPIRED') {
-            toast.error('Spotify session expired. Please reconnect your account.');
-            setIsSpotifyConnected(false);
-            setSpotifyToken(null);
-            localStorage.removeItem('spotify_access_token');
-            localStorage.removeItem('spotify_refresh_token');
-            localStorage.removeItem('spotify_token_expires');
-            setIsLoading(false);
-            return;
-          }
-          throw error;
-        }
+        // Use the unified search API with Spotify access token
+        response = await searchAPI.search(searchQuery, 'spotify', pageToken, spotifyToken);
       } else {
+        // Use the unified search API for YouTube (which will search local DB first)
         response = await searchAPI.search(searchQuery, 'youtube', pageToken);
       }
       
+      // Track the source of results
+      setSearchSource(response.source || 'external');
+      setHasMoreExternal(response.hasMoreExternal || false);
+      
       setResults(pageToken ? [...results, ...response.videos] : response.videos);
       setNextPageToken(response.nextPageToken || null);
+      
+      // Show user feedback about search source
+      if (response.source === 'local') {
+        toast.info(`Found ${response.videos.length} songs from our database`);
+      } else if (response.source === 'external') {
+        toast.info(`Found ${response.videos.length} songs from ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`);
+      }
     } catch (error) {
       console.error('Search error:', error);
       toast.error('Search failed. Please try again.');
@@ -124,7 +146,7 @@ const SearchPage: React.FC = () => {
       const platform = musicSource === 'spotify' ? 'spotify' : 'youtube';
       const url = musicSource === 'spotify' ? song.sources.spotify : song.sources.youtube;
       
-      await partyAPI.addSongToParty(partyId, {
+      const response = await partyAPI.addSongToParty(partyId, {
         title: song.title,
         artist: song.artist,
         url: url,
@@ -134,7 +156,11 @@ const SearchPage: React.FC = () => {
         bidAmount: bidAmount,
       });
       
-      toast.success('Song added to party!');
+      if (response.isDuplicate) {
+        toast.success(`Bid of £${bidAmount.toFixed(2)} added to existing song in queue!`);
+      } else {
+        toast.success('Song added to party!');
+      }
       navigate(`/party/${partyId}`);
     } catch (error: any) {
       console.error('Bid error:', error);
@@ -260,19 +286,37 @@ const SearchPage: React.FC = () => {
       {/* Results */}
       {results.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Search Results ({results.length})
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Search Results ({results.length})
+            </h2>
+            {searchSource && (
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                searchSource === 'local' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {searchSource === 'local' ? '📚 From Database' : `🌐 From ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`}
+              </div>
+            )}
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {results.map((song) => (
-              <div key={song.id} className="card hover:shadow-md transition-shadow">
+              <div key={song.id} className={`card hover:shadow-md transition-shadow ${song.isLocal ? 'ring-2 ring-green-200' : ''}`}>
                 <div className="flex space-x-4">
-                  <img
-                    src={song.coverArt}
-                    alt={song.title}
-                    className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                  />
+                  <div className="relative">
+                    <img
+                      src={song.coverArt}
+                      alt={song.title}
+                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                    />
+                    {song.isLocal && (
+                      <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1 py-0.5 rounded-full">
+                        📚
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-gray-900 truncate">
                       {song.title}
@@ -285,7 +329,20 @@ const SearchPage: React.FC = () => {
                       <span className="text-xs text-gray-500">
                         {formatDuration(song.duration)}
                       </span>
+                      {song.isLocal && song.globalBidValue && (
+                        <>
+                          <span className="text-xs text-gray-400">•</span>
+                          <span className="text-xs text-green-600 font-medium">
+                            £{song.globalBidValue.toFixed(2)} total bids
+                          </span>
+                        </>
+                      )}
                     </div>
+                    {song.isLocal && song.addedBy && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Added by {song.addedBy}
+                      </p>
+                    )}
                   </div>
                 </div>
                 
@@ -304,6 +361,23 @@ const SearchPage: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Show More Button - Only show when we have local results */}
+          {hasMoreExternal && searchSource === 'local' && (
+            <div className="text-center mt-6">
+              <button
+                onClick={handleShowMore}
+                disabled={isLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 mx-auto"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="px-2">{isLoading ? 'Searching...' : `Show More from ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`}</span>
+              </button>
+              <p className="text-sm text-gray-500 mt-2">
+                Didn't find what you're looking for? Search {musicSource === 'spotify' ? 'Spotify' : 'YouTube'} for more results.
+              </p>
+            </div>
+          )}
 
           {/* Load More */}
           {nextPageToken && (

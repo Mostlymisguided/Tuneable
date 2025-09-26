@@ -773,7 +773,7 @@ const Party: React.FC = () => {
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
                                 <span className="px-3 py-1 bg-gray-700 text-white rounded-lg text-sm">
-                                  £ {song.partyBidValue || 0.30}
+                                  £{typeof song.partyBidValue === 'number' ? song.partyBidValue.toFixed(2) : '0.00'}
                                 </span>
                                 <button
                                   onClick={() => handleBidClick(song)}
