@@ -918,4 +918,60 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
     }
 });
 
+// Remove a song from a party (veto functionality)
+router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        const userId = req.user.userId;
+
+        // Validate IDs
+        if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(songId)) {
+            return res.status(400).json({ error: 'Invalid party or song ID format' });
+        }
+
+        // Find the party
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host (only host can veto)
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the party host can veto songs' });
+        }
+
+        // Find the song in the party's queue
+        const songIndex = party.songs.findIndex(entry => entry.songId.toString() === songId);
+        if (songIndex === -1) {
+            return res.status(404).json({ error: 'Song not found in party queue' });
+        }
+
+        // Update the song status to vetoed instead of removing it completely
+        party.songs[songIndex].status = 'vetoed';
+        party.songs[songIndex].vetoedAt = new Date();
+        party.songs[songIndex].vetoedBy = userId;
+
+        await party.save();
+
+        // Broadcast the veto event to all party members
+        const { broadcastToParty } = require('../utils/broadcast');
+        broadcastToParty(partyId, {
+            type: 'SONG_VETOED',
+            songId: songId,
+            vetoedAt: party.songs[songIndex].vetoedAt,
+            vetoedBy: userId
+        });
+
+        res.json({
+            message: 'Song vetoed successfully',
+            songId: songId,
+            vetoedAt: party.songs[songIndex].vetoedAt
+        });
+
+    } catch (err) {
+        console.error('Error vetoing song:', err);
+        res.status(500).json({ error: 'Error vetoing song', details: err.message });
+    }
+});
+
 module.exports = router;
