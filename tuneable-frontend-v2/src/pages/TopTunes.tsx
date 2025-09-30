@@ -76,7 +76,7 @@ const TopTunes: React.FC = () => {
               Top Tunes
             </h1>
             <p className="text-xl text-purple-100">
-              The most bid-for songs on Tuneable
+              The most bid-for music on Tuneable
             </p>
           </div>
         </div>
@@ -120,7 +120,7 @@ const TopTunes: React.FC = () => {
                     onClick={() => handleSort('globalBidValue')}
                   >
                     <div className="flex items-center space-x-1">
-                      <span>Total Bids</span>
+                      <span>Total Bids (All Parties)</span>
                       <ArrowUpDown className="h-4 w-4" />
                     </div>
                   </th>

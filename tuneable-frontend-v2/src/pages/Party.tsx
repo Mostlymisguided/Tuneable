@@ -252,9 +252,9 @@ const Party: React.FC = () => {
             coverArt: actualSong.coverArt,
             sources: sources,
             globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
+            partyBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0,
             bids: actualSong.bids,
-            addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy,
-            totalBidValue: typeof actualSong.totalBidValue === 'number' ? actualSong.totalBidValue : 0
+            addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy
           };
         });
         
@@ -464,7 +464,7 @@ const Party: React.FC = () => {
     
     return party.songs.reduce((total: number, song: any) => {
       const songData = song.songId || song;
-      const bidValue = songData.partyBidValue || songData.totalBidValue || 0;
+      const bidValue = songData.partyBidValue || 0;
       return total + (typeof bidValue === 'number' ? bidValue : 0);
     }, 0);
   };
@@ -675,7 +675,7 @@ const Party: React.FC = () => {
                           const songData = song.songId || song;
                           return (
                             <div
-                              key={songData._id || `playing-${index}`}
+                              key={`playing-${songData._id}-${index}`}
                               className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
                             >
                               <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
@@ -719,7 +719,7 @@ const Party: React.FC = () => {
                         const songData = song.songId || song;
                         return (
                           <div
-                            key={songData._id || `queued-${index}`}
+                            key={`queued-${songData._id}-${index}`}
                             className="bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
                           >
                             {/* Number Badge */}
@@ -814,7 +814,7 @@ const Party: React.FC = () => {
                           const songData = song.songId || song;
                           return (
                             <div
-                              key={songData._id || `vetoed-${index}`}
+                              key={`vetoed-${songData._id}-${index}`}
                               className="flex items-center space-x-3 p-2 rounded-lg bg-red-900/20 border border-red-800/30"
                             >
                               <X className="h-4 w-4 text-red-400 flex-shrink-0" />
@@ -866,7 +866,7 @@ const Party: React.FC = () => {
                       const songData = song.songId || song;
                       return (
                         <div
-                          key={songData._id || `played-${index}`}
+                          key={`played-${songData._id}-${index}`}
                           className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700"
                         >
                           <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
@@ -958,7 +958,7 @@ const Party: React.FC = () => {
         onConfirm={handleBidConfirm}
         songTitle={selectedSong?.title || ''}
         songArtist={selectedSong?.artist || ''}
-        currentBid={selectedSong?.globalBidValue || 0}
+        currentBid={selectedSong?.partyBidValue || 0}
         userBalance={user?.balance || 0}
         isLoading={isBidding}
       />

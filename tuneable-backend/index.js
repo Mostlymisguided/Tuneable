@@ -9,6 +9,8 @@ console.log('MONGO_URI:', process.env.MONGO_URI);
 
 const cors = require('cors');
 const path = require('path');
+const session = require('express-session');
+const passport = require('./config/passport');
 
 const app = express();
 
@@ -19,6 +21,8 @@ const songRoutes = require('./routes/songRoutes'); // Import song routes
 const paymentRoutes = require('./routes/paymentRoutes');
 const youtubeRoutes = require('./routes/youtube');
 const spotifyRoutes = require('./routes/spotifyRoutes'); // Import Spotify routes
+const authRoutes = require('./routes/authRoutes'); // Import OAuth routes
+const podcastRoutes = require('./routes/podcastRoutes'); // Import consolidated Podcast routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -57,6 +61,22 @@ console.log('CORS enabled for allowed origins:', allowedOrigins);
 app.use(express.json());
 console.log('JSON body parsing middleware added.');
 
+// Session configuration for OAuth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+console.log('Passport OAuth middleware initialized.');
+
 // Basic route
 app.get('/', (req, res) => {
   console.log('GET /');
@@ -84,18 +104,22 @@ app.use('/api/songs', songRoutes); // Tunefeed route
 app.use('/api/payments', paymentRoutes);
 app.use('/api/youtube', youtubeRoutes);
 app.use('/api/spotify', spotifyRoutes); // Spotify routes
+app.use('/api/auth', authRoutes); // OAuth routes
+app.use('/api/podcasts', podcastRoutes); // Consolidated Podcast routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 
-// Serve static files from the React web directory
-app.use(express.static(path.join(__dirname, 'web')));
-
-// Catch-all route for non-API requests to serve React's index.html
+// API route handler - return 404 for non-API routes
 app.get('*', (req, res) => {
   if (req.url.startsWith('/api')) {
-    return res.status(404).json({ error: 'Route not found' });
+    return res.status(404).json({ error: 'API route not found' });
   }
-  res.sendFile(path.join(__dirname, 'web', 'index.html'));
+  // For non-API routes, redirect to frontend or return a simple message
+  res.status(404).json({ 
+    error: 'Route not found', 
+    message: 'This is the backend API. Please use the frontend application.',
+    frontend_url: process.env.FRONTEND_URL || 'http://localhost:5173'
+  });
 });
 
 // Centralized error handling middleware (with CORS headers on error responses)

@@ -47,9 +47,9 @@ router.post(
     check('password')
       .isLength({ min: 6 })
       .withMessage('Password must be at least 6 characters long'),
-    check('inviteCode')
-      .isLength(4)
-      .withMessage('Invite Code must be 4 characters long'),
+    // check('inviteCode')
+    //   .isLength(4)
+    //   .withMessage('Invite Code must be 4 characters long'),
   ],
   async (req, res) => {
     console.log('Incoming registration request:', req.body);
@@ -60,7 +60,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { username, email, password, inviteCode, cellPhone, givenName, familyName, homeLocation } = req.body;
+      const { username, email, password, cellPhone, givenName, familyName, homeLocation } = req.body;
       
       // Extract IP address using x-forwarded-for if available, otherwise fallback to connection IP
       const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -105,7 +105,7 @@ router.post(
         email,
         password,
         personalInviteCode,
-        parentInviteCode: inviteCode,
+        parentInviteCode: null,
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',

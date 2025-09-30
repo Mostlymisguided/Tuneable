@@ -41,12 +41,19 @@ const PartySchema = new mongoose.Schema({
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   songs: [
     {
-      songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', required: true },
+      // Support both songs and podcast episodes
+      songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song' },
+      episodeId: { type: mongoose.Schema.Types.ObjectId, ref: 'PodcastEpisode' },
       addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
       partyBidValue: { type: Number, default: 0 }, // Party-specific total bid value
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
       
-      // Song status within this party
+      // Content type and status
+      contentType: { 
+        type: String, 
+        enum: ['song', 'episode'], 
+        required: true 
+      },
       status: { 
         type: String, 
         enum: ['queued', 'playing', 'played', 'vetoed'], 

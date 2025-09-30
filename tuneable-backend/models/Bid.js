@@ -14,7 +14,12 @@ const bidSchema = new mongoose.Schema({
     songId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Song', 
-        required: true 
+        required: false 
+    },
+    episodeId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'PodcastEpisode', 
+        required: false 
     },
     amount: { 
         type: Number, 
@@ -32,15 +37,33 @@ const bidSchema = new mongoose.Schema({
     },
 });
 
+// Validation to ensure either songId or episodeId is provided
+bidSchema.pre('validate', function(next) {
+    if (!this.songId && !this.episodeId) {
+        return next(new Error('Either songId or episodeId must be provided'));
+    }
+    if (this.songId && this.episodeId) {
+        return next(new Error('Cannot have both songId and episodeId'));
+    }
+    next();
+});
+
 // Indexes
 bidSchema.index({ userId: 1 });
 bidSchema.index({ partyId: 1 });
 bidSchema.index({ songId: 1 });
+bidSchema.index({ episodeId: 1 });
 
 
 // Populate references for convenience
 bidSchema.pre(/^find/, function(next) {
-    this.populate('userId').populate('partyId').populate('songId');
+    this.populate('userId').populate('partyId');
+    if (this.songId) {
+        this.populate('songId');
+    }
+    if (this.episodeId) {
+        this.populate('episodeId');
+    }
     next();
 });
 

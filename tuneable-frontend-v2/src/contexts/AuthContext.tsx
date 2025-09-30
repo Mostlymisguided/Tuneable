@@ -25,7 +25,6 @@ interface RegisterData {
   username: string;
   email: string;
   password: string;
-  inviteCode: string;
   cellPhone?: string;
   givenName?: string;
   familyName?: string;
@@ -43,6 +42,7 @@ interface AuthContextType {
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalance: number) => void;
+  handleOAuthCallback: (token: string, userData: any) => void;
   isLoading: boolean;
 }
 
@@ -127,6 +127,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user');
   };
 
+  const handleOAuthCallback = (token: string, userData: any) => {
+    setToken(token);
+    setUser(userData);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
   const refreshUser = async () => {
     try {
       const response = await authAPI.getProfile();
@@ -153,6 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     refreshUser,
     updateBalance,
+    handleOAuthCallback,
     isLoading,
   };
 

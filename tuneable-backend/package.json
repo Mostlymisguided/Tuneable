@@ -19,6 +19,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-session": "^1.18.2",
     "express-validator": "^7.2.1",
     "geoip-lite": "^1.4.10",
     "jsonwebtoken": "^9.0.2",
@@ -29,7 +30,8 @@
     "passport-facebook": "^3.0.0",
     "stripe": "^17.6.0",
     "tough-cookie": "^5.1.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "jest": "^29.6.2",

@@ -87,29 +87,7 @@ router.post('/', authMiddleware, async (req, res) => {
       res.status(500).json({ error: 'Server error', details: err.message });
     }
   });
-  
- /* // Join an existing party - defunct route?
-router.post('/:id/join', authMiddleware, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user.userId;
-        const party = await Party.findById(id);
-        if (!party) return res.status(404).json({ error: 'Party not found' });
 
-       if (party.type === 'private' & FormData.partycode !=== partyCode)
-            return res.status(444).json({ error: 'Party Code incorrect' });
-
-        if (party.attendees.includes(userId))
-            return res.status(400).json({ error: 'User already joined the party' });
-
-        party.attendees.push(userId);
-        await party.save();
-
-        res.status(200).json({ message: 'Successfully joined the party', party });
-    } catch (err) {
-        handleError(res, err, 'Failed to join party');
-    }
-}); */
 
 router.post("/join/:partyId", authMiddleware, async (req, res) => {
     const { partyId } = req.params;
@@ -315,6 +293,8 @@ router.post('/geocode-address', async (req, res) => {
 // Place a bid on an existing song or add a new song with a bid
 router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
     try {
+        console.log("🎯 SONGS/BID ENDPOINT CALLED");
+        console.log("🎯 Request body:", JSON.stringify(req.body, null, 2));
         const { partyId } = req.params;
         const { songId, url, title, artist, bidAmount, platform, duration, coverArt } = req.body;
         const userId = req.user.userId;
@@ -325,6 +305,20 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
 
         if (bidAmount <= 0) {
             return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        // ✅ Check user balance before processing bid
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.balance < bidAmount) {
+            return res.status(400).json({ 
+                error: 'Insufficient funds', 
+                currentBalance: user.balance,
+                requiredAmount: bidAmount 
+            });
         }
 
         // ✅ Convert duration to integer & validate
@@ -354,6 +348,56 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
             if (!song) {
                 return res.status(404).json({ error: 'Song not found' });
             }
+
+            // ✅ Check if song is already in the party's queue
+            console.log("🔍 Checking for duplicate song in party queue...");
+            console.log("🔍 Looking for songId:", songId);
+            console.log("🔍 Party has", party.songs.length, "songs");
+            party.songs.forEach((entry, index) => {
+                console.log(`🔍 Song ${index}:`, entry.songId?.toString(), "matches?", entry.songId?.toString() === songId);
+            });
+            
+            const existingPartySong = party.songs.find(entry => entry.songId?.toString() === songId);
+            if (existingPartySong) {
+                // Song already exists in party - just add the bid amount to existing song
+                console.log("🎵 Song already in party queue, adding bid to existing song");
+                
+                // Create a new bid for the existing song
+                const bid = new Bid({
+                    userId,
+                    partyId,
+                    songId: song._id,
+                    amount: bidAmount,
+                });
+                await bid.save();
+
+                // ✅ Deduct bid amount from user balance
+                user.balance -= bidAmount;
+                await user.save();
+
+                // Update the song with bid info
+                song.bids.push(bid._id);
+                song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
+                await song.save();
+
+                // Update the party-specific bid value
+                existingPartySong.partyBids = existingPartySong.partyBids || [];
+                existingPartySong.partyBids.push(bid._id);
+                existingPartySong.partyBidValue = (existingPartySong.partyBidValue || 0) + bidAmount;
+                await party.save();
+
+                // Fetch updated song with populated bid info
+                const updatedSong = await Song.findById(song._id).populate({
+                    path: 'bids',
+                    populate: { path: 'userId', select: 'username' }
+                });
+
+                return res.status(200).json({
+                    message: 'Bid added to existing song in queue!',
+                    song: updatedSong,
+                    isDuplicate: true
+                });
+            }
         } else if (url && title && artist && platform) {
             // ✅ Try finding the song by platform URL
             song = await Song.findOne({ [`sources.${platform}`]: url });
@@ -374,6 +418,13 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
             }
 
             // ✅ Check if song is already in the party's queue
+            console.log("🔍 Checking for duplicate song in party queue (URL path)...");
+            console.log("🔍 Looking for song._id:", song._id.toString());
+            console.log("🔍 Party has", party.songs.length, "songs");
+            party.songs.forEach((entry, index) => {
+                console.log(`🔍 Song ${index}:`, entry.songId?.toString(), "matches?", entry.songId?.toString() === song._id.toString());
+            });
+            
             const existingPartySong = party.songs.find(entry => entry.songId?.toString() === song._id.toString());
             if (existingPartySong) {
                 // Song already exists in party - just add the bid amount to existing song
@@ -388,12 +439,18 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                 });
                 await bid.save();
 
+                // ✅ Deduct bid amount from user balance
+                user.balance -= bidAmount;
+                await user.save();
+
                 // Update the song with bid info
                 song.bids.push(bid._id);
                 song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
                 await song.save();
 
                 // Update the party-specific bid value
+                existingPartySong.partyBids = existingPartySong.partyBids || [];
+                existingPartySong.partyBids.push(bid._id);
                 existingPartySong.partyBidValue = (existingPartySong.partyBidValue || 0) + bidAmount;
                 await party.save();
 
@@ -426,10 +483,23 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
         });
         await bid.save();
 
+        // ✅ Deduct bid amount from user balance
+        user.balance -= bidAmount;
+        await user.save();
+
         // ✅ Update the song with bid info
         song.bids.push(bid._id);
         song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
         await song.save();
+
+        // ✅ Update party-specific song entry with bid info
+        const partySongEntry = party.songs.find(entry => entry.songId?.toString() === song._id.toString());
+        if (partySongEntry) {
+            partySongEntry.partyBids = partySongEntry.partyBids || [];
+            partySongEntry.partyBids.push(bid._id);
+            partySongEntry.partyBidValue = (partySongEntry.partyBidValue || 0) + bidAmount;
+            await party.save();
+        }
 
         // ✅ Fetch updated song with populated bid info
         const updatedSong = await Song.findById(song._id).populate({

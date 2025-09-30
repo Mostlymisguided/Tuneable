@@ -12,6 +12,9 @@ import About from './pages/About';
 import TopTunes from './pages/TopTunes';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import AuthCallback from './pages/AuthCallback';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import DataDeletion from './pages/DataDeletion';
 import Dashboard from './pages/Dashboard';
 import Parties from './pages/Parties';
 import Party from './pages/Party';
@@ -20,6 +23,7 @@ import Profile from './pages/Profile';
 import Payment from './pages/Payment';
 import Search from './pages/Search';
 import Wallet from './pages/Wallet';
+import PodcastDiscovery from './pages/PodcastDiscovery';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -46,6 +50,9 @@ const AppContent = () => {
             <Route path="/top-tunes" element={<TopTunes />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
             <Route 
               path="/dashboard" 
               element={
@@ -83,6 +90,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <Search />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/podcasts" 
+              element={
+                <ProtectedRoute>
+                  <PodcastDiscovery />
                 </ProtectedRoute>
               } 
             />

@@ -130,6 +130,37 @@ const Home: React.FC = () => {
           </Link>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-4 md:mb-0">
+              <p className="text-gray-400">&copy; 2024 Tuneable. All rights reserved.</p>
+            </div>
+            <div className="flex space-x-6">
+              <Link 
+                to="/privacy-policy" 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <Link 
+                to="/data-deletion" 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Data Deletion
+              </Link>
+              <Link 
+                to="/about" 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                About
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
