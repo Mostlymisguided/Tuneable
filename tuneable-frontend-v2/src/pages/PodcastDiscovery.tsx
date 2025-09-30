@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Play, Headphones, Plus, ExternalLink } from 'lucide-react';
+import { Search, Download, Play, Headphones, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 
@@ -44,7 +44,7 @@ const PodcastDiscovery: React.FC = () => {
   const [importing, setImporting] = useState<string | null>(null);
   const [genres, setGenres] = useState<Array<{id: string, name: string}>>([]);
   const [selectedGenre, setSelectedGenre] = useState('all');
-  const [rssUrl, setRssUrl] = useState('');
+  // RSS support removed - Taddy and Apple Podcasts are the primary sources
   const [popularFeeds, setPopularFeeds] = useState<Array<{name: string, url: string, description: string, category: string}>>([]);
   const [topBoostedPodcasts, setTopBoostedPodcasts] = useState<Array<{title: string, podcastTitle: string, globalBidValue: number, playCount: number}>>([]);
 
@@ -396,7 +396,7 @@ const PodcastDiscovery: React.FC = () => {
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-900">
                 {results.length > 0 
-                  ? `Found ${results.length} ${searchType} from ${searchSource === 'apple' ? 'Apple Podcasts' : searchSource === 'rss' ? 'RSS Feed' : 'PodcastIndex'}`
+                  ? `Found ${results.length} ${searchType} from ${searchSource === 'apple' ? 'Apple Podcasts' : 'PodcastIndex'}`
                   : `No ${searchType} found`
                 }
               </h2>
@@ -451,7 +451,7 @@ const PodcastDiscovery: React.FC = () => {
                         </div>
                         <button
                           onClick={() => handleImportEpisodes(
-                            searchSource === 'apple' ? podcast.appleId?.toString() : podcast.podcastIndexId?.toString(), 
+                            searchSource === 'apple' ? (podcast.appleId?.toString() || '') : (podcast.podcastIndexId?.toString() || ''), 
                             podcast.title
                           )}
                           disabled={importing === (searchSource === 'apple' ? podcast.appleId?.toString() : podcast.podcastIndexId?.toString())}

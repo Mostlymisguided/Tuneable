@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, Heart, DollarSign, Clock, Calendar, User, Headphones } from 'lucide-react';
+import { Play, Pause, Heart, DollarSign, Clock, User, Headphones } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 

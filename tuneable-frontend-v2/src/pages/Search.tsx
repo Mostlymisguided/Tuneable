@@ -304,7 +304,7 @@ const SearchPage: React.FC = () => {
           });
 
           if (response.ok) {
-            const data = await response.json();
+            await response.json();
             toast.success(`Podcast episode added to party with £${songBidAmount.toFixed(2)} bid!`);
             navigate(`/party/${partyId}`);
           } else {
