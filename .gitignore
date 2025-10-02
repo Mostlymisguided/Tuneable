@@ -10,11 +10,15 @@ yarn-error.log*
 
 # Environment variables
 .env
+.env.*
 
 # Database files
 *.wt
 *.db
 *.sqlite
+
+tuneable-backend/data/mongodb-new/
+tuneable-backend/config/mongod.conf
 
 # System files
 .DS_Store
@@ -35,3 +39,5 @@ tuneable-backend/uploads
 generateToken.js
 
 
+# Editor / backup files
+*.backup
