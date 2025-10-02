@@ -33,7 +33,7 @@ const Navbar: React.FC = () => {
                 >
                   Home
                 </Link>
-                {user.role.includes('admin') && (
+                {user.role?.includes('admin') && (
                   <Link
                     to="/create-party"
                     className="px-4 py-2 text-white rounded-lg font-medium transition-colors"

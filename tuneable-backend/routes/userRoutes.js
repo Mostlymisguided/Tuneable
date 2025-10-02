@@ -227,4 +227,34 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
   }
 });
 
+// Temporary route to make a user admin (for testing)
+router.post('/make-admin/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Add admin role if not already present
+    if (!user.role.includes('admin')) {
+      user.role.push('admin');
+      await user.save();
+    }
+    
+    res.json({ 
+      message: 'User promoted to admin', 
+      user: { 
+        _id: user._id, 
+        username: user.username, 
+        role: user.role 
+      } 
+    });
+  } catch (error) {
+    console.error('Error promoting user to admin:', error);
+    res.status(500).json({ error: 'Failed to promote user to admin' });
+  }
+});
+
 module.exports = router;
