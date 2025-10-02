@@ -33,15 +33,17 @@ const Navbar: React.FC = () => {
                 >
                   Home
                 </Link>
-                <Link
-                  to="/create-party"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  Create Party
-                </Link>
+                {user.role.includes('admin') && (
+                  <Link
+                    to="/create-party"
+                    className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                    style={{ textDecoration: 'none' }}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
+                  >
+                    Create Party
+                  </Link>
+                )}
                 <Link
                   to="/parties"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
