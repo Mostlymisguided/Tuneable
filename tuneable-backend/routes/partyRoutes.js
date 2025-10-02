@@ -8,6 +8,7 @@ const Party = require('../models/Party');
 const Song = require('../models/Song');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
+const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 require('dotenv').config(); // Load .env variables
@@ -50,7 +51,7 @@ router.post('/', authMiddleware, async (req, res) => {
         return res.status(400).json({ message: "Location is required" });
       }
   
-      const userId = req.user.userId;
+      const userId = req.user._id;
       if (!isValidObjectId(userId)) {
         console.log('❌ Invalid User ID:', userId);
         return res.status(400).json({ error: 'Invalid userId' });
@@ -92,7 +93,7 @@ router.post('/', authMiddleware, async (req, res) => {
 router.post("/join/:partyId", authMiddleware, async (req, res) => {
     const { partyId } = req.params;
     const { inviteCode, location } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id;
 
     try {
         const party = await Party.findById(partyId);
@@ -152,7 +153,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             .populate({
                 path: 'songs.songId',
                 model: 'Song',
-                select: 'title artist duration coverArt sources globalBidValue bids addedBy', // ✅ Added `addedBy`
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category', // ✅ Added `addedBy`, `tags`, `category`
                 populate: {
                     path: 'bids',
                     model: 'Bid',
@@ -200,6 +201,8 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 bids: entry.partyBids || [], // ✅ Use party-specific bids
                 addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
                 totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
+                tags: entry.songId.tags || [], // ✅ Include tags
+                category: entry.songId.category || 'Unknown', // ✅ Include category
                 
                 // ✅ NEW: Song status and timing information
                 status: entry.status || 'queued',
@@ -296,8 +299,10 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
         console.log("🎯 SONGS/BID ENDPOINT CALLED");
         console.log("🎯 Request body:", JSON.stringify(req.body, null, 2));
         const { partyId } = req.params;
-        const { songId, url, title, artist, bidAmount, platform, duration, coverArt } = req.body;
-        const userId = req.user.userId;
+        const { songId, url, title, artist, bidAmount, platform, duration, coverArt, tags, category } = req.body;
+        console.log("🎯 Tags received:", tags);
+        console.log("🎯 Category received:", category);
+        const userId = req.user._id;
 
         if (!mongoose.isValidObjectId(partyId)) {
             return res.status(400).json({ error: 'Invalid partyId format' });
@@ -404,17 +409,55 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
 
             if (!song) {
                 // ✅ Create a new song if it doesn't exist
+                console.log("🎵 Creating new song with tags:", tags, "and category:", category);
+                
+                // For YouTube videos, fetch detailed info (tags, category) only when adding to party
+                let videoTags = Array.isArray(tags) ? tags : [];
+                let videoCategory = category || 'Unknown';
+                
+                if (platform === 'youtube') {
+                    console.log("🎵 Fetching detailed video info for YouTube video...");
+                    console.log("🎵 Platform:", platform, "URL:", url);
+                    try {
+                        const videoId = url.split('v=')[1]?.split('&')[0];
+                        console.log("🎵 Extracted video ID:", videoId);
+                        if (videoId) {
+                            console.log("🎵 Calling getVideoDetails with videoId:", videoId);
+                            const videoDetails = await getVideoDetails(videoId);
+                            console.log("🎵 Video details response:", videoDetails);
+                            videoTags = videoDetails.tags;
+                            videoCategory = videoDetails.category;
+                            console.log("🎵 Fetched video details - Tags:", videoTags.length, "Category:", videoCategory);
+                        } else {
+                            console.log("❌ Could not extract video ID from URL:", url);
+                        }
+                    } catch (error) {
+                        console.error("❌ Error fetching video details:", error);
+                        // Continue with default values if API call fails
+                    }
+                } else {
+                    console.log("🎵 Not YouTube platform, skipping video details fetch. Platform:", platform);
+                }
+                
                 song = new Song({
                     title,
                     artist,
                     coverArt: extractedCoverArt,
                     duration: extractedDuration || 777, // ✅ Store duration correctly
                     sources: { [platform]: url },
+                    tags: videoTags,
+                    category: videoCategory,
                     addedBy: userId
                 });
 
                 console.log("🎵 Saving song to database:", JSON.stringify(song, null, 2)); // ✅ Proper log
-                await song.save();
+                try {
+                    await song.save();
+                    console.log("✅ Song saved successfully");
+                } catch (saveError) {
+                    console.error("❌ Error saving song:", saveError);
+                    throw saveError;
+                }
             }
 
             // ✅ Check if song is already in the party's queue
@@ -467,7 +510,11 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                 });
             } else {
                 // ✅ Song not in party yet - add it to the party's playlist
-                party.songs.push({ songId: song._id, addedBy: userId });
+                party.songs.push({ 
+                    songId: song._id, 
+                    addedBy: userId,
+                    contentType: 'song'
+                });
                 await party.save();
             }
         } else {
@@ -522,8 +569,8 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
 router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
-        const { songId, url, title, artist, bidAmount, platform, duration } = req.body;
-        const userId = req.user.userId;
+        const { songId, url, title, artist, bidAmount, platform, duration, tags, category } = req.body;
+        const userId = req.user._id;
 
         if (!mongoose.isValidObjectId(partyId)) {
             return res.status(400).json({ error: 'Invalid partyId format' });
@@ -584,15 +631,53 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
 
             if (!song) {
                 // ✅ Create a new song if it doesn't exist
+                console.log("🎵 Creating new song (songcardbid) with tags:", tags, "and category:", category);
+                
+                // For YouTube videos, fetch detailed info (tags, category) only when adding to party
+                let videoTags = Array.isArray(tags) ? tags : [];
+                let videoCategory = category || 'Unknown';
+                
+                if (platform === 'youtube') {
+                    console.log("🎵 Fetching detailed video info for YouTube video (songcardbid)...");
+                    console.log("🎵 Platform (songcardbid):", platform, "URL:", url);
+                    try {
+                        const videoId = url.split('v=')[1]?.split('&')[0];
+                        console.log("🎵 Extracted video ID (songcardbid):", videoId);
+                        if (videoId) {
+                            console.log("🎵 Calling getVideoDetails with videoId (songcardbid):", videoId);
+                            const videoDetails = await getVideoDetails(videoId);
+                            console.log("🎵 Video details response (songcardbid):", videoDetails);
+                            videoTags = videoDetails.tags;
+                            videoCategory = videoDetails.category;
+                            console.log("🎵 Fetched video details (songcardbid) - Tags:", videoTags.length, "Category:", videoCategory);
+                        } else {
+                            console.log("❌ Could not extract video ID from URL (songcardbid):", url);
+                        }
+                    } catch (error) {
+                        console.error("❌ Error fetching video details (songcardbid):", error);
+                        // Continue with default values if API call fails
+                    }
+                } else {
+                    console.log("🎵 Not YouTube platform, skipping video details fetch (songcardbid). Platform:", platform);
+                }
+                
                 song = new Song({
                     title,
                     artist,
                     coverArt: extractedCoverArt,
                     duration: extractedDuration || 777,
                     sources: { [platform]: url },
+                    tags: videoTags,
+                    category: videoCategory,
                     addedBy: userId
                 });
-                await song.save();
+                try {
+                    await song.save();
+                    console.log("✅ Song saved successfully (songcardbid)");
+                } catch (saveError) {
+                    console.error("❌ Error saving song (songcardbid):", saveError);
+                    throw saveError;
+                }
             }
 
             // Find or create party-specific song entry
@@ -603,7 +688,8 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
                     songId: song._id,
                     addedBy: userId,
                     partyBidValue: 0,
-                    partyBids: []
+                    partyBids: [],
+                    contentType: 'song'
                 };
                 party.songs.push(partySongEntry);
             }
@@ -672,7 +758,7 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
 router.post('/:partyId/songs/:songId/play', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
             return res.status(400).json({ error: 'Invalid partyId or songId format' });
@@ -736,7 +822,7 @@ router.post('/:partyId/songs/:songId/play', authMiddleware, async (req, res) => 
 router.post('/:partyId/songs/reset', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         if (!isValidObjectId(partyId)) {
             return res.status(400).json({ error: 'Invalid partyId format' });
@@ -777,7 +863,7 @@ router.post('/:partyId/songs/reset', authMiddleware, async (req, res) => {
 router.post('/:partyId/songs/:songId/complete', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
             return res.status(400).json({ error: 'Invalid partyId or songId format' });
@@ -870,7 +956,7 @@ router.post('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => 
     try {
         const { partyId, songId } = req.params;
         const { reason } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
             return res.status(400).json({ error: 'Invalid partyId or songId format' });
@@ -943,7 +1029,7 @@ router.post('/update-statuses', async (req, res) => {
 router.post('/:partyId/end', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         if (!isValidObjectId(partyId)) {
             return res.status(400).json({ error: 'Invalid partyId format' });
@@ -992,7 +1078,7 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
 router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         // Validate IDs
         if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(songId)) {

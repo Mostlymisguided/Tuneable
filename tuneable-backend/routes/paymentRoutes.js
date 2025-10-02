@@ -11,7 +11,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
     const { amount, currency } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -34,7 +34,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   try {
     const { amount, currency = 'gbp' } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -116,7 +116,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 router.post('/update-balance', authMiddleware, async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -144,7 +144,7 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
 router.post('/confirm-payment', authMiddleware, async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user._id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });

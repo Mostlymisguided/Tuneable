@@ -35,7 +35,8 @@ const songSchema = new mongoose.Schema({
   pitch: { type: Number, default: null },
   key: { type: String, default: null },
   elements: { type: [String], default: [] }, // Instrument/element tags
-  tags: { type: [String], default: [] }, // /vibe tags
+  tags: { type: [String], default: [] }, // YouTube tags from snippet.tags
+  category: { type: String, default: null }, // YouTube category name (mapped from categoryId)
   timeSignature: { type: String, default: null }, // Default to 4/4
   bitrate: { type: Number, default: null }, // kbps
   sampleRate: { type: Number, default: null }, // Hz

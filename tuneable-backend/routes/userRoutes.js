@@ -169,7 +169,7 @@ router.post(
 // Get user profile
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ message: 'User profile', user });
   } catch (error) {
@@ -183,7 +183,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     const { profilePic, ...updatedFields } = req.body; // Ensure profilePic isn't overwritten
 
     const user = await User.findByIdAndUpdate(
-      req.user.userId,
+      req.user._id,
       updatedFields,
       { new: true }
     ).select('-password');
@@ -209,7 +209,7 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
       console.log(`📸 Saving profile pic: ${profilePicPath} for user ${req.user.userId}`);
 
       const user = await User.findByIdAndUpdate(
-          req.user.userId,
+          req.user._id,
           { $set: { profilePic: profilePicPath } },
           { new: true, projection: { profilePic: 1, _id: 1 } }
       );

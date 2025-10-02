@@ -171,6 +171,8 @@ router.get('/', async (req, res) => {
                             : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`,
                         duration: video.duration || 111,
                         sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` },
+                        tags: video.tags || [],
+                        category: video.category || 'Unknown',
                         isLocal: false // Flag to indicate this is from external API
                     })),
                     source: 'external'

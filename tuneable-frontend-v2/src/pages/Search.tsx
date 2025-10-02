@@ -385,6 +385,8 @@ const SearchPage: React.FC = () => {
           duration: song.duration,
           coverArt: song.coverArt,
           bidAmount: songBidAmount,
+          tags: song.tags || [],
+          category: song.category || 'Unknown',
         });
         
         if (response.isDuplicate) {

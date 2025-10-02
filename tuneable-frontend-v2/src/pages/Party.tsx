@@ -27,6 +27,8 @@ interface PartySong {
   globalBidValue?: number;
   bids?: any[];
   addedBy: string;
+  tags?: string[];
+  category?: string;
   [key: string]: any; // Allow additional properties
 }
 
@@ -694,6 +696,36 @@ const Party: React.FC = () => {
                                 <p className="text-xs text-purple-300">
                                   Started: {song.playedAt ? new Date(song.playedAt).toLocaleTimeString() : 'Now'}
                                 </p>
+                                
+                                {/* Tags Display for Currently Playing */}
+                                {songData.tags && songData.tags.length > 0 && (
+                                  <div className="mt-2">
+                                    <div className="flex flex-wrap gap-1">
+                                      {songData.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
+                                        <span
+                                          key={tagIndex}
+                                          className="px-2 py-1 bg-purple-600 text-white text-xs rounded-full"
+                                        >
+                                          #{tag}
+                                        </span>
+                                      ))}
+                                      {songData.tags.length > 3 && (
+                                        <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">
+                                          +{songData.tags.length - 3} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Category Display for Currently Playing */}
+                                {songData.category && songData.category !== 'Unknown' && (
+                                  <div className="mt-1">
+                                    <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
+                                      {songData.category}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                               <div className="text-right">
                                 <p className="text-sm font-medium text-white">
@@ -767,6 +799,36 @@ const Party: React.FC = () => {
                                   return 'Unknown';
                                 })()}
                               </p>
+                              
+                              {/* Tags Display */}
+                              {songData.tags && songData.tags.length > 0 && (
+                                <div className="mt-2">
+                                  <div className="flex flex-wrap gap-1">
+                                    {songData.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
+                                      <span
+                                        key={tagIndex}
+                                        className="px-2 py-1 bg-purple-600 text-white text-xs rounded-full"
+                                      >
+                                        #{tag}
+                                      </span>
+                                    ))}
+                                    {songData.tags.length > 5 && (
+                                      <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">
+                                        +{songData.tags.length - 5} more
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Category Display */}
+                              {songData.category && songData.category !== 'Unknown' && (
+                                <div className="mt-1">
+                                  <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
+                                    {songData.category}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             
                             {/* Action Buttons */}
