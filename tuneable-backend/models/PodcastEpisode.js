@@ -73,7 +73,6 @@ podcastEpisodeSchema.index({ publishedAt: -1 });
 podcastEpisodeSchema.index({ globalBidValue: -1 });
 podcastEpisodeSchema.index({ playCount: -1 });
 podcastEpisodeSchema.index({ popularity: -1 });
-podcastEpisodeSchema.index({ guid: 1 });
 podcastEpisodeSchema.index({ podcastId: 1 });
 podcastEpisodeSchema.index({ addedBy: 1 });
 
