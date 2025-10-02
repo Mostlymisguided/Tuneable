@@ -8,17 +8,22 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables
-.env
-.env.*
+# Environment variables (ignore all variants and backups)
+*.env
+*.env.*
 
 # Database files
 *.wt
 *.db
 *.sqlite
 
-tuneable-backend/data/mongodb-new/
 tuneable-backend/config/mongod.conf
+
+# MongoDB runtime data
+tuneable-backend/data/db/
+tuneable-backend/data/mongodb/
+tuneable-backend/data/mongodb-new/
+!tuneable-backend/data/db/.keep
 
 # System files
 .DS_Store
@@ -28,16 +33,18 @@ Thumbs.db
 .vscode/
 .idea/
 
-
-tuneable-backend/data/mongodb/
-tuneable-backend/data/db/*
-!tuneable-backend/data/db/.keep
-
 tuneable-backend/uploads
 
+# Build artifacts
+*.zip
+*.tar.gz
+dist/
+build/
 
 generateToken.js
 
-
 # Editor / backup files
 *.backup
+*.old
+*.bak
+*~
