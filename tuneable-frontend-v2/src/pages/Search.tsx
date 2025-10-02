@@ -20,6 +20,8 @@ interface SearchResult {
   isPodcast?: boolean;
   podcastAuthor?: string;
   description?: string;
+  tags?: string[];
+  category?: string;
   // External podcast data
   taddyData?: any;
   appleData?: any;
