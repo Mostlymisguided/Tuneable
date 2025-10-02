@@ -5,13 +5,14 @@ const jwt = require('jsonwebtoken');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
-// Facebook OAuth Strategy
-passport.use(new FacebookStrategy({
-    clientID: process.env.FACEBOOK_APP_ID,
-    clientSecret: process.env.FACEBOOK_APP_SECRET,
-    callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
-    profileFields: ['id', 'emails', 'name', 'picture', 'location']
-  },
+// Facebook OAuth Strategy - only configure if environment variables are available
+if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+  passport.use(new FacebookStrategy({
+      clientID: process.env.FACEBOOK_APP_ID,
+      clientSecret: process.env.FACEBOOK_APP_SECRET,
+      callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
+      profileFields: ['id', 'emails', 'name', 'picture', 'location']
+    },
   async (accessToken, refreshToken, profile, done) => {
     try {
       console.log('Facebook profile:', profile);
@@ -104,7 +105,10 @@ passport.use(new FacebookStrategy({
       return done(error, null);
     }
   }
-));
+  ));
+} else {
+  console.log('⚠️  Facebook OAuth not configured - FACEBOOK_APP_ID or FACEBOOK_APP_SECRET missing');
+}
 
 // Generate unique invite code
 function generateInviteCode() {

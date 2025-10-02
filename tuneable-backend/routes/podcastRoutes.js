@@ -795,6 +795,10 @@ router.get('/discovery/apple/top-podcasts', async (req, res) => {
 // Get Taddy categories
 router.get('/discovery/taddy/categories', async (req, res) => {
   try {
+    if (!process.env.TADDY_API_KEY || !process.env.TADDY_USER_ID) {
+      return res.status(503).json({ error: 'Taddy API not configured' });
+    }
+    
     const result = taddyService.getCategories();
     res.json(result);
   } catch (error) {
@@ -806,6 +810,10 @@ router.get('/discovery/taddy/categories', async (req, res) => {
 // Search podcasts from Taddy
 router.get('/discovery/taddy/search-podcasts', async (req, res) => {
   try {
+    if (!process.env.TADDY_API_KEY || !process.env.TADDY_USER_ID) {
+      return res.status(503).json({ error: 'Taddy API not configured' });
+    }
+    
     const { q, max = 20 } = req.query;
     
     if (!q || q.trim().length < 2) {
@@ -832,6 +840,10 @@ router.get('/discovery/taddy/search-podcasts', async (req, res) => {
 // Search episodes from Taddy
 router.get('/discovery/taddy/search-episodes', async (req, res) => {
   try {
+    if (!process.env.TADDY_API_KEY || !process.env.TADDY_USER_ID) {
+      return res.status(503).json({ error: 'Taddy API not configured' });
+    }
+    
     const { q, max = 20 } = req.query;
     
     if (!q || q.trim().length < 2) {
@@ -858,6 +870,10 @@ router.get('/discovery/taddy/search-episodes', async (req, res) => {
 // Get podcast details from Taddy
 router.get('/discovery/taddy/podcast/:podcastUuid', async (req, res) => {
   try {
+    if (!process.env.TADDY_API_KEY || !process.env.TADDY_USER_ID) {
+      return res.status(503).json({ error: 'Taddy API not configured' });
+    }
+    
     const { podcastUuid } = req.params;
     
     const result = await taddyService.getPodcastById(podcastUuid);
@@ -879,6 +895,10 @@ router.get('/discovery/taddy/podcast/:podcastUuid', async (req, res) => {
 // Get episodes for a specific podcast from Taddy
 router.get('/discovery/taddy/podcast/:podcastUuid/episodes', async (req, res) => {
   try {
+    if (!process.env.TADDY_API_KEY || !process.env.TADDY_USER_ID) {
+      return res.status(503).json({ error: 'Taddy API not configured' });
+    }
+    
     const { podcastUuid } = req.params;
     const { max = 50 } = req.query;
     
@@ -902,6 +922,10 @@ router.get('/discovery/taddy/podcast/:podcastUuid/episodes', async (req, res) =>
 // Import episodes from Taddy (with auth)
 router.post('/discovery/taddy/import-episodes', authMiddleware, async (req, res) => {
   try {
+    if (!process.env.TADDY_API_KEY || !process.env.TADDY_USER_ID) {
+      return res.status(503).json({ error: 'Taddy API not configured' });
+    }
+    
     const { podcastUuid, maxEpisodes = 10, specificEpisode } = req.body;
     const userId = req.user._id;
 
