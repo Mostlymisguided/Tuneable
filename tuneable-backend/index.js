@@ -41,7 +41,7 @@ db.connectDB()
   });
 
 // Allowed origins: development and production
-const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com'];
+const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com', 'https://tuneable.pages.dev/', 'https://tuneable.stream', 'http://tuneable.stream'];
 
 // Define CORS options (temporary: allow all origins for MVP + Base44 integration)
 const corsOptions = {

@@ -62,7 +62,7 @@ const Navbar: React.FC = () => {
                 >
                   Music
                 </Link>
-                <Link
+                {/* <Link
                   to="/podcasts"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
@@ -70,7 +70,7 @@ const Navbar: React.FC = () => {
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   Podcasts
-                </Link>
+                </Link> */}
                 <Link
                   to="/wallet"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"

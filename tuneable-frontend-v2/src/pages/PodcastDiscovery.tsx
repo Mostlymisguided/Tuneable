@@ -10,7 +10,6 @@ interface Podcast {
   image: string;
   categories: string[];
   language: string;
-  rssUrl: string;
   podcastIndexId?: number;
   appleId?: number;
   genre?: string;
@@ -29,8 +28,7 @@ interface Episode {
   publishedAt: string;
   audioUrl: string;
   explicit: boolean;
-  podcastIndexId: number;
-  feedId: number;
+  appleId?: number;
 }
 
 const PodcastDiscovery: React.FC = () => {
@@ -334,7 +332,7 @@ const PodcastDiscovery: React.FC = () => {
                 {searchType === 'podcasts' ? (
                   // Podcast Results
                   (results as Podcast[]).map((podcast) => (
-                    <div key={podcast.podcastIndexId} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div key={podcast.appleId || podcast.title} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                       <div className="flex items-start space-x-4">
                         <img
                           src={podcast.image || '/default-podcast.png'}
@@ -396,7 +394,7 @@ const PodcastDiscovery: React.FC = () => {
                 ) : (
                   // Episode Results
                   (results as Episode[]).map((episode) => (
-                    <div key={episode.podcastIndexId} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div key={episode.appleId || episode.title} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                       <div className="flex items-start space-x-4">
                         <img
                           src={episode.podcastImage || '/default-podcast.png'}

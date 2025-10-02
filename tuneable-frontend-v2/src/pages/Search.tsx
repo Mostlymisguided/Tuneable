@@ -433,7 +433,8 @@ const SearchPage: React.FC = () => {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate(`/party/${partyId}`)}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 text-white rounded-lg font-medium transition-colors border border-white hover:bg-white hover:text-gray-900"
+              style={{ backgroundColor: 'transparent' }}
             >
               <ArrowLeft className="h-5 w-5" />
               <span>Back to Party</span>
@@ -477,8 +478,8 @@ const SearchPage: React.FC = () => {
           )}
         </div>
         
-        {/* Content Type Tabs */}
-        <div className="mb-6">
+        {/* Content Type Tabs - Commented out for MVP (only songs now) */}
+        {/* <div className="mb-6">
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
             <button
               onClick={() => setActiveTab('songs')}
@@ -503,10 +504,10 @@ const SearchPage: React.FC = () => {
               Podcasts
             </button>
           </div>
-        </div>
+        </div> */}
         
-        {/* Podcast Source Selector */}
-        {activeTab === 'podcasts' && (
+        {/* Podcast Source Selector - Commented out for MVP */}
+        {/* {activeTab === 'podcasts' && (
           <div className="mb-4">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-500">Search Source:</span>
@@ -544,7 +545,7 @@ const SearchPage: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
+        )} */}
         
         {/* Search Bar */}
         <div className="flex space-x-4">
