@@ -344,10 +344,10 @@ const SearchPage: React.FC = () => {
         });
 
         if (response.ok) {
-          const data = await response.json();
-          if (data.imported > 0) {
+          const importData = await response.json();
+          if (importData.imported > 0) {
             // Now bid on the newly created episode
-            const episodeId = data.importedEpisodes[0].id;
+            const episodeId = importData.importedEpisodes[0].id;
             const bidResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/${episodeId}/party/${partyId}/bid`, {
               method: 'POST',
               headers: {

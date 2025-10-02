@@ -37,7 +37,7 @@ const PodcastDiscovery: React.FC = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'podcasts' | 'episodes'>('podcasts');
-  const [searchSource, setSearchSource] = useState<'podcastindex' | 'apple' | 'rss'>('apple');
+  const [searchSource, setSearchSource] = useState<'apple'>('apple');
   const [results, setResults] = useState<Podcast[] | Episode[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -45,7 +45,7 @@ const PodcastDiscovery: React.FC = () => {
   const [genres, setGenres] = useState<Array<{id: string, name: string}>>([]);
   const [selectedGenre, setSelectedGenre] = useState('all');
   // RSS support removed - Taddy and Apple Podcasts are the primary sources
-  const [popularFeeds, setPopularFeeds] = useState<Array<{name: string, url: string, description: string, category: string}>>([]);
+  // const [popularFeeds, setPopularFeeds] = useState<Array<{name: string, url: string, description: string, category: string}>>([]);
   const [topBoostedPodcasts, setTopBoostedPodcasts] = useState<Array<{title: string, podcastTitle: string, globalBidValue: number, playCount: number}>>([]);
 
   useEffect(() => {
@@ -62,18 +62,18 @@ const PodcastDiscovery: React.FC = () => {
       }
     };
 
-    // Load popular RSS feeds
-    const loadPopularFeeds = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/rss/popular-feeds`);
-        if (response.ok) {
-          const data = await response.json();
-          setPopularFeeds(data.feeds || []);
-        }
-      } catch (error) {
-        console.error('Error loading popular feeds:', error);
-      }
-    };
+    // Load popular RSS feeds - DISABLED
+    // const loadPopularFeeds = async () => {
+    //   try {
+    //     const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/rss/popular-feeds`);
+    //     if (response.ok) {
+    //       const data = await response.json();
+    //       setPopularFeeds(data.feeds || []);
+    //     }
+    //   } catch (error) {
+    //     console.error('Error loading popular feeds:', error);
+    //   }
+    // };
 
     // Load top boosted podcasts
     const loadTopBoostedPodcasts = async () => {
@@ -89,7 +89,7 @@ const PodcastDiscovery: React.FC = () => {
     };
 
     loadGenres();
-    loadPopularFeeds();
+    // loadPopularFeeds();
     loadTopBoostedPodcasts();
   }, []);
 
@@ -105,29 +105,11 @@ const PodcastDiscovery: React.FC = () => {
         endpoint = searchType === 'podcasts' 
           ? `/api/podcasts/discovery/apple/search-podcasts`
           : `/api/podcasts/discovery/apple/search-episodes`;
-      } else if (searchSource === 'rss') {
-        // For RSS, we parse the URL directly
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/rss/parse-rss`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rssUrl: searchQuery })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setResults(data.episodes || []);
-          toast.success(`Found ${data.count || 0} episodes from RSS feed`);
-        } else {
-          const error = await response.json();
-          toast.error(error.error || 'RSS parsing failed');
-          setResults([]);
-        }
-        setLoading(false);
-        return;
       } else {
+        // Only Apple Podcasts supported
         endpoint = searchType === 'podcasts' 
-          ? `/api/podcasts/discovery/podcastindex/search-podcasts`
-          : `/api/podcasts/discovery/podcastindex/search-episodes`;
+          ? `/api/podcasts/discovery/apple/search-podcasts`
+          : `/api/podcasts/discovery/apple/search-episodes`;
       }
       
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}${endpoint}?q=${encodeURIComponent(searchQuery)}&max=20`);
@@ -135,7 +117,7 @@ const PodcastDiscovery: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setResults(data[searchType] || []);
-        toast.success(`Found ${data.count || 0} ${searchType} from ${searchSource === 'apple' ? 'Apple Podcasts' : 'PodcastIndex'}`);
+        toast.success(`Found ${data.count || 0} ${searchType} from Apple Podcasts`);
       } else {
         const error = await response.json();
         toast.error(error.error || 'Search failed');
@@ -188,16 +170,9 @@ const PodcastDiscovery: React.FC = () => {
     try {
       let endpoint, body;
       
-      if (searchSource === 'rss') {
-        endpoint = '/api/podcasts/discovery/rss/import-rss';
-        body = { rssUrl: searchQuery, maxEpisodes: 10 };
-      } else if (searchSource === 'apple') {
-        endpoint = '/api/podcasts/discovery/apple/import-episodes';
-        body = { appleId: podcastId, maxEpisodes: 10 };
-      } else {
-        endpoint = '/api/podcasts/discovery/podcastindex/import-episodes';
-        body = { podcastId: podcastId, maxEpisodes: 10 };
-      }
+      // Only Apple Podcasts supported
+      endpoint = '/api/podcasts/discovery/apple/import-episodes';
+      body = { appleId: podcastId, maxEpisodes: 10 };
         
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}${endpoint}`, {
         method: 'POST',
@@ -253,37 +228,13 @@ const PodcastDiscovery: React.FC = () => {
 
         {/* Search Interface */}
         <div className="mb-8 space-y-4">
-          {/* Source Selection */}
+          {/* Source Selection - Apple Podcasts only */}
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
             <button
               onClick={() => setSearchSource('apple')}
-              className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                searchSource === 'apple'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors bg-white text-gray-900 shadow-sm"
             >
               🍎 Apple Podcasts
-            </button>
-            <button
-              onClick={() => setSearchSource('podcastindex')}
-              className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                searchSource === 'podcastindex'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              📡 PodcastIndex
-            </button>
-            <button
-              onClick={() => setSearchSource('rss')}
-              className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                searchSource === 'rss'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              📻 RSS Feed
             </button>
           </div>
 
@@ -343,7 +294,7 @@ const PodcastDiscovery: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder={searchSource === 'rss' ? 'Enter RSS feed URL...' : `Search for ${searchType} on ${searchSource === 'apple' ? 'Apple Podcasts' : 'PodcastIndex'}...`}
+                placeholder={`Search for ${searchType} on Apple Podcasts...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -365,38 +316,13 @@ const PodcastDiscovery: React.FC = () => {
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>
-        ) : searchSource === 'rss' ? (
-          <>
-            {/* Popular RSS Feeds */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Popular RSS Feeds</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {popularFeeds.map((feed, index) => (
-                  <div key={index} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-                    <h4 className="font-medium text-gray-900 mb-1">{feed.name}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{feed.description}</p>
-                    <p className="text-xs text-gray-500 mb-3">{feed.category}</p>
-                    <button
-                      onClick={() => {
-                        setSearchQuery(feed.url);
-                        handleSearch();
-                      }}
-                      className="w-full px-3 py-2 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
-                    >
-                      Parse Feed
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
         ) : hasSearched ? (
           <>
             {/* Results Header */}
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-900">
                 {results.length > 0 
-                  ? `Found ${results.length} ${searchType} from ${searchSource === 'apple' ? 'Apple Podcasts' : 'PodcastIndex'}`
+                  ? `Found ${results.length} ${searchType} from Apple Podcasts`
                   : `No ${searchType} found`
                 }
               </h2>
@@ -451,13 +377,13 @@ const PodcastDiscovery: React.FC = () => {
                         </div>
                         <button
                           onClick={() => handleImportEpisodes(
-                            searchSource === 'apple' ? (podcast.appleId?.toString() || '') : (podcast.podcastIndexId?.toString() || ''), 
+                            podcast.appleId?.toString() || '', 
                             podcast.title
                           )}
-                          disabled={importing === (searchSource === 'apple' ? podcast.appleId?.toString() : podcast.podcastIndexId?.toString())}
+                          disabled={importing === podcast.appleId?.toString()}
                           className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                         >
-                          {importing === (searchSource === 'apple' ? podcast.appleId?.toString() : podcast.podcastIndexId?.toString()) ? (
+                          {importing === podcast.appleId?.toString() ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                           ) : (
                             <Download className="w-4 h-4 mr-2" />
