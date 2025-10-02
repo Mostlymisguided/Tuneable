@@ -41,11 +41,21 @@ db.connectDB()
   });
 
 // Allowed origins: development and production
-const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com', 'https://tuneable.pages.dev/', 'https://tuneable.stream', 'http://tuneable.stream'];
+const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com', 'https://tuneable.pages.dev', 'https://tuneable.stream', 'http://tuneable.stream'];
 
-// Define CORS options (temporary: allow all origins for MVP + Base44 integration)
+// Define CORS options
 const corsOptions = {
-  origin: '*',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
