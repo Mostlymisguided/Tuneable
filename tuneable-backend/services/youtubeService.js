@@ -104,6 +104,12 @@ const parseDuration = (duration) => {
 const getVideoDetails = async (videoId) => {
     const apiKey = process.env.YOUTUBE_API_KEY;
     
+    // Check if API key is available
+    if (!apiKey) {
+        console.error('YouTube API key not found in environment variables');
+        return { tags: [], category: 'Unknown', categoryId: null };
+    }
+    
     try {
         const response = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
             params: {
@@ -117,8 +123,13 @@ const getVideoDetails = async (videoId) => {
             const video = response.data.items[0];
             const categoryId = video.snippet.categoryId;
             
-            // Get category name
-            const categoryName = await getCategoryName(categoryId, apiKey);
+            // Get category name with error handling
+            let categoryName = 'Unknown';
+            try {
+                categoryName = await getCategoryName(categoryId, apiKey);
+            } catch (categoryError) {
+                console.error('Error fetching category name:', categoryError);
+            }
             
             return {
                 tags: video.snippet.tags || [],

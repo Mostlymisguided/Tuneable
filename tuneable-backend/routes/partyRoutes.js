@@ -425,15 +425,18 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                             console.log("🎵 Calling getVideoDetails with videoId:", videoId);
                             const videoDetails = await getVideoDetails(videoId);
                             console.log("🎵 Video details response:", videoDetails);
-                            videoTags = videoDetails.tags;
-                            videoCategory = videoDetails.category;
+                            videoTags = videoDetails.tags || [];
+                            videoCategory = videoDetails.category || 'Unknown';
                             console.log("🎵 Fetched video details - Tags:", videoTags.length, "Category:", videoCategory);
                         } else {
                             console.log("❌ Could not extract video ID from URL:", url);
                         }
                     } catch (error) {
                         console.error("❌ Error fetching video details:", error);
+                        console.log("🎵 Continuing with default values due to error");
                         // Continue with default values if API call fails
+                        videoTags = [];
+                        videoCategory = 'Unknown';
                     }
                 } else {
                     console.log("🎵 Not YouTube platform, skipping video details fetch. Platform:", platform);
@@ -647,15 +650,18 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
                             console.log("🎵 Calling getVideoDetails with videoId (songcardbid):", videoId);
                             const videoDetails = await getVideoDetails(videoId);
                             console.log("🎵 Video details response (songcardbid):", videoDetails);
-                            videoTags = videoDetails.tags;
-                            videoCategory = videoDetails.category;
+                            videoTags = videoDetails.tags || [];
+                            videoCategory = videoDetails.category || 'Unknown';
                             console.log("🎵 Fetched video details (songcardbid) - Tags:", videoTags.length, "Category:", videoCategory);
                         } else {
                             console.log("❌ Could not extract video ID from URL (songcardbid):", url);
                         }
                     } catch (error) {
                         console.error("❌ Error fetching video details (songcardbid):", error);
+                        console.log("🎵 Continuing with default values due to error (songcardbid)");
                         // Continue with default values if API call fails
+                        videoTags = [];
+                        videoCategory = 'Unknown';
                     }
                 } else {
                     console.log("🎵 Not YouTube platform, skipping video details fetch (songcardbid). Platform:", platform);
