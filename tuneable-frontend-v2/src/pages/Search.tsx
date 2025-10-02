@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { searchAPI, partyAPI } from '../lib/api';
 import { spotifyService } from '../services/spotifyService';
 import { toast } from 'react-toastify';
-import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Headphones } from 'lucide-react';
+import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
 
 // Define types directly to avoid import issues
@@ -35,10 +35,10 @@ const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [bidAmounts, setBidAmounts] = useState<Record<string, number>>({});
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'songs' | 'podcasts'>('songs');
+  const [activeTab] = useState<'songs' | 'podcasts'>('songs');
   const [party, setParty] = useState<any>(null);
   const [musicSource, setMusicSource] = useState<'youtube' | 'spotify'>('youtube');
-  const [podcastSource, setPodcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
+  const [podcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
   const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
