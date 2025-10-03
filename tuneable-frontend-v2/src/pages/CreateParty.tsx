@@ -278,6 +278,22 @@ const CreateParty: React.FC = () => {
           
           <div className="space-y-4">
             <div>
+              <label htmlFor="privacy" className="block text-sm font-medium text-gray-700" style={{ paddingBottom: '5px' }}>
+                Party Privacy
+              </label>
+              <select
+                id="privacy"
+                name="privacy"
+                className="input mt-1"
+                value={formData.privacy}
+                onChange={handleChange}
+              >
+                <option value="public">Public</option>
+                <option value="private">Private - Invite Code Required</option>
+              </select>
+            </div>
+
+            <div>
               <label htmlFor="type" className="block text-sm font-medium text-gray-700" style={{ paddingBottom: '5px' }}>
                 Party Type
               </label>
@@ -288,8 +304,8 @@ const CreateParty: React.FC = () => {
                 value={formData.type}
                 onChange={handleChange}
               >
-                <option value="public">Public</option>
-                <option value="private">Private - Invite Code Required</option>
+                <option value="remote">Remote - Collaborative Playlist</option>
+                <option value="live">Live - Real-time Venue</option>
               </select>
             </div>
 
