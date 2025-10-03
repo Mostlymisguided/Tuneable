@@ -134,8 +134,8 @@ async function migrateSongs() {
       const song = songsToMigrate[i];
       console.log(`\n🎵 Processing song ${i + 1}/${songsToMigrate.length}: ${song.title}`);
 
-      // Check if it's a YouTube song
-      const youtubeUrl = song.sources?.youtube;
+      // Check if it's a YouTube song - Handle both Map objects and regular objects
+      const youtubeUrl = song.sources instanceof Map ? song.sources.get("youtube") : song.sources?.youtube;
       if (!youtubeUrl) {
         console.log(`⏭️  Skipping non-YouTube song: ${song.title}`);
         skippedCount++;
