@@ -10,6 +10,7 @@ const PartySchema = new mongoose.Schema({
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   
   partyCode: { type: String, required: true, unique: true },
+  inviteCode: { type: String, unique: true, sparse: true }, // Optional invite code for private parties
   location: {type: String, required: true},
   musicSource: {
     type: String,

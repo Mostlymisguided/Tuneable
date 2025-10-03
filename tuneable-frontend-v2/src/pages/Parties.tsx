@@ -51,18 +51,46 @@ const Parties: React.FC = () => {
     fetchParties();
   }, []);
 
-  const handleJoinParty = (partyId: string, partyName: string) => {
-    // Check if this is a different party than the current one
-    const isDifferentParty = currentPartyId && currentPartyId !== partyId;
-    
-    if (isDifferentParty) {
-      showWarning(
-        `join "${partyName}"`,
-        () => navigate(`/party/${partyId}`)
-      );
-    } else {
-      // Same party or no current party, navigate directly
+  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string) => {
+    try {
+      // Check if this is a different party than the current one
+      const isDifferentParty = currentPartyId && currentPartyId !== partyId;
+      
+      if (isDifferentParty) {
+        showWarning(
+          `join "${partyName}"`,
+          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy)
+        );
+      } else {
+        // Same party or no current party, join directly
+        await joinPartyWithPrivacyCheck(partyId, partyPrivacy);
+      }
+    } catch (error) {
+      console.error('Error joining party:', error);
+    }
+  };
+
+  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string) => {
+    try {
+      if (partyPrivacy === 'private') {
+        // Prompt for party code
+        const inviteCode = prompt('This is a private party. Please enter the party code:');
+        if (!inviteCode) {
+          return; // User cancelled
+        }
+        
+        // Call join API with invite code
+        await partyAPI.joinParty(partyId, inviteCode);
+      } else {
+        // Public party, join without invite code
+        await partyAPI.joinParty(partyId);
+      }
+      
+      // Navigate to party page after successful join
       navigate(`/party/${partyId}`);
+    } catch (error: any) {
+      console.error('Error joining party:', error);
+      alert(error.response?.data?.message || 'Failed to join party');
     }
   };
 
@@ -162,7 +190,7 @@ const Parties: React.FC = () => {
                   Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
                 <button
-                  onClick={() => handleJoinParty(party._id, party.name)}
+                  onClick={() => handleJoinParty(party._id, party.name, party.privacy)}
                   className="btn-primary text-sm"
                 >
                   Join Party

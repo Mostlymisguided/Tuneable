@@ -28,6 +28,7 @@ const handleError = (res, err, message, status = 500) => {
 const deriveCodeFromPartyId = (objectId) => {
     return crypto.createHash('md5').update(objectId.toString()).digest('hex').substring(0, 6).toUpperCase();
   };
+
   
 
 /**
@@ -100,7 +101,7 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
         const party = await Party.findById(partyId);
         if (!party) return res.status(404).json({ message: "Party not found" });
 
-        if (party.privacy === "private" && party.inviteCode !== inviteCode) {
+        if (party.privacy === "private" && party.partyCode !== inviteCode) {
             return res.status(403).json({ message: "Invalid invite code" });
         }
 
