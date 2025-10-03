@@ -1037,6 +1037,108 @@ router.post('/update-statuses', async (req, res) => {
     }
 });
 
+// Skip to next song (remote parties only)
+router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const userId = req.user._id;
+
+        const party = await Party.findById(partyId).populate('songs.songId');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Only allow for remote parties
+        if (party.type !== 'remote') {
+            return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
+        }
+
+        // Find current playing song
+        const currentPlayingIndex = party.songs.findIndex(song => song.status === 'playing');
+        if (currentPlayingIndex === -1) {
+            return res.status(400).json({ error: 'No song currently playing' });
+        }
+
+        // Mark current song as played
+        party.songs[currentPlayingIndex].status = 'played';
+        party.songs[currentPlayingIndex].completedAt = new Date();
+
+        // Find next queued song
+        const nextQueuedIndex = party.songs.findIndex((song, index) => 
+            index > currentPlayingIndex && song.status === 'queued'
+        );
+
+        if (nextQueuedIndex !== -1) {
+            // Mark next song as playing
+            party.songs[nextQueuedIndex].status = 'playing';
+            party.songs[nextQueuedIndex].playedAt = new Date();
+        }
+
+        await party.save();
+
+        res.json({ 
+            success: true, 
+            message: 'Skipped to next song',
+            currentSong: nextQueuedIndex !== -1 ? party.songs[nextQueuedIndex] : null
+        });
+
+    } catch (error) {
+        console.error('Error skipping to next song:', error);
+        res.status(500).json({ error: 'Failed to skip to next song' });
+    }
+});
+
+// Skip to previous song (remote parties only)
+router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const userId = req.user._id;
+
+        const party = await Party.findById(partyId).populate('songs.songId');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Only allow for remote parties
+        if (party.type !== 'remote') {
+            return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
+        }
+
+        // Find current playing song
+        const currentPlayingIndex = party.songs.findIndex(song => song.status === 'playing');
+        if (currentPlayingIndex === -1) {
+            return res.status(400).json({ error: 'No song currently playing' });
+        }
+
+        // Find previous played song
+        const previousPlayedIndex = party.songs.findIndex((song, index) => 
+            index < currentPlayingIndex && song.status === 'played'
+        );
+
+        if (previousPlayedIndex !== -1) {
+            // Mark current song as queued
+            party.songs[currentPlayingIndex].status = 'queued';
+            party.songs[currentPlayingIndex].playedAt = undefined;
+
+            // Mark previous song as playing
+            party.songs[previousPlayedIndex].status = 'playing';
+            party.songs[previousPlayedIndex].completedAt = undefined;
+        }
+
+        await party.save();
+
+        res.json({ 
+            success: true, 
+            message: 'Skipped to previous song',
+            currentSong: previousPlayedIndex !== -1 ? party.songs[previousPlayedIndex] : null
+        });
+
+    } catch (error) {
+        console.error('Error skipping to previous song:', error);
+        res.status(500).json({ error: 'Failed to skip to previous song' });
+    }
+});
+
 // End a party (host only)
 router.post('/:partyId/end', authMiddleware, async (req, res) => {
     try {

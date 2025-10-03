@@ -216,6 +216,16 @@ export const partyAPI = {
     const response = await api.post(`/parties/${partyId}/end`);
     return response.data;
   },
+  
+  skipNext: async (partyId: string) => {
+    const response = await api.post(`/parties/${partyId}/skip-next`);
+    return response.data;
+  },
+  
+  skipPrevious: async (partyId: string) => {
+    const response = await api.post(`/parties/${partyId}/skip-previous`);
+    return response.data;
+  },
 };
 
 // Song API

@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -78,9 +78,13 @@ const Party: React.FC = () => {
     currentPartyId,
   } = useWebPlayerStore();
 
+  // Only use WebSocket for live parties
+  const shouldUseWebSocket = party?.type === 'live';
+  
   const { sendMessage } = useWebSocket({
     partyId: partyId || '',
     userId: user?._id,
+    enabled: shouldUseWebSocket,
     onMessage: (message: WebSocketMessage) => {
       console.log('WebSocket message received:', message);
       
@@ -203,6 +207,17 @@ const Party: React.FC = () => {
       fetchPartyDetails();
     }
   }, [partyId]);
+
+  // Periodic refresh for remote parties (no WebSocket)
+  useEffect(() => {
+    if (party?.type === 'remote' && partyId) {
+      const interval = setInterval(() => {
+        fetchPartyDetails();
+      }, 5000); // Refresh every 5 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [party?.type, partyId]);
 
   // Set current song and host status when party loads
   useEffect(() => {
@@ -442,6 +457,34 @@ const Party: React.FC = () => {
     }
   };
 
+  const handleSkipNext = async () => {
+    if (!partyId) return;
+    
+    try {
+      await partyAPI.skipNext(partyId);
+      toast.success('Skipped to next song');
+      // Refresh party data to show updated queue
+      await fetchPartyDetails();
+    } catch (error: any) {
+      console.error('Error skipping to next song:', error);
+      toast.error(error.response?.data?.error || 'Failed to skip to next song');
+    }
+  };
+
+  const handleSkipPrevious = async () => {
+    if (!partyId) return;
+    
+    try {
+      await partyAPI.skipPrevious(partyId);
+      toast.success('Skipped to previous song');
+      // Refresh party data to show updated queue
+      await fetchPartyDetails();
+    } catch (error: any) {
+      console.error('Error skipping to previous song:', error);
+      toast.error(error.response?.data?.error || 'Failed to skip to previous song');
+    }
+  };
+
 
 
   const formatDuration = (duration: number | string | undefined) => {
@@ -600,16 +643,18 @@ const Party: React.FC = () => {
           >
             Add Songs
           </button>
-          <button 
-            onClick={() => {
-              const element = document.getElementById('previously-played');
-              element?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="px-4 py-2 shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium" 
-            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-          >
-            Previously Played
-          </button>
+          {party.type === 'live' && (
+            <button 
+              onClick={() => {
+                const element = document.getElementById('previously-played');
+                element?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-4 py-2 shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium" 
+              style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
+            >
+              Previously Played
+            </button>
+          )}
         </div>
 
         {/* Wallet Balance */}
@@ -727,6 +772,27 @@ const Party: React.FC = () => {
                                   </div>
                                 )}
                               </div>
+                              
+                              {/* Skip buttons for remote parties */}
+                              {party.type === 'remote' && (
+                                <div className="flex flex-col space-y-2">
+                                  <button
+                                    onClick={handleSkipPrevious}
+                                    className="p-2 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors"
+                                    title="Skip to previous song"
+                                  >
+                                    <SkipBack className="h-4 w-4 text-white" />
+                                  </button>
+                                  <button
+                                    onClick={handleSkipNext}
+                                    className="p-2 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors"
+                                    title="Skip to next song"
+                                  >
+                                    <SkipForward className="h-4 w-4 text-white" />
+                                  </button>
+                                </div>
+                              )}
+                              
                               <div className="text-right">
                                 <p className="text-sm font-medium text-white">
                                   £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
@@ -914,8 +980,8 @@ const Party: React.FC = () => {
               </div>
             )}
 
-            {/* Previously Played Songs */}
-            {party.songs.filter((song: any) => song.status === 'played').length > 0 && (
+            {/* Previously Played Songs - Only show for live parties */}
+            {party.type === 'live' && party.songs.filter((song: any) => song.status === 'played').length > 0 && (
               <div id="previously-played" className="mt-8">
                 <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
                   <CheckCircle className="h-5 w-5 mr-2" />

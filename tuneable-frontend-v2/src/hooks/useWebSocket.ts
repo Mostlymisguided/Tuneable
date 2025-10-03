@@ -17,6 +17,7 @@ interface WebSocketMessage {
 interface UseWebSocketOptions {
   partyId: string;
   userId?: string;
+  enabled?: boolean;
   onMessage?: (message: WebSocketMessage) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -25,6 +26,7 @@ interface UseWebSocketOptions {
 export const useWebSocket = ({
   partyId,
   userId,
+  enabled = true,
   onMessage,
   onConnect,
   onDisconnect,
@@ -110,14 +112,16 @@ export const useWebSocket = ({
   };
 
   useEffect(() => {
-    if (partyId) {
+    if (partyId && enabled) {
       connect();
+    } else if (!enabled) {
+      disconnect();
     }
 
     return () => {
       disconnect();
     };
-  }, [partyId]);
+  }, [partyId, enabled]);
 
   return {
     isConnected,
