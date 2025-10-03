@@ -25,7 +25,8 @@
     "stripe": "^14.7.0",
     "googleapis": "^128.0.0",
     "xml2js": "^0.6.2",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
