@@ -90,7 +90,8 @@ export interface Party {
   startTime: string;
   musicSource: 'youtube' | 'spotify' | 'direct_upload';
   endTime?: string;
-  type: 'public' | 'private' | 'geocoded';
+  privacy: 'public' | 'private';
+  type: 'remote' | 'live';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   minimumBid: number;

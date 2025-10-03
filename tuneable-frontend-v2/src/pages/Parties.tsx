@@ -17,7 +17,8 @@ interface PartyType {
   songs: any[];
   startTime: string;
   endTime?: string;
-  type: 'public' | 'private' | 'geocoded';
+  privacy: 'public' | 'private';
+  type: 'remote' | 'live';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   createdAt: string;

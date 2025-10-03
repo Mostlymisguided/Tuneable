@@ -40,7 +40,7 @@ router.post('/', authMiddleware, async (req, res) => {
       console.log('🔥 Create Party Request Received:', req.body);
       console.log('🔑 Authenticated User:', req.user);
   
-      const { name, location, startTime, type, musicSource, minimumBid } = req.body;
+      const { name, location, startTime, privacy, type, musicSource, minimumBid } = req.body;
   
       if (!name ) {
         console.log('❌ Missing Name');
@@ -71,7 +71,8 @@ router.post('/', authMiddleware, async (req, res) => {
         songs: [],
         bids: [],
         startTime: startTime || new Date(), // Use provided startTime or current time for automatic
-        type: type || 'public',
+        privacy: privacy || 'public',
+        type: type || 'remote',
         status: startTime ? 'scheduled' : 'active', // If no startTime provided, party starts immediately
         musicSource: musicSource || 'youtube',
         minimumBid: minimumBid || 0.33,
@@ -99,11 +100,11 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
         const party = await Party.findById(partyId);
         if (!party) return res.status(404).json({ message: "Party not found" });
 
-        if (party.type === "private" && party.inviteCode !== inviteCode) {
+        if (party.privacy === "private" && party.inviteCode !== inviteCode) {
             return res.status(403).json({ message: "Invalid invite code" });
         }
 
-        if (party.type === "geocoded") {
+        if (party.type === "live") {
             const distance = calculateDistance(location, party.location);
             if (distance > party.allowedRadius) {
                 return res.status(403).json({ message: "You're too far away to join" });

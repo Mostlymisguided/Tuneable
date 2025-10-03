@@ -70,10 +70,15 @@ const PartySchema = new mongoose.Schema({
   ],
   startTime:{ type: Date, default: Date.now },
   endTime: { type: Date, default: null},
+  privacy: {
+    type: String,
+    enum: ['public', 'private'],
+    default: 'public',
+  },
   type: {
     type: String,
-    enum: ['public', 'private', 'geocoded'],
-    default: 'public',
+    enum: ['remote', 'live'],
+    default: 'remote',
   },
   status: {
     type: String,
