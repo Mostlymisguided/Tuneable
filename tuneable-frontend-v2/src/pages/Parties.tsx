@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { useAuth } from '../contexts/AuthContext';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import { Music, Users, MapPin, Clock } from 'lucide-react';
 
@@ -29,6 +30,7 @@ const Parties: React.FC = () => {
   const [parties, setParties] = useState<PartyType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
   const { currentPartyId } = useWebPlayerStore();
 
