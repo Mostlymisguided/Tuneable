@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, RefreshCw } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -208,16 +208,8 @@ const Party: React.FC = () => {
     }
   }, [partyId]);
 
-  // Periodic refresh for remote parties (no WebSocket)
-  useEffect(() => {
-    if (party?.type === 'remote' && partyId) {
-      const interval = setInterval(() => {
-        fetchPartyDetails();
-      }, 5000); // Refresh every 5 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [party?.type, partyId]);
+  // Manual refresh only for remote parties (no automatic polling)
+  // Remote parties will refresh on user actions (bids, adds, skips) and manual refresh button
 
   // Set current song and host status when party loads
   useEffect(() => {
@@ -485,6 +477,18 @@ const Party: React.FC = () => {
     }
   };
 
+  const handleManualRefresh = async () => {
+    if (!partyId) return;
+    
+    try {
+      await fetchPartyDetails();
+      toast.success('Queue refreshed');
+    } catch (error: any) {
+      console.error('Error refreshing party:', error);
+      toast.error('Failed to refresh queue');
+    }
+  };
+
 
 
   const formatDuration = (duration: number | string | undefined) => {
@@ -643,6 +647,18 @@ const Party: React.FC = () => {
           >
             Add Songs
           </button>
+          
+          {/* Manual refresh button for remote parties */}
+          {party.type === 'remote' && (
+            <button 
+              onClick={handleManualRefresh}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center space-x-2"
+              title="Refresh queue"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh</span>
+            </button>
+          )}
           {party.type === 'live' && (
             <button 
               onClick={() => {
