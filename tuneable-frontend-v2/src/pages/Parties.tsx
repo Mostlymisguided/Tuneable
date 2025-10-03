@@ -53,7 +53,7 @@ const Parties: React.FC = () => {
     fetchParties();
   }, []);
 
-  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string, partyHost: any) => {
+  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string, partyHost: any, partyAttendees: any[]) => {
     try {
       // Check if this is a different party than the current one
       const isDifferentParty = currentPartyId && currentPartyId !== partyId;
@@ -61,18 +61,18 @@ const Parties: React.FC = () => {
       if (isDifferentParty) {
         showWarning(
           `join "${partyName}"`,
-          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost)
+          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost, partyAttendees)
         );
       } else {
         // Same party or no current party, join directly
-        await joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost);
+        await joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost, partyAttendees);
       }
     } catch (error) {
       console.error('Error joining party:', error);
     }
   };
 
-  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string, partyHost: any) => {
+  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string, partyHost: any, partyAttendees: any[]) => {
     try {
       // Check if current user is the host
       const currentUserId = user?._id;
@@ -81,8 +81,24 @@ const Parties: React.FC = () => {
         (typeof partyHost === 'object' && partyHost._id === currentUserId)
       );
 
+      // Check if user is already an attendee
+      const isAlreadyAttendee = partyAttendees.some(attendee => {
+        if (typeof attendee === 'string') {
+          return attendee === currentUserId;
+        } else if (typeof attendee === 'object' && attendee._id) {
+          return attendee._id === currentUserId;
+        }
+        return false;
+      });
+
+      // If user is already an attendee, just navigate without calling join API
+      if (isAlreadyAttendee) {
+        navigate(`/party/${partyId}`);
+        return;
+      }
+
       if (partyPrivacy === 'private' && !isHost) {
-        // Prompt for party code (only if not host)
+        // Prompt for party code (only if not host and not already attendee)
         const inviteCode = prompt('This is a private party. Please enter the party code:');
         if (!inviteCode) {
           return; // User cancelled
@@ -199,7 +215,7 @@ const Parties: React.FC = () => {
                   Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
                 <button
-                  onClick={() => handleJoinParty(party._id, party.name, party.privacy, party.host)}
+                  onClick={() => handleJoinParty(party._id, party.name, party.privacy, party.host, party.attendees)}
                   className="btn-primary text-sm"
                 >
                   Join Party
