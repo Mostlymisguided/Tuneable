@@ -13,9 +13,7 @@ const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 require('dotenv').config(); // Load .env variables
 
-//const { What3words } = require('@what3words/api');
-
-//const w3w = new What3words({ apiKey: process.env.WHAT3WORDS_API_KEY });
+// What3words functionality removed for now
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 // Centralized error handler
@@ -261,27 +259,27 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     }
 });
 
-// What3words: Convert lat/lon to a 3-word address
-router.post('/convert-to-3wa', async (req, res) => {
-    const { lat, lon } = req.body;
-    try {
-        const response = await w3w.convertTo3wa({ lat, lon });
-        res.json({ what3words: response.words });
-    } catch (error) {
-        handleError(res, error, 'Error converting to What3words');
-    }
-});
+// What3words functionality removed for now
+// router.post('/convert-to-3wa', async (req, res) => {
+//     const { lat, lon } = req.body;
+//     try {
+//         const response = await w3w.convertTo3wa({ lat, lon });
+//         res.json({ what3words: response.words });
+//     } catch (error) {
+//         handleError(res, error, 'Error converting to What3words');
+//     }
+// });
 
-// What3words: Convert 3-word address to lat/lon
-router.post('/convert-to-coordinates', async (req, res) => {
-    const { words } = req.body;
-    try {
-        const response = await w3w.convertToCoordinates({ words });
-        res.json({ lat: response.coordinates.lat, lon: response.coordinates.lng });
-    } catch (error) {
-        handleError(res, error, 'Error converting from What3words');
-    }
-});
+// What3words functionality removed for now
+// router.post('/convert-to-coordinates', async (req, res) => {
+//     const { words } = req.body;
+//     try {
+//         const response = await w3w.convertToCoordinates({ words });
+//         res.json({ lat: response.coordinates.lat, lon: response.coordinates.lng });
+//     } catch (error) {
+//         handleError(res, error, 'Error converting from What3words');
+//     }
+// });
 
 // Google Maps: Convert address to lat/lon
 router.post('/geocode-address', async (req, res) => {

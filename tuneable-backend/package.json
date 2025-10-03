@@ -23,7 +23,6 @@
     "multer": "^1.4.5-lts.1",
     "axios": "^1.6.2",
     "stripe": "^14.7.0",
-    "what3words": "^1.0.3",
     "googleapis": "^128.0.0",
     "xml2js": "^0.6.2",
     "node-cron": "^3.0.3"
