@@ -101,16 +101,20 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
         const party = await Party.findById(partyId);
         if (!party) return res.status(404).json({ message: "Party not found" });
 
-        if (party.privacy === "private" && party.partyCode !== inviteCode) {
+        // Check if user is the host (host can always join without code)
+        const isHost = party.host.toString() === userId.toString();
+        
+        if (party.privacy === "private" && !isHost && party.partyCode !== inviteCode) {
             return res.status(403).json({ message: "Invalid invite code" });
         }
 
-        if (party.type === "live") {
-            const distance = calculateDistance(location, party.location);
-            if (distance > party.allowedRadius) {
-                return res.status(403).json({ message: "You're too far away to join" });
-            }
-        }
+        // TODO: Implement geocoding logic for live parties
+        // if (party.type === "live") {
+        //     const distance = calculateDistance(location, party.location);
+        //     if (distance > party.allowedRadius) {
+        //         return res.status(403).json({ message: "You're too far away to join" });
+        //     }
+        // }
 
         if (!party.attendees.includes(userId)) {
             party.attendees.push(userId);

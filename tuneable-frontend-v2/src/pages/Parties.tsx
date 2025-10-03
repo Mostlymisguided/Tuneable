@@ -51,7 +51,7 @@ const Parties: React.FC = () => {
     fetchParties();
   }, []);
 
-  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string) => {
+  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string, partyHost: any) => {
     try {
       // Check if this is a different party than the current one
       const isDifferentParty = currentPartyId && currentPartyId !== partyId;
@@ -59,21 +59,28 @@ const Parties: React.FC = () => {
       if (isDifferentParty) {
         showWarning(
           `join "${partyName}"`,
-          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy)
+          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost)
         );
       } else {
         // Same party or no current party, join directly
-        await joinPartyWithPrivacyCheck(partyId, partyPrivacy);
+        await joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost);
       }
     } catch (error) {
       console.error('Error joining party:', error);
     }
   };
 
-  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string) => {
+  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string, partyHost: any) => {
     try {
-      if (partyPrivacy === 'private') {
-        // Prompt for party code
+      // Check if current user is the host
+      const currentUserId = user?._id;
+      const isHost = partyHost && (
+        (typeof partyHost === 'string' && partyHost === currentUserId) ||
+        (typeof partyHost === 'object' && partyHost._id === currentUserId)
+      );
+
+      if (partyPrivacy === 'private' && !isHost) {
+        // Prompt for party code (only if not host)
         const inviteCode = prompt('This is a private party. Please enter the party code:');
         if (!inviteCode) {
           return; // User cancelled
@@ -82,7 +89,7 @@ const Parties: React.FC = () => {
         // Call join API with invite code
         await partyAPI.joinParty(partyId, inviteCode);
       } else {
-        // Public party, join without invite code
+        // Public party or host joining, join without invite code
         await partyAPI.joinParty(partyId);
       }
       
@@ -190,7 +197,7 @@ const Parties: React.FC = () => {
                   Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
                 <button
-                  onClick={() => handleJoinParty(party._id, party.name, party.privacy)}
+                  onClick={() => handleJoinParty(party._id, party.name, party.privacy, party.host)}
                   className="btn-primary text-sm"
                 >
                   Join Party
