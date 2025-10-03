@@ -324,7 +324,11 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        if (user.balance < bidAmount) {
+        // Convert to pence to avoid floating point precision issues
+        const userBalancePence = Math.round(user.balance * 100);
+        const bidAmountPence = Math.round(bidAmount * 100);
+
+        if (userBalancePence < bidAmountPence) {
             return res.status(400).json({ 
                 error: 'Insufficient funds', 
                 currentBalance: user.balance,
@@ -382,8 +386,8 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                 });
                 await bid.save();
 
-                // ✅ Deduct bid amount from user balance
-                user.balance -= bidAmount;
+                // ✅ Deduct bid amount from user balance (using pence to avoid floating point issues)
+                user.balance = (userBalancePence - bidAmountPence) / 100;
                 await user.save();
 
                 // Update the song with bid info
@@ -491,8 +495,8 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
                 });
                 await bid.save();
 
-                // ✅ Deduct bid amount from user balance
-                user.balance -= bidAmount;
+                // ✅ Deduct bid amount from user balance (using pence to avoid floating point issues)
+                user.balance = (userBalancePence - bidAmountPence) / 100;
                 await user.save();
 
                 // Update the song with bid info
@@ -539,8 +543,8 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
         });
         await bid.save();
 
-        // ✅ Deduct bid amount from user balance
-        user.balance -= bidAmount;
+        // ✅ Deduct bid amount from user balance (using pence to avoid floating point issues)
+        user.balance = (userBalancePence - bidAmountPence) / 100;
         await user.save();
 
         // ✅ Update the song with bid info
@@ -595,7 +599,11 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        if (user.balance < bidAmount) {
+        // Convert to pence to avoid floating point precision issues
+        const userBalancePence = Math.round(user.balance * 100);
+        const bidAmountPence = Math.round(bidAmount * 100);
+
+        if (userBalancePence < bidAmountPence) {
             return res.status(400).json({ 
                 error: 'Insufficient funds', 
                 currentBalance: user.balance,
@@ -718,8 +726,8 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
         });
         await bid.save();
 
-        // ✅ Deduct bid amount from user balance
-        user.balance -= bidAmount;
+        // ✅ Deduct bid amount from user balance (using pence to avoid floating point issues)
+        user.balance = (userBalancePence - bidAmountPence) / 100;
         await user.save();
 
         // ✅ Update GLOBAL song bid info (for analytics)
