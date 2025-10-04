@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { v7: uuidv7 } = require('uuid');
+const { uuidv7 } = require('uuidv7');
 
 const PartySchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
