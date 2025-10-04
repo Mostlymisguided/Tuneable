@@ -146,7 +146,7 @@ const SearchPage: React.FC = () => {
             const podcastData = await podcastResponse.json();
             // Convert podcast episodes to search result format
             const podcastResults = podcastData.episodes.map((episode: any) => ({
-              id: episode._id,
+              id: episode.id,
               title: episode.title,
               artist: episode.podcastTitle,
               coverArt: episode.podcastImage,
@@ -618,7 +618,7 @@ const SearchPage: React.FC = () => {
               if (song.isPodcast) {
                 // Use EpisodeCard for podcast episodes
                 const episode = {
-                  _id: song.id,
+                  id: song.id,
                   title: song.title,
                   description: song.description || '',
                   podcastTitle: song.artist,

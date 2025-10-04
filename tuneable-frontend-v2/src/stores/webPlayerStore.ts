@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface Song {
-  _id: string;
+  id: string;
   title: string;
   artist: string;
   duration: number;
@@ -185,7 +185,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       
       removeFromQueue: (songId) => {
         set((state) => ({
-          queue: state.queue.filter(song => song._id !== songId)
+          queue: state.queue.filter(song => song.id !== songId)
         }));
       },
       

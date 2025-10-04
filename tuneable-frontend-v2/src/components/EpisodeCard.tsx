@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 
 interface Episode {
-  _id: string;
+  id: string;
   title: string;
   description: string;
   podcastTitle: string;
@@ -64,7 +64,7 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
 
     setIsBoosting(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/${episode._id}/boost`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/${episode.id}/boost`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

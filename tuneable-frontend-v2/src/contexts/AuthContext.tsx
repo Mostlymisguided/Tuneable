@@ -3,7 +3,7 @@ import { authAPI } from '../lib/api';
 
 // Define types directly to avoid import issues
 interface User {
-  _id: string;
+  id: string;
   username: string;
   email: string;
   profilePic?: string;

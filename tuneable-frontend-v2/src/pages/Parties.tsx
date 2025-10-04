@@ -9,12 +9,12 @@ import { Music, Users, MapPin, Clock } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartyType {
-  _id: string;
+  id: string;
   name: string;
   location: string;
-  host: string | { _id: string; username: string; userId: string; id: string };
+  host: string | { id: string; username: string; userId: string; _id: string };
   partyCode: string;
-  attendees: (string | { _id: string; username: string; userId: string; id: string })[];
+  attendees: (string | { id: string; username: string; userId: string; _id: string })[];
   songs: any[];
   startTime: string;
   endTime?: string;
@@ -75,18 +75,18 @@ const Parties: React.FC = () => {
   const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string, partyHost: any, partyAttendees: any[]) => {
     try {
       // Check if current user is the host
-      const currentUserId = user?._id;
+      const currentUserId = user?.id;
       const isHost = partyHost && (
         (typeof partyHost === 'string' && partyHost === currentUserId) ||
-        (typeof partyHost === 'object' && partyHost._id === currentUserId)
+        (typeof partyHost === 'object' && partyHost.id === currentUserId)
       );
 
       // Check if user is already an attendee
       const isAlreadyAttendee = partyAttendees.some(attendee => {
         if (typeof attendee === 'string') {
           return attendee === currentUserId;
-        } else if (typeof attendee === 'object' && attendee._id) {
-          return attendee._id === currentUserId;
+        } else if (typeof attendee === 'object' && attendee.id) {
+          return attendee.id === currentUserId;
         }
         return false;
       });
@@ -181,7 +181,7 @@ const Parties: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {parties.map((party) => (
-            <div key={party._id} className="card hover:shadow-md transition-shadow">
+            <div key={party.id} className="card hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">{party.name}</h3>
                 <span 
@@ -215,7 +215,7 @@ const Parties: React.FC = () => {
                   Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
                 <button
-                  onClick={() => handleJoinParty(party._id, party.name, party.privacy, party.host, party.attendees)}
+                  onClick={() => handleJoinParty(party.id, party.name, party.privacy, party.host, party.attendees)}
                   className="btn-primary text-sm"
                 >
                   Join Party

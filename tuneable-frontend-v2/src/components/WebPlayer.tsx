@@ -157,9 +157,9 @@ const WebPlayer: React.FC<WebPlayerProps> = ({
                   console.log('Song started playing in WebPlayer');
                 } else if (event.data === window.YT.PlayerState.ENDED) {
                   // Notify backend that song completed
-                  if (partyId && currentSong?._id && isHost) {
+                  if (partyId && currentSong?.id && isHost) {
                     console.log('Notifying backend that song completed');
-                    partyAPI.completeSong(partyId, currentSong._id)
+                    partyAPI.completeSong(partyId, currentSong.id)
                       .then(() => {
                         console.log('Song completion confirmed, advancing to next song');
                         onNext();

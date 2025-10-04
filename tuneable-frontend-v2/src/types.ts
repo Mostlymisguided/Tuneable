@@ -1,6 +1,6 @@
 // Simple types file to avoid module resolution issues
 export interface User {
-  _id: string;
+  id: string;
   username: string;
   email: string;
   profilePic?: string;
@@ -33,7 +33,7 @@ export interface RegisterData {
 }
 
 export interface Song {
-  _id: string;
+  id: string;
   title: string;
   artist: string;
   producer?: string;
@@ -65,7 +65,7 @@ export interface SearchResult {
 }
 
 export interface Bid {
-  _id: string;
+  id: string;
   userId: string;
   partyId: string;
   songId: string;
@@ -80,7 +80,7 @@ export interface PartySong {
 }
 
 export interface Party {
-  _id: string;
+  id: string;
   name: string;
   location: string;
   host: string;

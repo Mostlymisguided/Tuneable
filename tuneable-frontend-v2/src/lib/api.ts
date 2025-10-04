@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Define types directly to avoid import issues
 interface User {
-  _id: string;
+  id: string;
   username: string;
   email: string;
   profilePic?: string;
@@ -21,12 +21,12 @@ interface User {
 }
 
 interface Party {
-  _id: string;
+  id: string;
   name: string;
   location: string;
-  host: string | { _id: string; username: string; userId: string; id: string };
+  host: string | { id: string; username: string; userId: string; _id: string };
   partyCode: string;
-  attendees: (string | { _id: string; username: string; userId: string; id: string })[];
+  attendees: (string | { id: string; username: string; userId: string; _id: string })[];
   songs: PartySong[];
   startTime: string;
   endTime?: string;

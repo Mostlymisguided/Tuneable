@@ -74,7 +74,7 @@ const CreateParty: React.FC = () => {
 
       const response = await partyAPI.createParty(partyData);
       toast.success('Party created successfully!');
-      navigate(`/party/${response.party._id}`);
+      navigate(`/party/${response.party.id}`);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create party');
     } finally {

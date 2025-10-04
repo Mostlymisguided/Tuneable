@@ -83,7 +83,7 @@ const Party: React.FC = () => {
   
   const { sendMessage } = useWebSocket({
     partyId: partyId || '',
-    userId: user?._id,
+    userId: user?.id,
     enabled: shouldUseWebSocket,
     onMessage: (message: WebSocketMessage) => {
       console.log('WebSocket message received:', message);
@@ -115,7 +115,7 @@ const Party: React.FC = () => {
                 ...prev,
                 songs: prev.songs.map((song: any) => {
                   const songData = song.songId || song;
-                  if (songData._id === message.songId) {
+                  if (songData.id === message.songId) {
                     return {
                       ...song,
                       status: 'playing',
@@ -143,7 +143,7 @@ const Party: React.FC = () => {
                 ...prev,
                 songs: prev.songs.map((song: any) => {
                   const songData = song.songId || song;
-                  if (songData._id === message.songId) {
+                  if (songData.id === message.songId) {
                     console.log('Found song to mark as played:', songData.title);
                     return {
                       ...song,
@@ -167,7 +167,7 @@ const Party: React.FC = () => {
                 ...prev,
                 songs: prev.songs.map((song: any) => {
                   const songData = song.songId || song;
-                  if (songData._id === message.songId) {
+                  if (songData.id === message.songId) {
                     return {
                       ...song,
                       status: 'vetoed',
@@ -254,7 +254,7 @@ const Party: React.FC = () => {
           }
           
           return {
-            _id: actualSong._id,
+            id: actualSong.id,
             title: actualSong.title,
             artist: actualSong.artist,
             duration: actualSong.duration,
@@ -282,8 +282,8 @@ const Party: React.FC = () => {
     }
     
     if (user && party) {
-      const hostId = typeof party.host === 'string' ? party.host : party.host._id;
-      setIsHost(user._id === hostId);
+      const hostId = typeof party.host === 'string' ? party.host : party.host.id;
+      setIsHost(user.id === hostId);
     }
   }, [party, user, partyId, currentPartyId, setQueue, setCurrentSong, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
@@ -298,8 +298,8 @@ const Party: React.FC = () => {
       setParty(response.party);
       
       // Check if current user is the host
-      const hostId = typeof response.party.host === 'object' ? response.party.host._id : response.party.host;
-      setIsHost(user?._id === hostId);
+      const hostId = typeof response.party.host === 'object' ? response.party.host.id : response.party.host;
+      setIsHost(user?.id === hostId);
       
       // Note: Song setting is now handled by the useEffect hook
       // to prevent interference with global player state
@@ -348,7 +348,7 @@ const Party: React.FC = () => {
 
     try {
       // Remove the song from the party
-      await partyAPI.removeSong(partyId!, song._id);
+      await partyAPI.removeSong(partyId!, song.id);
       toast.success('Song vetoed and removed from queue');
     } catch (error) {
       console.error('Error vetoing song:', error);
@@ -738,7 +738,7 @@ const Party: React.FC = () => {
                           const songData = song.songId || song;
                           return (
                             <div
-                              key={`playing-${songData._id}-${index}`}
+                              key={`playing-${songData.id}-${index}`}
                               className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
                             >
                               <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
@@ -833,7 +833,7 @@ const Party: React.FC = () => {
                         const songData = song.songId || song;
                         return (
                           <div
-                            key={`queued-${songData._id}-${index}`}
+                            key={`queued-${songData.id}-${index}`}
                             className="bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
                           >
                             {/* Number Badge */}
@@ -875,7 +875,7 @@ const Party: React.FC = () => {
                                   }
                                   if (typeof songData.addedBy === 'string') {
                                     // If it's a string, it might be an ObjectId, try to find the user
-                                    const user = party.attendees.find((attendee: any) => attendee._id === songData.addedBy);
+                                    const user = party.attendees.find((attendee: any) => attendee.id === songData.addedBy);
                                     return user?.username || user?.name || 'Unknown';
                                   }
                                   return 'Unknown';
@@ -958,7 +958,7 @@ const Party: React.FC = () => {
                           const songData = song.songId || song;
                           return (
                             <div
-                              key={`vetoed-${songData._id}-${index}`}
+                              key={`vetoed-${songData.id}-${index}`}
                               className="flex items-center space-x-3 p-2 rounded-lg bg-red-900/20 border border-red-800/30"
                             >
                               <X className="h-4 w-4 text-red-400 flex-shrink-0" />
@@ -1010,7 +1010,7 @@ const Party: React.FC = () => {
                       const songData = song.songId || song;
                       return (
                         <div
-                          key={`played-${songData._id}-${index}`}
+                          key={`played-${songData.id}-${index}`}
                           className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700"
                         >
                           <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
@@ -1049,16 +1049,16 @@ const Party: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendees</h3>
             <div className="space-y-2">
               {party.attendees.map((attendee: any) => {
-                const hostId = typeof party.host === 'string' ? party.host : party.host?._id;
+                const hostId = typeof party.host === 'string' ? party.host : party.host?.id;
                 return (
-                  <div key={attendee._id} className="flex items-center space-x-3">
+                  <div key={attendee.id} className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-600">
                         {attendee.username?.charAt(0).toUpperCase() || '?'}
                       </span>
                     </div>
                     <span className="text-sm text-gray-900">{attendee.username || 'Unknown User'}</span>
-                    {attendee._id === hostId && (
+                    {attendee.id === hostId && (
                       <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                         Host
                       </span>

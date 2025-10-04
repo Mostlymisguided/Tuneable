@@ -3,7 +3,7 @@ import { topTunesAPI } from '../lib/api';
 import { ArrowUpDown, Music } from 'lucide-react';
 
 interface TopTunesSong {
-  _id: string;
+  id: string;
   title: string;
   artist: string;
   duration: number;
@@ -137,7 +137,7 @@ const TopTunes: React.FC = () => {
                   </tr>
                 ) : (
                   songs.map((song, index) => (
-                    <tr key={song._id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={song.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {index + 1}
                       </td>

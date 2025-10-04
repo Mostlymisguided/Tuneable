@@ -60,7 +60,7 @@ const PersistentWebPlayer: React.FC = () => {
                 const mappedSongs = queuedSongs.map((song: any) => {
                   const actualSong = song.songId || song;
                   return {
-                    _id: actualSong._id,
+                    id: actualSong.id,
                     title: actualSong.title,
                     artist: actualSong.artist,
                     duration: actualSong.duration,
@@ -278,9 +278,9 @@ const PersistentWebPlayer: React.FC = () => {
                   console.log('Song started playing in WebPlayer');
                 } else if (event.data === window.YT.PlayerState.ENDED) {
                   // Notify backend that song completed
-                  if (currentPartyId && currentSong?._id && isHost) {
+                  if (currentPartyId && currentSong?.id && isHost) {
                     console.log('Notifying backend that song completed');
-                    partyAPI.completeSong(currentPartyId, currentSong._id)
+                    partyAPI.completeSong(currentPartyId, currentSong.id)
                       .then(() => {
                         console.log('Song completion confirmed, advancing to next song');
                         next();
@@ -742,7 +742,7 @@ const PersistentWebPlayer: React.FC = () => {
     if (!currentSong || !currentPartyId || !isHost) return;
     
     try {
-      await partyAPI.removeSong(currentPartyId, currentSong._id);
+      await partyAPI.removeSong(currentPartyId, currentSong.id);
       console.log('Song vetoed successfully');
       // The song will be removed from the queue and next song will start automatically
     } catch (error) {
