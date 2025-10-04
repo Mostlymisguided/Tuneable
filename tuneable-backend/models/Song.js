@@ -61,7 +61,6 @@ songSchema.pre('save', function (next) {
 });
 
 // Indexes for performance
-songSchema.index({ uuid: 1 });
 songSchema.index({ "sources.youtube": 1 });
 songSchema.index({ "sources.spotify": 1 });
 songSchema.index({ globalBidValue: -1 });

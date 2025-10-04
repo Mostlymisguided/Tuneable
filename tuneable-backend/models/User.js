@@ -82,7 +82,6 @@ userSchema.statics.findByEmail = async function(email) {
 };
 
 // Indexes
-userSchema.index({ uuid: 1 });
 
 //comment to check debug restart
 

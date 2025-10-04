@@ -56,7 +56,6 @@ bidSchema.pre('validate', function(next) {
 });
 
 // Indexes
-bidSchema.index({ uuid: 1 });
 bidSchema.index({ userId: 1 });
 bidSchema.index({ partyId: 1 });
 bidSchema.index({ songId: 1 });

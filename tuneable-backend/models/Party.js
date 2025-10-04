@@ -173,7 +173,6 @@ PartySchema
   .pre('findById', autoPopulateSongs);
 
 // Add indexes for performance
-PartySchema.index({ uuid: 1 });
 PartySchema.index({ host: 1 });
 PartySchema.index({ attendees: 1 });
 
