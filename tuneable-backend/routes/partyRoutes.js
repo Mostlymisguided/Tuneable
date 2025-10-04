@@ -351,6 +351,19 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
             return res.status(404).json({ error: 'Party not found' });
         }
 
+        // ✅ Ensure all existing songs have contentType set (migration for old data)
+        let needsSave = false;
+        for (const songEntry of party.songs) {
+            if (!songEntry.contentType) {
+                songEntry.contentType = 'song'; // Default to 'song' for existing entries
+                needsSave = true;
+            }
+        }
+        if (needsSave) {
+            await party.save();
+            console.log("✅ Migrated existing songs to include contentType (songs/bid)");
+        }
+
         let song;
         if (songId && mongoose.isValidObjectId(songId)) {
             // ✅ Check if song exists in DB (only if songId is a valid MongoDB ObjectId)
@@ -666,6 +679,19 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
         const party = await Party.findById(partyId).populate('songs.songId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // ✅ Ensure all existing songs have contentType set (migration for old data)
+        let needsSave = false;
+        for (const songEntry of party.songs) {
+            if (!songEntry.contentType) {
+                songEntry.contentType = 'song'; // Default to 'song' for existing entries
+                needsSave = true;
+            }
+        }
+        if (needsSave) {
+            await party.save();
+            console.log("✅ Migrated existing songs to include contentType");
         }
 
         // ✅ Check minimum bid for songcardbid (initial song additions)
