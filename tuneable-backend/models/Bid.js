@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const { v7: uuidv7 } = require('uuid');
 
 const bidSchema = new mongoose.Schema({
+  uuid: { type: String, unique: true, default: uuidv7 },
     userId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'User', 
@@ -21,6 +23,11 @@ const bidSchema = new mongoose.Schema({
         ref: 'PodcastEpisode', 
         required: false 
     },
+    // UUID references for external API usage
+    user_uuid: { type: String },
+    party_uuid: { type: String },
+    song_uuid: { type: String },
+    episode_uuid: { type: String },
     amount: { 
         type: Number, 
         required: true, 
@@ -49,6 +56,7 @@ bidSchema.pre('validate', function(next) {
 });
 
 // Indexes
+bidSchema.index({ uuid: 1 });
 bidSchema.index({ userId: 1 });
 bidSchema.index({ partyId: 1 });
 bidSchema.index({ songId: 1 });

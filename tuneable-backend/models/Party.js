@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const { v7: uuidv7 } = require('uuid');
 
 const PartySchema = new mongoose.Schema({
+  uuid: { type: String, unique: true, default: uuidv7 },
   name: {
     type: String,
     required: true,
@@ -8,6 +10,7 @@ const PartySchema = new mongoose.Schema({
     maxlength: [100, 'Party name cannot exceed 100 characters'],
   },
   host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  host_uuid: { type: String }, // UUID reference for external API usage
   
   partyCode: { type: String, required: true, unique: true },
   location: {type: String, required: true},
@@ -38,6 +41,7 @@ const PartySchema = new mongoose.Schema({
     }
   },  */
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  attendee_uuids: [{ type: String }], // UUID references for external API usage
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   songs: [
     {
@@ -45,6 +49,10 @@ const PartySchema = new mongoose.Schema({
       songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song' },
       episodeId: { type: mongoose.Schema.Types.ObjectId, ref: 'PodcastEpisode' },
       addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      // UUID references for external API usage
+      song_uuid: { type: String },
+      episode_uuid: { type: String },
+      addedBy_uuid: { type: String },
       partyBidValue: { type: Number, default: 0 }, // Party-specific total bid value
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
       
@@ -66,6 +74,7 @@ const PartySchema = new mongoose.Schema({
       completedAt: { type: Date, default: null }, // When finished playing
       vetoedAt: { type: Date, default: null }, // When vetoed
       vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who vetoed it
+      vetoedBy_uuid: { type: String }, // UUID reference for external API usage
     },
   ],
   startTime:{ type: Date, default: Date.now },
@@ -164,6 +173,7 @@ PartySchema
   .pre('findById', autoPopulateSongs);
 
 // Add indexes for performance
+PartySchema.index({ uuid: 1 });
 PartySchema.index({ host: 1 });
 PartySchema.index({ attendees: 1 });
 

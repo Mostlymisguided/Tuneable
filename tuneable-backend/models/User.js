@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const { v7: uuidv7 } = require('uuid');
 
 const userSchema = new mongoose.Schema({
+  uuid: { type: String, unique: true, default: uuidv7 },
   username: { type: String, required: true, unique: true },
   email: { type: String, required: false, unique: true, sparse: true },
   password: { type: String }, // Made optional for OAuth users
@@ -78,6 +80,9 @@ userSchema.statics.findByUserId = async function(userId) {
 userSchema.statics.findByEmail = async function(email) {
   return this.findOne({ email }).select('-password');
 };
+
+// Indexes
+userSchema.index({ uuid: 1 });
 
 //comment to check debug restart
 

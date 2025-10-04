@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const { v7: uuidv7 } = require('uuid');
 
 const songSchema = new mongoose.Schema({
+  uuid: { type: String, unique: true, default: uuidv7 },
   title: { type: String, required: true },
   artist: { type: String, required: true },
   producer: { type: String },
@@ -43,6 +45,7 @@ const songSchema = new mongoose.Schema({
 
   // User data
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  addedBy_uuid: { type: String }, // UUID reference for external API usage
   uploadedAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   playCount: { type: Number, default: 0 }, // Tracks number of plays in parties
@@ -58,6 +61,7 @@ songSchema.pre('save', function (next) {
 });
 
 // Indexes for performance
+songSchema.index({ uuid: 1 });
 songSchema.index({ "sources.youtube": 1 });
 songSchema.index({ "sources.spotify": 1 });
 songSchema.index({ globalBidValue: -1 });
