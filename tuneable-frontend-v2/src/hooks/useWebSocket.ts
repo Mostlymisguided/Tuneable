@@ -41,7 +41,22 @@ export const useWebSocket = ({
       return;
     }
 
-    const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8000';
+    // Auto-detect WebSocket URL based on environment
+    const getWebSocketUrl = () => {
+      if (import.meta.env.VITE_WEBSOCKET_URL) {
+        return import.meta.env.VITE_WEBSOCKET_URL;
+      }
+      
+      // Production detection
+      if (window.location.hostname === 'tuneable.pages.dev' || window.location.hostname === 'tuneable.stream') {
+        return 'wss://tuneable.onrender.com';
+      }
+      
+      // Development fallback
+      return 'ws://localhost:8000';
+    };
+    
+    const wsUrl = getWebSocketUrl();
     console.log('WebSocket connecting to:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

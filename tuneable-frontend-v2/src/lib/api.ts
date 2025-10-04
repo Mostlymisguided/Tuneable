@@ -165,13 +165,13 @@ export const partyAPI = {
   },
   
   addSongToParty: async (partyId: string, songData: any) => {
-    const response = await api.post(`/parties/${partyId}/songs/bid`, songData);
+    const response = await api.post(`/parties/${partyId}/songcardbid`, songData);
     return response.data;
   },
   
   placeBid: async (partyId: string, song: any, bidAmount: number) => {
     const response = await api.post(`/parties/${partyId}/songcardbid`, {
-      songId: song._id,
+      songId: song.id,
       bidAmount,
       url: song.sources?.youtube || '',
       title: song.title,

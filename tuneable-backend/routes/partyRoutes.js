@@ -92,7 +92,7 @@ router.post('/', authMiddleware, async (req, res) => {
   });
 
 
-router.post("/join/:partyId", authMiddleware, async (req, res) => {
+router.post("/join/:partyId", authMiddleware, resolvePartyId(), async (req, res) => {
     const { partyId } = req.params;
     const { inviteCode, location } = req.body;
     const userId = req.user._id;
@@ -312,6 +312,15 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
 
         if (bidAmount <= 0) {
             return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        // ✅ Check minimum bid for boost bids on existing songs (£0.01 minimum)
+        if (bidAmount < 0.01) {
+            return res.status(400).json({ 
+                error: 'Bid amount must be at least £0.01 for boost bids',
+                minimumBid: 0.01,
+                providedBid: bidAmount
+            });
         }
 
         // ✅ Check user balance before processing bid
@@ -589,6 +598,21 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
             return res.status(400).json({ error: 'Bid amount must be greater than 0' });
         }
 
+        // ✅ Fetch party with populated songs and check minimum bid requirement
+        const party = await Party.findById(partyId).populate('songs.songId');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // ✅ Check minimum bid for songcardbid (initial song additions)
+        if (bidAmount < party.minimumBid) {
+            return res.status(400).json({ 
+                error: `Bid amount must be at least £${party.minimumBid}`,
+                minimumBid: party.minimumBid,
+                providedBid: bidAmount
+            });
+        }
+
         // ✅ Check user balance before processing bid
         const user = await User.findById(userId);
         if (!user) {
@@ -612,12 +636,6 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
         const extractedCoverArt = req.body.coverArt && req.body.coverArt.includes("http")
             ? req.body.coverArt 
             : `https://img.youtube.com/vi/${req.body.url.split("v=")[1]}/hqdefault.jpg`;
-
-        // ✅ Fetch party with populated songs
-        const party = await Party.findById(partyId).populate('songs.songId');
-        if (!party) {
-            return res.status(404).json({ error: 'Party not found' });
-        }
 
         let song;
         let partySongEntry = null;
