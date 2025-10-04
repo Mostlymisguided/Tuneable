@@ -7,6 +7,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const Song = require("../models/Song");
 const Party = require("../models/Party");
 const { isValidObjectId } = require("../utils/validators");
+const { transformResponse } = require('../utils/uuidTransform');
 
 // Configure Multer for File Uploads
 const fileFilter = (req, file, cb) => {
@@ -305,13 +306,13 @@ router.get('/top-tunes', async (req, res) => {
       .select('title artist duration coverArt globalBidValue uploadedAt')
       .lean();
     
-    res.json({
+    res.json(transformResponse({
       success: true,
       songs: songs,
       total: songs.length,
       sortBy: sortField,
       limit: limitNum
-    });
+    }));
   } catch (err) {
     console.error('Error fetching Top Tunes songs:', err);
     res.status(500).json({ 

@@ -10,6 +10,7 @@ const path = require('path');
 const geoip = require('geoip-lite'); // Added geoip-lite
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const { transformResponse } = require('../utils/uuidTransform');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -159,7 +160,7 @@ router.post(
       }
       const token = jwt.sign({ userId: user._id, email: user.email, username: user.username }, SECRET_KEY, { expiresIn: '24h' });
 
-      res.json({ message: 'Login successful!', token, user });
+      res.json(transformResponse({ message: 'Login successful!', token, user }));
     } catch (error) {
       res.status(500).json({ error: 'Error logging in', details: error.message });
     }
@@ -171,7 +172,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ message: 'User profile', user });
+    res.json(transformResponse({ message: 'User profile', user }));
   } catch (error) {
     res.status(500).json({ error: 'Error ing user profile', details: error.message });
   }
@@ -190,7 +191,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    res.json({ message: 'Profile updated successfully', user });
+    res.json(transformResponse({ message: 'Profile updated successfully', user }));
   } catch (error) {
     res.status(500).json({ error: 'Error updating profile', details: error.message });
   }
@@ -220,7 +221,7 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
       }
 
       console.log("✅ Profile picture updated:", user.profilePic);
-      res.json({ message: 'Profile picture updated successfully', user });
+      res.json(transformResponse({ message: 'Profile picture updated successfully', user }));
   } catch (error) {
       console.error('Error updating profile picture:', error.message);
       res.status(500).json({ error: 'Error updating profile picture', details: error.message });

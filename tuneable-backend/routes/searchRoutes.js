@@ -3,6 +3,7 @@ const NodeCache = require('node-cache');
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
 const spotifyService = require('../services/spotifyService'); // Spotify API logic
 const Song = require('../models/Song'); // Local database model
+const { transformResponse } = require('../utils/uuidTransform');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
@@ -203,7 +204,7 @@ router.get('/', async (req, res) => {
         cache.set(cacheKey, formattedResults);
         console.log('Caching result for query:', cacheKey);
 
-        res.json(formattedResults);
+        res.json(transformResponse(formattedResults));
     } catch (error) {
         console.error('Search Error:', error.message);
         res.status(500).json({ error: 'Failed to perform search', details: error.message });
@@ -216,7 +217,7 @@ router.get('/debug', async (req, res) => {
         const totalSongs = await Song.countDocuments();
         const sampleSongs = await Song.find().limit(5).lean();
         
-        res.json({
+        res.json(transformResponse({
             totalSongs,
             sampleSongs: sampleSongs.map(song => ({
                 id: song._id,
@@ -225,7 +226,7 @@ router.get('/debug', async (req, res) => {
                 sources: song.sources,
                 globalBidValue: song.globalBidValue
             }))
-        });
+        }));
     } catch (error) {
         console.error('Debug error:', error);
         res.status(500).json({ error: error.message });

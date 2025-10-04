@@ -11,6 +11,7 @@ const User = require('../models/User');
 const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
+const { transformResponse } = require('../utils/uuidTransform');
 require('dotenv').config(); // Load .env variables
 
 // What3words functionality removed for now
@@ -81,7 +82,7 @@ router.post('/', authMiddleware, async (req, res) => {
       console.log('✅ Party Created Successfully:', party);
   
       broadcast(party._id, { message: 'New party created', party });
-      res.status(201).json({ message: 'Party created successfully', party });
+      res.status(201).json(transformResponse({ message: 'Party created successfully', party }));
   
     } catch (err) {
       console.error('🔥 Error creating party:', err);
@@ -119,7 +120,7 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
             await party.save();
         }
 
-        res.json({ message: "Joined successfully", party });
+        res.json(transformResponse({ message: "Joined successfully", party }));
 
     } catch (error) {
         res.status(500).json({ message: "Server error", error });
@@ -138,7 +139,7 @@ router.get('/', authMiddleware, async (req, res) => {
             .select('-songs') // Exclude songs for better performance
             .populate('host', 'username'); // Populate the host field with the username only
 
-        res.status(200).json({ message: 'Parties fetched successfully', parties });
+        res.status(200).json(transformResponse({ message: 'Parties fetched successfully', parties }));
     } catch (err) {
         handleError(res, err, 'Failed to fetch parties');
     }
@@ -249,10 +250,10 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             songs: processedSongs, // ✅ Return flattened, sorted songs
         };
 
-        res.status(200).json({
+        res.status(200).json(transformResponse({
             message: 'Party details fetched successfully',
             party: responseParty,
-        });
+        }));
     } catch (err) {
         console.error('Error fetching party details:', err.message);
         res.status(500).json({ error: 'Failed to fetch party details', details: err.message });
@@ -565,10 +566,10 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
             populate: { path: 'userId', select: 'username' }
         });
 
-        res.status(200).json({
+        res.status(200).json(transformResponse({
             message: 'Bid placed successfully!',
             song: updatedSong
-        });
+        }));
     } catch (err) {
         console.error("❌ Error placing bid:", err);
         res.status(500).json({ error: 'Error placing bid', details: err.message });
@@ -757,7 +758,7 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
             _id: { $in: partySongEntry.partyBids } 
         }).populate('userId', 'username');
 
-        res.status(200).json({
+        res.status(200).json(transformResponse({
             message: 'Bid placed successfully!',
             song: {
                 ...updatedSong.toObject(),
@@ -765,7 +766,7 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
                 partyBids: partyBids
             },
             updatedBalance: user.balance
-        });
+        }));
     } catch (err) {
         console.error("❌ Error placing bid:", err);
         res.status(500).json({ error: 'Error placing bid', details: err.message });
