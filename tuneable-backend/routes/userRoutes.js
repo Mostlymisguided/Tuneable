@@ -123,20 +123,10 @@ router.post(
       
       console.log('User registered successfully:', user);
 
-      res.status(201).json({
+      res.status(201).json(transformResponse({
         message: 'User registered successfully',
-        user: {
-          _id: user._id,
-          username: user.username,
-          email: user.email,
-          personalInviteCode: user.personalInviteCode,
-          cellPhone: user.cellPhone,
-          givenName: user.givenName,
-          familyName: user.familyName,
-          homeLocation: user.homeLocation,
-          profilePic: user.profilePic,
-        },
-      });
+        user: user,
+      }));
     } catch (error) {
       console.error('Error registering user:', error.message);
       res.status(500).json({ error: 'Error registering user', details: error.message });

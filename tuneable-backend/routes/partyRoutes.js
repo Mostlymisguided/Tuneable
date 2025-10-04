@@ -12,6 +12,7 @@ const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 const { transformResponse } = require('../utils/uuidTransform');
+const { resolvePartyId } = require('../utils/idResolver');
 require('dotenv').config(); // Load .env variables
 
 // What3words functionality removed for now
@@ -146,13 +147,9 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // FETCH PARTY DETAILS
-router.get('/:id/details', authMiddleware, async (req, res) => {
+router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { id } = req.params;
-
-        if (!mongoose.isValidObjectId(id)) {
-            return res.status(400).json({ error: 'Invalid Party ID format' });
-        }
 
         const party = await Party.findById(id)
             .populate({
@@ -299,7 +296,7 @@ router.post('/geocode-address', async (req, res) => {
 });
 
 // Place a bid on an existing song or add a new song with a bid
-router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
+router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         console.log("🎯 SONGS/BID ENDPOINT CALLED");
         console.log("🎯 Request body:", JSON.stringify(req.body, null, 2));
@@ -578,7 +575,7 @@ router.post('/:partyId/songs/bid', authMiddleware, async (req, res) => {
 
 // test bid route from songcard
 // Place a bid on an existing song
-router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
+router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const { songId, url, title, artist, bidAmount, platform, duration, tags, category } = req.body;
@@ -625,11 +622,8 @@ router.post('/:partyId/songcardbid', authMiddleware, async (req, res) => {
         let song;
         let partySongEntry = null;
 
-        if (songId) {
-            // ✅ Check if song exists in DB
-            if (!mongoose.isValidObjectId(songId)) {
-                return res.status(400).json({ error: 'Invalid songId format' });
-            }
+        if (songId && mongoose.isValidObjectId(songId)) {
+            // ✅ Check if song exists in DB (only if songId is a valid MongoDB ObjectId)
 
             song = await Song.findById(songId);
             if (!song) {

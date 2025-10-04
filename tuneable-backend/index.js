@@ -41,7 +41,7 @@ db.connectDB()
   });
 
 // Allowed origins: development and production
-const allowedOrigins = ['http://localhost:3000', 'http://tuneable.com', 'https://tuneable.com', 'https://tuneable.pages.dev', 'https://tuneable.stream', 'http://tuneable.stream'];
+const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://tuneable.com', 'https://tuneable.com', 'https://tuneable.pages.dev', 'https://tuneable.stream', 'http://tuneable.stream'];
 
 // Define CORS options
 const corsOptions = {
