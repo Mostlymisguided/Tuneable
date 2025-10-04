@@ -306,9 +306,7 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
         console.log("🎯 Category received:", category);
         const userId = req.user._id;
 
-        if (!mongoose.isValidObjectId(partyId)) {
-            return res.status(400).json({ error: 'Invalid partyId format' });
-        }
+        // Note: partyId validation handled by resolvePartyId() middleware
 
         if (bidAmount <= 0) {
             return res.status(400).json({ error: 'Bid amount must be greater than 0' });
@@ -354,11 +352,8 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
         }
 
         let song;
-        if (songId) {
-            // ✅ Check if song exists in DB
-            if (!mongoose.isValidObjectId(songId)) {
-                return res.status(400).json({ error: 'Invalid songId format' });
-            }
+        if (songId && mongoose.isValidObjectId(songId)) {
+            // ✅ Check if song exists in DB (only if songId is a valid MongoDB ObjectId)
 
             song = await Song.findById(songId).populate({
                 path: 'bids',
@@ -528,6 +523,75 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
                 });
             } else {
                 // ✅ Song not in party yet - add it to the party's playlist
+                party.songs.push({ 
+                    songId: song._id, 
+                    addedBy: userId,
+                    contentType: 'song'
+                });
+                await party.save();
+            }
+        } else if (url && title && artist && platform) {
+            // ✅ Handle case where songId is not a valid MongoDB ObjectId (e.g., YouTube video ID)
+            // Try finding the song by platform URL
+            song = await Song.findOne({ [`sources.${platform}`]: url });
+
+            if (!song) {
+                // ✅ Create a new song if it doesn't exist
+                console.log("🎵 Creating new song (songs/bid) with tags:", tags, "and category:", category);
+                
+                // For YouTube videos, fetch detailed info (tags, category) only when adding to party
+                let videoTags = Array.isArray(tags) ? tags : [];
+                let videoCategory = category || 'Unknown';
+                
+                if (platform === 'youtube') {
+                    console.log("🎵 Fetching detailed video info for YouTube video (songs/bid)...");
+                    console.log("🎵 Platform (songs/bid):", platform, "URL:", url);
+                    try {
+                        const videoId = url.split('v=')[1]?.split('&')[0];
+                        console.log("🎵 Extracted video ID (songs/bid):", videoId);
+                        if (videoId) {
+                            console.log("🎵 Calling getVideoDetails with videoId (songs/bid):", videoId);
+                            const videoDetails = await getVideoDetails(videoId);
+                            console.log("🎵 Video details response (songs/bid):", videoDetails);
+                            videoTags = videoDetails.tags || [];
+                            videoCategory = videoDetails.category || 'Unknown';
+                            console.log("🎵 Fetched video details (songs/bid) - Tags:", videoTags.length, "Category:", videoCategory);
+                        } else {
+                            console.log("❌ Could not extract video ID from URL (songs/bid):", url);
+                        }
+                    } catch (error) {
+                        console.error("❌ Error fetching video details (songs/bid):", error);
+                        console.log("🎵 Continuing with default values due to error (songs/bid)");
+                        // Continue with default values if API call fails
+                        videoTags = [];
+                        videoCategory = 'Unknown';
+                    }
+                } else {
+                    console.log("🎵 Not YouTube platform, skipping video details fetch (songs/bid). Platform:", platform);
+                }
+                
+                song = new Song({
+                    title,
+                    artist,
+                    coverArt: extractedCoverArt,
+                    duration: extractedDuration || 777,
+                    sources: { [platform]: url },
+                    tags: videoTags,
+                    category: videoCategory,
+                    addedBy: userId
+                });
+                try {
+                    await song.save();
+                    console.log("✅ Song saved successfully (songs/bid)");
+                } catch (saveError) {
+                    console.error("❌ Error saving song (songs/bid):", saveError);
+                    throw saveError;
+                }
+            }
+
+            // Add song to party if not already there
+            const existingPartySong = party.songs.find(entry => entry.songId?.toString() === song._id.toString());
+            if (!existingPartySong) {
                 party.songs.push({ 
                     songId: song._id, 
                     addedBy: userId,
