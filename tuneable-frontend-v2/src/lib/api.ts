@@ -170,10 +170,19 @@ export const partyAPI = {
   },
   
   placeBid: async (partyId: string, song: any, bidAmount: number) => {
+    // Handle both array format (from party details) and object format (from search)
+    let youtubeUrl = '';
+    if (Array.isArray(song.sources)) {
+      const youtubeSource = song.sources.find((s: any) => s.platform === 'youtube');
+      youtubeUrl = youtubeSource?.url || '';
+    } else if (song.sources && typeof song.sources === 'object') {
+      youtubeUrl = song.sources.youtube || '';
+    }
+
     const response = await api.post(`/parties/${partyId}/songcardbid`, {
-      songId: song.id,
+      songId: song._id || song.id,
       bidAmount,
-      url: song.sources?.youtube || '',
+      url: youtubeUrl,
       title: song.title,
       artist: song.artist,
       platform: 'youtube',
