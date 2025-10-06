@@ -1043,7 +1043,13 @@ const Party: React.FC = () => {
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
                                 <span className="px-3 py-1 bg-gray-700 text-white rounded-lg text-sm">
-                                  £{typeof song.partyBidValue === 'number' ? song.partyBidValue.toFixed(2) : '0.00'}
+                                  £{(() => {
+                                    if (selectedTimePeriod === 'all-time') {
+                                      return typeof song.partyBidValue === 'number' ? song.partyBidValue.toFixed(2) : '0.00';
+                                    } else {
+                                      return typeof song.timePeriodBidValue === 'number' ? song.timePeriodBidValue.toFixed(2) : '0.00';
+                                    }
+                                  })()}
                                 </span>
                                 <button
                                   onClick={() => handleBidClick(song)}
