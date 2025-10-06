@@ -1354,7 +1354,7 @@ router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
 });
 
 // Get songs sorted by bid values within specific time periods
-router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, async (req, res) => {
+router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
