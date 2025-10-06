@@ -81,7 +81,7 @@ const Party: React.FC = () => {
     setCurrentPartyId,
     setGlobalPlayerActive,
     currentPartyId,
-    currentSongId,
+    currentSong,
   } = useWebPlayerStore();
 
   // Only use WebSocket for live parties
@@ -261,7 +261,7 @@ const Party: React.FC = () => {
           }
           
           return {
-            id: actualSong.id,
+            id: actualSong.id || actualSong.uuid || actualSong._id, // Prefer UUID for external API
             title: actualSong.title,
             artist: actualSong.artist,
             duration: actualSong.duration,
@@ -269,6 +269,7 @@ const Party: React.FC = () => {
             sources: sources,
             globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
             partyBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0,
+            totalBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0, // Use partyBidValue as totalBidValue
             bids: actualSong.bids,
             addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy
           };
@@ -320,7 +321,7 @@ const Party: React.FC = () => {
         }
         
         return {
-          id: song.id || song._id,
+          id: song.id || song.uuid || song._id, // Prefer UUID for external API
           title: song.title,
           artist: song.artist,
           duration: song.duration,
@@ -328,6 +329,7 @@ const Party: React.FC = () => {
           sources: sources,
           globalBidValue: typeof song.globalBidValue === 'number' ? song.globalBidValue : 0,
           partyBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0,
+          totalBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0, // Use partyBidValue as totalBidValue
           bids: song.bids,
           addedBy: typeof song.addedBy === 'object' ? song.addedBy?.username || 'Unknown' : song.addedBy
         };
@@ -336,11 +338,11 @@ const Party: React.FC = () => {
       setQueue(cleanedQueue);
       
       // If there are songs and no current song, set the first one
-      if (cleanedQueue.length > 0 && !currentSongId) {
+      if (cleanedQueue.length > 0 && !currentSong) {
         setCurrentSong(cleanedQueue[0], 0, true);
       }
     }
-  }, [sortedSongs, selectedTimePeriod, party, setQueue, setCurrentSong, currentSongId]);
+  }, [sortedSongs, selectedTimePeriod, party, setQueue, setCurrentSong, currentSong]);
 
   const fetchPartyDetails = async () => {
     try {
