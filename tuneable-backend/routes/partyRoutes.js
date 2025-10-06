@@ -1077,11 +1077,11 @@ router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) =>
         // Sort by bid value (highest first) for all statuses
         songsWithStatus.sort((a, b) => (b.partyBidValue || 0) - (a.partyBidValue || 0));
 
-        res.json({
+        res.json(transformResponse({
             status: status,
             songs: songsWithStatus,
             count: songsWithStatus.length
-        });
+        }));
     } catch (err) {
         console.error('Error fetching songs by status:', err);
         res.status(500).json({ error: 'Error fetching songs by status', details: err.message });
@@ -1473,13 +1473,13 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
             .filter(song => song !== null)
             .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
 
-        res.json({
+        res.json(transformResponse({
             timePeriod: timePeriod,
             songs: processedSongs,
             count: processedSongs.length,
             periodStartDate: startDate,
             periodEndDate: now
-        });
+        }));
 
     } catch (err) {
         console.error('Error fetching songs sorted by time period:', err);
