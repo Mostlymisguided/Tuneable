@@ -10,8 +10,7 @@ import PersistentWebPlayer from './components/PersistentWebPlayer';
 import Home from './pages/Home';
 import About from './pages/About';
 import TopTunes from './pages/TopTunes';
-import Login from './pages/Login';
-import Register from './pages/Register';
+import AuthPage from './pages/AuthPage';
 import AuthCallback from './pages/AuthCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import DataDeletion from './pages/DataDeletion';
@@ -48,8 +47,8 @@ const AppContent = () => {
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/top-tunes" element={<TopTunes />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<AuthPage />} />
+            <Route path="/register" element={<AuthPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
