@@ -55,11 +55,14 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 
 // Google OAuth routes (for future implementation)
 router.get('/google', (req, res) => {
-  res.status(501).json({ error: 'Google OAuth not implemented yet' });
+  // For now, redirect to frontend with a message
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${frontendUrl}/login?message=google_coming_soon`);
 });
 
 router.get('/google/callback', (req, res) => {
-  res.status(501).json({ error: 'Google OAuth not implemented yet' });
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${frontendUrl}/login?message=google_coming_soon`);
 });
 
 module.exports = router;
