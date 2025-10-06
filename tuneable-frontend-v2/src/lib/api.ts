@@ -226,6 +226,11 @@ export const partyAPI = {
     const response = await api.post(`/parties/${partyId}/skip-previous`);
     return response.data;
   },
+  
+  getSongsSortedByTime: async (partyId: string, timePeriod: string) => {
+    const response = await api.get(`/parties/${partyId}/songs/sorted/${timePeriod}`);
+    return response.data;
+  },
 };
 
 // Song API

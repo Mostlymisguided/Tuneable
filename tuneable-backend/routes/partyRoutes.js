@@ -361,7 +361,7 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
         }
         if (needsSave) {
             await party.save();
-            console.log("✅ Migrated existing songs to include contentType (songs/bid)");
+            console.log("✅ Migrated existing songs to include  (songs/bid)");
         }
 
         let song;
@@ -1350,6 +1350,125 @@ router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error('Error vetoing song:', err);
         res.status(500).json({ error: 'Error vetoing song', details: err.message });
+    }
+});
+
+// Get songs sorted by bid values within specific time periods
+router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, timePeriod } = req.params;
+        const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
+
+        if (!validTimePeriods.includes(timePeriod)) {
+            return res.status(400).json({ 
+                error: 'Invalid time period. Must be one of: ' + validTimePeriods.join(', ') 
+            });
+        }
+
+        const party = await Party.findById(partyId)
+            .populate({
+                path: 'songs.songId',
+                model: 'Song',
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category'
+            })
+            .populate('songs.addedBy', 'username');
+
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Calculate date ranges
+        const now = new Date();
+        let startDate = null;
+
+        switch (timePeriod) {
+            case 'today':
+                startDate = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // 24 hours ago
+                break;
+            case 'this-week':
+                startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)); // 7 days ago
+                break;
+            case 'this-month':
+                startDate = new Date(now.getTime() - (28 * 24 * 60 * 60 * 1000)); // 28 days ago
+                break;
+            case 'this-year':
+                startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000)); // 365 days ago
+                break;
+            case 'all-time':
+                startDate = null; // No date filter
+                break;
+        }
+
+        // Get all bids for this party within the time period
+        let bidQuery = { 
+            partyId: party._id,
+            status: { $in: ['active', 'played'] } // Only count active and played bids
+        };
+
+        if (startDate) {
+            bidQuery.createdAt = { $gte: startDate };
+        }
+
+        const bids = await Bid.find(bidQuery).select('songId episodeId amount createdAt');
+
+        // Calculate bid values for each song within the time period
+        const songBidValues = {};
+        bids.forEach(bid => {
+            const songId = bid.songId?.toString() || bid.episodeId?.toString();
+            if (songId) {
+                songBidValues[songId] = (songBidValues[songId] || 0) + bid.amount;
+            }
+        });
+
+        // Process and sort songs by their bid values within the time period
+        const processedSongs = party.songs
+            .map((entry) => {
+                if (!entry.songId) return null;
+
+                const availablePlatforms = Object.entries(entry.songId.sources || {})
+                    .filter(([key, value]) => value)
+                    .map(([key, value]) => ({ platform: key, url: value }));
+
+                const timePeriodBidValue = songBidValues[entry.songId._id.toString()] || 0;
+
+                return {
+                    _id: entry.songId._id,
+                    title: entry.songId.title,
+                    artist: entry.songId.artist,
+                    duration: entry.songId.duration,
+                    coverArt: entry.songId.coverArt,
+                    sources: entry.songId.sources,
+                    availablePlatforms,
+                    globalBidValue: entry.songId.globalBidValue || 0,
+                    partyBidValue: entry.partyBidValue || 0, // All-time party bid value
+                    timePeriodBidValue, // Bid value for the specific time period
+                    addedBy: entry.addedBy,
+                    status: entry.status,
+                    queuedAt: entry.queuedAt,
+                    playedAt: entry.playedAt,
+                    completedAt: entry.completedAt,
+                    vetoedAt: entry.vetoedAt,
+                    vetoedBy: entry.vetoedBy,
+                    contentType: entry.contentType || 'song'
+                };
+            })
+            .filter(song => song !== null)
+            .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
+
+        res.json({
+            timePeriod: timePeriod,
+            songs: processedSongs,
+            count: processedSongs.length,
+            periodStartDate: startDate,
+            periodEndDate: now
+        });
+
+    } catch (err) {
+        console.error('Error fetching songs sorted by time period:', err);
+        res.status(500).json({ 
+            error: 'Error fetching songs sorted by time period', 
+            details: err.message 
+        });
     }
 });
 

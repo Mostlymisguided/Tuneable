@@ -63,6 +63,11 @@ const Party: React.FC = () => {
   const [endPartyModalOpen, setEndPartyModalOpen] = useState(false);
   const [isEndingParty, setIsEndingParty] = useState(false);
 
+  // Sorting state
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState('all-time');
+  const [sortedSongs, setSortedSongs] = useState<any[]>([]);
+  const [isLoadingSortedSongs, setIsLoadingSortedSongs] = useState(false);
+
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
 
@@ -205,6 +210,7 @@ const Party: React.FC = () => {
   useEffect(() => {
     if (partyId) {
       fetchPartyDetails();
+      fetchSortedSongs(selectedTimePeriod);
     }
   }, [partyId]);
 
@@ -331,6 +337,27 @@ const Party: React.FC = () => {
     } else {
       copyPartyCode();
     }
+  };
+
+  // Sorting functions
+  const fetchSortedSongs = async (timePeriod: string) => {
+    if (!partyId) return;
+    
+    setIsLoadingSortedSongs(true);
+    try {
+      const response = await partyAPI.getSongsSortedByTime(partyId, timePeriod);
+      setSortedSongs(response.songs);
+    } catch (error) {
+      console.error('Error fetching sorted songs:', error);
+      toast.error('Failed to load sorted songs');
+    } finally {
+      setIsLoadingSortedSongs(false);
+    }
+  };
+
+  const handleTimePeriodChange = (timePeriod: string) => {
+    setSelectedTimePeriod(timePeriod);
+    fetchSortedSongs(timePeriod);
   };
 
   // Bid handling functions
@@ -821,6 +848,98 @@ const Party: React.FC = () => {
                           );
                         })}
                     </div>
+                  </div>
+                )}
+
+                {/* Sorting Tabs */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Sort by Bid Activity</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: 'all-time', label: 'All Time' },
+                      { key: 'this-year', label: 'This Year' },
+                      { key: 'this-month', label: 'This Month' },
+                      { key: 'this-week', label: 'This Week' },
+                      { key: 'today', label: 'Today' }
+                    ].map((period) => (
+                      <button
+                        key={period.key}
+                        onClick={() => handleTimePeriodChange(period.key)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          selectedTimePeriod === period.key
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {period.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sorted Songs Display */}
+                {selectedTimePeriod !== 'all-time' && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-white mb-3">
+                      Top Songs - {selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </h3>
+                    {isLoadingSortedSongs ? (
+                      <div className="text-center py-8">
+                        <div className="text-gray-400">Loading sorted songs...</div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedSongs.slice(0, 10).map((song: any, index: number) => (
+                          <div
+                            key={`sorted-${song._id}-${index}`}
+                            className="bg-purple-800/50 p-4 rounded-lg flex items-center space-x-4 border border-purple-700/30"
+                          >
+                            {/* Rank Badge */}
+                            <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-bold text-sm">{index + 1}</span>
+                            </div>
+                            
+                            {/* Song Thumbnail */}
+                            <img
+                              src={song.coverArt || '/default-cover.jpg'}
+                              alt={song.title || 'Unknown Song'}
+                              className="w-16 h-16 rounded object-cover flex-shrink-0"
+                              width="64"
+                              height="64"
+                            />
+                            
+                            {/* Song Details */}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-white text-lg truncate">
+                                {song.title || 'Unknown Song'}
+                              </h4>
+                              <p className="text-sm text-gray-300 truncate">
+                                {song.artist || 'Unknown Artist'}
+                              </p>
+                              <div className="flex items-center space-x-4 mt-1">
+                                <div className="flex items-center space-x-1">
+                                  <Coins className="h-4 w-4 text-yellow-400" />
+                                  <span className="text-sm text-yellow-400">
+                                    £{(song.timePeriodBidValue || 0).toFixed(2)} this period
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Coins className="h-4 w-4 text-gray-400" />
+                                  <span className="text-sm text-gray-400">
+                                    £{(song.partyBidValue || 0).toFixed(2)} total
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {sortedSongs.length === 0 && (
+                          <div className="text-center py-8 text-gray-400">
+                            No songs with bids in this time period
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
