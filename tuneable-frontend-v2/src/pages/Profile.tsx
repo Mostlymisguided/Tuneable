@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { 
@@ -41,7 +40,6 @@ interface UserProfile {
 }
 
 const Profile: React.FC = () => {
-  const { user, updateBalance } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -71,9 +69,9 @@ const Profile: React.FC = () => {
       
       // Initialize edit form with current values
       setEditForm({
-        givenName: response.user.givenName || '',
-        familyName: response.user.familyName || '',
-        cellPhone: response.user.cellPhone || '',
+        givenName: (response.user as any).givenName || '',
+        familyName: (response.user as any).familyName || '',
+        cellPhone: (response.user as any).cellPhone || '',
         homeLocation: {
           city: response.user.homeLocation?.city || '',
           country: response.user.homeLocation?.country || ''
@@ -141,7 +139,7 @@ const Profile: React.FC = () => {
 
   const handleSaveProfile = async () => {
     try {
-      const response = await authAPI.updateProfile(editForm);
+      await authAPI.updateProfile(editForm);
       
       if (profile) {
         setProfile({
