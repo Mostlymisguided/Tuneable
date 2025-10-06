@@ -978,6 +978,9 @@ const Party: React.FC = () => {
                               <h4 className="font-medium text-white text-lg truncate">
                                 {songData.title || 'Unknown Song'}
                               </h4>
+                              <p className="text-sm text-gray-300 truncate">
+                                {songData.artist || 'Unknown Artist'}
+                              </p>
                               <div className="flex items-center space-x-4 mt-1">
                                 <div className="flex items-center space-x-1">
                                   <div className="w-4 h-4 bg-red-500 rounded flex items-center justify-center">
