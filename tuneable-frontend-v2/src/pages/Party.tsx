@@ -81,6 +81,7 @@ const Party: React.FC = () => {
     setCurrentPartyId,
     setGlobalPlayerActive,
     currentPartyId,
+    currentSongId,
   } = useWebPlayerStore();
 
   // Only use WebSocket for live parties
@@ -293,6 +294,53 @@ const Party: React.FC = () => {
     }
   }, [party, user, partyId, currentPartyId, setQueue, setCurrentSong, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
+  // Update WebPlayer queue when sorting changes
+  useEffect(() => {
+    if (party && selectedTimePeriod !== 'all-time' && sortedSongs.length > 0) {
+      // Update the global player queue with sorted songs
+      const queuedSortedSongs = sortedSongs.filter((song: any) => song.status === 'queued');
+      console.log('Updating WebPlayer queue with sorted songs:', queuedSortedSongs.length);
+      
+      // Clean and set the queue in global store
+      const cleanedQueue = queuedSortedSongs.map((song: any) => {
+        let sources = {};
+        
+        if (song.sources) {
+          if (Array.isArray(song.sources)) {
+            for (const source of song.sources) {
+              if (source && source.platform === 'youtube' && source.url) {
+                (sources as any).youtube = source.url;
+              } else if (source && source.platform === 'spotify' && source.url) {
+                (sources as any).spotify = source.url;
+              }
+            }
+          } else if (typeof song.sources === 'object') {
+            sources = song.sources;
+          }
+        }
+        
+        return {
+          id: song.id || song._id,
+          title: song.title,
+          artist: song.artist,
+          duration: song.duration,
+          coverArt: song.coverArt,
+          sources: sources,
+          globalBidValue: typeof song.globalBidValue === 'number' ? song.globalBidValue : 0,
+          partyBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0,
+          bids: song.bids,
+          addedBy: typeof song.addedBy === 'object' ? song.addedBy?.username || 'Unknown' : song.addedBy
+        };
+      });
+      
+      setQueue(cleanedQueue);
+      
+      // If there are songs and no current song, set the first one
+      if (cleanedQueue.length > 0 && !currentSongId) {
+        setCurrentSong(cleanedQueue[0], 0, true);
+      }
+    }
+  }, [sortedSongs, selectedTimePeriod, party, setQueue, setCurrentSong, currentSongId]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -358,6 +406,17 @@ const Party: React.FC = () => {
   const handleTimePeriodChange = (timePeriod: string) => {
     setSelectedTimePeriod(timePeriod);
     fetchSortedSongs(timePeriod);
+  };
+
+  // Get songs to display based on selected time period
+  const getDisplaySongs = () => {
+    if (selectedTimePeriod === 'all-time') {
+      // Show regular party songs
+      return party.songs.filter((song: any) => song.status === 'queued');
+    } else {
+      // Show sorted songs from the selected time period
+      return sortedSongs.filter((song: any) => song.status === 'queued');
+    }
   };
 
   // Bid handling functions
@@ -622,9 +681,11 @@ const Party: React.FC = () => {
               <Music className="h-6 w-6 text-white" />
               <div>
                 <div className="text-2xl font-bold text-white">
-                  {party.songs.filter((song: any) => song.status === 'queued').length}
+                  {getDisplaySongs().length}
                 </div>
-                <div className="text-sm text-gray-300">In Queue</div>
+                <div className="text-sm text-gray-300">
+                  {selectedTimePeriod === 'all-time' ? 'In Queue' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
+                </div>
               </div>
             </div>
           </div>
@@ -665,7 +726,10 @@ const Party: React.FC = () => {
             Now Playing
           </button>
           <button className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium" style={{backgroundColor: '#9333EA'}}>
-            Queue ({party.songs.filter((song: any) => song.status === 'queued').length})
+            {selectedTimePeriod === 'all-time' 
+              ? `Queue (${party.songs.filter((song: any) => song.status === 'queued').length})`
+              : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplaySongs().length})`
+            }
           </button>
           <button 
             onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
@@ -877,78 +941,16 @@ const Party: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Sorted Songs Display */}
-                {selectedTimePeriod !== 'all-time' && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-white mb-3">
-                      Top Songs - {selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </h3>
-                    {isLoadingSortedSongs ? (
+
+                {/* Queue */}
+                {getDisplaySongs().length > 0 && (
+                  <div className="space-y-3">
+                    {isLoadingSortedSongs && selectedTimePeriod !== 'all-time' ? (
                       <div className="text-center py-8">
                         <div className="text-gray-400">Loading sorted songs...</div>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {sortedSongs.slice(0, 10).map((song: any, index: number) => (
-                          <div
-                            key={`sorted-${song._id}-${index}`}
-                            className="bg-purple-800/50 p-4 rounded-lg flex items-center space-x-4 border border-purple-700/30"
-                          >
-                            {/* Rank Badge */}
-                            <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-white font-bold text-sm">{index + 1}</span>
-                            </div>
-                            
-                            {/* Song Thumbnail */}
-                            <img
-                              src={song.coverArt || '/default-cover.jpg'}
-                              alt={song.title || 'Unknown Song'}
-                              className="w-16 h-16 rounded object-cover flex-shrink-0"
-                              width="64"
-                              height="64"
-                            />
-                            
-                            {/* Song Details */}
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-white text-lg truncate">
-                                {song.title || 'Unknown Song'}
-                              </h4>
-                              <p className="text-sm text-gray-300 truncate">
-                                {song.artist || 'Unknown Artist'}
-                              </p>
-                              <div className="flex items-center space-x-4 mt-1">
-                                <div className="flex items-center space-x-1">
-                                  <Coins className="h-4 w-4 text-yellow-400" />
-                                  <span className="text-sm text-yellow-400">
-                                    £{(song.timePeriodBidValue || 0).toFixed(2)} this period
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <Coins className="h-4 w-4 text-gray-400" />
-                                  <span className="text-sm text-gray-400">
-                                    £{(song.partyBidValue || 0).toFixed(2)} total
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        {sortedSongs.length === 0 && (
-                          <div className="text-center py-8 text-gray-400">
-                            No songs with bids in this time period
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Queue */}
-                {party.songs.filter((song: any) => song.status === 'queued').length > 0 && (
-                  <div className="space-y-3">
-                    {party.songs
-                      .filter((song: any) => song.status === 'queued')
-                      .map((song: any, index: number) => {
+                      getDisplaySongs().map((song: any, index: number) => {
                         const songData = song.songId || song;
                         return (
                           <div
@@ -1058,7 +1060,8 @@ const Party: React.FC = () => {
                             </div>
                           </div>
                         );
-                      })}
+                      })
+                    )}
                   </div>
                 )}
 
