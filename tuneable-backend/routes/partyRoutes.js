@@ -193,6 +193,8 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
 
             return {
                 _id: entry.songId._id,
+                id: entry.songId.uuid || entry.songId._id, // Use UUID for external API, fallback to _id
+                uuid: entry.songId.uuid || entry.songId._id, // Also include uuid field for consistency
                 title: entry.songId.title,
                 artist: entry.songId.artist,
                 duration: entry.songId.duration || '666',
@@ -730,18 +732,32 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
         let song;
         let partySongEntry = null;
 
-        if (songId && mongoose.isValidObjectId(songId)) {
-            // ✅ Check if song exists in DB (only if songId is a valid MongoDB ObjectId)
+        if (songId) {
+            // ✅ Check if song exists in DB - handle both ObjectId and UUID
+            if (mongoose.isValidObjectId(songId)) {
+                // Handle MongoDB ObjectId
+                song = await Song.findById(songId);
+                if (!song) {
+                    return res.status(404).json({ error: 'Song not found' });
+                }
 
-            song = await Song.findById(songId);
-            if (!song) {
-                return res.status(404).json({ error: 'Song not found' });
-            }
+                // Find the party-specific song entry
+                partySongEntry = party.songs.find(entry => entry.songId._id.toString() === songId);
+                if (!partySongEntry) {
+                    return res.status(404).json({ error: 'Song not found in this party' });
+                }
+            } else {
+                // Handle UUID
+                song = await Song.findOne({ uuid: songId });
+                if (!song) {
+                    return res.status(404).json({ error: 'Song not found' });
+                }
 
-            // Find the party-specific song entry
-            partySongEntry = party.songs.find(entry => entry.songId._id.toString() === songId);
-            if (!partySongEntry) {
-                return res.status(404).json({ error: 'Song not found in this party' });
+                // Find the party-specific song entry by UUID
+                partySongEntry = party.songs.find(entry => entry.song_uuid === songId || entry.songId.uuid === songId);
+                if (!partySongEntry) {
+                    return res.status(404).json({ error: 'Song not found in this party' });
+                }
             }
         } else if (url && title && artist && platform) {
             // ✅ Try finding the song by platform URL
@@ -1433,6 +1449,8 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
 
                 return {
                     _id: entry.songId._id,
+                    id: entry.songId.uuid || entry.songId._id, // Use UUID for external API, fallback to _id
+                    uuid: entry.songId.uuid || entry.songId._id, // Also include uuid field for consistency
                     title: entry.songId.title,
                     artist: entry.songId.artist,
                     duration: entry.songId.duration,

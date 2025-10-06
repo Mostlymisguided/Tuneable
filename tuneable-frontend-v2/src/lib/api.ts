@@ -180,7 +180,7 @@ export const partyAPI = {
     }
 
     const response = await api.post(`/parties/${partyId}/songcardbid`, {
-      songId: song._id || song.id,
+      songId: song.id || song.uuid || song._id, // Prefer UUID for external API
       bidAmount,
       url: youtubeUrl,
       title: song.title,
