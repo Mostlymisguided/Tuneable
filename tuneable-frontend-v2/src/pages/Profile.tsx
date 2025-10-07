@@ -6,8 +6,8 @@ import {
   MapPin, 
   Mail, 
   Phone, 
-  Camera, 
-  Upload, 
+  Camera,
+  Loader2,
   Edit3, 
   Save, 
   X,
@@ -42,8 +42,8 @@ interface UserProfile {
 const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Edit form state
@@ -190,8 +190,11 @@ const Profile: React.FC = () => {
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-8">
           <div className="flex items-center space-x-6">
             {/* Profile Picture */}
-            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+            <div className="relative group">
+              <div 
+                className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 {profile.profilePic ? (
                   <img
                     src={profile.profilePic}
@@ -201,21 +204,22 @@ const Profile: React.FC = () => {
                 ) : (
                   <User className="w-12 h-12 text-gray-400" />
                 )}
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center rounded-full">
+                  {isUploading ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </div>
               </div>
-              {/* Overlay with camera icon - shows on hover */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-full transition-all duration-200 flex items-center justify-center">
-                {isUploading ? (
-                  <Upload className="w-6 h-6 text-white animate-spin" />
-                ) : (
-                  <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                )}
-              </div>
+              {/* Hidden file input - absolutely positioned off-screen */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleProfilePicUpload}
-                className="hidden"
+                style={{ display: 'none' }}
               />
             </div>
 
