@@ -192,7 +192,7 @@ const Profile: React.FC = () => {
             {/* Profile Picture */}
             <div className="relative group">
               <div 
-                className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center cursor-pointer"
+                className="w-48 h-48 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center cursor-pointer shadow-xl"
                 onClick={() => fileInputRef.current?.click()}
               >
                 {profile.profilePic ? (
@@ -202,14 +202,14 @@ const Profile: React.FC = () => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <User className="w-12 h-12 text-gray-400" />
+                  <User className="w-24 h-24 text-gray-400" />
                 )}
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center rounded-full">
                   {isUploading ? (
-                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    <Loader2 className="w-8 h-8 text-white animate-spin" />
                   ) : (
-                    <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Camera className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   )}
                 </div>
               </div>
