@@ -72,6 +72,15 @@ const Party: React.FC = () => {
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
 
+  // Function to scroll to webplayer
+  const scrollToWebPlayer = () => {
+    // Scroll to the bottom of the page where the webplayer is located
+    window.scrollTo({ 
+      top: document.documentElement.scrollHeight, 
+      behavior: 'smooth' 
+    });
+  };
+
   // Use global WebPlayer store
   const {
     setCurrentSong,
@@ -725,7 +734,11 @@ const Party: React.FC = () => {
 
         {/* Tab Navigation */}
         <div className="flex space-x-1 mb-6">
-          <button className="px-4 py-2 shadow-sm bg-black/20 border-white/20 border border-gray-500 text-white rounded-lg font-medium" style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}>
+          <button 
+            onClick={scrollToWebPlayer}
+            className="px-4 py-2 shadow-sm bg-black/20 border-white/20 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-700/30 transition-colors" 
+            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
+          >
             Now Playing
           </button>
           <button className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium" style={{backgroundColor: '#9333EA'}}>
@@ -982,37 +995,14 @@ const Party: React.FC = () => {
                             {/* Song Details */}
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-white text-lg truncate">
-                                {songData.title || 'Unknown Song'}
+                                {songData.title || 'Unknown Song'} • {songData.artist || 'Unknown Artist'}
                               </h4>
-                              <p className="text-sm text-gray-300 truncate">
-                                {songData.artist || 'Unknown Artist'}
-                              </p>
                               <div className="flex items-center space-x-4 mt-1">
-                                <div className="flex items-center space-x-1">
-                                  <div className="w-4 h-4 bg-red-500 rounded flex items-center justify-center">
-                                    <span className="text-xs text-white">▶</span>
-                                  </div>
-                                  <span className="text-sm text-gray-300">YouTube</span>
-                                </div>
                                 <div className="flex items-center space-x-1">
                                   <Clock className="h-4 w-4 text-gray-400" />
                                   <span className="text-sm text-gray-300">{formatDuration(songData.duration)}</span>
                                 </div>
                               </div>
-                              <p className="text-sm text-gray-400 mt-1">
-                                Added by: {(() => {
-                                  if (!songData.addedBy) return 'Unknown';
-                                  if (typeof songData.addedBy === 'object') {
-                                    return songData.addedBy.username || songData.addedBy.name || 'Unknown';
-                                  }
-                                  if (typeof songData.addedBy === 'string') {
-                                    // If it's a string, it might be an ObjectId, try to find the user
-                                    const user = party.attendees.find((attendee: any) => attendee.id === songData.addedBy);
-                                    return user?.username || user?.name || 'Unknown';
-                                  }
-                                  return 'Unknown';
-                                })()}
-                              </p>
                               
                               {/* Tags Display */}
                               {songData.tags && songData.tags.length > 0 && (

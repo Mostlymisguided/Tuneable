@@ -1482,6 +1482,8 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
                     partyBidValue: entry.partyBidValue || 0, // All-time party bid value
                     timePeriodBidValue, // Bid value for the specific time period
                     bids: entry.songId.bids || [], // ✅ Include populated bids for TopBidders component
+                    tags: entry.songId.tags || [], // ✅ Include tags for display
+                    category: entry.songId.category || null, // ✅ Include category for display
                     addedBy: entry.addedBy,
                     status: entry.status,
                     queuedAt: entry.queuedAt,
