@@ -377,8 +377,7 @@ router.get('/top-tunes', async (req, res) => {
           select: 'username profilePic uuid',
         },
       })
-      .select('title artist duration coverArt globalBidValue uploadedAt bids uuid')
-      .lean();
+      .select('title artist duration coverArt globalBidValue uploadedAt bids uuid');
     
     res.json(transformResponse({
       success: true,

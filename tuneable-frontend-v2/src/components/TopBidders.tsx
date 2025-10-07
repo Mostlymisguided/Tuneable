@@ -22,9 +22,6 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
     return null;
   }
 
-  // Debug: Log the bids data to see what we're receiving
-  console.log('TopBidders received bids:', bids);
-
   // Sort bids by amount (highest first) and take top N
   const topBids = [...bids]
     .filter(bid => bid.userId && bid.amount > 0) // Filter out invalid bids

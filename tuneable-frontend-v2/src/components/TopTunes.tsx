@@ -48,7 +48,6 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       const fetchLimit = showAll ? 50 : Math.max(20, limit);
       const response = await topTunesAPI.getTopTunes(sortBy, fetchLimit);
       if (response.success) {
-        console.log('TopTunes API response:', response.songs);
         setSongs(response.songs);
       }
     } catch (error) {
