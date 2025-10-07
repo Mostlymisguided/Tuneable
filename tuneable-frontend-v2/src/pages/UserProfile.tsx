@@ -3,17 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
   ArrowLeft, 
-  User, 
-  Calendar, 
   MapPin, 
   Coins, 
-  Trophy, 
   Music, 
   TrendingUp,
   Clock,
-  Heart,
   ExternalLink,
-  Award,
   BarChart3,
   Activity
 } from 'lucide-react';
