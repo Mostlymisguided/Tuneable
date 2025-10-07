@@ -987,22 +987,35 @@ const Party: React.FC = () => {
                             <img
                               src={songData.coverArt || '/default-cover.jpg'}
                               alt={songData.title || 'Unknown Song'}
-                              className="w-16 h-16 rounded object-cover flex-shrink-0"
-                              width="64"
-                              height="64"
+                              className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                              width="128"
+                              height="128"
+                              onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
                             />
                             
                             {/* Song Details */}
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-white text-lg truncate">
-                                {songData.title || 'Unknown Song'} • {songData.artist || 'Unknown Artist'}
-                              </h4>
-                              <div className="flex items-center space-x-4 mt-1">
-                                <div className="flex items-center space-x-1">
+                              <div className="flex items-center space-x-2">
+                                <h4 
+                                  className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                  onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
+                                >
+                                  {songData.title || 'Unknown Song'}
+                                </h4>
+                                <span className="text-gray-400">•</span>
+                                <span className="text-gray-300 text-lg truncate font-light">
+                                  {songData.artist || 'Unknown Artist'}
+                                </span>
+                                <div className="flex items-center space-x-1 ml-2">
                                   <Clock className="h-4 w-4 text-gray-400" />
                                   <span className="text-sm text-gray-300">{formatDuration(songData.duration)}</span>
                                 </div>
                               </div>
+                              
+                              {/* Top Bidders Display */}
+                              {songData.bids && songData.bids.length > 0 && (
+                                <TopBidders bids={songData.bids} maxDisplay={5} />
+                              )}
                               
                               {/* Tags Display */}
                               {songData.tags && songData.tags.length > 0 && (
@@ -1032,11 +1045,6 @@ const Party: React.FC = () => {
                                     {songData.category}
                                   </span>
                                 </div>
-                              )}
-                              
-                              {/* Top Bidders Display */}
-                              {songData.bids && songData.bids.length > 0 && (
-                                <TopBidders bids={songData.bids} maxDisplay={5} />
                               )}
                             </div>
                             
