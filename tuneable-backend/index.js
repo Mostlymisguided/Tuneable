@@ -41,7 +41,26 @@ db.connectDB()
   });
 
 // Allowed origins: development and production
-const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://tuneable.com', 'https://tuneable.com', 'https://tuneable.pages.dev', 'https://tuneable.stream', 'http://tuneable.stream'];
+const allowedOrigins = [
+  // Local development
+  'http://localhost:3000', 
+  'http://localhost:5173', 
+  'http://localhost:5174', 
+  'http://localhost:5175', 
+  'http://127.0.0.1:5173', 
+  'http://127.0.0.1:5174', 
+  'http://127.0.0.1:5175',
+  // Production - tuneable.stream (primary)
+  'https://tuneable.stream',
+  'https://www.tuneable.stream',
+  'http://tuneable.stream',
+  // Cloudflare Pages
+  'https://tuneable.pages.dev',
+  // Legacy tuneable.com (deprecated - keeping for transition)
+  'https://tuneable.com',
+  'https://www.tuneable.com',
+  'http://tuneable.com'
+];
 
 // Define CORS options
 const corsOptions = {
