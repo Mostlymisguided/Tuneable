@@ -131,11 +131,11 @@ const AuthPage: React.FC = () => {
       <div className="mt-7 flex flex-col gap-2">
         <button
           onClick={() => handleSocialAuth('facebook')}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white p-2 text-sm font-medium text-black outline-none focus:ring-2 focus:ring-[#333] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-[#1877F2] bg-[#1877F2] p-2 text-sm font-medium text-white outline-none focus:ring-2 focus:ring-[#1877F2] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 hover:bg-[#166fe5] transition-colors"
         >
-          <svg className="h-[18px] w-[18px]" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="20" fill="#1877F2"/>
-            <path d="M29.5 16.5H26.5C25.5 16.5 24.5 17.5 24.5 18.5V21.5H29.5L28.5 26.5H24.5V37.5H19.5V26.5H16.5V21.5H19.5V18.5C19.5 14.9 21.9 12.5 25.5 12.5H29.5V16.5Z" fill="white"/>
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="#1877F2"/>
+            <path d="M16 8.25H14.5C13.75 8.25 13.25 8.75 13.25 9.5V11.25H16L15.5 14H13.25V18.75H11V14H9V11.25H11V9.5C11 7.45 12.45 6 14.5 6H16V8.25Z" fill="white"/>
           </svg>
           Continue with Facebook
         </button>
@@ -207,11 +207,11 @@ const AuthPage: React.FC = () => {
       <div className="mt-7 flex flex-col gap-2">
         <button
           onClick={() => handleSocialAuth('facebook')}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-slate-300 bg-white p-2 text-sm font-medium text-black outline-none focus:ring-2 focus:ring-[#333] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-[#1877F2] bg-[#1877F2] p-2 text-sm font-medium text-white outline-none focus:ring-2 focus:ring-[#1877F2] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 hover:bg-[#166fe5] transition-colors"
         >
-          <svg className="h-[18px] w-[18px]" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="20" fill="#1877F2"/>
-            <path d="M29.5 16.5H26.5C25.5 16.5 24.5 17.5 24.5 18.5V21.5H29.5L28.5 26.5H24.5V37.5H19.5V26.5H16.5V21.5H19.5V18.5C19.5 14.9 21.9 12.5 25.5 12.5H29.5V16.5Z" fill="white"/>
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="#1877F2"/>
+            <path d="M16 8.25H14.5C13.75 8.25 13.25 8.75 13.25 9.5V11.25H16L15.5 14H13.25V18.75H11V14H9V11.25H11V9.5C11 7.45 12.45 6 14.5 6H16V8.25Z" fill="white"/>
           </svg>
           Continue with Facebook
         </button>

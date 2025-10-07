@@ -22,11 +22,6 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
     return null;
   }
 
-  // Debug: Check the data structure
-  console.log('TopBidders bids:', bids);
-  console.log('First bid userId:', bids[0]?.userId);
-  console.log('First bid userId type:', typeof bids[0]?.userId);
-
   // Sort bids by amount (highest first) and take top N
   const topBids = [...bids]
     .filter(bid => bid.userId && bid.amount > 0) // Filter out invalid bids

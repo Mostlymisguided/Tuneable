@@ -365,7 +365,7 @@ router.get('/top-tunes', async (req, res) => {
       sortObj[sortField] = -1; // Descending for duration and date
     }
     
-    const songs = await Song.find({ globalBidValue: { $gt: 0 } }) // Only songs with bids
+    let songs = await Song.find({ globalBidValue: { $gt: 0 } }) // Only songs with bids
       .sort(sortObj)
       .limit(limitNum)
       .populate({
@@ -378,6 +378,24 @@ router.get('/top-tunes', async (req, res) => {
         },
       })
       .select('title artist duration coverArt globalBidValue uploadedAt bids uuid');
+
+    // Ensure proper population by manually checking and populating if needed
+    const Bid = require('../models/Bid');
+    const User = require('../models/User');
+    
+    for (let song of songs) {
+      if (song.bids && song.bids.length > 0) {
+        for (let bid of song.bids) {
+          // If userId is still a string, populate it manually
+          if (typeof bid.userId === 'string') {
+            const user = await User.findOne({ uuid: bid.userId }).select('username profilePic uuid');
+            if (user) {
+              bid.userId = user;
+            }
+          }
+        }
+      }
+    }
     
     res.json(transformResponse({
       success: true,
