@@ -8,6 +8,7 @@ import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
+import TopBidders from '../components/TopBidders';
 import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, RefreshCw } from 'lucide-react';
 
@@ -872,15 +873,20 @@ const Party: React.FC = () => {
                                   </div>
                                 )}
                                 
-                                {/* Category Display for Currently Playing */}
-                                {songData.category && songData.category !== 'Unknown' && (
-                                  <div className="mt-1">
-                                    <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
-                                      {songData.category}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
+                              {/* Category Display for Currently Playing */}
+                              {songData.category && songData.category !== 'Unknown' && (
+                                <div className="mt-1">
+                                  <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
+                                    {songData.category}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {/* Top Bidders Display for Currently Playing */}
+                              {songData.bids && songData.bids.length > 0 && (
+                                <TopBidders bids={songData.bids} maxDisplay={5} />
+                              )}
+                            </div>
                               
                               {/* Skip buttons for remote parties */}
                               {party.type === 'remote' && (
@@ -1036,6 +1042,11 @@ const Party: React.FC = () => {
                                     {songData.category}
                                   </span>
                                 </div>
+                              )}
+                              
+                              {/* Top Bidders Display */}
+                              {songData.bids && songData.bids.length > 0 && (
+                                <TopBidders bids={songData.bids} maxDisplay={5} />
                               )}
                             </div>
                             

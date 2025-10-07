@@ -161,7 +161,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                     model: 'Bid',
                     populate: {
                         path: 'userId',
-                        select: 'username',
+                        select: 'username profilePic uuid',  // ✅ Added profilePic and uuid for top bidders display
                     },
                 },
             })

@@ -192,18 +192,14 @@ const Profile: React.FC = () => {
             {/* Profile Picture */}
             <div className="relative group">
               <div 
-                className="w-48 h-48 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center cursor-pointer shadow-xl"
+                className="w-48 h-48 rounded-full overflow-hidden bg-white flex items-center justify-center cursor-pointer shadow-xl"
                 onClick={() => fileInputRef.current?.click()}
               >
-                {profile.profilePic ? (
-                  <img
-                    src={profile.profilePic}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="w-24 h-24 text-gray-400" />
-                )}
+                <img
+                  src={profile.profilePic || '/android-chrome-192x192.png'}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center rounded-full">
                   {isUploading ? (
