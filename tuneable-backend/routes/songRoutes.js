@@ -368,7 +368,16 @@ router.get('/top-tunes', async (req, res) => {
     const songs = await Song.find({ globalBidValue: { $gt: 0 } }) // Only songs with bids
       .sort(sortObj)
       .limit(limitNum)
-      .select('title artist duration coverArt globalBidValue uploadedAt')
+      .populate({
+        path: 'bids',
+        model: 'Bid',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'username profilePic uuid',
+        },
+      })
+      .select('title artist duration coverArt globalBidValue uploadedAt bids uuid')
       .lean();
     
     res.json(transformResponse({

@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { topTunesAPI } from '../lib/api';
 import { ArrowUpDown, Music } from 'lucide-react';
+import TopBidders from './TopBidders';
 
 interface TopTunesSong {
   id: string;
+  uuid?: string;
   title: string;
   artist: string;
   duration: number;
   coverArt: string;
   globalBidValue: number;
   uploadedAt: string;
+  bids?: Array<{
+    userId: {
+      username: string;
+      profilePic?: string;
+      uuid: string;
+    };
+    amount: number;
+  }>;
 }
 
 interface TopTunesProps {
@@ -18,19 +29,23 @@ interface TopTunesProps {
 }
 
 const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) => {
+  const navigate = useNavigate();
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('globalBidValue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [showAll, setShowAll] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     fetchTopTunes();
-  }, [sortBy, limit]);
+  }, [sortBy, limit, showAll]);
 
   const fetchTopTunes = async () => {
     try {
       setLoading(true);
-      const response = await topTunesAPI.getTopTunes(sortBy, limit);
+      const fetchLimit = showAll ? 50 : limit; // Fetch more songs when expanded
+      const response = await topTunesAPI.getTopTunes(sortBy, fetchLimit);
       if (response.success) {
         setSongs(response.songs);
       }
@@ -59,6 +74,19 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   const formatBidValue = (value: number) => {
     return `£${value.toFixed(2)}`;
   };
+
+  const handleShowMore = () => {
+    setShowAll(true);
+    setIsExpanded(true);
+  };
+
+  const handleShowLess = () => {
+    setShowAll(false);
+    setIsExpanded(false);
+  };
+
+  // Determine which songs to display
+  const displaySongs = isExpanded ? songs : songs.slice(0, limit);
 
   if (loading) {
     return (
@@ -90,6 +118,9 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Song
               </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Top Bids
+              </th>
               <th 
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('artist')}
@@ -120,40 +151,53 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {songs.length === 0 ? (
+            {displaySongs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                   <Music className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm">No songs with bids yet</p>
                 </td>
               </tr>
             ) : (
-              songs.map((song, index) => (
+              displaySongs.map((song, index) => (
                 <tr key={song.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                     {index + 1}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0 h-10 w-10">
+                      <div 
+                        className="flex-shrink-0 h-12 w-12 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => song.uuid && navigate(`/tune/${song.uuid}`)}
+                      >
                         {song.coverArt ? (
                           <img
-                            className="h-10 w-10 rounded-lg object-cover"
+                            className="h-12 w-12 rounded-lg object-cover"
                             src={song.coverArt}
                             alt={`${song.title} cover`}
                           />
                         ) : (
-                          <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                            <Music className="h-5 w-5 text-gray-400" />
+                          <div className="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
+                            <Music className="h-6 w-6 text-gray-400" />
                           </div>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p 
+                          className="text-sm font-medium text-gray-900 truncate cursor-pointer hover:text-purple-600 transition-colors"
+                          onClick={() => song.uuid && navigate(`/tune/${song.uuid}`)}
+                        >
                           {song.title}
                         </p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {song.bids && song.bids.length > 0 ? (
+                      <TopBidders bids={song.bids} maxDisplay={3} />
+                    ) : (
+                      <span className="text-sm text-gray-400">No bids</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                     {song.artist}
@@ -170,6 +214,22 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
           </tbody>
         </table>
       </div>
+      
+      {/* Show More/Less Button */}
+      {songs.length > limit && (
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={isExpanded ? handleShowLess : handleShowMore}
+            className="w-full text-center text-sm font-medium text-purple-600 hover:text-purple-800 transition-colors"
+          >
+            {isExpanded ? (
+              `Show Less (${limit} songs)`
+            ) : (
+              `Show More (${songs.length - limit} more songs)`
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
