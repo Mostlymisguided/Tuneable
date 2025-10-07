@@ -44,9 +44,11 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   const fetchTopTunes = async () => {
     try {
       setLoading(true);
-      const fetchLimit = showAll ? 50 : limit; // Fetch more songs when expanded
+      // Always fetch at least 20 songs initially to enable Show More button
+      const fetchLimit = showAll ? 50 : Math.max(20, limit);
       const response = await topTunesAPI.getTopTunes(sortBy, fetchLimit);
       if (response.success) {
+        console.log('TopTunes API response:', response.songs);
         setSongs(response.songs);
       }
     } catch (error) {
