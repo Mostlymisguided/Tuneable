@@ -11,7 +11,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
     const { amount, currency } = req.body;
-    const userId = req.user._id;
+    const userId = req.user.uuid;  // Use UUID instead of _id for Stripe metadata
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -34,7 +34,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   try {
     const { amount, currency = 'gbp' } = req.body;
-    const userId = req.user._id;
+    const userId = req.user.uuid;  // Use UUID string instead of _id ObjectId
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -59,7 +59,7 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
       success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?success=true&amount=${amount}`,
       cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?canceled=true`,
       metadata: {
-        userId: userId,
+        userId: userId,  // Now a UUID string, not ObjectId
         amount: amount.toString(),
         type: 'wallet_topup'
       },
@@ -90,12 +90,12 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     
     if (session.metadata.type === 'wallet_topup') {
       try {
-        const userId = session.metadata.userId;
+        const userId = session.metadata.userId;  // This is now a UUID string
         const amount = parseFloat(session.metadata.amount);
 
-        // Update user balance
-        const user = await User.findByIdAndUpdate(
-          userId,
+        // Update user balance - find by UUID instead of _id
+        const user = await User.findOneAndUpdate(
+          { uuid: userId },  // Find by UUID instead of _id
           { $inc: { balance: amount } },
           { new: true }
         );
@@ -116,7 +116,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 router.post('/update-balance', authMiddleware, async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user._id;
+    const userId = req.user._id;  // Use _id here since it's internal only, not passed to Stripe
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -144,7 +144,7 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
 router.post('/confirm-payment', authMiddleware, async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user._id;
+    const userId = req.user._id;  // Use _id here since it's internal only, not passed to Stripe
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
