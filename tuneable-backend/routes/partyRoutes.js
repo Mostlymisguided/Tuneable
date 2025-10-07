@@ -202,7 +202,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 sources: availablePlatforms, // ✅ Store platform data as an array
                 globalBidValue: entry.songId.globalBidValue || 0, // Keep for analytics
                 partyBidValue: entry.partyBidValue || 0, // ✅ Use party-specific bid value
-                bids: entry.partyBids || [], // ✅ Use party-specific bids
+                bids: entry.songId.bids || [], // ✅ Use populated bids from songId with user data
                 addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
                 totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
                 tags: entry.songId.tags || [], // ✅ Include tags
@@ -1067,7 +1067,20 @@ router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) =>
             return res.status(400).json({ error: 'Invalid status. Must be one of: ' + validStatuses.join(', ') });
         }
 
-        const party = await Party.findById(partyId).populate('songs.songId').populate('songs.addedBy', 'username');
+        const party = await Party.findById(partyId)
+            .populate({
+                path: 'songs.songId',
+                model: 'Song',
+                populate: {
+                    path: 'bids',
+                    model: 'Bid',
+                    populate: {
+                        path: 'userId',
+                        select: 'username profilePic uuid',  // ✅ Added profilePic and uuid for top bidders display
+                    },
+                },
+            })
+            .populate('songs.addedBy', 'username');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
@@ -1385,7 +1398,15 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
             .populate({
                 path: 'songs.songId',
                 model: 'Song',
-                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category'
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category',
+                populate: {
+                    path: 'bids',
+                    model: 'Bid',
+                    populate: {
+                        path: 'userId',
+                        select: 'username profilePic uuid',  // ✅ Added profilePic and uuid for top bidders display
+                    },
+                },
             })
             .populate('songs.addedBy', 'username');
 
@@ -1460,6 +1481,7 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
                     globalBidValue: entry.songId.globalBidValue || 0,
                     partyBidValue: entry.partyBidValue || 0, // All-time party bid value
                     timePeriodBidValue, // Bid value for the specific time period
+                    bids: entry.songId.bids || [], // ✅ Include populated bids for TopBidders component
                     addedBy: entry.addedBy,
                     status: entry.status,
                     queuedAt: entry.queuedAt,
