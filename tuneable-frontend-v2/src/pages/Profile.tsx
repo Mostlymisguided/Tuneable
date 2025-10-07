@@ -190,7 +190,7 @@ const Profile: React.FC = () => {
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-8">
           <div className="flex items-center space-x-6">
             {/* Profile Picture */}
-            <div className="relative">
+            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
               <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
                 {profile.profilePic ? (
                   <img
@@ -202,17 +202,14 @@ const Profile: React.FC = () => {
                   <User className="w-12 h-12 text-gray-400" />
                 )}
               </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+              {/* Overlay with camera icon - shows on hover */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-full transition-all duration-200 flex items-center justify-center">
                 {isUploading ? (
-                  <Upload className="w-4 h-4 text-purple-600 animate-spin" />
+                  <Upload className="w-6 h-6 text-white animate-spin" />
                 ) : (
-                  <Camera className="w-4 h-4 text-purple-600" />
+                  <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                 )}
-              </button>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
