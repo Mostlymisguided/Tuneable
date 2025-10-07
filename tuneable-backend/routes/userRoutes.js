@@ -296,12 +296,12 @@ router.get('/:userId/profile', async (req, res) => {
       .populate({
         path: 'songId',
         model: 'Song',
-        select: 'title artist coverArt duration globalBidValue uuid',
+        select: 'title artist coverArt duration globalBidValue uuid _id',
       })
       .populate({
         path: 'partyId',
         model: 'Party',
-        select: 'name partyCode uuid',
+        select: 'name partyCode uuid _id',
       })
       .sort({ createdAt: -1 }) // Most recent bids first
       .limit(50); // Limit to 50 most recent bids
@@ -345,7 +345,7 @@ router.get('/:userId/profile', async (req, res) => {
     res.json(transformResponse({
       message: 'User profile fetched successfully',
       user: {
-        _id: user._id,
+        id: user.uuid, // Use UUID as primary ID for external API
         uuid: user.uuid,
         username: user.username,
         profilePic: user.profilePic,

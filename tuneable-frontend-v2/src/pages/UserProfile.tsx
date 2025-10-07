@@ -15,7 +15,7 @@ import {
 import { userAPI } from '../lib/api';
 
 interface UserProfile {
-  _id: string;
+  id: string; // UUID as primary ID
   uuid: string;
   username: string;
   profilePic?: string;
@@ -228,22 +228,22 @@ const UserProfile: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-black/20 rounded-lg p-6 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{stats.totalBids}</div>
+                <div className="text-2xl font-bold text-white">{stats.totalBids || 0}</div>
                 <div className="text-sm text-gray-300">Total Bids</div>
               </div>
               <div className="bg-black/20 rounded-lg p-6 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">£{stats.totalAmountBid.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-white">£{(stats.totalAmountBid || 0).toFixed(2)}</div>
                 <div className="text-sm text-gray-300">Total Spent</div>
               </div>
               <div className="bg-black/20 rounded-lg p-6 text-center">
                 <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">£{stats.averageBidAmount.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-white">£{(stats.averageBidAmount || 0).toFixed(2)}</div>
                 <div className="text-sm text-gray-300">Avg Bid</div>
               </div>
               <div className="bg-black/20 rounded-lg p-6 text-center">
                 <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{stats.uniqueSongsCount}</div>
+                <div className="text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
                 <div className="text-sm text-gray-300">Unique Songs</div>
               </div>
             </div>
@@ -264,22 +264,22 @@ const UserProfile: React.FC = () => {
                       </div>
                     </div>
                     <img
-                      src={bid.songId.coverArt || '/android-chrome-192x192.png'}
-                      alt={`${bid.songId.title} cover`}
+                      src={bid.songId?.coverArt || '/android-chrome-192x192.png'}
+                      alt={`${bid.songId?.title || 'Unknown Song'} cover`}
                       className="w-16 h-16 rounded-lg object-cover"
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-semibold text-white">{bid.songId.title}</h3>
+                        <h3 className="text-lg font-semibold text-white">{bid.songId?.title || 'Unknown Song'}</h3>
                         <span className="text-gray-400">by</span>
-                        <span className="text-purple-300">{bid.songId.artist}</span>
+                        <span className="text-purple-300">{bid.songId?.artist || 'Unknown Artist'}</span>
                       </div>
                       <div className="text-sm text-gray-400">
-                        {bid.partyId.name} • {formatDate(bid.createdAt)}
+                        {bid.partyId?.name || 'Unknown Party'} • {formatDate(bid.createdAt)}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-green-400">£{bid.amount.toFixed(2)}</div>
+                      <div className="text-2xl font-bold text-green-400">£{bid.amount?.toFixed(2) || '0.00'}</div>
                       <div className="text-sm text-gray-400">Bid Amount</div>
                     </div>
                   </div>
@@ -296,36 +296,37 @@ const UserProfile: React.FC = () => {
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
                 {songsWithBids.map((songData) => (
-                  <div key={songData.song._id} className="flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
+                  <div key={songData.song?.uuid || songData.song?._id || 'unknown'} className="flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
                     <img
-                      src={songData.song.coverArt || '/android-chrome-192x192.png'}
-                      alt={`${songData.song.title} cover`}
+                      src={songData.song?.coverArt || '/android-chrome-192x192.png'}
+                      alt={`${songData.song?.title || 'Unknown Song'} cover`}
                       className="w-16 h-16 rounded-lg object-cover"
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-semibold text-white">{songData.song.title}</h3>
+                        <h3 className="text-lg font-semibold text-white">{songData.song?.title || 'Unknown Song'}</h3>
                         <span className="text-gray-400">by</span>
-                        <span className="text-purple-300">{songData.song.artist}</span>
+                        <span className="text-purple-300">{songData.song?.artist || 'Unknown Artist'}</span>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-gray-400">
                         <span className="flex items-center">
                           <Clock className="w-4 h-4 mr-1" />
-                          {formatDuration(songData.song.duration)}
+                          {formatDuration(songData.song?.duration)}
                         </span>
                         <span className="flex items-center">
                           <Activity className="w-4 h-4 mr-1" />
-                          {songData.bidCount} bid{songData.bidCount !== 1 ? 's' : ''}
+                          {songData.bidCount || 0} bid{(songData.bidCount || 0) !== 1 ? 's' : ''}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-green-400">£{songData.totalAmount.toFixed(2)}</div>
+                      <div className="text-xl font-bold text-green-400">£{(songData.totalAmount || 0).toFixed(2)}</div>
                       <div className="text-sm text-gray-400">Total Bid</div>
                     </div>
                     <button
-                      onClick={() => navigate(`/tune/${songData.song.uuid}`)}
+                      onClick={() => songData.song?.uuid && navigate(`/tune/${songData.song.uuid}`)}
                       className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
+                      disabled={!songData.song?.uuid}
                     >
                       <ExternalLink className="w-4 h-4 mr-2" />
                       View Song
