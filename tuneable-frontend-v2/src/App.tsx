@@ -24,6 +24,7 @@ import Search from './pages/Search';
 import Wallet from './pages/Wallet';
 import PodcastDiscovery from './pages/PodcastDiscovery';
 import TuneProfile from './pages/TuneProfile';
+import UserProfile from './pages/UserProfile';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -128,6 +129,10 @@ const AppContent = () => {
             <Route 
               path="/tune/:songId" 
               element={<TuneProfile />} 
+            />
+            <Route 
+              path="/user/:userId" 
+              element={<UserProfile />} 
             />
           </Routes>
         </main>

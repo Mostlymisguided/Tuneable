@@ -265,4 +265,112 @@ router.post('/make-admin/:userId', async (req, res) => {
   }
 });
 
+// @route   GET /api/users/:userId/profile
+// @desc    Get comprehensive user profile with bidding history
+// @access  Public (for viewing user profiles)
+router.get('/:userId/profile', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Find user by UUID or ObjectId
+    let user;
+    if (userId.includes('-')) {
+      // UUID format
+      user = await User.findOne({ uuid: userId });
+    } else if (mongoose.Types.ObjectId.isValid(userId)) {
+      // ObjectId format
+      user = await User.findById(userId);
+    } else {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get user's bidding history with song details
+    const Bid = require('../models/Bid');
+    const Song = require('../models/Song');
+    
+    const userBids = await Bid.find({ userId: user._id })
+      .populate({
+        path: 'songId',
+        model: 'Song',
+        select: 'title artist coverArt duration globalBidValue uuid',
+      })
+      .populate({
+        path: 'partyId',
+        model: 'Party',
+        select: 'name partyCode uuid',
+      })
+      .sort({ createdAt: -1 }) // Most recent bids first
+      .limit(50); // Limit to 50 most recent bids
+
+    // Calculate bidding statistics
+    const totalBids = userBids.length;
+    const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+    const averageBidAmount = totalBids > 0 ? totalAmountBid / totalBids : 0;
+    
+    // Get unique songs bid on
+    const uniqueSongs = [...new Set(userBids.map(bid => bid.songId?._id?.toString()).filter(Boolean))];
+    
+    // Get top 5 highest bids
+    const topBids = [...userBids]
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    // Group bids by song for display
+    const bidsBySong = {};
+    userBids.forEach(bid => {
+      if (bid.songId) {
+        const songId = bid.songId._id.toString();
+        if (!bidsBySong[songId]) {
+          bidsBySong[songId] = {
+            song: bid.songId,
+            bids: [],
+            totalAmount: 0,
+            bidCount: 0,
+          };
+        }
+        bidsBySong[songId].bids.push(bid);
+        bidsBySong[songId].totalAmount += bid.amount;
+        bidsBySong[songId].bidCount += 1;
+      }
+    });
+
+    // Convert to array and sort by total amount bid
+    const songsWithBids = Object.values(bidsBySong)
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    res.json(transformResponse({
+      message: 'User profile fetched successfully',
+      user: {
+        _id: user._id,
+        uuid: user.uuid,
+        username: user.username,
+        profilePic: user.profilePic,
+        email: user.email,
+        balance: user.balance,
+        homeLocation: user.homeLocation,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      stats: {
+        totalBids,
+        totalAmountBid,
+        averageBidAmount,
+        uniqueSongsCount: uniqueSongs.length,
+      },
+      topBids,
+      songsWithBids,
+    }));
+
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Error fetching user profile', details: error.message });
+  }
+});
+
 module.exports = router;

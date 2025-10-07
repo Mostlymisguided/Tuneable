@@ -321,5 +321,12 @@ export const topTunesAPI = {
   },
 };
 
+export const userAPI = {
+  getProfile: async (userId: string) => {
+    const response = await api.get(`/users/${userId}/profile`);
+    return response.data;
+  },
+};
+
 
 export default api;
