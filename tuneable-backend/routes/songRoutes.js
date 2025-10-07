@@ -6,6 +6,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 const Song = require("../models/Song");
 const Party = require("../models/Party");
+const Comment = require("../models/Comment");
 const { isValidObjectId } = require("../utils/validators");
 const { transformResponse } = require('../utils/uuidTransform');
 
@@ -276,6 +277,70 @@ router.get("/:partyId/songs/:songId", authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/songs/:songId/profile
+// @desc    Get comprehensive song details for Tune Profile page
+// @access  Public (for viewing song details)
+router.get('/:songId/profile', async (req, res) => {
+  try {
+    const { songId } = req.params;
+
+    // Find song by UUID or ObjectId
+    let song;
+    if (songId.includes('-')) {
+      // UUID format
+      song = await Song.findOne({ uuid: songId });
+    } else if (isValidObjectId(songId)) {
+      // ObjectId format
+      song = await Song.findById(songId);
+    } else {
+      return res.status(400).json({ error: 'Invalid song ID format' });
+    }
+
+    if (!song) {
+      return res.status(404).json({ error: 'Song not found' });
+    }
+
+    // Populate song with bids and user data
+    const populatedSong = await Song.findById(song._id)
+      .populate({
+        path: 'bids',
+        model: 'Bid',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'username profilePic uuid', // Include profilePic for TopBidders
+        },
+      })
+      .populate({
+        path: 'addedBy',
+        model: 'User',
+        select: 'username profilePic uuid',
+      });
+
+    // Fetch recent comments for the song (limit to 5 for preview)
+    const recentComments = await Comment.find({ 
+      songId: song._id, 
+      parentCommentId: null,
+      isDeleted: false 
+    })
+      .populate('userId', 'username profilePic uuid')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Add comments to the response
+    populatedSong.comments = recentComments;
+
+    res.json(transformResponse({
+      message: 'Song profile fetched successfully',
+      song: populatedSong,
+    }));
+
+  } catch (error) {
+    console.error('Error fetching song profile:', error);
+    res.status(500).json({ error: 'Error fetching song profile', details: error.message });
+  }
+});
+
 // @route   GET /api/songs/top-tunes
 // @desc    Get top songs by global bid value for Top Tunes
 // @access  Public
@@ -320,6 +385,208 @@ router.get('/top-tunes', async (req, res) => {
       error: 'Error fetching Top Tunes songs', 
       details: err.message 
     });
+  }
+});
+
+// ==================== COMMENT ROUTES ====================
+
+// @route   POST /api/songs/:songId/comments
+// @desc    Create a new comment on a song
+// @access  Private (requires authentication)
+router.post('/:songId/comments', authMiddleware, async (req, res) => {
+  try {
+    const { songId } = req.params;
+    const { content, parentCommentId } = req.body;
+    const userId = req.user._id;
+
+    // Validate content
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'Comment content is required' });
+    }
+
+    if (content.length > 1000) {
+      return res.status(400).json({ error: 'Comment must be less than 1000 characters' });
+    }
+
+    // Validate song exists
+    let song;
+    if (songId.includes('-')) {
+      song = await Song.findOne({ uuid: songId });
+    } else if (isValidObjectId(songId)) {
+      song = await Song.findById(songId);
+    } else {
+      return res.status(400).json({ error: 'Invalid song ID format' });
+    }
+
+    if (!song) {
+      return res.status(404).json({ error: 'Song not found' });
+    }
+
+    // Create comment
+    const comment = new Comment({
+      content: content.trim(),
+      userId,
+      songId: song._id,
+      parentCommentId: parentCommentId || null,
+    });
+
+    await comment.save();
+
+    // Populate user data for response
+    await comment.populate('userId', 'username profilePic uuid');
+
+    res.status(201).json(transformResponse({
+      message: 'Comment created successfully',
+      comment,
+    }));
+
+  } catch (error) {
+    console.error('Error creating comment:', error);
+    res.status(500).json({ error: 'Error creating comment', details: error.message });
+  }
+});
+
+// @route   GET /api/songs/:songId/comments
+// @desc    Get all comments for a song
+// @access  Public
+router.get('/:songId/comments', async (req, res) => {
+  try {
+    const { songId } = req.params;
+    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    // Validate song exists
+    let song;
+    if (songId.includes('-')) {
+      song = await Song.findOne({ uuid: songId });
+    } else if (isValidObjectId(songId)) {
+      song = await Song.findById(songId);
+    } else {
+      return res.status(400).json({ error: 'Invalid song ID format' });
+    }
+
+    if (!song) {
+      return res.status(404).json({ error: 'Song not found' });
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Fetch comments (top-level only, no replies for now)
+    const comments = await Comment.find({ 
+      songId: song._id, 
+      parentCommentId: null,
+      isDeleted: false 
+    })
+      .populate('userId', 'username profilePic uuid')
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count
+    const totalComments = await Comment.countDocuments({ 
+      songId: song._id, 
+      parentCommentId: null,
+      isDeleted: false 
+    });
+
+    res.json(transformResponse({
+      message: 'Comments fetched successfully',
+      comments,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalComments,
+        pages: Math.ceil(totalComments / parseInt(limit)),
+      },
+    }));
+
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ error: 'Error fetching comments', details: error.message });
+  }
+});
+
+// @route   POST /api/comments/:commentId/like
+// @desc    Like/unlike a comment
+// @access  Private (requires authentication)
+router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user._id;
+
+    if (!isValidObjectId(commentId)) {
+      return res.status(400).json({ error: 'Invalid comment ID format' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    // Check if user already liked the comment
+    const hasLiked = comment.likes.includes(userId);
+
+    if (hasLiked) {
+      // Unlike
+      comment.likes.pull(userId);
+    } else {
+      // Like
+      comment.likes.push(userId);
+    }
+
+    await comment.save();
+    await comment.populate('userId', 'username profilePic uuid');
+
+    res.json(transformResponse({
+      message: hasLiked ? 'Comment unliked' : 'Comment liked',
+      comment,
+      hasLiked: !hasLiked,
+    }));
+
+  } catch (error) {
+    console.error('Error toggling comment like:', error);
+    res.status(500).json({ error: 'Error toggling comment like', details: error.message });
+  }
+});
+
+// @route   DELETE /api/comments/:commentId
+// @desc    Delete a comment (soft delete)
+// @access  Private (comment owner only)
+router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user._id;
+
+    if (!isValidObjectId(commentId)) {
+      return res.status(400).json({ error: 'Invalid comment ID format' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    // Check if user owns the comment
+    if (comment.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'You can only delete your own comments' });
+    }
+
+    // Soft delete
+    comment.isDeleted = true;
+    comment.deletedAt = new Date();
+    await comment.save();
+
+    res.json(transformResponse({
+      message: 'Comment deleted successfully',
+    }));
+
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Error deleting comment', details: error.message });
   }
 });
 

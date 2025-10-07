@@ -269,6 +269,31 @@ export const songAPI = {
     });
     return response.data;
   },
+
+  getProfile: async (songId: string) => {
+    const response = await api.get(`/songs/${songId}/profile`);
+    return response.data;
+  },
+  
+  getComments: async (songId: string, page = 1, limit = 20) => {
+    const response = await api.get(`/songs/${songId}/comments?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+  
+  createComment: async (songId: string, content: string) => {
+    const response = await api.post(`/songs/${songId}/comments`, { content });
+    return response.data;
+  },
+  
+  likeComment: async (commentId: string) => {
+    const response = await api.post(`/comments/${commentId}/like`);
+    return response.data;
+  },
+  
+  deleteComment: async (commentId: string) => {
+    const response = await api.delete(`/comments/${commentId}`);
+    return response.data;
+  },
 };
 
 // Search API

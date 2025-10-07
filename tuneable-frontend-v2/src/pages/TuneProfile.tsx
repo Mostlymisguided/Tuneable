@@ -1,0 +1,457 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { 
+  ArrowLeft, 
+  Music, 
+  User, 
+  Calendar, 
+  Clock, 
+  Heart, 
+  ThumbsUp,
+  Trash2,
+  Edit,
+  Play,
+  ExternalLink,
+  Globe,
+  Tag,
+  Mic,
+  Disc,
+  Headphones,
+  Volume2
+} from 'lucide-react';
+import { songAPI } from '../lib/api';
+import TopBidders from '../components/TopBidders';
+import { useAuth } from '../contexts/AuthContext';
+
+interface Song {
+  _id: string;
+  uuid: string;
+  title: string;
+  artist: string;
+  producer?: string;
+  featuring?: string[];
+  rightsHolder?: string;
+  rightsHolderEmail?: string;
+  album?: string;
+  genre?: string;
+  releaseDate?: string;
+  duration?: number;
+  coverArt?: string;
+  explicit?: boolean;
+  isrc?: string;
+  upc?: string;
+  globalBidValue?: number;
+  bpm?: number;
+  pitch?: number;
+  key?: string;
+  elements?: string[];
+  tags?: string[];
+  category?: string;
+  timeSignature?: string;
+  bitrate?: number;
+  sampleRate?: number;
+  lyrics?: string;
+  playCount?: number;
+  popularity?: number;
+  sources?: { [key: string]: string };
+  bids?: Bid[];
+  comments?: Comment[];
+  addedBy?: {
+    _id: string;
+    username: string;
+    profilePic?: string;
+    uuid: string;
+  };
+  uploadedAt?: string;
+  updatedAt?: string;
+}
+
+interface Bid {
+  _id: string;
+  userId: {
+    _id: string;
+    username: string;
+    profilePic?: string;
+    uuid: string;
+  };
+  amount: number;
+  createdAt: string;
+}
+
+interface Comment {
+  _id: string;
+  content: string;
+  userId: {
+    _id: string;
+    username: string;
+    profilePic?: string;
+    uuid: string;
+  };
+  likeCount: number;
+  likes: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+const TuneProfile: React.FC = () => {
+  const { songId } = useParams<{ songId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const [song, setSong] = useState<Song | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [showAllFields, setShowAllFields] = useState(false);
+
+  useEffect(() => {
+    if (songId) {
+      fetchSongProfile();
+    }
+  }, [songId]);
+
+  const fetchSongProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await songAPI.getProfile(songId!);
+      setSong(response.song);
+      setComments(response.song.comments || []);
+    } catch (err: any) {
+      console.error('Error fetching song profile:', err);
+      setError(err.response?.data?.error || 'Failed to load song profile');
+      toast.error('Failed to load song profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim() || !songId || !user) return;
+
+    try {
+      setSubmittingComment(true);
+      const response = await songAPI.createComment(songId, newComment.trim());
+      setComments(prev => [response.comment, ...prev]);
+      setNewComment('');
+      toast.success('Comment added successfully!');
+    } catch (err: any) {
+      console.error('Error creating comment:', err);
+      toast.error(err.response?.data?.error || 'Failed to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    if (!user) {
+      toast.error('Please log in to like comments');
+      return;
+    }
+
+    try {
+      const response = await songAPI.likeComment(commentId);
+      setComments(prev => prev.map(comment => 
+        comment._id === commentId 
+          ? { ...comment, likeCount: response.hasLiked ? comment.likeCount + 1 : comment.likeCount - 1 }
+          : comment
+      ));
+    } catch (err: any) {
+      console.error('Error liking comment:', err);
+      toast.error('Failed to like comment');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+
+    try {
+      await songAPI.deleteComment(commentId);
+      setComments(prev => prev.filter(comment => comment._id !== commentId));
+      toast.success('Comment deleted successfully');
+    } catch (err: any) {
+      console.error('Error deleting comment:', err);
+      toast.error('Failed to delete comment');
+    }
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return 'Unknown';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getFieldValue = (value: any, fallback = 'Not specified') => {
+    if (value === null || value === undefined || value === '') return fallback;
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : fallback;
+    return value.toString();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading song profile...</div>
+      </div>
+    );
+  }
+
+  if (error || !song) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-white text-xl mb-4">Error loading song profile</div>
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const songFields = [
+    { label: 'Title', value: song.title, icon: Music },
+    { label: 'Artist', value: song.artist, icon: Mic },
+    { label: 'Producer', value: song.producer, icon: Volume2 },
+    { label: 'Featuring', value: song.featuring, icon: User },
+    { label: 'Album', value: song.album, icon: Disc },
+    { label: 'Genre', value: song.genre, icon: Tag },
+    { label: 'Release Date', value: song.releaseDate, icon: Calendar },
+    { label: 'Duration', value: song.duration ? formatDuration(song.duration) : null, icon: Clock },
+    { label: 'Explicit', value: song.explicit ? 'Yes' : 'No', icon: Globe },
+    { label: 'ISRC', value: song.isrc, icon: Music },
+    { label: 'UPC', value: song.upc, icon: Disc },
+    { label: 'BPM', value: song.bpm, icon: Headphones },
+    { label: 'Key', value: song.key, icon: Music },
+    { label: 'Time Signature', value: song.timeSignature, icon: Music },
+    { label: 'Bitrate', value: song.bitrate ? `${song.bitrate} kbps` : null, icon: Headphones },
+    { label: 'Sample Rate', value: song.sampleRate ? `${song.sampleRate} Hz` : null, icon: Headphones },
+    { label: 'Elements', value: song.elements, icon: Tag },
+    { label: 'Tags', value: song.tags, icon: Tag },
+    { label: 'Category', value: song.category, icon: Tag },
+    { label: 'Play Count', value: song.playCount, icon: Play },
+    { label: 'Popularity', value: song.popularity, icon: Heart },
+  ];
+
+  const visibleFields = showAllFields ? songFields : songFields.slice(0, 8);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center text-white hover:text-purple-300 mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back
+          </button>
+          
+          <div className="flex items-start space-x-6">
+            {/* Album Art */}
+            <div className="flex-shrink-0">
+              <img
+                src={song.coverArt || '/android-chrome-192x192.png'}
+                alt={`${song.title} cover`}
+                className="w-48 h-48 rounded-lg shadow-xl object-cover"
+              />
+            </div>
+            
+            {/* Song Info */}
+            <div className="flex-1 text-white">
+              <h1 className="text-4xl font-bold mb-2">{song.title}</h1>
+              <p className="text-2xl text-purple-300 mb-4">{song.artist}</p>
+              
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-black/20 rounded-lg p-4">
+                  <div className="text-sm text-gray-300">Global Bid Value</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    £{song.globalBidValue?.toFixed(2) || '0.00'}
+                  </div>
+                </div>
+                <div className="bg-black/20 rounded-lg p-4">
+                  <div className="text-sm text-gray-300">Play Count</div>
+                  <div className="text-2xl font-bold text-blue-400">
+                    {song.playCount || 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Platform Links */}
+              {song.sources && Object.keys(song.sources).length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">Listen on:</h3>
+                  <div className="flex space-x-3">
+                    {Object.entries(song.sources).map(([platform, url]) => (
+                      <a
+                        key={platform}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Bidders */}
+        {song.bids && song.bids.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-4">Top Bidders</h2>
+            <div className="bg-black/20 rounded-lg p-6">
+              <TopBidders bids={song.bids} maxDisplay={10} />
+            </div>
+          </div>
+        )}
+
+        {/* Song Details */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-white">Song Details</h2>
+            <button
+              onClick={() => setShowAllFields(!showAllFields)}
+              className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              {showAllFields ? 'Show Less' : 'Show All Fields'}
+            </button>
+          </div>
+          
+          <div className="bg-black/20 rounded-lg p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {visibleFields.map((field, index) => {
+                const IconComponent = field.icon;
+                return (
+                  <div key={index} className="flex items-start space-x-3">
+                    <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
+                    <div>
+                      <div className="text-sm text-gray-300">{field.label}</div>
+                      <div className="text-white font-medium">
+                        {getFieldValue(field.value)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Lyrics Section */}
+            {song.lyrics && (
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <h3 className="text-lg font-semibold text-white mb-3">Lyrics</h3>
+                <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
+                  {song.lyrics}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Comments Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">Comments</h2>
+          
+          {/* Add Comment Form */}
+          {user && (
+            <div className="bg-black/20 rounded-lg p-6 mb-6">
+              <form onSubmit={handleSubmitComment}>
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Share your thoughts about this song..."
+                  className="w-full h-24 bg-black/20 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-purple-500"
+                  maxLength={1000}
+                />
+                <div className="flex justify-between items-center mt-3">
+                  <div className="text-sm text-gray-400">
+                    {newComment.length}/1000 characters
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!newComment.trim() || submittingComment}
+                    className="px-6 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
+                  >
+                    {submittingComment ? 'Posting...' : 'Post Comment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Comments List */}
+          <div className="space-y-4">
+            {comments.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                No comments yet. Be the first to share your thoughts!
+              </div>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment._id} className="bg-black/20 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <img
+                      src={comment.userId.profilePic || '/android-chrome-192x192.png'}
+                      alt={comment.userId.username}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="font-semibold text-white">
+                          {comment.userId.username}
+                        </span>
+                        <span className="text-sm text-gray-400">
+                          {formatDate(comment.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-gray-300 mb-3">{comment.content}</p>
+                      
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={() => handleLikeComment(comment._id)}
+                          className="flex items-center space-x-1 text-gray-400 hover:text-purple-400 transition-colors"
+                        >
+                          <ThumbsUp className="w-4 h-4" />
+                          <span>{comment.likeCount}</span>
+                        </button>
+                        
+                        {user && comment.userId._id === user.id && (
+                          <button
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="flex items-center space-x-1 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TuneProfile;

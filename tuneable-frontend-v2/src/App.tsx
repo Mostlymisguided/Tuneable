@@ -23,6 +23,7 @@ import Payment from './pages/Payment';
 import Search from './pages/Search';
 import Wallet from './pages/Wallet';
 import PodcastDiscovery from './pages/PodcastDiscovery';
+import TuneProfile from './pages/TuneProfile';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -123,6 +124,10 @@ const AppContent = () => {
                   <Wallet />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/tune/:songId" 
+              element={<TuneProfile />} 
             />
           </Routes>
         </main>
