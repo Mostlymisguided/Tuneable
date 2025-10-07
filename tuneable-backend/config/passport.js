@@ -21,8 +21,13 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       let user = await User.findOne({ facebookId: profile.id });
       
       if (user) {
-        // User exists, update their Facebook access token and location if available
+        // User exists, update their Facebook access token
         user.facebookAccessToken = accessToken;
+        
+        // Update profile picture if user doesn't have one
+        if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
+          user.profilePic = profile.photos[0].value;
+        }
         
         // Update location if available and not already set
         if (profile._json && profile._json.location && !user.homeLocation.city) {
@@ -41,9 +46,17 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         user = await User.findOne({ email: profile.emails[0].value });
         
         if (user) {
+          // Check if this is the first time linking Facebook
+          const isFirstFacebookLink = !user.facebookId;
+          
           // Link Facebook account to existing user
           user.facebookId = profile.id;
           user.facebookAccessToken = accessToken;
+          
+          // Update profile picture if user doesn't have one or is linking Facebook for first time
+          if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstFacebookLink)) {
+            user.profilePic = profile.photos[0].value;
+          }
           
           // Update location if available and not already set
           if (profile._json && profile._json.location && !user.homeLocation.city) {
