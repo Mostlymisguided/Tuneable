@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Music, Users, DollarSign, Plus } from 'lucide-react';
+import TopTunes from '../components/TopTunes';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -15,6 +16,11 @@ const Dashboard: React.FC = () => {
         <p className="text-gray-600 mt-2">
           Ready to create some amazing music experiences?
         </p>
+      </div>
+
+      {/* Top Tunes Section */}
+      <div className="mb-8">
+        <TopTunes limit={5} showHeader={true} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
