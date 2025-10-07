@@ -266,11 +266,17 @@ const UserProfile: React.FC = () => {
                     <img
                       src={bid.songId?.coverArt || '/android-chrome-192x192.png'}
                       alt={`${bid.songId?.title || 'Unknown Song'} cover`}
-                      className="w-16 h-16 rounded-lg object-cover"
+                      className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => bid.songId?.uuid && navigate(`/tune/${bid.songId.uuid}`)}
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-semibold text-white">{bid.songId?.title || 'Unknown Song'}</h3>
+                        <h3 
+                          className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
+                          onClick={() => bid.songId?.uuid && navigate(`/tune/${bid.songId.uuid}`)}
+                        >
+                          {bid.songId?.title || 'Unknown Song'}
+                        </h3>
                         <span className="text-gray-400">by</span>
                         <span className="text-purple-300">{bid.songId?.artist || 'Unknown Artist'}</span>
                       </div>
@@ -300,11 +306,17 @@ const UserProfile: React.FC = () => {
                     <img
                       src={songData.song?.coverArt || '/android-chrome-192x192.png'}
                       alt={`${songData.song?.title || 'Unknown Song'} cover`}
-                      className="w-16 h-16 rounded-lg object-cover"
+                      className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => songData.song?.uuid && navigate(`/tune/${songData.song.uuid}`)}
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-semibold text-white">{songData.song?.title || 'Unknown Song'}</h3>
+                        <h3 
+                          className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
+                          onClick={() => songData.song?.uuid && navigate(`/tune/${songData.song.uuid}`)}
+                        >
+                          {songData.song?.title || 'Unknown Song'}
+                        </h3>
                         <span className="text-gray-400">by</span>
                         <span className="text-purple-300">{songData.song?.artist || 'Unknown Artist'}</span>
                       </div>
