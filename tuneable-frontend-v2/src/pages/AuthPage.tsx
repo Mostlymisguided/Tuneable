@@ -43,10 +43,12 @@ const AuthPage: React.FC = () => {
   const message = urlParams.get('message');
 
   const handleSocialAuth = (provider: 'facebook' | 'google') => {
+    // VITE_API_URL already includes /api, so don't add it again
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     if (provider === 'facebook') {
-      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/facebook`;
+      window.location.href = `${baseUrl}/auth/facebook`;
     } else if (provider === 'google') {
-      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/google`;
+      window.location.href = `${baseUrl}/auth/google`;
     }
   };
 
