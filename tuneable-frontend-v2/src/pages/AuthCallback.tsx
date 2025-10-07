@@ -9,31 +9,34 @@ const AuthCallback: React.FC = () => {
   const { handleOAuthCallback } = useAuth();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const userParam = searchParams.get('user');
-    const error = searchParams.get('error');
+    const handleAuth = async () => {
+      const token = searchParams.get('token');
+      const error = searchParams.get('error');
 
-    if (error) {
-      toast.error('Authentication failed. Please try again.');
-      navigate('/login');
-      return;
-    }
+      if (error) {
+        toast.error('Authentication failed. Please try again.');
+        navigate('/login');
+        return;
+      }
 
-    if (token && userParam) {
-      try {
-        const userData = JSON.parse(decodeURIComponent(userParam));
-        handleOAuthCallback(token, userData);
-        toast.success('Login successful!');
-        navigate('/dashboard');
-      } catch (error) {
-        console.error('Error parsing user data:', error);
+      if (token) {
+        try {
+          // handleOAuthCallback now fetches user data automatically
+          await handleOAuthCallback(token);
+          toast.success('Login successful!');
+          navigate('/dashboard');
+        } catch (error) {
+          console.error('Error during OAuth callback:', error);
+          toast.error('Authentication failed. Please try again.');
+          navigate('/login');
+        }
+      } else {
         toast.error('Authentication failed. Please try again.');
         navigate('/login');
       }
-    } else {
-      toast.error('Authentication failed. Please try again.');
-      navigate('/login');
-    }
+    };
+
+    handleAuth();
   }, [searchParams, navigate, handleOAuthCallback]);
 
   return (

@@ -20,13 +20,19 @@ module.exports = async (req, res, next) => {
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
 
-        // Validate that userId is a valid ObjectId
-        if (!mongoose.Types.ObjectId.isValid(decoded.userId)) {
+        // Fetch user by UUID (new approach) or fallback to _id (legacy support)
+        let user;
+        
+        // Check if userId looks like a UUID (contains hyphens) or ObjectId (24 hex chars)
+        if (decoded.userId && decoded.userId.includes('-')) {
+            // UUID format - look up by uuid field
+            user = await User.findOne({ uuid: decoded.userId }).select("_id uuid username email");
+        } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
+            // Legacy ObjectId format - look up by _id for backward compatibility
+            user = await User.findById(decoded.userId).select("_id uuid username email");
+        } else {
             throw new Error("Invalid userId format in token");
         }
-
-        // Fetch the full user details from MongoDB
-        const user = await User.findById(decoded.userId).select("_id username");
 
         if (!user) {
             return res.status(401).json({ error: "User not found" });
@@ -35,7 +41,7 @@ module.exports = async (req, res, next) => {
         // Attach the full user object to req.user
         req.user = user;
 
-        console.log("✅ Authenticated User:", req.user);
+        console.log("✅ Authenticated User:", req.user.username, "(UUID:", req.user.uuid + ")");
         next();
     } catch (err) {
         return res.status(401).json({ error: "Invalid token", details: err.message });

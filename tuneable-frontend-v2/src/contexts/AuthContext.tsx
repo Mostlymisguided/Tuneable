@@ -42,7 +42,7 @@ interface AuthContextType {
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalance: number) => void;
-  handleOAuthCallback: (token: string, userData: any) => void;
+  handleOAuthCallback: (token: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -127,11 +127,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user');
   };
 
-  const handleOAuthCallback = (token: string, userData: any) => {
-    setToken(token);
-    setUser(userData);
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+  const handleOAuthCallback = async (token: string) => {
+    try {
+      // Store token first
+      setToken(token);
+      localStorage.setItem('token', token);
+      
+      // Fetch user data using the token
+      const response = await authAPI.getProfile();
+      setUser(response.user);
+      localStorage.setItem('user', JSON.stringify(response.user));
+    } catch (error) {
+      // If fetching user fails, clear the token
+      console.error('Failed to fetch user after OAuth:', error);
+      setToken(null);
+      localStorage.removeItem('token');
+      throw error;
+    }
   };
 
   const refreshUser = async () => {

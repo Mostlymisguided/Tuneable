@@ -123,8 +123,20 @@ router.post(
       
       console.log('User registered successfully:', user);
 
+      // Generate JWT token for auto-login using UUID
+      const token = jwt.sign(
+        { 
+          userId: user.uuid,  // Use UUID instead of _id
+          email: user.email, 
+          username: user.username 
+        },
+        SECRET_KEY,
+        { expiresIn: '24h' }
+      );
+
       res.status(201).json(transformResponse({
         message: 'User registered successfully',
+        token,  // Include token for auto-login
         user: user,
       }));
     } catch (error) {
@@ -148,7 +160,12 @@ router.post(
       if (!user || !(await bcrypt.compare(password, user.password))) {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
-      const token = jwt.sign({ userId: user._id, email: user.email, username: user.username }, SECRET_KEY, { expiresIn: '24h' });
+      // Generate JWT token using UUID
+      const token = jwt.sign({ 
+        userId: user.uuid,  // Use UUID instead of _id
+        email: user.email, 
+        username: user.username 
+      }, SECRET_KEY, { expiresIn: '24h' });
 
       res.json(transformResponse({ message: 'Login successful!', token, user }));
     } catch (error) {

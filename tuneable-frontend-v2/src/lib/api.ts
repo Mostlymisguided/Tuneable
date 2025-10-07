@@ -107,6 +107,11 @@ export const authAPI = {
     });
     return response.data;
   },
+  
+  refreshToken: async () => {
+    const response = await api.post('/auth/refresh');
+    return response.data;
+  },
 };
 
 // Payment API
