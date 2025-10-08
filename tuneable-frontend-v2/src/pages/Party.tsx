@@ -301,8 +301,10 @@ const Party: React.FC = () => {
     }
     
     if (user && party) {
-      const hostId = typeof party.host === 'string' ? party.host : party.host.id;
-      setIsHost(user.id === hostId);
+      // Use UUID comparison for consistency
+      const hostUuid = party.host_uuid || (typeof party.host === 'object' ? party.host.id : party.host);
+      setIsHost(user.id === hostUuid);
+      console.log('🔍 isHost check:', { userId: user.id, hostUuid, isHost: user.id === hostUuid });
     }
   }, [party, user, partyId, currentPartyId, setQueue, setCurrentSong, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
@@ -364,9 +366,10 @@ const Party: React.FC = () => {
       const response = await partyAPI.getPartyDetails(partyId!);
       setParty(response.party);
       
-      // Check if current user is the host
-      const hostId = typeof response.party.host === 'object' ? response.party.host.id : response.party.host;
-      setIsHost(user?.id === hostId);
+      // Check if current user is the host (use UUID)
+      const hostUuid = response.party.host_uuid || (typeof response.party.host === 'object' ? response.party.host.id : response.party.host);
+      setIsHost(user?.id === hostUuid);
+      console.log('🔍 fetchPartyDetails isHost check:', { userId: user?.id, hostUuid, isHost: user?.id === hostUuid });
       
       // Note: Song setting is now handled by the useEffect hook
       // to prevent interference with global player state
