@@ -21,9 +21,6 @@ const songSchema = new mongoose.Schema({
   // Global bidding system (for analytics across all parties)
   globalBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   globalBidValue: { type: Number, default: 0 }, // Tracks total bid amount across all parties (for analytics)
-  
-  // Legacy field for backward compatibility (deprecated)
-  bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
 
   // Platform-specific URLs (Flexible Map)
   sources: {
