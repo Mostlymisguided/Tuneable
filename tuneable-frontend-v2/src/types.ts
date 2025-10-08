@@ -205,10 +205,10 @@ export interface Party {
   id: string;
   name: string;
   location: string;
-  host: string;
+  host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   host_uuid?: string; // UUID reference for host
   partyCode: string;
-  attendees: string[];
+  attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   songs: PartySong[];
   startTime: string;
   musicSource: 'youtube' | 'spotify' | 'direct_upload';

@@ -107,7 +107,6 @@ async function migrateBidsToMedia() {
           { 
             $set: { 
               bids: mediaBids.map(b => b._id),
-              globalBids: mediaBids.map(b => b._id),
               globalBidValue: mediaBids.reduce((sum, b) => sum + b.amount, 0)
             }
           }

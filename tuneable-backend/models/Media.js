@@ -307,9 +307,9 @@ mediaSchema.virtual('primaryArtist').get(function() {
 mediaSchema.virtual('summary').get(function() {
   // Get top 10 bids sorted by amount
   let topBids = [];
-  if (this.globalBids && this.globalBids.length > 0) {
+  if (this.bids && this.bids.length > 0) {
     // Sort bids by amount (descending) and take top 10
-    topBids = [...this.globalBids]
+    topBids = [...this.bids]
       .sort((a, b) => (b.amount || 0) - (a.amount || 0))
       .slice(0, 10)
       .map(bid => ({

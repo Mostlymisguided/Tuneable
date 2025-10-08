@@ -406,8 +406,8 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
                 await user.save();
 
                 // Update the song with bid info
-                song.globalBids = song.globalBids || [];
-                song.globalBids.push(bid._id);
+                song.bids = song.bids || [];
+                song.bids.push(bid._id);
                 song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
                 await song.save();
 
@@ -516,8 +516,8 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
                 await user.save();
 
                 // Update the song with bid info
-                song.globalBids = song.globalBids || [];
-                song.globalBids.push(bid._id);
+                song.bids = song.bids || [];
+                song.bids.push(bid._id);
                 song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
                 await song.save();
 
@@ -866,7 +866,7 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
 
         // ✅ Fetch updated song with populated bid info for response
         const updatedSong = await Song.findById(song._id).populate({
-            path: 'globalBids',
+            path: 'bids',
             populate: { path: 'userId', select: 'username' }
         });
 

@@ -38,7 +38,6 @@ const podcastEpisodeSchema = new mongoose.Schema({
   
   // Tuneable-specific fields (similar to Song model)
   globalBidValue: { type: Number, default: 0 },
-  globalBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
   // Metadata

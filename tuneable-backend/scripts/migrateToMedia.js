@@ -60,8 +60,7 @@ async function migrateToMedia() {
           
           sources: song.sources || new Map(),
           globalBidValue: song.globalBidValue || 0,
-          globalBids: song.globalBids || song.bids || [],
-          bids: song.bids || [], // Legacy field
+          bids: song.bids || [],
           addedBy: song.addedBy,
           addedBy_uuid: song.addedBy_uuid,
           uploadedAt: song.uploadedAt,
@@ -143,8 +142,7 @@ async function migrateToMedia() {
           
           sources: new Map([['rss', episode.rssUrl]]),
           globalBidValue: episode.globalBidValue || 0,
-          globalBids: episode.globalBids || episode.bids || [],
-          bids: episode.bids || [], // Legacy field
+          bids: episode.bids || [],
           addedBy: episode.addedBy,
           uploadedAt: episode.uploadedAt,
           playCount: episode.playCount || 0,
