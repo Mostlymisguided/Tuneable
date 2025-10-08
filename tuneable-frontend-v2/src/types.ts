@@ -144,6 +144,15 @@ export interface Media {
   // Platform sources
   sources: Record<string, string>;
   
+  // External platform IDs (for deduplication & syncing)
+  externalIds?: Record<string, string>;
+  
+  // Podcast series reference
+  podcastSeries?: string;
+  
+  // Transcript (for podcasts/videos)
+  transcript?: string;
+  
   // Bidding
   globalBidValue: number;
   bids?: Array<{

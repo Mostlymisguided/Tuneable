@@ -129,7 +129,8 @@ const mediaSchema = new mongoose.Schema({
   explicit: { type: Boolean, default: false }, // Explicit content flag
   isrc: { type: String, default: null }, // International Standard Recording Code
   upc: { type: String, default: null }, // Universal Product Code
-  lyrics: { type: String }, // Song lyrics or transcript
+  lyrics: { type: String }, // Song lyrics
+  transcript: { type: String }, // Podcast/video transcript
   bpm: { type: Number },
   key: { type: String },
   pitch: { type: Number },
@@ -171,9 +172,17 @@ const mediaSchema = new mongoose.Schema({
   // Episode/Series information (for podcasts, TV shows, etc.)
   episodeNumber: { type: Number, default: null },
   seasonNumber: { type: Number, default: null },
+  podcastSeries: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', default: null }, // Reference to podcast series Media item
   
   // Platform sources (flexible map)
   sources: {
+    type: Map,
+    of: String,
+    default: {}
+  },
+  
+  // External platform IDs (for syncing & deduplication)
+  externalIds: {
     type: Map,
     of: String,
     default: {}
@@ -258,6 +267,12 @@ mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
 mediaSchema.index({ releaseDate: -1 }); // Index for release date sorting
 mediaSchema.index({ episodeNumber: 1, seasonNumber: 1 }); // Index for episode/season queries
+mediaSchema.index({ podcastSeries: 1 }); // Index for podcast series lookups
+mediaSchema.index({ "externalIds.podcastIndex": 1 }); // Index for Podcast Index lookups
+mediaSchema.index({ "externalIds.taddy": 1 }); // Index for Taddy UUID lookups
+mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
+mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
+mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify lookups
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.target_uuid": 1 }); // Index for finding relationships to specific media
 mediaSchema.index({ title: 'text', description: 'text' });
