@@ -4,7 +4,8 @@ const path = require("path");
 const mongoose = require("mongoose");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
-const Song = require("../models/Song");
+const Song = require("../models/Song"); // Legacy model
+const Media = require("../models/Media"); // New unified model
 const Party = require("../models/Party");
 const Comment = require("../models/Comment");
 const { isValidObjectId } = require("../utils/validators");
@@ -284,56 +285,111 @@ router.get('/:songId/profile', async (req, res) => {
   try {
     const { songId } = req.params;
 
-    // Find song by UUID or ObjectId
-    let song;
+    // Try to find in Media collection first (new unified model)
+    let media;
     if (songId.includes('-')) {
       // UUID format
-      song = await Song.findOne({ uuid: songId });
+      media = await Media.findOne({ uuid: songId });
     } else if (isValidObjectId(songId)) {
       // ObjectId format
-      song = await Song.findById(songId);
+      media = await Media.findById(songId);
     } else {
-      return res.status(400).json({ error: 'Invalid song ID format' });
+      return res.status(400).json({ error: 'Invalid media ID format' });
     }
 
-    if (!song) {
-      return res.status(404).json({ error: 'Song not found' });
-    }
-
-    // Populate song with bids and user data
-    const populatedSong = await Song.findById(song._id)
-      .populate({
-        path: 'bids',
-        model: 'Bid',
-        populate: {
-          path: 'userId',
-          model: 'User',
-          select: 'username profilePic uuid', // Include profilePic for TopBidders
-        },
-      })
+    // Fallback to legacy Song collection if not found in Media
+    if (!media) {
+      let song;
+      if (songId.includes('-')) {
+        song = await Song.findOne({ uuid: songId });
+      } else if (isValidObjectId(songId)) {
+        song = await Song.findById(songId);
+      }
+      
+      if (!song) {
+        return res.status(404).json({ error: 'Media not found' });
+      }
+      
+      // Populate legacy song with bids and user data
+      const populatedSong = await Song.findById(song._id)
+        .populate({
+          path: 'bids',
+          model: 'Bid',
+          populate: {
+            path: 'userId',
+            model: 'User',
+            select: 'username profilePic uuid',
+          },
+        })
       .populate({
         path: 'addedBy',
         model: 'User',
         select: 'username profilePic uuid',
       });
 
-    // Fetch recent comments for the song (limit to 5 for preview)
-    const recentComments = await Comment.find({ 
-      songId: song._id, 
-      parentCommentId: null,
-      isDeleted: false 
-    })
-      .populate('userId', 'username profilePic uuid')
-      .sort({ createdAt: -1 })
-      .limit(5);
+      // Fetch recent comments for the legacy song
+      const recentComments = await Comment.find({ 
+        songId: song._id, 
+        parentCommentId: null,
+        isDeleted: false 
+      })
+        .populate('userId', 'username profilePic uuid')
+        .sort({ createdAt: -1 })
+        .limit(5);
 
-    // Add comments to the response
-    populatedSong.comments = recentComments;
+      // Add comments to the response
+      populatedSong.comments = recentComments;
 
-    res.json(transformResponse({
-      message: 'Song profile fetched successfully',
-      song: populatedSong,
-    }));
+      res.json(transformResponse({
+        message: 'Song profile fetched successfully',
+        song: populatedSong,
+      }));
+      
+    } else {
+      // Handle new Media model
+      const populatedMedia = await Media.findById(media._id)
+        .populate({
+          path: 'bids',
+          model: 'Bid',
+          populate: {
+            path: 'userId',
+            model: 'User',
+            select: 'username profilePic uuid',
+          },
+        })
+        .populate({
+          path: 'addedBy',
+          model: 'User',
+          select: 'username profilePic uuid',
+        });
+
+      // Fetch recent comments for the media
+      const recentComments = await Comment.find({ 
+        songId: media._id, 
+        parentCommentId: null,
+        isDeleted: false 
+      })
+        .populate('userId', 'username profilePic uuid')
+        .sort({ createdAt: -1 })
+        .limit(5);
+
+      // Add comments to the response
+      populatedMedia.comments = recentComments;
+
+      // Transform Media to match expected format
+      const transformedMedia = {
+        ...populatedMedia.toObject(),
+        artist: populatedMedia.artist && populatedMedia.artist.length > 0 ? 
+                populatedMedia.artist[0].name : 'Unknown Artist', // Primary artist name
+        artists: populatedMedia.artist || [], // Full artist subdocuments
+        creators: populatedMedia.creatorNames || [], // All creator names
+      };
+
+      res.json(transformResponse({
+        message: 'Media profile fetched successfully',
+        song: transformedMedia,
+      }));
+    }
 
   } catch (error) {
     console.error('Error fetching song profile:', error);
@@ -348,24 +404,39 @@ router.get('/top-tunes', async (req, res) => {
   try {
     const { sortBy = 'globalBidValue', limit = 10 } = req.query;
     
-    // Validate sortBy parameter
-    const validSortFields = ['globalBidValue', 'title', 'artist', 'duration', 'uploadedAt'];
+    // Validate sortBy parameter - map legacy fields to new Media fields
+    const validSortFields = ['globalBidValue', 'title', 'creators', 'duration', 'uploadedAt'];
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'globalBidValue';
     
+    // Map legacy field names to Media model fields
+    const fieldMapping = {
+      'title': 'title',
+      'artist': 'creators', // Map artist to creators
+      'duration': 'duration',
+      'globalBidValue': 'globalBidValue',
+      'uploadedAt': 'uploadedAt'
+    };
+    
+    const mediaSortField = fieldMapping[sortField] || sortField;
+    
     // Validate limit parameter
-    const limitNum = Math.min(parseInt(limit) || 10, 100); // Max 100 songs
+    const limitNum = Math.min(parseInt(limit) || 10, 100); // Max 100 items
     
     // Build sort object
     let sortObj = {};
-    if (sortField === 'globalBidValue') {
-      sortObj[sortField] = -1; // Descending for bid value
-    } else if (sortField === 'title' || sortField === 'artist') {
-      sortObj[sortField] = 1; // Ascending for text fields
+    if (mediaSortField === 'globalBidValue') {
+      sortObj[mediaSortField] = -1; // Descending for bid value
+    } else if (mediaSortField === 'title' || mediaSortField === 'creators') {
+      sortObj[mediaSortField] = 1; // Ascending for text fields
     } else {
-      sortObj[sortField] = -1; // Descending for duration and date
+      sortObj[mediaSortField] = -1; // Descending for duration and date
     }
     
-    let songs = await Song.find({ globalBidValue: { $gt: 0 } }) // Only songs with bids
+    // Use new Media model, filtering for music content
+    let media = await Media.find({ 
+      globalBidValue: { $gt: 0 },
+      contentType: { $in: ['music'] } // Only music content for now
+    })
       .sort(sortObj)
       .limit(limitNum)
       .populate({
@@ -377,15 +448,15 @@ router.get('/top-tunes', async (req, res) => {
           select: 'username profilePic uuid',
         },
       })
-      .select('title artist duration coverArt globalBidValue uploadedAt bids uuid');
+      .select('title artist producer featuring creatorNames duration coverArt globalBidValue uploadedAt bids uuid contentType contentForm genres category');
 
     // Ensure proper population by manually checking and populating if needed
     const Bid = require('../models/Bid');
     const User = require('../models/User');
     
-    for (let song of songs) {
-      if (song.bids && song.bids.length > 0) {
-        for (let bid of song.bids) {
+    for (let mediaItem of media) {
+      if (mediaItem.bids && mediaItem.bids.length > 0) {
+        for (let bid of mediaItem.bids) {
           // If userId is still a string, populate it manually
           if (typeof bid.userId === 'string') {
             const user = await User.findOne({ uuid: bid.userId }).select('username profilePic uuid');
@@ -397,10 +468,29 @@ router.get('/top-tunes', async (req, res) => {
       }
     }
     
+    // Transform Media items to match expected frontend format
+    const transformedSongs = media.map(item => ({
+      id: item.uuid || item._id,
+      uuid: item.uuid,
+      title: item.title,
+      artist: item.artist && item.artist.length > 0 ? item.artist[0].name : 'Unknown Artist', // Primary artist name
+      artists: item.artist || [], // Full artist array with subdocuments
+      creators: item.creatorNames || [], // All creator names
+      producer: item.producer || [],
+      featuring: item.featuring || [],
+      duration: item.duration,
+      coverArt: item.coverArt,
+      globalBidValue: item.globalBidValue,
+      uploadedAt: item.uploadedAt,
+      bids: item.bids,
+      contentType: item.contentType,
+      contentForm: item.contentForm
+    }));
+    
     res.json(transformResponse({
       success: true,
-      songs: songs,
-      total: songs.length,
+      songs: transformedSongs,
+      total: transformedSongs.length,
       sortBy: sortField,
       limit: limitNum
     }));

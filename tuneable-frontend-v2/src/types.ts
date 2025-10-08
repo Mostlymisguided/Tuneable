@@ -32,6 +32,14 @@ export interface RegisterData {
   };
 }
 
+// Creator subdocument interface
+export interface Creator {
+  name: string;
+  userId?: string | null;
+  verified: boolean;
+}
+
+// Legacy Song interface (for backward compatibility)
 export interface Song {
   id: string;
   title: string;
@@ -53,6 +61,110 @@ export interface Song {
   playCount: number;
   popularity: number;
   lyrics?: string;
+}
+
+// Media relationship interface
+export interface MediaRelationship {
+  type: 'remix_of' | 'cover_of' | 'sampled_in' | 'uses_sample' | 'same_series' | 'inspired_by' | 'references' | 'other';
+  target_uuid: string;
+  description?: string;
+}
+
+// New unified Media interface
+export interface Media {
+  id: string;
+  uuid: string;
+  title: string;
+  
+  // Content classification
+  contentType: string[];
+  contentForm: string[];
+  mediaType: string[];
+  
+  // Creators (hybrid subdocuments)
+  artist?: Creator[];
+  producer?: Creator[];
+  featuring?: Creator[];
+  songwriter?: Creator[];
+  composer?: Creator[];
+  host?: Creator[];
+  guest?: Creator[];
+  narrator?: Creator[];
+  director?: Creator[];
+  cinematographer?: Creator[];
+  editor?: Creator[];
+  author?: Creator[];
+  label?: Creator[];
+  
+  // Auto-generated creator names
+  creatorNames: string[];
+  
+  // Metadata
+  duration?: number;
+  fileSize?: number;
+  coverArt?: string;
+  description?: string;
+  tags: string[];
+  genres: string[];
+  category?: string;
+  
+  // Release information
+  album?: string;
+  EP?: string;
+  releaseDate?: string;
+  
+  // Episode/Series
+  episodeNumber?: number;
+  seasonNumber?: number;
+  
+  // Music-specific metadata
+  explicit?: boolean;
+  isrc?: string;
+  upc?: string;
+  lyrics?: string;
+  bpm?: number;
+  key?: string;
+  pitch?: number;
+  timeSignature?: string;
+  bitrate?: number;
+  sampleRate?: number;
+  elements?: string[];
+  rightsHolder?: string;
+  
+  // Video/Image metadata
+  resolution?: string;
+  aspectRatio?: string;
+  colorSpace?: string;
+  
+  // Written content metadata
+  pages?: number;
+  wordCount?: number;
+  language?: string;
+  
+  // Platform sources
+  sources: Record<string, string>;
+  
+  // Bidding
+  globalBidValue: number;
+  bids?: Array<{
+    userId: {
+      username: string;
+      profilePic?: string;
+      uuid: string;
+    };
+    amount: number;
+  }>;
+  
+  // Relationships
+  relationships?: MediaRelationship[];
+  
+  // System metadata
+  addedBy: string;
+  uploadedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  playCount: number;
+  popularity: number;
 }
 
 export interface SearchResult {

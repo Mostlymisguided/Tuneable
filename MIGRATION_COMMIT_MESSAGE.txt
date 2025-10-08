@@ -1,0 +1,69 @@
+🚀 Implement unified Media model to replace Song/PodcastEpisode
+
+Major architectural improvement to support multiple content types beyond music.
+
+## ✨ New Features
+
+### 1. Unified Media Model (`models/Media.js`)
+- Flexible classification system with contentType, contentForm, and mediaType arrays
+- Support for multiple content types: music, spoken, video, image, written, interactive
+- Multiple creators support (replaces single artist field)
+- Comprehensive metadata fields:
+  * Music: producer, featuring, rightsHolder, explicit, isrc, upc, bpm, key, pitch, timeSignature, bitrate, sampleRate, elements
+  * Video/Image: resolution, aspectRatio, colorSpace
+  * Written: pages, wordCount, language
+  * Universal: coverArt, description, tags, genre, category, sources (platform-agnostic Map)
+
+### 2. Updated Supporting Models
+- **Bid Model**: Added mediaId reference (keeping songId/episodeId for backward compatibility)
+- **Party Model**: Added media array (keeping songs array for backward compatibility)
+- **Comment Model**: Ready for future mediaId support (currently uses songId)
+
+### 3. Migration Infrastructure
+- `scripts/migrateToMedia.js`: Migrates Songs/Episodes to Media collection
+- `scripts/migrateBidsToMedia.js`: Updates Bids to reference Media items
+- Both scripts properly load .env and run against MongoDB Atlas
+
+### 4. API Updates
+- Updated `routes/songRoutes.js` to use Media model with Song fallback
+- `/api/songs/top-tunes`: Now queries Media collection
+- `/api/songs/:songId/profile`: Supports both Media and Song lookups
+- Transforms Media responses for frontend compatibility (creators[0] → artist)
+
+## 🔧 Technical Improvements
+
+1. **Disabled Bid auto-populate** to prevent circular dependency issues
+2. **UUID-first approach** for all Media items
+3. **Backward compatibility** maintained throughout
+4. **Platform agnostic** sources using Map instead of fixed fields
+
+## 📊 Migration Results (MongoDB Atlas)
+
+- ✅ 45 songs → Media items
+- ✅ 5 podcast episodes → Media items
+- ✅ 111 bids updated with mediaId references
+- ✅ 44 media items updated with bid data
+- ✅ 13 parties updated with media array
+- ✅ 50 total media items created
+
+## 📝 Documentation
+
+- Added `MEDIA_MIGRATION_GUIDE.md` with comprehensive documentation
+- Includes usage examples, API changes, and rollback plan
+
+## ⚠️ Breaking Changes
+
+None - all changes are backward compatible. Legacy Song/PodcastEpisode models remain functional.
+
+## 🚀 Next Steps
+
+1. Update frontend TypeScript interfaces
+2. Update frontend components to use new Media structure
+3. Test thoroughly before removing legacy models
+4. Consider migrating Comment model to use mediaId
+
+---
+
+Co-authored-by: AI Assistant
+Date: October 8, 2025
+

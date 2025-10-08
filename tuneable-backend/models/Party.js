@@ -43,6 +43,33 @@ const PartySchema = new mongoose.Schema({
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   attendee_uuids: [{ type: String }], // UUID references for external API usage
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
+  
+  // New unified media collection
+  media: [
+    {
+      mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', required: true },
+      media_uuid: { type: String }, // UUID reference for external API usage
+      addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      addedBy_uuid: { type: String },
+      partyBidValue: { type: Number, default: 0 },
+      partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
+      
+      // Status and timing (universal)
+      status: { 
+        type: String, 
+        enum: ['queued', 'playing', 'played', 'vetoed'], 
+        default: 'queued' 
+      },
+      queuedAt: { type: Date, default: Date.now },
+      playedAt: { type: Date, default: null },
+      completedAt: { type: Date, default: null },
+      vetoedAt: { type: Date, default: null },
+      vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      vetoedBy_uuid: { type: String }
+    }
+  ],
+  
+  // Legacy songs collection (for backward compatibility during migration)
   songs: [
     {
       // Support both songs and podcast episodes

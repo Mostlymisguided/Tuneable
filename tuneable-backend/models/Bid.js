@@ -13,6 +13,13 @@ const bidSchema = new mongoose.Schema({
         ref: 'Party', 
         required: true 
     },
+    // New unified Media reference
+    mediaId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Media', 
+        required: false 
+    },
+    // Legacy references (for backward compatibility)
     songId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Song', 
@@ -26,8 +33,9 @@ const bidSchema = new mongoose.Schema({
     // UUID references for external API usage
     user_uuid: { type: String },
     party_uuid: { type: String },
-    song_uuid: { type: String },
-    episode_uuid: { type: String },
+    media_uuid: { type: String }, // New unified UUID reference
+    song_uuid: { type: String }, // Legacy
+    episode_uuid: { type: String }, // Legacy
     amount: { 
         type: Number, 
         required: true, 
@@ -44,13 +52,15 @@ const bidSchema = new mongoose.Schema({
     },
 });
 
-// Validation to ensure either songId or episodeId is provided
+// Validation to ensure either mediaId, songId, or episodeId is provided
 bidSchema.pre('validate', function(next) {
-    if (!this.songId && !this.episodeId) {
-        return next(new Error('Either songId or episodeId must be provided'));
+    if (!this.mediaId && !this.songId && !this.episodeId) {
+        return next(new Error('Either mediaId, songId, or episodeId must be provided'));
     }
-    if (this.songId && this.episodeId) {
-        return next(new Error('Cannot have both songId and episodeId'));
+    // Count how many are set
+    const refCount = [this.mediaId, this.songId, this.episodeId].filter(Boolean).length;
+    if (refCount > 1) {
+        return next(new Error('Cannot have multiple content references (mediaId, songId, episodeId)'));
     }
     next();
 });
@@ -58,20 +68,26 @@ bidSchema.pre('validate', function(next) {
 // Indexes
 bidSchema.index({ userId: 1 });
 bidSchema.index({ partyId: 1 });
-bidSchema.index({ songId: 1 });
-bidSchema.index({ episodeId: 1 });
+bidSchema.index({ mediaId: 1 }); // New unified index
+bidSchema.index({ songId: 1 }); // Legacy
+bidSchema.index({ episodeId: 1 }); // Legacy
 
 
 // Populate references for convenience
-bidSchema.pre(/^find/, function(next) {
-    this.populate('userId').populate('partyId');
-    if (this.songId) {
-        this.populate('songId');
-    }
-    if (this.episodeId) {
-        this.populate('episodeId');
-    }
-    next();
-});
+// NOTE: Disabled auto-populate to prevent issues with Media model population
+// Use explicit .populate() calls in routes instead
+// bidSchema.pre(/^find/, function(next) {
+//     this.populate('userId').populate('partyId');
+//     if (this.mediaId) {
+//         this.populate('mediaId');
+//     }
+//     if (this.songId) {
+//         this.populate('songId');
+//     }
+//     if (this.episodeId) {
+//         this.populate('episodeId');
+//     }
+//     next();
+// });
 
 module.exports = mongoose.model('Bid', bidSchema);
