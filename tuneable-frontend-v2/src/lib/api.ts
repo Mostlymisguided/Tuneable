@@ -197,11 +197,6 @@ export const partyAPI = {
     return response.data;
   },
   
-  vetoSong: async (partyId: string, songId: string) => {
-    const response = await api.post(`/parties/${partyId}/songs/${songId}/veto`);
-    return response.data;
-  },
-  
   playSong: async (partyId: string, songId: string) => {
     const response = await api.post(`/parties/${partyId}/songs/${songId}/play`);
     return response.data;
