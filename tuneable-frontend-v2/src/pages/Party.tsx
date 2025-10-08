@@ -302,7 +302,7 @@ const Party: React.FC = () => {
     
     if (user && party) {
       // Use UUID comparison for consistency
-      const hostUuid = party.host_uuid || (typeof party.host === 'object' ? party.host.id : party.host);
+      const hostUuid = (party as any).host_uuid || (typeof party.host === 'object' ? party.host.id : party.host);
       setIsHost(user.id === hostUuid);
       console.log('🔍 isHost check:', { userId: user.id, hostUuid, isHost: user.id === hostUuid });
     }
@@ -367,7 +367,7 @@ const Party: React.FC = () => {
       setParty(response.party);
       
       // Check if current user is the host (use UUID)
-      const hostUuid = response.party.host_uuid || (typeof response.party.host === 'object' ? response.party.host.id : response.party.host);
+      const hostUuid = (response.party as any).host_uuid || (typeof response.party.host === 'object' ? response.party.host.id : response.party.host);
       setIsHost(user?.id === hostUuid);
       console.log('🔍 fetchPartyDetails isHost check:', { userId: user?.id, hostUuid, isHost: user?.id === hostUuid });
       
