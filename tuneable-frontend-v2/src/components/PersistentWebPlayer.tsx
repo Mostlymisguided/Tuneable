@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, Volume2, VolumeX, Maximize, Music, X } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Music, X, SkipForward, SkipBack } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -837,57 +837,70 @@ const PersistentWebPlayer: React.FC = () => {
               </div>
             </div>
 
-            {/* Main Play/Pause Button */}
-            <button
-              onClick={() => {
-                console.log('Play/pause button clicked, current state:', isPlaying);
-                setIsManualControl(true);
-                togglePlayPause();
-                
-                // For Spotify, also trigger Web API calls to ensure playback
-                if (musicSource === 'spotify') {
-                  setTimeout(() => {
-                    const newState = !isPlaying; // This will be the new state after togglePlayPause
-                    console.log('Triggering Spotify Web API for state:', newState);
-                    
-                    if (newState) {
-                      resumeSpotifyPlayback();
-                    } else {
-                      pauseSpotifyPlayback();
-                    }
-                    
-                    // Re-enable automatic state sync after a delay
+            {/* Playback Controls */}
+            <div className="flex items-center space-x-2">
+              {/* Previous/Skip Back Button */}
+              <button
+                onClick={previous}
+                disabled={currentSongIndex === 0 || !currentSong}
+                className="w-8 h-8 bg-gray-700/50 text-white rounded-full flex items-center justify-center hover:bg-gray-600/50 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-700/50"
+                title="Previous Song"
+              >
+                <SkipBack className="h-4 w-4" />
+              </button>
+
+              {/* Main Play/Pause Button */}
+              <button
+                onClick={() => {
+                  console.log('Play/pause button clicked, current state:', isPlaying);
+                  setIsManualControl(true);
+                  togglePlayPause();
+                  
+                  // For Spotify, also trigger Web API calls to ensure playback
+                  if (musicSource === 'spotify') {
+                    setTimeout(() => {
+                      const newState = !isPlaying; // This will be the new state after togglePlayPause
+                      console.log('Triggering Spotify Web API for state:', newState);
+                      
+                      if (newState) {
+                        resumeSpotifyPlayback();
+                      } else {
+                        pauseSpotifyPlayback();
+                      }
+                      
+                      // Re-enable automatic state sync after a delay
+                      setTimeout(() => {
+                        setIsManualControl(false);
+                      }, 1000);
+                    }, 200);
+                  } else {
+                    // For non-Spotify, just re-enable after a short delay
                     setTimeout(() => {
                       setIsManualControl(false);
-                    }, 1000);
-                  }, 200);
-                } else {
-                  // For non-Spotify, just re-enable after a short delay
-                  setTimeout(() => {
-                    setIsManualControl(false);
-                  }, 500);
-                }
-              }}
+                    }, 500);
+                  }
+                }}
               className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              disabled={!isHost || !currentSong}
-            >
-              {isPlaying ? (
-                <Pause className="h-6 w-6 ml-0.5" />
-              ) : (
-                <Play className="h-6 w-6 ml-1" />
-              )}
-            </button>
-
-            {/* Veto Button - Only visible to host when song is playing */}
-            {isHost && currentSong && (
-              <button
-                onClick={handleVetoCurrentSong}
-                className="w-10 h-10 bg-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/30 transition-all duration-200 rounded-full flex items-center justify-center"
-                title="Veto this song (emergency only)"
+              disabled={!currentSong}
+              title={currentSong ? (isPlaying ? 'Pause' : 'Play') : 'No song playing'}
               >
-                <X className="h-5 w-5" />
+                {isPlaying ? (
+                  <Pause className="h-6 w-6 ml-0.5" />
+                ) : (
+                  <Play className="h-6 w-6 ml-1" />
+                )}
               </button>
-            )}
+
+              {/* Next/Skip Forward Button */}
+              <button
+                onClick={next}
+                disabled={currentSongIndex >= queue.length - 1 || !currentSong}
+                className="w-8 h-8 bg-gray-700/50 text-white rounded-full flex items-center justify-center hover:bg-gray-600/50 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-700/50"
+                title="Next Song"
+              >
+                <SkipForward className="h-4 w-4" />
+              </button>
+            </div>
 
             {/* Fullscreen Button */}
             <button
