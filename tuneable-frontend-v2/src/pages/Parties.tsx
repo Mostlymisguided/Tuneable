@@ -12,9 +12,9 @@ interface PartyType {
   id: string;
   name: string;
   location: string;
-  host: string | { id: string; username: string; userId: string; _id: string };
+  host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   partyCode: string;
-  attendees: (string | { id: string; username: string; userId: string; _id: string })[];
+  attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   songs: any[];
   startTime: string;
   endTime?: string;
