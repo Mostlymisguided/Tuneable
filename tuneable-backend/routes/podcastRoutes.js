@@ -189,8 +189,8 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     
     // Update episode
     episode.globalBidValue += amount;
-    episode.globalBids = episode.globalBids || [];
-    episode.globalBids.push(bid._id);
+    episode.bids = episode.bids || [];
+    episode.bids.push(bid._id);
     await episode.save();
     
     res.json({ message: 'Episode boosted successfully!', episode });
@@ -277,8 +277,8 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     
     // Update global episode
     episode.globalBidValue += amount;
-    episode.globalBids = episode.globalBids || [];
-    episode.globalBids.push(bid._id);
+    episode.bids = episode.bids || [];
+    episode.bids.push(bid._id);
     await episode.save();
     
     res.json({ message: 'Episode added to party and bid placed!', episode });

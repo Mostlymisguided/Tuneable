@@ -254,7 +254,7 @@ router.get("/:partyId/songs/:songId", authMiddleware, async (req, res) => {
     //  the song details with populated bid info
     const song = await Song.findById(songId)
       .populate({
-        path: "globalBids",
+        path: "bids",
         populate: {
           path: "userId",
           model: "User",
@@ -313,7 +313,7 @@ router.get('/:songId/profile', async (req, res) => {
       // Populate legacy song with bids and user data
       const populatedSong = await Song.findById(song._id)
         .populate({
-          path: 'globalBids',
+          path: 'bids',
           model: 'Bid',
           populate: {
             path: 'userId',
@@ -349,7 +349,7 @@ router.get('/:songId/profile', async (req, res) => {
       // Handle new Media model
       const populatedMedia = await Media.findById(media._id)
         .populate({
-          path: 'globalBids',
+          path: 'bids',
           model: 'Bid',
           populate: {
             path: 'userId',
@@ -440,7 +440,7 @@ router.get('/top-tunes', async (req, res) => {
       .sort(sortObj)
       .limit(limitNum)
       .populate({
-        path: 'globalBids',
+        path: 'bids',
         model: 'Bid',
         populate: {
           path: 'userId',
@@ -448,15 +448,15 @@ router.get('/top-tunes', async (req, res) => {
           select: 'username profilePic uuid',
         },
       })
-      .select('title artist producer featuring creatorNames duration coverArt globalBidValue uploadedAt globalBids uuid contentType contentForm genres category');
+      .select('title artist producer featuring creatorNames duration coverArt globalBidValue uploadedAt bids uuid contentType contentForm genres category');
 
     // Ensure proper population by manually checking and populating if needed
     const Bid = require('../models/Bid');
     const User = require('../models/User');
     
     for (let mediaItem of media) {
-      if (mediaItem.globalBids && mediaItem.globalBids.length > 0) {
-        for (let bid of mediaItem.globalBids) {
+      if (mediaItem.bids && mediaItem.bids.length > 0) {
+        for (let bid of mediaItem.bids) {
           // If userId is still a string, populate it manually
           if (typeof bid.userId === 'string') {
             const user = await User.findOne({ uuid: bid.userId }).select('username profilePic uuid');
@@ -482,7 +482,7 @@ router.get('/top-tunes', async (req, res) => {
       coverArt: item.coverArt,
       globalBidValue: item.globalBidValue,
       uploadedAt: item.uploadedAt,
-      bids: item.globalBids, // Map globalBids to 'bids' for frontend compatibility
+      bids: item.bids,
       contentType: item.contentType,
       contentForm: item.contentForm
     }));

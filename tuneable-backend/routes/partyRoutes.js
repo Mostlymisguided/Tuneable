@@ -155,9 +155,9 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             .populate({
                 path: 'songs.songId',
                 model: 'Song',
-                select: 'title artist duration coverArt sources globalBidValue globalBids addedBy tags category', // ✅ Added `addedBy`, `tags`, `category`
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category', // ✅ Added `addedBy`, `tags`, `category`
                 populate: {
-                    path: 'globalBids',
+                    path: 'bids',
                     model: 'Bid',
                     populate: {
                         path: 'userId',
@@ -202,7 +202,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 sources: availablePlatforms, // ✅ Store platform data as an array
                 globalBidValue: entry.songId.globalBidValue || 0, // Keep for analytics
                 partyBidValue: entry.partyBidValue || 0, // ✅ Use party-specific bid value
-                bids: entry.songId.globalBids || [], // ✅ Use populated globalBids from songId with user data
+                bids: entry.songId.bids || [], // ✅ Use populated bids from songId with user data
                 addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
                 totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
                 tags: entry.songId.tags || [], // ✅ Include tags
@@ -634,8 +634,8 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
         await user.save();
 
                 // ✅ Update the song with bid info
-                song.globalBids = song.globalBids || [];
-                song.globalBids.push(bid._id);
+                song.bids = song.bids || [];
+                song.bids.push(bid._id);
                 song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
                 await song.save();
 
@@ -851,8 +851,8 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
         await user.save();
 
         // ✅ Update GLOBAL song bid info (for analytics)
-        song.globalBids = song.globalBids || [];
-        song.globalBids.push(bid._id);
+        song.bids = song.bids || [];
+        song.bids.push(bid._id);
         song.globalBidValue = (song.globalBidValue || 0) + bidAmount;
         
         await song.save();
@@ -1397,9 +1397,9 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
             .populate({
                 path: 'songs.songId',
                 model: 'Song',
-                select: 'title artist duration coverArt sources globalBidValue globalBids addedBy tags category',
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category',
                 populate: {
-                    path: 'globalBids',
+                    path: 'bids',
                     model: 'Bid',
                     populate: {
                         path: 'userId',
@@ -1480,7 +1480,7 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
                     globalBidValue: entry.songId.globalBidValue || 0,
                     partyBidValue: entry.partyBidValue || 0, // All-time party bid value
                     timePeriodBidValue, // Bid value for the specific time period
-                    bids: entry.songId.globalBids || [], // ✅ Include populated globalBids for TopBidders component
+                    bids: entry.songId.bids || [], // ✅ Include populated bids for TopBidders component
                     tags: entry.songId.tags || [], // ✅ Include tags for display
                     category: entry.songId.category || null, // ✅ Include category for display
                     addedBy: entry.addedBy,

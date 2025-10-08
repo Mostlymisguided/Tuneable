@@ -190,7 +190,7 @@ const mediaSchema = new mongoose.Schema({
   
   // Bidding system (universal)
   globalBidValue: { type: Number, default: 0 },
-  globalBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
+  bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
   // Universal metadata
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
