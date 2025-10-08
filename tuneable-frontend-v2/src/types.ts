@@ -205,6 +205,7 @@ export interface Party {
   name: string;
   location: string;
   host: string;
+  host_uuid?: string; // UUID reference for host
   partyCode: string;
   attendees: string[];
   songs: PartySong[];
