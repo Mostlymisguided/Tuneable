@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, Volume2, VolumeX, Maximize, Music, X, SkipForward, SkipBack } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Music, SkipForward, SkipBack } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -25,6 +25,8 @@ const PersistentWebPlayer: React.FC = () => {
   const {
     isPlaying,
     currentSong,
+    currentSongIndex,
+    queue,
     volume,
     isMuted,
     isHost,
@@ -34,6 +36,7 @@ const PersistentWebPlayer: React.FC = () => {
     pause,
     togglePlayPause,
     next,
+    previous,
     setVolume,
     toggleMute,
     setQueue,
@@ -736,19 +739,6 @@ const PersistentWebPlayer: React.FC = () => {
     console.error('Failed to play track after all attempts');
   };
 
-
-  // Veto function for host to remove current song
-  const handleVetoCurrentSong = async () => {
-    if (!currentSong || !currentPartyId || !isHost) return;
-    
-    try {
-      await partyAPI.removeSong(currentPartyId, currentSong.id);
-      console.log('Song vetoed successfully');
-      // The song will be removed from the queue and next song will start automatically
-    } catch (error) {
-      console.error('Error vetoing song:', error);
-    }
-  };
 
   // Don't render if player is not globally active
   if (!isGlobalPlayerActive) {
