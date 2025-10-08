@@ -138,7 +138,7 @@ router.get('/', authMiddleware, async (req, res) => {
     try {
         const parties = await Party.find()
             .select('-songs') // Exclude songs for better performance
-            .populate('host', 'username'); // Populate the host field with the username only
+            .populate('host', 'username uuid'); // ✅ Include uuid for consistent host identification
 
         res.status(200).json(transformResponse({ message: 'Parties fetched successfully', parties }));
     } catch (err) {
@@ -168,12 +168,12 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             .populate({
                 path: 'attendees',
                 model: 'User',
-                select: 'username',
+                select: 'username uuid',
             })
             .populate({
                 path: 'host',
                 model: 'User',
-                select: 'username',
+                select: 'username uuid',  // ✅ Include uuid for isHost comparison
             });
 
         if (!party) {

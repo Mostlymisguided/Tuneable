@@ -1,6 +1,7 @@
 // Simple types file to avoid module resolution issues
 export interface User {
   id: string;
+  uuid?: string; // UUIDv7 for external API
   username: string;
   email: string;
   profilePic?: string;

@@ -3,6 +3,7 @@ import axios from 'axios';
 // Define types directly to avoid import issues
 interface User {
   id: string;
+  uuid?: string; // UUIDv7 for external API
   username: string;
   email: string;
   profilePic?: string;
@@ -24,9 +25,9 @@ interface Party {
   id: string;
   name: string;
   location: string;
-  host: string | { id: string; username: string; userId: string; _id: string };
+  host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   partyCode: string;
-  attendees: (string | { id: string; username: string; userId: string; _id: string })[];
+  attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   songs: PartySong[];
   startTime: string;
   endTime?: string;

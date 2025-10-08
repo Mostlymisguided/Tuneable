@@ -45,11 +45,6 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true } 
 });
 
-// Virtual to alias _id as userId
-userSchema.virtual('userId').get(function() {
-  return this._id.toHexString();
-});
-
 // Pre-save hook to hash the password
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

@@ -4,6 +4,7 @@ import { authAPI } from '../lib/api';
 // Define types directly to avoid import issues
 interface User {
   id: string;
+  uuid?: string; // UUIDv7 for external API
   username: string;
   email: string;
   profilePic?: string;
