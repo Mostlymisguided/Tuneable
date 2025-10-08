@@ -1514,4 +1514,106 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
     }
 });
 
+// @route   PUT /api/parties/:partyId/songs/:songId/veto
+// @desc    Veto a song (host only) - sets status to 'vetoed' and removes from queue
+// @access  Private (host only)
+router.put('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        
+        // Check if user is the host
+        if (party.host.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Only the host can veto songs' });
+        }
+        
+        // Find the song in the party
+        const songEntry = party.songs.find(s => 
+            (s.songId && s.songId.toString() === songId) || 
+            (s.song_uuid === songId) ||
+            (s.episodeId && s.episodeId.toString() === songId) ||
+            (s.episode_uuid === songId)
+        );
+        
+        if (!songEntry) {
+            return res.status(404).json({ error: 'Song not found in party' });
+        }
+        
+        // Update song status to vetoed
+        songEntry.status = 'vetoed';
+        songEntry.vetoedAt = new Date();
+        songEntry.vetoedBy = req.user._id;
+        songEntry.vetoedBy_uuid = req.user.uuid;
+        
+        await party.save();
+        
+        res.json(transformResponse({
+            message: 'Song vetoed successfully',
+            party: party
+        }));
+        
+    } catch (err) {
+        console.error('Error vetoing song:', err);
+        res.status(500).json({ 
+            error: 'Error vetoing song', 
+            details: err.message 
+        });
+    }
+});
+
+// @route   PUT /api/parties/:partyId/songs/:songId/unveto
+// @desc    Un-veto a song (restore to queue) - host only
+// @access  Private (host only)
+router.put('/:partyId/songs/:songId/unveto', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, songId } = req.params;
+        
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        
+        // Check if user is the host
+        if (party.host.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Only the host can un-veto songs' });
+        }
+        
+        // Find the song in the party
+        const songEntry = party.songs.find(s => 
+            (s.songId && s.songId.toString() === songId) || 
+            (s.song_uuid === songId) ||
+            (s.episodeId && s.episodeId.toString() === songId) ||
+            (s.episode_uuid === songId)
+        );
+        
+        if (!songEntry) {
+            return res.status(404).json({ error: 'Song not found in party' });
+        }
+        
+        // Restore song to queued status
+        songEntry.status = 'queued';
+        songEntry.vetoedAt = null;
+        songEntry.vetoedBy = null;
+        songEntry.vetoedBy_uuid = null;
+        
+        await party.save();
+        
+        res.json(transformResponse({
+            message: 'Song restored to queue successfully',
+            party: party
+        }));
+        
+    } catch (err) {
+        console.error('Error un-vetoing song:', err);
+        res.status(500).json({ 
+            error: 'Error un-vetoing song', 
+            details: err.message 
+        });
+    }
+});
+
 module.exports = router;

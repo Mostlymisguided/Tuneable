@@ -68,6 +68,7 @@ const Party: React.FC = () => {
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('all-time');
   const [sortedSongs, setSortedSongs] = useState<any[]>([]);
   const [isLoadingSortedSongs, setIsLoadingSortedSongs] = useState(false);
+  const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
@@ -445,12 +446,34 @@ const Party: React.FC = () => {
     }
 
     try {
-      // Remove the song from the party
-      await partyAPI.removeSong(partyId!, song.id);
-      toast.success('Song vetoed and removed from queue');
+      // Veto the song (sets status to 'vetoed')
+      await partyAPI.vetoSong(partyId!, song.id);
+      toast.success('Song vetoed');
+      
+      // Refresh party data
+      await fetchPartyDetails();
     } catch (error) {
       console.error('Error vetoing song:', error);
       toast.error('Failed to veto song');
+    }
+  };
+  
+  const handleUnvetoClick = async (song: any) => {
+    if (!isHost) {
+      toast.error('Only the host can restore songs');
+      return;
+    }
+
+    try {
+      // Un-veto the song (restore to 'queued' status)
+      await partyAPI.unvetoSong(partyId!, song.id);
+      toast.success('Song restored to queue');
+      
+      // Refresh party data
+      await fetchPartyDetails();
+    } catch (error) {
+      console.error('Error restoring song:', error);
+      toast.error('Failed to restore song');
     }
   };
 
@@ -741,11 +764,22 @@ const Party: React.FC = () => {
           >
             Now Playing
           </button>
-          <button className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium" style={{backgroundColor: '#9333EA'}}>
+          <button 
+            onClick={() => setShowVetoed(false)}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${!showVetoed ? 'bg-purple-600 text-white' : 'bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30'}`}
+            style={!showVetoed ? {backgroundColor: '#9333EA'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
+          >
             {selectedTimePeriod === 'all-time' 
               ? `Queue (${party.songs.filter((song: any) => song.status === 'queued').length})`
               : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplaySongs().length})`
             }
+          </button>
+          <button 
+            onClick={() => setShowVetoed(true)}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${showVetoed ? 'bg-red-600 text-white' : 'bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30'}`}
+            style={showVetoed ? {backgroundColor: '#DC2626'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
+          >
+            Vetoed ({party.songs.filter((song: any) => song.status === 'vetoed').length})
           </button>
           <button 
             onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
@@ -936,35 +970,36 @@ const Party: React.FC = () => {
                   </div>
                 )}
 
-                {/* Sorting Tabs */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-white mb-3">Sort by Bid Activity</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { key: 'all-time', label: 'All Time' },
-                      { key: 'this-year', label: 'This Year' },
-                      { key: 'this-month', label: 'This Month' },
-                      { key: 'this-week', label: 'This Week' },
-                      { key: 'today', label: 'Today' }
-                    ].map((period) => (
-                      <button
-                        key={period.key}
-                        onClick={() => handleTimePeriodChange(period.key)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          selectedTimePeriod === period.key
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {period.label}
-                      </button>
-                    ))}
+                {/* Sorting Tabs - Only show for Queue, not Vetoed */}
+                {!showVetoed && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-white mb-3">Sort by Bid Activity</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'all-time', label: 'All Time' },
+                        { key: 'this-year', label: 'This Year' },
+                        { key: 'this-month', label: 'This Month' },
+                        { key: 'this-week', label: 'This Week' },
+                        { key: 'today', label: 'Today' }
+                      ].map((period) => (
+                        <button
+                          key={period.key}
+                          onClick={() => handleTimePeriodChange(period.key)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            selectedTimePeriod === period.key
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          {period.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-
-                {/* Queue */}
-                {getDisplaySongs().length > 0 && (
+                {/* Song Queue - Show when NOT viewing vetoed */}
+                {!showVetoed && getDisplaySongs().length > 0 && (
                   <div className="space-y-3">
                     {isLoadingSortedSongs && selectedTimePeriod !== 'all-time' ? (
                       <div className="text-center py-8">
@@ -1070,10 +1105,10 @@ const Party: React.FC = () => {
                                 {isHost && (
                                   <button
                                     onClick={() => handleVetoClick(song)}
-                                    className="px-4 py-2 bg-transparent hover:bg-red-600 text-red-600 hover:text-white rounded-lg font-medium transition-colors flex items-center space-x-2 border border-red-600"
+                                    className="w-10 h-10 bg-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/30 transition-all duration-200 rounded-lg flex items-center justify-center group relative"
+                                    title="Veto this song"
                                   >
-                                    <X className="h-4 w-4" />
-                                    <span>Veto</span>
+                                    <X className="h-5 w-5" />
                                   </button>
                                 )}
                               </div>
@@ -1086,42 +1121,73 @@ const Party: React.FC = () => {
                 )}
 
 
-                {/* Vetoed Songs */}
-                {party.songs.filter((song: any) => song.status === 'vetoed').length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-red-400 mb-3 flex items-center">
-                      <X className="h-5 w-5 mr-2" />
-                      Vetoed ({party.songs.filter((song: any) => song.status === 'vetoed').length})
-                    </h3>
-                    <div className="space-y-2 max-h-32 overflow-y-auto">
-                      {party.songs
+                {/* Vetoed Songs - Show when Vetoed tab is active */}
+                {showVetoed && (
+                  <div className="space-y-3">
+                    {party.songs.filter((song: any) => song.status === 'vetoed').length === 0 ? (
+                      <div className="text-center py-8">
+                        <X className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">No vetoed songs</p>
+                      </div>
+                    ) : (
+                      party.songs
                         .filter((song: any) => song.status === 'vetoed')
                         .map((song: any, index: number) => {
                           const songData = song.songId || song;
                           return (
                             <div
                               key={`vetoed-${songData.id}-${index}`}
-                              className="flex items-center space-x-3 p-2 rounded-lg bg-red-900/20 border border-red-800/30"
+                              className="bg-red-900/20 border border-red-800/30 p-4 rounded-lg flex items-center space-x-4"
                             >
-                              <X className="h-4 w-4 text-red-400 flex-shrink-0" />
                               <img
                                 src={songData.coverArt || '/default-cover.jpg'}
                                 alt={songData.title || 'Unknown Song'}
-                                className="w-10 h-10 rounded object-cover"
-                                width="40"
-                                height="40"
+                                className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                                width="128"
+                                height="128"
+                                onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
                               />
+                              
+                              {/* Song Details */}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
-                                <p className="text-xs text-gray-500 truncate">{songData.artist || 'Unknown Artist'}</p>
-                                <p className="text-xs text-red-400">
-                                  Vetoed {song.vetoedAt ? new Date(song.vetoedAt).toLocaleTimeString() : 'recently'}
-                                </p>
+                                <div className="flex items-center space-x-2">
+                                  <h4 
+                                    className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                    onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
+                                  >
+                                    {songData.title || 'Unknown Song'}
+                                  </h4>
+                                  <span className="text-gray-400">•</span>
+                                  <span className="text-gray-300 text-lg truncate font-light">
+                                    {songData.artist || 'Unknown Artist'}
+                                  </span>
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <Clock className="h-4 w-4 text-gray-400" />
+                                    <span className="text-sm text-gray-300">{formatDuration(songData.duration)}</span>
+                                  </div>
+                                </div>
+                                <div className="mt-2">
+                                  <p className="text-xs text-red-400">
+                                    Vetoed {song.vetoedAt ? new Date(song.vetoedAt).toLocaleString() : 'recently'}
+                                  </p>
+                                </div>
                               </div>
+                              
+                              {/* Restore Button - Host only */}
+                              {isHost && (
+                                <div className="flex flex-col space-y-2">
+                                  <button
+                                    onClick={() => handleUnvetoClick(song)}
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+                                  >
+                                    <span>Restore</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
-                        })}
-                    </div>
+                        })
+                    )}
                   </div>
                 )}
               </div>
