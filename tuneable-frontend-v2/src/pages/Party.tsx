@@ -1287,11 +1287,11 @@ const Party: React.FC = () => {
           <div className="card">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendees</h3>
             <div className="space-y-2">
-              {party.attendees.map((attendee: any) => {
+              {party.attendees.map((attendee: any, index: number) => {
                 const hostId = typeof party.host === 'string' ? party.host : party.host?.uuid;
                 const attendeeId = attendee.uuid || attendee.id;
                 return (
-                  <div key={attendeeId} className="flex items-center space-x-3">
+                  <div key={`${attendeeId}-${index}`} className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-600">
                         {attendee.username?.charAt(0).toUpperCase() || '?'}
