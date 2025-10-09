@@ -1000,21 +1000,6 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         await media.save();
 
-        // Add media to party
-        const partyMediaEntry = {
-            mediaId: media._id,
-            media_uuid: media.uuid,
-            addedBy: userId,
-            addedBy_uuid: user.uuid,
-            partyBidValue: bidAmount,
-            partyBids: [],
-            status: 'queued',
-            queuedAt: new Date()
-        };
-
-        party.media.push(partyMediaEntry);
-        await party.save();
-
         // Create bid record
         const bid = new Bid({
             userId,
@@ -1025,6 +1010,26 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         });
 
         await bid.save();
+
+        // Add bid to media's bids array
+        media.bids = media.bids || [];
+        media.bids.push(bid._id);
+        await media.save();
+
+        // Add media to party with bid
+        const partyMediaEntry = {
+            mediaId: media._id,
+            media_uuid: media.uuid,
+            addedBy: userId,
+            addedBy_uuid: user.uuid,
+            partyBidValue: bidAmount,
+            partyBids: [bid._id],
+            status: 'queued',
+            queuedAt: new Date()
+        };
+
+        party.media.push(partyMediaEntry);
+        await party.save();
 
         // Update user balance
         user.balance = (userBalancePence - bidAmountPence) / 100;

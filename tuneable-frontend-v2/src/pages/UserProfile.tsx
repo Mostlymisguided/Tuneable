@@ -84,7 +84,6 @@ const UserProfile: React.FC = () => {
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [topBids, setTopBids] = useState<Bid[]>([]);
   const [songsWithBids, setSongsWithBids] = useState<SongWithBids[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +100,6 @@ const UserProfile: React.FC = () => {
       const response = await userAPI.getProfile(userId!);
       setUser(response.user);
       setStats(response.stats);
-      setTopBids(response.topBids);
       setSongsWithBids(response.songsWithBids);
     } catch (err: any) {
       console.error('Error fetching user profile:', err);
@@ -150,7 +148,8 @@ const UserProfile: React.FC = () => {
           <div className="text-white text-xl mb-4">Error loading user profile</div>
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white"
+            className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
+            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
           >
             Go Back
           </button>
@@ -166,9 +165,9 @@ const UserProfile: React.FC = () => {
         <div className="mb-8">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center text-white hover:text-purple-300 mb-4 transition-colors"
+            className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
+            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </button>
           
@@ -178,7 +177,7 @@ const UserProfile: React.FC = () => {
               <img
                 src={user.profilePic || '/android-chrome-192x192.png'}
                 alt={`${user.username} profile`}
-                className="w-48 h-48 rounded-full shadow-xl object-cover"
+                className="w-64 h-64 rounded-full shadow-xl object-cover"
               />
             </div>
             
@@ -224,7 +223,7 @@ const UserProfile: React.FC = () => {
         {/* Bidding Statistics */}
         {stats && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">Bidding Statistics</h2>
+            <h2 className="text-2xl font-bold text-white mb-4">Profile Info</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-black/20 rounded-lg p-6 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
@@ -250,59 +249,19 @@ const UserProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Top Bids */}
-        {topBids.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">Top Bids</h2>
-            <div className="bg-black/20 rounded-lg p-6">
-              <div className="space-y-4">
-                {topBids.map((bid, index) => (
-                  <div key={bid._id} className="flex items-center space-x-4 p-4 bg-black/10 rounded-lg">
-                    <div className="flex-shrink-0">
-                      <div className="flex items-center justify-center w-12 h-12 bg-purple-600 rounded-full">
-                        <span className="text-white font-bold text-lg">#{index + 1}</span>
-                      </div>
-                    </div>
-                    <img
-                      src={bid.songId?.coverArt || '/android-chrome-192x192.png'}
-                      alt={`${bid.songId?.title || 'Unknown Song'} cover`}
-                      className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => bid.songId?.uuid && navigate(`/tune/${bid.songId.uuid}`)}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h3 
-                          className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
-                          onClick={() => bid.songId?.uuid && navigate(`/tune/${bid.songId.uuid}`)}
-                        >
-                          {bid.songId?.title || 'Unknown Song'}
-                        </h3>
-                        <span className="text-gray-400">by</span>
-                        <span className="text-purple-300">{bid.songId?.artist || 'Unknown Artist'}</span>
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        {bid.partyId?.name || 'Unknown Party'} • {formatDate(bid.createdAt)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-green-400">£{bid.amount?.toFixed(2) || '0.00'}</div>
-                      <div className="text-sm text-gray-400">Bid Amount</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Songs with Bids */}
         {songsWithBids.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">Songs Bid On</h2>
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
-                {songsWithBids.map((songData) => (
+                {songsWithBids.map((songData, index) => (
                   <div key={songData.song?.uuid || songData.song?._id || 'unknown'} className="flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
+                    <div className="flex-shrink-0">
+                      <div className="flex items-center justify-center w-12 h-12 bg-purple-600 rounded-full">
+                        <span className="text-white font-bold text-lg">#{index + 1}</span>
+                      </div>
+                    </div>
                     <img
                       src={songData.song?.coverArt || '/android-chrome-192x192.png'}
                       alt={`${songData.song?.title || 'Unknown Song'} cover`}
@@ -330,19 +289,29 @@ const UserProfile: React.FC = () => {
                           {songData.bidCount || 0} bid{(songData.bidCount || 0) !== 1 ? 's' : ''}
                         </span>
                       </div>
+                      {/* Tags Display */}
+                      {songData.song?.tags && songData.song.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {songData.song.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
+                            <span 
+                              key={tagIndex}
+                              className="px-2 py-1 bg-purple-600/30 text-purple-200 text-xs rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {songData.song.tags.length > 5 && (
+                            <span className="px-2 py-1 text-gray-400 text-xs">
+                              +{songData.song.tags.length - 5} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-xl font-bold text-green-400">£{(songData.totalAmount || 0).toFixed(2)}</div>
                       <div className="text-sm text-gray-400">Total Bid</div>
                     </div>
-                    <button
-                      onClick={() => songData.song?.uuid && navigate(`/tune/${songData.song.uuid}`)}
-                      className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
-                      disabled={!songData.song?.uuid}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      View Song
-                    </button>
                   </div>
                 ))}
               </div>
