@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { 
   Eye, 
   EyeOff,
-  X
+  
 } from 'lucide-react';
 
 const AuthPage: React.FC = () => {
@@ -115,7 +115,7 @@ const AuthPage: React.FC = () => {
 
   const renderLoginForm = () => (
     <div className="p-5">
-      <div className="text-center">
+      <div className="text-center p-4">
         <p className="mb-3 text-2xl font-semibold leading-5 text-slate-900">
           Login to your account
         </p>
@@ -124,7 +124,7 @@ const AuthPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="mt-7 flex flex-col gap-2">
+      <div className="mt-7 flex items-center justify-center flex-col gap-2">
         <button onClick={() => handleSocialAuth('facebook')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
           <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
             <path d="M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759h-306v-759h-255v-296h255v-218q0-186 104-288.5t277-102.5q147 0 228 12z"></path>
@@ -133,7 +133,7 @@ const AuthPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex w-full items-center gap-2 py-6 text-sm text-slate-600">
+      <div className="flex w-full items-center gap-2 py-8 text-sm text-slate-600">
         <div className="h-px w-full bg-slate-200"></div>
         OR
         <div className="h-px w-full bg-slate-200"></div>
@@ -162,21 +162,22 @@ const AuthPage: React.FC = () => {
           value={formData.password}
           onChange={handleChange}
         />
-        <p className="mb-3 mt-2 text-sm text-gray-500">
-          <Link to="/forgot-password" className="text-blue-800 hover:text-blue-600">
-            Reset your password?
-          </Link>
-        </p>
+              <div className="mt-7 p-4 flex items-center justify-center flex-col gap-2">
         <button
           type="submit"
           disabled={isLoading}
-          className="px-4 py-3 w-full shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-gray-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
           style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
         >
           {isLoading ? 'Loading...' : 'Continue'}
         </button>
+        </div>
       </form>
-
+      <p className="mb-3 mt-2 text-sm text-gray-500 text-center">
+          <Link to="/forgot-password" className="text-blue-800 hover:text-blue-600">
+            Reset your password?
+          </Link>
+        </p>
       <div className="mt-6 text-center text-sm text-slate-600">
         Don't have an account?{' '}
         <Link to="/register" className="font-medium text-[#4285f4]">
@@ -187,7 +188,7 @@ const AuthPage: React.FC = () => {
   );
 
   const renderRegisterForm = () => (
-    <div className="p-5">
+    <div className="p-4">
       <div className="text-center">
         <p className="mb-3 text-2xl font-semibold leading-5 text-slate-900">
           Create your account
@@ -197,7 +198,7 @@ const AuthPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="mt-7 flex flex-col gap-2 items-center">
+      <div className="mt-7 flex flex-col p-4 flex items-center justify-center gap-2 items-center">
         <button onClick={() => handleSocialAuth('facebook')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
           <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
             <path d="M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759h-306v-759h-255v-296h255v-218q0-186 104-288.5t277-102.5q147 0 228 12z"></path>
@@ -206,17 +207,17 @@ const AuthPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex w-full items-center gap-2 py-6 text-sm text-slate-600">
+      <div className="flex w-full items-center gap-2 p-4 text-sm text-slate-600">
         <div className="h-px w-full bg-slate-200"></div>
         OR
         <div className="h-px w-full bg-slate-200"></div>
       </div>
 
       <form className="w-full space-y-4" onSubmit={handleRegister}>
-        <div className="flex flex-col">
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="flex flex-col flex items-center justify-center">
+          {/* <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
             Username
-          </label>
+          </label> */}
           <input
             id="username"
             name="username"
@@ -229,41 +230,10 @@ const AuthPage: React.FC = () => {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col">
-            <label htmlFor="givenName" className="block text-sm font-medium text-gray-700 mb-2">
-              First Name
-            </label>
-            <input
-              id="givenName"
-              name="givenName"
-              type="text"
-              className="block w-auto rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="First name"
-              value={formData.givenName}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="flex flex-col">
-            <label htmlFor="familyName" className="block text-sm font-medium text-gray-700 mb-2">
-              Last Name
-            </label>
-            <input
-              id="familyName"
-              name="familyName"
-              type="text"
-              className="block w-auto rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="Last name"
-              value={formData.familyName}
-              onChange={handleChange}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col">
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="flex flex-col flex items-center justify-center">
+          {/* <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
             Email Address
-          </label>
+          </label> */}
           <input
             name="email"
             type="email"
@@ -276,10 +246,10 @@ const AuthPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex flex-col">
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="flex flex-col flex items-center justify-center">
+         {/*} <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
             Password
-          </label>
+          </label> */}
           <div className="relative inline-block">
             <input
               name="password"
@@ -294,18 +264,18 @@ const AuthPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 mt-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col">
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="flex flex-col flex items-center justify-center">
+          {/*<label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
             Confirm Password
-          </label>
-          <div className="relative inline-block">
+          </label>*/}
+          <div className="relative inline-block ">
             <input
               name="confirmPassword"
               type={showConfirmPassword ? 'text' : 'password'}
@@ -319,26 +289,22 @@ const AuthPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 mt-2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          
-          
-        </div>
-
+        <div className="flex flex-col p-4 flex items-center justify-center">
         <button
           type="submit"
           disabled={isLoading}
-          className="px-4 py-3 w-full shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
           style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
         >
           {isLoading ? 'Creating account...' : 'Create Account'}
         </button>
+        </div>
       </form>
 
       <div className="mt-6 text-center text-sm text-slate-600">
@@ -352,16 +318,16 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="bg-black/50 overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 h-full items-center justify-center flex">
-      <div className="relative p-4 w-full max-w-md h-full md:h-auto">
-        <div className="relative bg-white rounded-lg shadow">
+      <div className="relative p-4 w-2/3 max-w-xl h-full md:h-auto">
+        <div className="relative bg-white p-4 rounded-lg shadow">
           {/* Close Button */}
           <button
             type="button"
             onClick={handleClose}
-            className="absolute top-3 right-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
+            className="py-2 px-4 w-auto max-w-md flex justify-center items-center hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
+            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
           >
-            <X className="w-5 h-5" />
-            <span className="sr-only">Close popup</span>
+            <span className="sr-only">Back</span>
           </button>
 
           {/* Error/Success Messages */}
