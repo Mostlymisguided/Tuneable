@@ -274,7 +274,7 @@ const Party: React.FC = () => {
           return {
             id: actualSong.id || actualSong.uuid || actualSong._id, // Prefer UUID for external API
             title: actualSong.title,
-            artist: actualSong.artist,
+            artist: Array.isArray(actualSong.artist) ? actualSong.artist[0]?.name || 'Unknown Artist' : actualSong.artist,
             duration: actualSong.duration,
             coverArt: actualSong.coverArt,
             sources: sources,
@@ -341,7 +341,7 @@ const Party: React.FC = () => {
         return {
           id: song.id || song.uuid || song._id, // Prefer UUID for external API
           title: song.title,
-          artist: song.artist,
+          artist: Array.isArray(song.artist) ? song.artist[0]?.name || 'Unknown Artist' : song.artist,
           duration: song.duration,
           coverArt: song.coverArt,
           sources: sources,
@@ -915,7 +915,7 @@ const Party: React.FC = () => {
                               />
                               <div className="flex-1">
                                 <h4 className="font-medium text-white text-lg">{songData.title || 'Unknown Song'}</h4>
-                                <p className="text-sm text-gray-400">{songData.artist || 'Unknown Artist'}</p>
+                                <p className="text-sm text-gray-400">{Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}</p>
                                 <p className="text-xs text-purple-300">
                                   Started: {song.playedAt ? new Date(song.playedAt).toLocaleTimeString() : 'Now'}
                                 </p>
@@ -1061,7 +1061,7 @@ const Party: React.FC = () => {
                                 </h4>
                                 <span className="text-gray-400">•</span>
                                 <span className="text-gray-300 text-lg truncate font-light">
-                                  {songData.artist || 'Unknown Artist'}
+                                  {Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}
                                 </span>
                                 <div className="flex items-center space-x-1 ml-2">
                                   <Clock className="h-4 w-4 text-gray-400" />
@@ -1181,7 +1181,7 @@ const Party: React.FC = () => {
                                   </h4>
                                   <span className="text-gray-400">•</span>
                                   <span className="text-gray-300 text-lg truncate font-light">
-                                    {songData.artist || 'Unknown Artist'}
+                                    {Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}
                                   </span>
                                   <div className="flex items-center space-x-1 ml-2">
                                     <Clock className="h-4 w-4 text-gray-400" />
@@ -1253,7 +1253,7 @@ const Party: React.FC = () => {
                           />
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
-                            <p className="text-xs text-gray-500 truncate">{songData.artist || 'Unknown Artist'}</p>
+                            <p className="text-xs text-gray-500 truncate">{Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}</p>
                             <p className="text-xs text-gray-600">
                               {song.completedAt ? new Date(song.completedAt).toLocaleTimeString() : 'Completed'}
                             </p>
@@ -1332,7 +1332,7 @@ const Party: React.FC = () => {
         onClose={handleBidModalClose}
         onConfirm={handleBidConfirm}
         songTitle={selectedSong?.title || ''}
-        songArtist={selectedSong?.artist || ''}
+        songArtist={Array.isArray(selectedSong?.artist) ? selectedSong.artist[0]?.name || 'Unknown Artist' : selectedSong?.artist || 'Unknown Artist'}
         currentBid={selectedSong?.partyBidValue || 0}
         userBalance={user?.balance || 0}
         isLoading={isBidding}
