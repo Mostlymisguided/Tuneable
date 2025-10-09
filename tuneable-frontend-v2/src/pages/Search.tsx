@@ -379,7 +379,7 @@ const SearchPage: React.FC = () => {
         const platform = musicSource === 'spotify' ? 'spotify' : 'youtube';
         const url = musicSource === 'spotify' ? song.sources.spotify : song.sources.youtube;
         
-        const response = await partyAPI.addSongToParty(partyId, {
+        const response = await partyAPI.addMediaToParty(partyId, {
           title: song.title,
           artist: song.artist,
           url: url,
