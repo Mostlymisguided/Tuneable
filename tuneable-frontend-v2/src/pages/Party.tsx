@@ -806,7 +806,8 @@ const Party: React.FC = () => {
           {party.type === 'remote' && (
             <button 
               onClick={handleManualRefresh}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center space-x-2"
+              className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 flex items-center space-x-2"
+              style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
               title="Refresh queue"
             >
               <RefreshCw className="h-4 w-4" />

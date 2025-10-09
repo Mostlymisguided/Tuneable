@@ -129,16 +129,12 @@ const AuthPage: React.FC = () => {
       </div>
 
       <div className="mt-7 flex flex-col gap-2">
-        <button
-          onClick={() => handleSocialAuth('facebook')}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-[#1877F2] bg-[#1877F2] p-2 text-sm font-medium text-white outline-none focus:ring-2 focus:ring-[#1877F2] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 hover:bg-[#166fe5] transition-colors"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" fill="#1877F2"/>
-            <path d="M16 8.25H14.5C13.75 8.25 13.25 8.75 13.25 9.5V11.25H16L15.5 14H13.25V18.75H11V14H9V11.25H11V9.5C11 7.45 12.45 6 14.5 6H16V8.25Z" fill="white"/>
-          </svg>
-          Continue with Facebook
-        </button>
+      <button  onClick={() => handleSocialAuth('facebook')} type="button" class="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
+  <svg width="20" height="20" fill="currentColor" class="mr-2" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759h-306v-759h-255v-296h255v-218q0-186 104-288.5t277-102.5q147 0 228 12z"></path>
+  </svg>
+  Sign in with Facebook
+</button>
       </div>
 
       <div className="flex w-full items-center gap-2 py-6 text-sm text-slate-600">
@@ -178,7 +174,8 @@ const AuthPage: React.FC = () => {
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex w-full items-center justify-center rounded-lg bg-black p-2 py-3 text-sm font-medium text-white outline-none focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:bg-gray-400"
+          className="px-4 py-3 w-full shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
         >
           {isLoading ? 'Loading...' : 'Continue'}
         </button>
@@ -204,17 +201,13 @@ const AuthPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="mt-7 flex flex-col gap-2">
-        <button
-          onClick={() => handleSocialAuth('facebook')}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded border border-[#1877F2] bg-[#1877F2] p-2 text-sm font-medium text-white outline-none focus:ring-2 focus:ring-[#1877F2] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 hover:bg-[#166fe5] transition-colors"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" fill="#1877F2"/>
-            <path d="M16 8.25H14.5C13.75 8.25 13.25 8.75 13.25 9.5V11.25H16L15.5 14H13.25V18.75H11V14H9V11.25H11V9.5C11 7.45 12.45 6 14.5 6H16V8.25Z" fill="white"/>
-          </svg>
-          Continue with Facebook
-        </button>
+      <div className="mt-7 flex flex-col gap-2 items-center">
+          <button  onClick={() => handleSocialAuth('facebook')} type="button" class="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
+  <svg width="20" height="20" fill="currentColor" class="mr-2" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759h-306v-759h-255v-296h255v-218q0-186 104-288.5t277-102.5q147 0 228 12z"></path>
+  </svg>
+  Sign in with Facebook
+</button>
       </div>
 
       <div className="flex w-full items-center gap-2 py-6 text-sm text-slate-600">
@@ -223,50 +216,47 @@ const AuthPage: React.FC = () => {
         <div className="h-px w-full bg-slate-200"></div>
       </div>
 
-      <form className="w-full space-y-3" onSubmit={handleRegister}>
-        <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+      <form className="w-full space-y-4" onSubmit={handleRegister}>
+        <div className="flex flex-col">
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
             Username
           </label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              id="username"
-              name="username"
-              type="text"
-              required
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pl-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="Choose a username"
-              value={formData.username}
-              onChange={handleChange}
-            />
-          </div>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            required
+            className="block w-auto rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+            placeholder="Choose a username"
+            value={formData.username}
+            onChange={handleChange}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="givenName" className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex flex-col">
+            <label htmlFor="givenName" className="block text-sm font-medium text-gray-700 mb-2">
               First Name
             </label>
             <input
               id="givenName"
               name="givenName"
               type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-auto rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="First name"
               value={formData.givenName}
               onChange={handleChange}
             />
           </div>
-          <div>
-            <label htmlFor="familyName" className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex flex-col">
+            <label htmlFor="familyName" className="block text-sm font-medium text-gray-700 mb-2">
               Last Name
             </label>
             <input
               id="familyName"
               name="familyName"
               type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-auto rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="Last name"
               value={formData.familyName}
               onChange={handleChange}
@@ -274,8 +264,8 @@ const AuthPage: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="flex flex-col">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
             Email Address
           </label>
           <input
@@ -283,24 +273,24 @@ const AuthPage: React.FC = () => {
             type="email"
             autoComplete="email"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+            className="block w-auto rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
             placeholder="Email Address"
             value={formData.email}
             onChange={handleChange}
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="flex flex-col">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
             Password
           </label>
-          <div className="relative">
+          <div className="relative inline-block">
             <input
               name="password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
               required
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-auto rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
@@ -315,17 +305,17 @@ const AuthPage: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="flex flex-col">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
             Confirm Password
           </label>
-          <div className="relative">
+          <div className="relative inline-block">
             <input
               name="confirmPassword"
               type={showConfirmPassword ? 'text' : 'password'}
               autoComplete="new-password"
               required
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-auto rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="Confirm Password"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -340,65 +330,16 @@ const AuthPage: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="cellPhone" className="block text-sm font-medium text-gray-700 mb-1">
-            Phone (Optional)
-          </label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              id="cellPhone"
-              name="cellPhone"
-              type="tel"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pl-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="+1 (555) 123-4567"
-              value={formData.cellPhone}
-              onChange={handleChange}
-            />
-          </div>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-              City
-            </label>
-            <div className="relative">
-              <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="city"
-                name="city"
-                type="text"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 pl-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-                placeholder="City"
-                value={formData.homeLocation.city}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
-              Country
-            </label>
-            <div className="relative">
-              <Flag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="country"
-                name="country"
-                type="text"
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 pl-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-                placeholder="Country"
-                value={formData.homeLocation.country}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
+          
+          
         </div>
 
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex w-full items-center justify-center rounded-lg bg-black p-2 py-3 text-sm font-medium text-white outline-none focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:bg-gray-400"
+          className="px-4 py-3 w-full shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
         >
           {isLoading ? 'Creating account...' : 'Create Account'}
         </button>
