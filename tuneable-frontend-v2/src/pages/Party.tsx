@@ -453,7 +453,8 @@ const Party: React.FC = () => {
 
   // Bid handling functions
   const handleBidClick = (song: any) => {
-    const songData = song.songId || song;
+    // Handle both old songs (songId) and new media (mediaId) structure
+    const songData = song.mediaId || song.songId || song;
     setSelectedSong(songData);
     setBidModalOpen(true);
   };
@@ -523,7 +524,15 @@ const Party: React.FC = () => {
 
     setIsBidding(true);
     try {
-      const response = await partyAPI.placeBid(partyId, selectedSong, bidAmount);
+      // Get the media/song ID - try various ID fields
+      const mediaId = selectedSong.uuid || selectedSong.id || selectedSong._id;
+      if (!mediaId) {
+        toast.error('Unable to identify media item');
+        setIsBidding(false);
+        return;
+      }
+      
+      const response = await partyAPI.placeBid(partyId, mediaId, bidAmount);
       toast.success(`Bid of £${bidAmount.toFixed(2)} placed successfully!`);
       
       // Update user balance if provided in response
