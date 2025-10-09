@@ -5,7 +5,7 @@ const axios = require('axios');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const Party = require('../models/Party');
-const Song = require('../models/Song');
+const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const { getVideoDetails } = require('../services/youtubeService');
@@ -137,7 +137,7 @@ router.post("/join/:partyId", authMiddleware, resolvePartyId(), async (req, res)
 router.get('/', authMiddleware, async (req, res) => {
     try {
         const parties = await Party.find()
-            .select('-songs') // Exclude songs for better performance
+            .select('-media') // Exclude media for better performance
             .populate('host', 'username uuid'); // ✅ Include uuid for consistent host identification
 
         res.status(200).json(transformResponse({ message: 'Parties fetched successfully', parties }));
@@ -153,8 +153,8 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
 
         const party = await Party.findById(id)
             .populate({
-                path: 'songs.songId',
-                model: 'Song',
+                path: 'media.mediaId',
+                model: 'Media',
                 select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category', // ✅ Added `addedBy`, `tags`, `category`
                 populate: {
                     path: 'bids',
@@ -182,31 +182,31 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
 
         console.log('Fetched Party Details:', JSON.stringify(party, null, 2));
 
-        // ✅ **Flatten `songId` structure & extract platform URLs with PARTY-SPECIFIC bid values and status**
-        const processedSongs = party.songs.map((entry) => {
-            if (!entry.songId) return null; // Edge case: skip invalid entries
+        // ✅ **Flatten `mediaId` structure & extract platform URLs with PARTY-SPECIFIC bid values and status**
+        const processedMedia = party.media.map((entry) => {
+            if (!entry.mediaId) return null; // Edge case: skip invalid entries
 
             // ✅ Ensure `sources` is defined to avoid `.map()` errors
-            const availablePlatforms = Object.entries(entry.songId.sources || {})
+            const availablePlatforms = Object.entries(entry.mediaId.sources || {})
                 .filter(([key, value]) => value) // Remove null values
                 .map(([key, value]) => ({ platform: key, url: value }));
 
             return {
-                _id: entry.songId._id,
-                id: entry.songId.uuid || entry.songId._id, // Use UUID for external API, fallback to _id
-                uuid: entry.songId.uuid || entry.songId._id, // Also include uuid field for consistency
-                title: entry.songId.title,
-                artist: entry.songId.artist,
-                duration: entry.songId.duration || '666',
-                coverArt: entry.songId.coverArt || '/default-cover.jpg',
+                _id: entry.mediaId._id,
+                id: entry.mediaId.uuid || entry.mediaId._id, // Use UUID for external API, fallback to _id
+                uuid: entry.mediaId.uuid || entry.mediaId._id, // Also include uuid field for consistency
+                title: entry.mediaId.title,
+                artist: entry.mediaId.artist,
+                duration: entry.mediaId.duration || '666',
+                coverArt: entry.mediaId.coverArt || '/default-cover.jpg',
                 sources: availablePlatforms, // ✅ Store platform data as an array
-                globalBidValue: entry.songId.globalBidValue || 0, // Keep for analytics
+                globalBidValue: entry.mediaId.globalBidValue || 0, // Keep for analytics
                 partyBidValue: entry.partyBidValue || 0, // ✅ Use party-specific bid value
-                bids: entry.songId.bids || [], // ✅ Use populated bids from songId with user data
-                addedBy: entry.songId.addedBy, // ✅ Ensures `addedBy` exists
+                bids: entry.mediaId.bids || [], // ✅ Use populated bids from mediaId with user data
+                addedBy: entry.mediaId.addedBy, // ✅ Ensures `addedBy` exists
                 totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
-                tags: entry.songId.tags || [], // ✅ Include tags
-                category: entry.songId.category || 'Unknown', // ✅ Include category
+                tags: entry.mediaId.tags || [], // ✅ Include tags
+                category: entry.mediaId.category || 'Unknown', // ✅ Include category
                 
                 // ✅ NEW: Song status and timing information
                 status: entry.status || 'queued',
@@ -218,8 +218,8 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             };
         }).filter(Boolean); // ✅ Remove null entries
 
-        // ✅ Sort songs by status and then by bid value
-        processedSongs.sort((a, b) => {
+        // ✅ Sort media by status and then by bid value
+        processedMedia.sort((a, b) => {
             // First sort by status priority: playing > queued > played > vetoed
             const statusPriority = { playing: 0, queued: 1, played: 2, vetoed: 3 };
             const statusDiff = statusPriority[a.status] - statusPriority[b.status];
@@ -246,7 +246,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             musicSource: party.musicSource,
             createdAt: party.createdAt,
             updatedAt: party.updatedAt,
-            songs: processedSongs, // ✅ Return flattened, sorted songs
+            media: processedMedia, // ✅ Return flattened, sorted media
         };
 
         res.status(200).json(transformResponse({
@@ -348,35 +348,35 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
     : `https://img.youtube.com/vi/${req.body.url.split("v=")[1]}/hqdefault.jpg`; // ✅ Generate from video ID
 
         // ✅ Fetch party only once
-        const party = await Party.findById(partyId).populate('songs.songId');
+        const party = await Party.findById(partyId).populate('media.mediaId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // ✅ Ensure all existing songs have contentType set (migration for old data)
+        // ✅ Ensure all existing media have contentType set (migration for old data)
         let needsSave = false;
-        for (const songEntry of party.songs) {
-            if (!songEntry.contentType) {
-                songEntry.contentType = 'song'; // Default to 'song' for existing entries
+        for (const mediaEntry of party.media) {
+            if (!mediaEntry.contentType) {
+                mediaEntry.contentType = 'song'; // Default to 'song' for existing entries
                 needsSave = true;
             }
         }
         if (needsSave) {
             await party.save();
-            console.log("✅ Migrated existing songs to include  (songs/bid)");
+            console.log("✅ Migrated existing media to include contentType (media/bid)");
         }
 
-        let song;
+        let media;
         if (songId && mongoose.isValidObjectId(songId)) {
-            // ✅ Check if song exists in DB (only if songId is a valid MongoDB ObjectId)
+            // ✅ Check if media exists in DB (only if songId is a valid MongoDB ObjectId)
 
-            song = await Song.findById(songId).populate({
+            media = await Media.findById(songId).populate({
                 path: 'bids',
                 populate: { path: 'userId', select: 'username' }
             });
 
-            if (!song) {
-                return res.status(404).json({ error: 'Song not found' });
+            if (!media) {
+                return res.status(404).json({ error: 'Media not found' });
             }
 
             // ✅ Check if song is already in the party's queue
@@ -664,6 +664,10 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
     }
 });
 
+/* ==========================================
+ * OLD SONGCARDBID ROUTE - COMMENTED OUT
+ * Replaced with new Media-based routes below
+ * ==========================================
 // test bid route from songcard
 // Place a bid on an existing song
 router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (req, res) => {
@@ -887,6 +891,285 @@ router.post('/:partyId/songcardbid', authMiddleware, resolvePartyId(), async (re
     } catch (err) {
         console.error("❌ Error placing bid:", err);
         res.status(500).json({ error: 'Error placing bid', details: err.message });
+    }
+});
+==========================================
+END OF OLD SONGCARDBID ROUTE
+========================================== */
+
+/* ==========================================
+ * NEW MEDIA-BASED BID ROUTES
+ * ==========================================
+ */
+
+// Route 1: Add new media to party with initial bid
+router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const { url, title, artist, bidAmount, platform, duration, tags, category } = req.body;
+        const userId = req.user._id;
+
+        if (!mongoose.isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid partyId format' });
+        }
+
+        if (bidAmount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        // Get party and check minimum bid
+        const party = await Party.findById(partyId).populate('host', 'username uuid');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        if (bidAmount < party.minimumBid) {
+            return res.status(400).json({ 
+                error: `Bid amount must be at least £${party.minimumBid}`,
+                minimumBid: party.minimumBid,
+                providedBid: bidAmount
+            });
+        }
+
+        // Check user balance
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const userBalancePence = Math.round(user.balance * 100);
+        const bidAmountPence = Math.round(bidAmount * 100);
+
+        if (userBalancePence < bidAmountPence) {
+            return res.status(400).json({ 
+                error: 'Insufficient balance',
+                required: bidAmount,
+                available: user.balance
+            });
+        }
+
+        // Extract cover art and duration
+        let extractedCoverArt = '/default-cover.jpg';
+        let extractedDuration = duration || 180;
+
+        if (platform === 'youtube' && url) {
+            const videoId = url.split('v=')[1]?.split('&')[0];
+            if (videoId) {
+                extractedCoverArt = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                
+                try {
+                    const videoDetails = await getVideoDetails(videoId);
+                    extractedDuration = videoDetails.duration || duration || 180;
+                } catch (error) {
+                    console.error('Error fetching video details:', error);
+                }
+            }
+        }
+
+        // Get video tags and category for YouTube
+        let videoTags = Array.isArray(tags) ? tags : [];
+        let videoCategory = category || 'Unknown';
+        
+        if (platform === 'youtube') {
+            try {
+                const videoId = url.split('v=')[1]?.split('&')[0];
+                if (videoId) {
+                    const videoDetails = await getVideoDetails(videoId);
+                    videoTags = videoDetails.tags || [];
+                    videoCategory = videoDetails.category || 'Unknown';
+                }
+            } catch (error) {
+                console.error('Error fetching video details:', error);
+            }
+        }
+        
+        // Create new media item
+        const media = new Media({
+            title,
+            artist: [{ name: artist, userId: null, verified: false }],
+            coverArt: extractedCoverArt,
+            duration: extractedDuration,
+            sources: { [platform]: url },
+            tags: videoTags,
+            category: videoCategory,
+            addedBy: userId,
+            globalBidValue: bidAmount,
+            contentType: 'music',
+            contentForm: 'song'
+        });
+
+        await media.save();
+
+        // Add media to party
+        const partyMediaEntry = {
+            mediaId: media._id,
+            media_uuid: media.uuid,
+            addedBy: userId,
+            addedBy_uuid: user.uuid,
+            partyBidValue: bidAmount,
+            partyBids: [],
+            status: 'queued',
+            queuedAt: new Date()
+        };
+
+        party.media.push(partyMediaEntry);
+        await party.save();
+
+        // Create bid record
+        const bid = new Bid({
+            userId,
+            partyId,
+            songId: media._id,
+            amount: bidAmount,
+            status: 'active'
+        });
+
+        await bid.save();
+
+        // Update user balance
+        user.balance = (userBalancePence - bidAmountPence) / 100;
+        await user.save();
+
+        // Populate the response
+        const populatedMedia = await Media.findById(media._id)
+            .populate({
+                path: 'bids',
+                populate: {
+                    path: 'userId',
+                    select: 'username profilePic uuid'
+                }
+            });
+
+        res.status(201).json(transformResponse({
+            message: 'Media added to party successfully',
+            media: populatedMedia,
+            bid: bid,
+            updatedBalance: user.balance
+        }));
+
+    } catch (err) {
+        console.error('Error adding media to party:', err);
+        res.status(500).json({ error: 'Failed to add media to party', details: err.message });
+    }
+});
+
+// Route 2: Place bid on existing media in party
+router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId, mediaId } = req.params;
+        const { bidAmount } = req.body;
+        const userId = req.user._id;
+
+        if (!mongoose.isValidObjectId(partyId)) {
+            return res.status(400).json({ error: 'Invalid partyId format' });
+        }
+
+        if (bidAmount <= 0) {
+            return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+        }
+
+        // Get party and check if media exists in party
+        const party = await Party.findById(partyId).populate('media.mediaId');
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Find media by either ObjectId or UUID
+        let partyMediaEntry;
+        if (mongoose.isValidObjectId(mediaId)) {
+            partyMediaEntry = party.media.find(entry => 
+                entry.mediaId && entry.mediaId._id.toString() === mediaId
+            );
+        } else {
+            // Try finding by UUID
+            partyMediaEntry = party.media.find(entry => 
+                entry.media_uuid === mediaId || (entry.mediaId && entry.mediaId.uuid === mediaId)
+            );
+        }
+
+        if (!partyMediaEntry) {
+            return res.status(404).json({ error: 'Media not found in party queue' });
+        }
+
+        // Check minimum bid
+        if (bidAmount < party.minimumBid) {
+            return res.status(400).json({ 
+                error: `Bid amount must be at least £${party.minimumBid}`,
+                minimumBid: party.minimumBid,
+                providedBid: bidAmount
+            });
+        }
+
+        // Check user balance
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const userBalancePence = Math.round(user.balance * 100);
+        const bidAmountPence = Math.round(bidAmount * 100);
+
+        if (userBalancePence < bidAmountPence) {
+            return res.status(400).json({ 
+                error: 'Insufficient balance',
+                required: bidAmount,
+                available: user.balance
+            });
+        }
+
+        // Get the actual media ObjectId
+        const actualMediaId = partyMediaEntry.mediaId._id || partyMediaEntry.mediaId;
+
+        // Create bid record
+        const bid = new Bid({
+            userId,
+            partyId,
+            songId: actualMediaId,
+            amount: bidAmount,
+            status: 'active'
+        });
+
+        await bid.save();
+
+        // Update party media entry bid value
+        partyMediaEntry.partyBidValue = (partyMediaEntry.partyBidValue || 0) + bidAmount;
+        partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
+        partyMediaEntry.partyBids.push(bid._id);
+        await party.save();
+
+        // Update media global bid value
+        const media = await Media.findById(actualMediaId);
+        if (media) {
+            media.globalBidValue = (media.globalBidValue || 0) + bidAmount;
+            media.bids = media.bids || [];
+            media.bids.push(bid._id);
+            await media.save();
+        }
+
+        // Update user balance
+        user.balance = (userBalancePence - bidAmountPence) / 100;
+        await user.save();
+
+        // Get updated media with bids
+        const updatedMedia = await Media.findById(actualMediaId)
+            .populate({
+                path: 'bids',
+                populate: {
+                    path: 'userId',
+                    select: 'username profilePic uuid'
+                }
+            });
+
+        res.status(201).json(transformResponse({
+            message: 'Bid placed successfully',
+            media: updatedMedia,
+            bid: bid,
+            updatedBalance: user.balance
+        }));
+
+    } catch (err) {
+        console.error('Error placing bid:', err);
+        res.status(500).json({ error: 'Failed to place bid', details: err.message });
     }
 });
 

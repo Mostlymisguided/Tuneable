@@ -170,30 +170,14 @@ export const partyAPI = {
     return response.data;
   },
   
-  addSongToParty: async (partyId: string, songData: any) => {
-    const response = await api.post(`/parties/${partyId}/songcardbid`, songData);
+  addMediaToParty: async (partyId: string, mediaData: any) => {
+    const response = await api.post(`/parties/${partyId}/media/add`, mediaData);
     return response.data;
   },
   
-  placeBid: async (partyId: string, song: any, bidAmount: number) => {
-    // Handle both array format (from party details) and object format (from search)
-    let youtubeUrl = '';
-    if (Array.isArray(song.sources)) {
-      const youtubeSource = song.sources.find((s: any) => s.platform === 'youtube');
-      youtubeUrl = youtubeSource?.url || '';
-    } else if (song.sources && typeof song.sources === 'object') {
-      youtubeUrl = song.sources.youtube || '';
-    }
-
-    const response = await api.post(`/parties/${partyId}/songcardbid`, {
-      songId: song.id || song.uuid || song._id, // Prefer UUID for external API
-      bidAmount,
-      url: youtubeUrl,
-      title: song.title,
-      artist: song.artist,
-      platform: 'youtube',
-      duration: song.duration || 888,
-      coverArt: song.coverArt || '',
+  placeBid: async (partyId: string, mediaId: string, bidAmount: number) => {
+    const response = await api.post(`/parties/${partyId}/media/${mediaId}/bid`, {
+      bidAmount
     });
     return response.data;
   },
