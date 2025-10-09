@@ -106,10 +106,15 @@ function transformDocument(doc, options = {}) {
           }
         }
         
-        // Transform user reference
+        // Transform user reference - preserve username for TopBidders component
         if (bid.userId && bid.userId.uuid) {
           transformedBid.user_uuid = bid.userId.uuid;
-          transformedBid.userId = bid.userId.uuid;
+          // Keep the full user object for display purposes (TopBidders component needs username)
+          transformedBid.userId = {
+            uuid: bid.userId.uuid,
+            username: bid.userId.username,
+            profilePic: bid.userId.profilePic
+          };
         }
         
         // Transform party reference

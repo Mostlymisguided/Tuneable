@@ -23,9 +23,18 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
   }
 
   // Sort bids by amount (highest first) and take top N
-  const topBids = [...bids]
-    .filter(bid => bid.userId && bid.amount > 0) // Filter out invalid bids
-    .sort((a, b) => b.amount - a.amount)
+  // Handle Mongoose documents by accessing amount from _doc if needed
+  const validBids = [...bids].filter(bid => {
+    const amount = bid.amount || (bid._doc && bid._doc.amount) || 0;
+    return bid.userId && bid.userId.username && amount > 0;
+  });
+  
+  const topBids = validBids
+    .sort((a, b) => {
+      const amountA = a.amount || (a._doc && a._doc.amount) || 0;
+      const amountB = b.amount || (b._doc && b._doc.amount) || 0;
+      return amountB - amountA;
+    })
     .slice(0, maxDisplay);
 
   if (topBids.length === 0) {
@@ -54,7 +63,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
             
             {/* Bid Amount - Permanently displayed */}
             <span className="text-xs text-white font-semibold mt-1">
-              £{bid.amount.toFixed(2)}
+              £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
             </span>
           </div>
         ))}

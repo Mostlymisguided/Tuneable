@@ -1021,7 +1021,8 @@ const Party: React.FC = () => {
                       </div>
                     ) : (
                       getDisplaySongs().map((song: any, index: number) => {
-                        const songData = song.songId || song;
+                        // For sorted songs, the data is already flattened, for regular party songs it's nested under songId
+                        const songData = selectedTimePeriod === 'all-time' ? (song.songId || song) : song;
                         return (
                           <div
                             key={`queued-${songData.id}-${index}`}
