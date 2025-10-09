@@ -1271,16 +1271,17 @@ const Party: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendees</h3>
             <div className="space-y-2">
               {party.attendees.map((attendee: any) => {
-                const hostId = typeof party.host === 'string' ? party.host : party.host?.id;
+                const hostId = typeof party.host === 'string' ? party.host : party.host?.uuid;
+                const attendeeId = attendee.uuid || attendee.id;
                 return (
-                  <div key={attendee.id} className="flex items-center space-x-3">
+                  <div key={attendeeId} className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-600">
                         {attendee.username?.charAt(0).toUpperCase() || '?'}
                       </span>
                     </div>
                     <span className="text-sm text-gray-900">{attendee.username || 'Unknown User'}</span>
-                    {attendee.id === hostId && (
+                    {attendeeId === hostId && (
                       <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                         Host
                       </span>

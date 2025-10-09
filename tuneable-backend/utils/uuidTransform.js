@@ -75,11 +75,14 @@ function transformDocument(doc, options = {}) {
       };
     }
     
-    // Handle attendees array
+    // Handle attendees array - preserve username for display
     if (transformed.attendees && Array.isArray(transformed.attendees)) {
       transformed.attendees = transformed.attendees.map(attendee => {
         if (attendee.uuid) {
-          return attendee.uuid;
+          return {
+            uuid: attendee.uuid,
+            username: attendee.username
+          };
         }
         return attendee;
       });
