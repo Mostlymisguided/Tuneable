@@ -236,8 +236,8 @@ export interface WebSocketMessage {
   type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT';
   partyId?: string;
   userId?: string;
-  queue?: PartySong[];
-  song?: PartySong;
+  queue?: PartyMedia[];
+  song?: PartyMedia;
 }
 
 export interface AuthContextType {

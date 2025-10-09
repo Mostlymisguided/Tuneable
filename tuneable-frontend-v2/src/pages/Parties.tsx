@@ -15,7 +15,8 @@ interface PartyType {
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   partyCode: string;
   attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
-  songs: any[];
+  media?: any[];
+  songs?: any[]; // Legacy support
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';

@@ -8,6 +8,7 @@ interface Bid {
     uuid: string;
   };
   amount: number;
+  _doc?: any; // Mongoose document property
 }
 
 interface TopBiddersProps {
