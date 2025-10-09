@@ -65,10 +65,14 @@ function transformDocument(doc, options = {}) {
       });
     }
     
-    // Handle host reference
+    // Handle host reference - preserve username for display
     if (transformed.host && transformed.host.uuid) {
       transformed.host_uuid = transformed.host.uuid;
-      transformed.host = transformed.host.uuid;
+      // Keep the full host object for display purposes
+      transformed.host = {
+        uuid: transformed.host.uuid,
+        username: transformed.host.username
+      };
     }
     
     // Handle attendees array

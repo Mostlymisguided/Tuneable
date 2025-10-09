@@ -696,7 +696,7 @@ const Party: React.FC = () => {
                 </div>
                 <div className="mt-1">
                   <span className="text-gray-400 text-sm">
-                    Host: {typeof party.host === 'object' ? party.host.username : 'Unknown Host'}
+                    Host: {typeof party.host === 'object' && party.host.username ? party.host.username : 'Unknown Host'}
                   </span>
                 </div>
               </div>
