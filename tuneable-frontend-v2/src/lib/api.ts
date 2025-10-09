@@ -28,7 +28,8 @@ interface Party {
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   partyCode: string;
   attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
-  songs: PartySong[];
+  media: any[];
+  songs?: any[]; // Legacy support during migration
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
@@ -37,11 +38,7 @@ interface Party {
   watershed: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-interface PartySong {
-  songId: string;
-  addedBy: string;
+  host_uuid?: string; // UUID reference for host
 }
 
 // Unused interfaces removed to fix linting warnings

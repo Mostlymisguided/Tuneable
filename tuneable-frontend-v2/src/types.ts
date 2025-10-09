@@ -196,9 +196,18 @@ export interface Bid {
   status: 'requested' | 'active' | 'played' | 'vetoed' | 'refunded';
 }
 
-export interface PartySong {
-  songId: string;
+export interface PartyMedia {
+  mediaId: string;
+  media_uuid?: string;
   addedBy: string;
+  addedBy_uuid?: string;
+  partyBidValue: number;
+  status: 'queued' | 'playing' | 'played' | 'vetoed';
+  queuedAt?: string;
+  playedAt?: string;
+  completedAt?: string;
+  vetoedAt?: string;
+  vetoedBy?: string;
 }
 
 export interface Party {
@@ -209,7 +218,8 @@ export interface Party {
   host_uuid?: string; // UUID reference for host
   partyCode: string;
   attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
-  songs: PartySong[];
+  media: PartyMedia[];
+  songs?: PartyMedia[]; // Legacy support during migration
   startTime: string;
   musicSource: 'youtube' | 'spotify' | 'direct_upload';
   endTime?: string;

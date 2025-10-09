@@ -233,15 +233,15 @@ const Party: React.FC = () => {
   useEffect(() => {
     console.log('Party useEffect triggered - party:', !!party, 'songs:', party?.songs?.length, 'currentPartyId:', currentPartyId, 'partyId:', partyId);
     
-    if (party && party.songs.length > 0) {
+    if (party && getPartyMedia().length > 0) {
       // Always update the global player queue when party data loads
       // This ensures the queue is updated even if it's the "same" party (e.g., on page reload)
       console.log('Updating global player queue for party:', partyId);
         
         // Filter to only include queued songs for the WebPlayer
-        const queuedSongs = party.songs.filter((song: any) => song.status === 'queued');
+        const queuedSongs = getPartyMedia().filter((song: any) => song.status === 'queued');
         console.log('Queued songs for WebPlayer:', queuedSongs.length);
-        console.log('All party songs statuses:', party.songs.map((s: any) => ({ title: s.songId?.title, status: s.status })));
+        console.log('All party songs statuses:', getPartyMedia().map((s: any) => ({ title: s.songId?.title || s.mediaId?.title, status: s.status })));
         
         // Clean and set the queue in global store
         const cleanedQueue = queuedSongs.map((song: any) => {
@@ -434,11 +434,17 @@ const Party: React.FC = () => {
     fetchSortedSongs(timePeriod);
   };
 
+  // Helper to get media items (support both old songs and new media)
+  const getPartyMedia = () => {
+    // Use media if available, fall back to songs for backward compatibility
+    return party.media || party.songs || [];
+  };
+
   // Get songs to display based on selected time period
   const getDisplaySongs = () => {
     if (selectedTimePeriod === 'all-time') {
-      // Show regular party songs
-      return party.songs.filter((song: any) => song.status === 'queued');
+      // Show regular party media
+      return getPartyMedia().filter((item: any) => item.status === 'queued');
     } else {
       // Show sorted songs from the selected time period
       return sortedSongs.filter((song: any) => song.status === 'queued');
@@ -643,11 +649,12 @@ const Party: React.FC = () => {
   };
 
   const calculateTotalBids = () => {
-    if (!party?.songs) return 0;
+    const media = getPartyMedia();
+    if (!media) return 0;
     
-    return party.songs.reduce((total: number, song: any) => {
-      const songData = song.songId || song;
-      const bidValue = songData.partyBidValue || 0;
+    return media.reduce((total: number, item: any) => {
+      const mediaData = item.mediaId || item.songId || item;
+      const bidValue = mediaData.partyBidValue || 0;
       return total + (typeof bidValue === 'number' ? bidValue : 0);
     }, 0);
   };
@@ -742,7 +749,7 @@ const Party: React.FC = () => {
               <Clock className="h-6 w-6 text-white" />
               <div>
                 <div className="text-2xl font-bold text-white">
-                  {party.songs.filter((song: any) => song.status === 'played').length}
+                  {getPartyMedia().filter((song: any) => song.status === 'played').length}
                 </div>
                 <div className="text-sm text-gray-300">Played</div>
               </div>
@@ -783,7 +790,7 @@ const Party: React.FC = () => {
             style={!showVetoed ? {backgroundColor: '#9333EA'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
           >
             {selectedTimePeriod === 'all-time' 
-              ? `Queue (${party.songs.filter((song: any) => song.status === 'queued').length})`
+              ? `Queue (${getPartyMedia().filter((song: any) => song.status === 'queued').length})`
               : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplaySongs().length})`
             }
           </button>
@@ -792,7 +799,7 @@ const Party: React.FC = () => {
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${showVetoed ? 'bg-red-600 text-white' : 'bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30'}`}
             style={showVetoed ? {backgroundColor: '#DC2626'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
           >
-            Vetoed ({party.songs.filter((song: any) => song.status === 'vetoed').length})
+            Vetoed ({getPartyMedia().filter((song: any) => song.status === 'vetoed').length})
           </button>
           <button 
             onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
@@ -877,17 +884,17 @@ const Party: React.FC = () => {
           )}
           
           <div className="space-y-3">
-            {party.songs.length > 0 ? (
+            {getPartyMedia().length > 0 ? (
               <div className="space-y-6">
                 {/* Currently Playing */}
-                {party.songs.filter((song: any) => song.status === 'playing').length > 0 && (
+                {getPartyMedia().filter((song: any) => song.status === 'playing').length > 0 && (
                   <div>
                     <h3 className="text-lg font-medium text-purple-400 mb-3 flex items-center">
                       <Play className="h-5 w-5 mr-2" />
                       Currently Playing
                     </h3>
                     <div className="space-y-3">
-                      {party.songs
+                      {getPartyMedia()
                         .filter((song: any) => song.status === 'playing')
                         .map((song: any, index: number) => {
                           const songData = song.songId || song;
@@ -1139,13 +1146,13 @@ const Party: React.FC = () => {
                 {/* Vetoed Songs - Show when Vetoed tab is active */}
                 {showVetoed && (
                   <div className="space-y-3">
-                    {party.songs.filter((song: any) => song.status === 'vetoed').length === 0 ? (
+                    {getPartyMedia().filter((song: any) => song.status === 'vetoed').length === 0 ? (
                       <div className="text-center py-8">
                         <X className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-500">No vetoed songs</p>
                       </div>
                     ) : (
-                      party.songs
+                      getPartyMedia()
                         .filter((song: any) => song.status === 'vetoed')
                         .map((song: any, index: number) => {
                           const songData = song.songId || song;
@@ -1220,11 +1227,11 @@ const Party: React.FC = () => {
             )}
 
             {/* Previously Played Songs - Only show for live parties */}
-            {party.type === 'live' && party.songs.filter((song: any) => song.status === 'played').length > 0 && (
+            {party.type === 'live' && getPartyMedia().filter((song: any) => song.status === 'played').length > 0 && (
               <div id="previously-played" className="mt-8">
                 <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
                   <CheckCircle className="h-5 w-5 mr-2" />
-                  Previously Played ({party.songs.filter((song: any) => song.status === 'played').length})
+                  Previously Played ({getPartyMedia().filter((song: any) => song.status === 'played').length})
                 </h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {party.songs
