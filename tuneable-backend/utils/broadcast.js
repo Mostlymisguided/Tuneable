@@ -1,8 +1,20 @@
+/**
+ * WebSocket Broadcast Utility
+ * 
+ * NOTE: This module provides WebSocket functionality for live party (jukebox) features.
+ * Currently NOT used in MVP which focuses on remote parties only.
+ * 
+ * Will be activated when party.type === 'live' for future jukebox functionality where
+ * songs auto-play and status updates (playing, completed, etc.) are synced in real-time.
+ * 
+ * For remote parties (MVP), status management happens via manual skip/refresh actions.
+ */
+
 const { WebSocketServer } = require("ws");
 
 let wss = null;
-const activeRooms = {}; // Store song queues per party
-const partyHosts = {};  // Store host per party
+const activeRooms = {}; // Store song queues per party (live parties only)
+const partyHosts = {};  // Store host per party (live parties only)
 
 const setWebSocketServer = (server) => {
   wss = new WebSocketServer({ server });

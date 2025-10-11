@@ -169,8 +169,10 @@ if (require.main === module) {
     console.log(`Server running on PORT ${PORT}`);
     
     // Set up WebSocket server after the HTTP server is ready
+    // NOTE: WebSocket is for future live party (jukebox) feature
+    // Currently only used if party.type === 'live' (MVP uses remote parties only)
     setWebSocketServer(server);
-    console.log('✅ WebSocket server initialized.');
+    console.log('✅ WebSocket server initialized (for future live parties).');
   });
 }
 

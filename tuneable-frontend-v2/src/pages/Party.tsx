@@ -96,6 +96,8 @@ const Party: React.FC = () => {
   } = useWebPlayerStore();
 
   // Only use WebSocket for live parties
+  // NOTE: WebSocket functionality is for future live jukebox feature
+  // MVP focuses on remote parties only, so this is disabled (shouldUseWebSocket = false)
   const shouldUseWebSocket = party?.type === 'live';
   
   const { sendMessage } = useWebSocket({
@@ -1251,6 +1253,7 @@ const Party: React.FC = () => {
             )}
 
             {/* Previously Played Songs - Only show for live parties */}
+            {/* NOTE: This section is for future live jukebox feature. MVP uses remote parties only. */}
             {party.type === 'live' && getPartyMedia().filter((song: any) => song.status === 'played').length > 0 && (
               <div id="previously-played" className="mt-8">
                 <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
