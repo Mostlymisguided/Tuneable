@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
-  ArrowLeft, 
   Music, 
   User, 
   Calendar, 
@@ -211,7 +210,8 @@ const TuneProfile: React.FC = () => {
           <div className="text-white text-xl mb-4">Error loading song profile</div>
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white"
+            className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
+            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
           >
             Go Back
           </button>
@@ -253,9 +253,9 @@ const TuneProfile: React.FC = () => {
         <div className="mb-8">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center text-white hover:text-purple-300 mb-4 transition-colors"
+            className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
+            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </button>
           

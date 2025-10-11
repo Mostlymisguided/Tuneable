@@ -1081,7 +1081,7 @@ const Party: React.FC = () => {
                                 </span>
                                 <div className="flex items-center space-x-1 ml-2">
                                   <Clock className="h-4 w-4 text-gray-400" />
-                                  <span className="text-sm text-gray-300">{formatDuration(songData.duration)}</span>
+                                  <span className="p-2 text-sm text-gray-300">{formatDuration(songData.duration)}</span>
                                 </div>
                               </div>
                               

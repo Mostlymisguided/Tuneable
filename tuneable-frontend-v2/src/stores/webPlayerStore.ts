@@ -14,6 +14,13 @@ interface Song {
   totalBidValue: number;
 }
 
+interface TopBidder {
+  userId: string;
+  username: string;
+  avatar?: string;
+  amount: number;
+}
+
 interface WebPlayerState {
   // Player state
   isPlaying: boolean;
@@ -22,6 +29,22 @@ interface WebPlayerState {
   volume: number;
   isMuted: boolean;
   isHost: boolean;
+  
+  // Time tracking
+  currentTime: number;
+  duration: number;
+  setCurrentTime: (time: number) => void;
+  setDuration: (duration: number) => void;
+  seekTo: (time: number) => void;
+  
+  // Video display
+  showVideo: boolean;
+  toggleVideo: () => void;
+  setShowVideo: (show: boolean) => void;
+  
+  // Bid information
+  topBidder: TopBidder | null;
+  setTopBidder: (bidder: TopBidder | null) => void;
   
   // Player actions
   setCurrentSong: (song: Song | null, index?: number, autoPlay?: boolean) => void;
@@ -69,12 +92,54 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       isGlobalPlayerActive: false,
       sendWebSocketMessage: () => {},
       
+      // Time tracking state
+      currentTime: 0,
+      duration: 0,
+      
+      // Video display state
+      showVideo: false,
+      
+      // Bid information state
+      topBidder: null,
+      
       // Actions
+      
+      // Time tracking actions
+      setCurrentTime: (time) => {
+        set({ currentTime: time });
+      },
+      
+      setDuration: (duration) => {
+        set({ duration });
+      },
+      
+      seekTo: (time) => {
+        set({ currentTime: time });
+        // The actual seeking will be handled by the player component
+      },
+      
+      // Video display actions
+      toggleVideo: () => {
+        set((state) => ({ showVideo: !state.showVideo }));
+      },
+      
+      setShowVideo: (show) => {
+        set({ showVideo: show });
+      },
+      
+      // Bid information actions
+      setTopBidder: (bidder) => {
+        set({ topBidder: bidder });
+      },
+      
       setCurrentSong: (song, index = 0, autoPlay = false) => {
         set({ 
           currentSong: song, 
           currentSongIndex: index,
-          isPlaying: autoPlay // Auto-play if requested (for jukebox experience)
+          isPlaying: autoPlay, // Auto-play if requested (for jukebox experience)
+          currentTime: 0, // Reset time when changing songs
+          duration: 0,
+          topBidder: null // Clear top bidder when changing songs
         });
       },
       
@@ -219,6 +284,9 @@ export const useWebPlayerStore = create<WebPlayerState>()(
         queue: state.queue,
         currentPartyId: state.currentPartyId,
         isGlobalPlayerActive: state.isGlobalPlayerActive,
+        showVideo: state.showVideo,
+        currentTime: state.currentTime,
+        duration: state.duration,
       }),
     }
   )
