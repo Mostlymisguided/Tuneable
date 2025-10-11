@@ -297,8 +297,16 @@ router.post('/geocode-address', async (req, res) => {
     }
 });
 
-// Place a bid on an existing song or add a new song with a bid
-router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req, res) => {
+/* ==========================================
+ * OLD SONGS/BID ROUTE - REMOVED
+ * This route used the deprecated Song model.
+ * Use the new Media-based routes instead:
+ * - POST /:partyId/media/add (to add new media with initial bid)
+ * - POST /:partyId/media/:mediaId/bid (to bid on existing media)
+ * ==========================================
+
+// REMOVED: Place a bid on an existing song or add a new song with a bid
+// router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         console.log("🎯 SONGS/BID ENDPOINT CALLED");
         console.log("🎯 Request body:", JSON.stringify(req.body, null, 2));
@@ -663,6 +671,9 @@ router.post('/:partyId/songs/bid', authMiddleware, resolvePartyId(), async (req,
         res.status(500).json({ error: 'Error placing bid', details: err.message });
     }
 });
+==========================================
+END OF OLD SONGS/BID ROUTE
+========================================== */
 
 /* ==========================================
  * OLD SONGCARDBID ROUTE - COMMENTED OUT
@@ -1000,13 +1011,42 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         await media.save();
 
-        // Create bid record
+        // Calculate queue context
+        const queuedMedia = party.media.filter(m => m.status === 'queued');
+        const queueSize = queuedMedia.length;
+        const queuePosition = queueSize + 1; // This new song will be at the end
+
+        // Detect platform from user-agent (don't use 'platform' from req.body as it's the media platform like 'youtube')
+        const userAgent = req.headers['user-agent'] || '';
+        let detectedPlatform = 'unknown';
+        if (userAgent.includes('Mobile')) detectedPlatform = 'mobile';
+        else if (userAgent.includes('Tablet')) detectedPlatform = 'tablet';
+        else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
+
+        // Create bid record with denormalized fields
         const bid = new Bid({
             userId,
             partyId,
-            songId: media._id,
+            mediaId: media._id, // Use mediaId instead of songId
             amount: bidAmount,
-            status: 'active'
+            status: 'active',
+            
+            // Required denormalized fields
+            username: user.username,
+            partyName: party.name,
+            mediaTitle: media.title,
+            partyType: party.type,
+            
+            // Recommended fields
+            mediaArtist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown Artist',
+            mediaCoverArt: media.coverArt,
+            isInitialBid: true, // This is adding new media to party
+            queuePosition: queuePosition,
+            queueSize: queueSize,
+            mediaContentType: media.contentType,
+            mediaContentForm: media.contentForm,
+            mediaDuration: media.duration,
+            platform: detectedPlatform
         });
 
         await bid.save();
@@ -1124,14 +1164,49 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 
         // Get the actual media ObjectId
         const actualMediaId = partyMediaEntry.mediaId._id || partyMediaEntry.mediaId;
+        
+        // Get full media object for denormalized fields (from populated party)
+        const populatedMedia = partyMediaEntry.mediaId;
 
-        // Create bid record
+        // Calculate queue context
+        const queuedMedia = party.media.filter(m => m.status === 'queued');
+        const queueSize = queuedMedia.length;
+        // Find position of this media in the queue
+        const queuePosition = queuedMedia.findIndex(m => 
+            (m.mediaId._id || m.mediaId).toString() === actualMediaId.toString()
+        ) + 1; // +1 for 1-indexed position
+
+        // Detect platform from user-agent
+        const userAgent = req.headers['user-agent'] || '';
+        let detectedPlatform = 'unknown';
+        if (userAgent.includes('Mobile')) detectedPlatform = 'mobile';
+        else if (userAgent.includes('Tablet')) detectedPlatform = 'tablet';
+        else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
+
+        // Create bid record with denormalized fields
         const bid = new Bid({
             userId,
             partyId,
-            songId: actualMediaId,
+            mediaId: actualMediaId, // Use mediaId instead of songId
             amount: bidAmount,
-            status: 'active'
+            status: 'active',
+            
+            // Required denormalized fields
+            username: user.username,
+            partyName: party.name,
+            mediaTitle: populatedMedia.title,
+            partyType: party.type,
+            
+            // Recommended fields
+            mediaArtist: Array.isArray(populatedMedia.artist) && populatedMedia.artist.length > 0 ? populatedMedia.artist[0].name : 'Unknown Artist',
+            mediaCoverArt: populatedMedia.coverArt,
+            isInitialBid: false, // This is boosting existing media in party
+            queuePosition: queuePosition > 0 ? queuePosition : null, // null if not found in queue
+            queueSize: queueSize,
+            mediaContentType: populatedMedia.contentType,
+            mediaContentForm: populatedMedia.contentForm,
+            mediaDuration: populatedMedia.duration,
+            platform: detectedPlatform
         });
 
         await bid.save();
@@ -1669,7 +1744,7 @@ router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
     }
 });
 
-// Get songs sorted by bid values within specific time periods
+// Get media sorted by bid values within specific time periods
 router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
@@ -1683,19 +1758,19 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
 
         const party = await Party.findById(partyId)
             .populate({
-                path: 'songs.songId',
-                model: 'Song',
-                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category',
+                path: 'media.mediaId',
+                model: 'Media',
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category uuid',
                 populate: {
                     path: 'bids',
                     model: 'Bid',
                     populate: {
                         path: 'userId',
-                        select: 'username profilePic uuid',  // ✅ Added profilePic and uuid for top bidders display
+                        select: 'username profilePic uuid',
                     },
                 },
             })
-            .populate('songs.addedBy', 'username');
+            .populate('media.addedBy', 'username');
 
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
@@ -1733,44 +1808,49 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
             bidQuery.createdAt = { $gte: startDate };
         }
 
-        const bids = await Bid.find(bidQuery).select('songId episodeId amount createdAt');
+        const bids = await Bid.find(bidQuery).select('mediaId amount createdAt');
 
-        // Calculate bid values for each song within the time period
-        const songBidValues = {};
+        // Calculate bid values for each media within the time period
+        const mediaBidValues = {};
         bids.forEach(bid => {
-            const songId = bid.songId?.toString() || bid.episodeId?.toString();
-            if (songId) {
-                songBidValues[songId] = (songBidValues[songId] || 0) + bid.amount;
+            const mediaId = bid.mediaId?.toString();
+            if (mediaId) {
+                mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
             }
         });
 
-        // Process and sort songs by their bid values within the time period
-        const processedSongs = party.songs
+        // Process and sort media by their bid values within the time period
+        const processedSongs = party.media
             .map((entry) => {
-                if (!entry.songId) return null;
+                if (!entry.mediaId) return null;
 
-                const availablePlatforms = Object.entries(entry.songId.sources || {})
+                const availablePlatforms = Object.entries(entry.mediaId.sources || {})
                     .filter(([key, value]) => value)
                     .map(([key, value]) => ({ platform: key, url: value }));
 
-                const timePeriodBidValue = songBidValues[entry.songId._id.toString()] || 0;
+                const timePeriodBidValue = mediaBidValues[entry.mediaId._id.toString()] || 0;
+
+                // Get artist name from Media subdocument array
+                const artistName = Array.isArray(entry.mediaId.artist) && entry.mediaId.artist.length > 0
+                    ? entry.mediaId.artist[0].name
+                    : 'Unknown Artist';
 
                 return {
-                    _id: entry.songId._id,
-                    id: entry.songId.uuid || entry.songId._id, // Use UUID for external API, fallback to _id
-                    uuid: entry.songId.uuid || entry.songId._id, // Also include uuid field for consistency
-                    title: entry.songId.title,
-                    artist: entry.songId.artist,
-                    duration: entry.songId.duration,
-                    coverArt: entry.songId.coverArt,
-                    sources: entry.songId.sources,
+                    _id: entry.mediaId._id,
+                    id: entry.mediaId.uuid || entry.mediaId._id, // Use UUID for external API, fallback to _id
+                    uuid: entry.mediaId.uuid || entry.mediaId._id, // Also include uuid field for consistency
+                    title: entry.mediaId.title,
+                    artist: artistName, // Transform for frontend compatibility
+                    duration: entry.mediaId.duration,
+                    coverArt: entry.mediaId.coverArt,
+                    sources: entry.mediaId.sources,
                     availablePlatforms,
-                    globalBidValue: entry.songId.globalBidValue || 0,
+                    globalBidValue: entry.mediaId.globalBidValue || 0,
                     partyBidValue: entry.partyBidValue || 0, // All-time party bid value
                     timePeriodBidValue, // Bid value for the specific time period
-                    bids: entry.songId.bids || [], // ✅ Include populated bids for TopBidders component
-                    tags: entry.songId.tags || [], // ✅ Include tags for display
-                    category: entry.songId.category || null, // ✅ Include category for display
+                    bids: entry.mediaId.bids || [], // Include populated bids for TopBidders component
+                    tags: entry.mediaId.tags || [], // Include tags for display
+                    category: entry.mediaId.category || null, // Include category for display
                     addedBy: entry.addedBy,
                     status: entry.status,
                     queuedAt: entry.queuedAt,
@@ -1778,7 +1858,7 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
                     completedAt: entry.completedAt,
                     vetoedAt: entry.vetoedAt,
                     vetoedBy: entry.vetoedBy,
-                    contentType: entry.contentType || 'song'
+                    contentType: entry.contentType || 'music'
                 };
             })
             .filter(song => song !== null)

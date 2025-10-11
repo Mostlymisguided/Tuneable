@@ -543,6 +543,11 @@ const Party: React.FC = () => {
       // Refresh party data to get updated bid information
       await fetchPartyDetails();
       
+      // Refresh sorted songs if viewing a time-filtered period
+      if (selectedTimePeriod !== 'all-time') {
+        await fetchSortedSongs(selectedTimePeriod);
+      }
+      
       setBidModalOpen(false);
       setSelectedSong(null);
     } catch (error: any) {
@@ -1117,15 +1122,25 @@ const Party: React.FC = () => {
                             {/* Action Buttons */}
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
-                                <span className="px-3 py-1 bg-gray-700 text-white rounded-lg text-sm">
-                                  £{(() => {
-                                    if (selectedTimePeriod === 'all-time') {
-                                      return typeof song.partyBidValue === 'number' ? song.partyBidValue.toFixed(2) : '0.00';
-                                    } else {
-                                      return typeof song.timePeriodBidValue === 'number' ? song.timePeriodBidValue.toFixed(2) : '0.00';
-                                    }
-                                  })()}
-                                </span>
+                                {/* Dual Bid Display */}
+                                <div className="flex flex-col items-end space-y-1 bg-gray-700 px-3 py-2 rounded-lg">
+                                  <div className="text-right">
+                                    <div className="text-xs text-gray-400 uppercase tracking-wide">
+                                      {selectedTimePeriod === 'all-time' ? 'Party' : selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    </div>
+                                    <div className="text-lg font-bold text-white">
+                                      £{selectedTimePeriod === 'all-time' 
+                                        ? (typeof song.partyBidValue === 'number' ? song.partyBidValue.toFixed(2) : '0.00')
+                                        : (typeof song.timePeriodBidValue === 'number' ? song.timePeriodBidValue.toFixed(2) : '0.00')}
+                                    </div>
+                                  </div>
+                                  <div className="text-right border-t border-gray-600 pt-1 w-full">
+                                    <div className="text-xs text-gray-500 uppercase tracking-wide">Global</div>
+                                    <div className="text-sm text-gray-300">
+                                      £{(typeof songData.globalBidValue === 'number' ? songData.globalBidValue.toFixed(2) : '0.00')}
+                                    </div>
+                                  </div>
+                                </div>
                                 <button
                                   onClick={() => handleBidClick(song)}
                                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"

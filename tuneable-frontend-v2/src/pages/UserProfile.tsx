@@ -2,13 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
-  ArrowLeft, 
   MapPin, 
   Coins, 
   Music, 
   TrendingUp,
   Clock,
-  ExternalLink,
   BarChart3,
   Activity
 } from 'lucide-react';
@@ -45,6 +43,7 @@ interface Bid {
     duration?: number;
     globalBidValue?: number;
     uuid: string;
+    tags?: string[];
   };
   partyId: {
     _id: string;
@@ -65,6 +64,7 @@ interface SongWithBids {
     duration?: number;
     globalBidValue?: number;
     uuid: string;
+    tags?: string[];
   };
   bids: Bid[];
   totalAmount: number;
@@ -110,8 +110,11 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatJoinDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
   };
 
   const formatDuration = (seconds?: number) => {
@@ -200,7 +203,7 @@ const UserProfile: React.FC = () => {
                 <div className="bg-black/20 rounded-lg p-4">
                   <div className="text-sm text-gray-300">Member Since</div>
                   <div className="text-2xl font-bold text-blue-400">
-                    {formatDate(user.createdAt)}
+                    {formatJoinDate(user.createdAt)}
                   </div>
                 </div>
               </div>

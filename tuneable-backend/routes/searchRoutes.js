@@ -2,80 +2,92 @@ const express = require('express');
 const NodeCache = require('node-cache');
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
 const spotifyService = require('../services/spotifyService'); // Spotify API logic
-const Song = require('../models/Song'); // Local database model
+const Media = require('../models/Media'); // Unified media model
 const { transformResponse } = require('../utils/uuidTransform');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
 
-// Search local database first
+// Search local database first (using Media model)
 const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
     try {
         console.log(`Searching local database for: "${query}" (source: ${source})`);
         
-        // First, let's see what songs exist in the database
-        const totalSongs = await Song.countDocuments();
-        console.log(`Total songs in database: ${totalSongs}`);
+        // Count media items (filter by music for now)
+        const totalMedia = await Media.countDocuments({ contentType: { $in: ['music'] } });
+        console.log(`Total media items in database: ${totalMedia}`);
         
-        // Create search criteria
+        // Create search criteria for Media model
         const searchCriteria = {
-            $or: [
-                { title: { $regex: query, $options: 'i' } },
-                { artist: { $regex: query, $options: 'i' } },
-                { album: { $regex: query, $options: 'i' } }
+            $and: [
+                {
+                    $or: [
+                        { title: { $regex: query, $options: 'i' } },
+                        { 'artist.name': { $regex: query, $options: 'i' } }, // Search in artist subdocuments
+                        { creatorNames: { $regex: query, $options: 'i' } }, // Search all creator names
+                        { album: { $regex: query, $options: 'i' } }
+                    ]
+                },
+                { contentType: { $in: ['music'] } } // Filter to music content
             ]
         };
 
         // If source is specified, filter by platform
         if (source === 'youtube') {
-            searchCriteria['sources.youtube'] = { $exists: true, $ne: null };
+            searchCriteria.$and.push({ 'sources.youtube': { $exists: true, $ne: null } });
         } else if (source === 'spotify') {
-            searchCriteria['sources.spotify'] = { $exists: true, $ne: null };
+            searchCriteria.$and.push({ 'sources.spotify': { $exists: true, $ne: null } });
         }
 
         console.log('Search criteria:', JSON.stringify(searchCriteria, null, 2));
 
-        const songs = await Song.find(searchCriteria)
+        const media = await Media.find(searchCriteria)
             .sort({ globalBidValue: -1, popularity: -1 }) // Sort by bid value and popularity
             .limit(limit)
             .populate('addedBy', 'username')
             .lean();
 
-        console.log(`Found ${songs.length} songs in local database`);
+        console.log(`Found ${media.length} media items in local database`);
         
-        // Debug: Log first few songs to see their structure
-        if (songs.length > 0) {
-            console.log('Sample song structure:', JSON.stringify(songs[0], null, 2));
+        // Debug: Log first few media to see their structure
+        if (media.length > 0) {
+            console.log('Sample media structure:', JSON.stringify(media[0], null, 2));
         }
 
         // Format results to match external API format
-        const formattedResults = songs.map(song => {
+        const formattedResults = media.map(mediaItem => {
             // Handle sources - it could be a Map, plain object, or undefined
             let sources = {};
-            if (song.sources) {
+            if (mediaItem.sources) {
                 try {
                     // Try to convert to object if it's iterable
-                    if (typeof song.sources[Symbol.iterator] === 'function') {
-                        sources = Object.fromEntries(song.sources);
-                    } else if (typeof song.sources === 'object') {
-                        sources = song.sources;
+                    if (typeof mediaItem.sources[Symbol.iterator] === 'function') {
+                        sources = Object.fromEntries(mediaItem.sources);
+                    } else if (typeof mediaItem.sources === 'object') {
+                        sources = mediaItem.sources;
                     }
                 } catch (error) {
-                    console.log('Error processing sources for song:', song._id, error);
+                    console.log('Error processing sources for media:', mediaItem._id, error);
                     // Fallback: try to access as plain object
-                    sources = song.sources || {};
+                    sources = mediaItem.sources || {};
                 }
             }
 
+            // Get primary artist name
+            const artistName = Array.isArray(mediaItem.artist) && mediaItem.artist.length > 0
+                ? mediaItem.artist[0].name
+                : 'Unknown Artist';
+
             return {
-                id: song._id.toString(),
-                title: song.title,
-                artist: song.artist,
-                coverArt: song.coverArt || (source === 'youtube' && sources.youtube ? `https://img.youtube.com/vi/${sources.youtube.split('v=')[1]?.split('&')[0]}/hqdefault.jpg` : ''),
-                duration: song.duration || 0,
+                id: mediaItem._id.toString(),
+                uuid: mediaItem.uuid, // Include UUID for frontend
+                title: mediaItem.title,
+                artist: artistName,
+                coverArt: mediaItem.coverArt || (source === 'youtube' && sources.youtube ? `https://img.youtube.com/vi/${sources.youtube.split('v=')[1]?.split('&')[0]}/hqdefault.jpg` : ''),
+                duration: mediaItem.duration || 0,
                 sources: sources,
-                globalBidValue: song.globalBidValue || 0,
-                addedBy: song.addedBy?.username || 'Unknown',
+                globalBidValue: mediaItem.globalBidValue || 0,
+                addedBy: mediaItem.addedBy?.username || 'Unknown',
                 isLocal: true // Flag to indicate this is from our database
             };
         });
@@ -214,17 +226,20 @@ router.get('/', async (req, res) => {
 // Debug endpoint to see what's in the database
 router.get('/debug', async (req, res) => {
     try {
-        const totalSongs = await Song.countDocuments();
-        const sampleSongs = await Song.find().limit(5).lean();
+        const totalMedia = await Media.countDocuments({ contentType: { $in: ['music'] } });
+        const sampleMedia = await Media.find({ contentType: { $in: ['music'] } }).limit(5).lean();
         
         res.json(transformResponse({
-            totalSongs,
-            sampleSongs: sampleSongs.map(song => ({
-                id: song._id,
-                title: song.title,
-                artist: song.artist,
-                sources: song.sources,
-                globalBidValue: song.globalBidValue
+            totalMedia,
+            sampleMedia: sampleMedia.map(media => ({
+                id: media._id,
+                uuid: media.uuid,
+                title: media.title,
+                artist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown',
+                sources: media.sources,
+                globalBidValue: media.globalBidValue,
+                contentType: media.contentType,
+                contentForm: media.contentForm
             }))
         }));
     } catch (error) {

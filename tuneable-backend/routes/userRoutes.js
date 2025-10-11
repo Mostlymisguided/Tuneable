@@ -288,15 +288,15 @@ router.get('/:userId/profile', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get user's bidding history with song details
+    // Get user's bidding history with media details
     const Bid = require('../models/Bid');
-    const Song = require('../models/Song');
+    const Media = require('../models/Media');
     
     const userBids = await Bid.find({ userId: user._id })
       .populate({
-        path: 'songId',
-        model: 'Song',
-        select: 'title artist coverArt duration globalBidValue uuid _id',
+        path: 'mediaId',
+        model: 'Media',
+        select: 'title artist coverArt duration globalBidValue uuid _id contentType contentForm',
       })
       .populate({
         path: 'partyId',
@@ -311,35 +311,44 @@ router.get('/:userId/profile', async (req, res) => {
     const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
     const averageBidAmount = totalBids > 0 ? totalAmountBid / totalBids : 0;
     
-    // Get unique songs bid on
-    const uniqueSongs = [...new Set(userBids.map(bid => bid.songId?._id?.toString()).filter(Boolean))];
+    // Get unique media items bid on
+    const uniqueMedia = [...new Set(userBids.map(bid => bid.mediaId?._id?.toString()).filter(Boolean))];
     
     // Get top 5 highest bids
     const topBids = [...userBids]
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
-    // Group bids by song for display
-    const bidsBySong = {};
+    // Group bids by media for display
+    const bidsByMedia = {};
     userBids.forEach(bid => {
-      if (bid.songId) {
-        const songId = bid.songId._id.toString();
-        if (!bidsBySong[songId]) {
-          bidsBySong[songId] = {
-            song: bid.songId,
+      if (bid.mediaId) {
+        const mediaId = bid.mediaId._id.toString();
+        if (!bidsByMedia[mediaId]) {
+          // Transform Media artist array to string for frontend compatibility
+          const artistName = Array.isArray(bid.mediaId.artist) && bid.mediaId.artist.length > 0
+            ? bid.mediaId.artist[0].name
+            : 'Unknown Artist';
+            
+          bidsByMedia[mediaId] = {
+            song: {
+              ...bid.mediaId.toObject ? bid.mediaId.toObject() : bid.mediaId,
+              artist: artistName, // Transform for frontend compatibility
+              tags: bid.mediaId.tags || []
+            },
             bids: [],
             totalAmount: 0,
             bidCount: 0,
           };
         }
-        bidsBySong[songId].bids.push(bid);
-        bidsBySong[songId].totalAmount += bid.amount;
-        bidsBySong[songId].bidCount += 1;
+        bidsByMedia[mediaId].bids.push(bid);
+        bidsByMedia[mediaId].totalAmount += bid.amount;
+        bidsByMedia[mediaId].bidCount += 1;
       }
     });
 
     // Convert to array and sort by total amount bid
-    const songsWithBids = Object.values(bidsBySong)
+    const songsWithBids = Object.values(bidsByMedia)
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
     res.json(transformResponse({
@@ -361,10 +370,10 @@ router.get('/:userId/profile', async (req, res) => {
         totalBids,
         totalAmountBid,
         averageBidAmount,
-        uniqueSongsCount: uniqueSongs.length,
+        uniqueSongsCount: uniqueMedia.length, // Renamed but keeping field name for frontend compatibility
       },
       topBids,
-      songsWithBids,
+      songsWithBids, // Keeping field name for frontend compatibility
     }));
 
   } catch (error) {

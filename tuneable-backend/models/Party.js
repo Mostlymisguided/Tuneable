@@ -125,15 +125,8 @@ const PartySchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-});
-
-// Automatically update `updatedAt` on save
-PartySchema.pre('save', function (next) {
-  this.updatedAt = Date.now();
-  next();
+}, {
+  timestamps: true
 });
 
 // Method to calculate party status based on current time

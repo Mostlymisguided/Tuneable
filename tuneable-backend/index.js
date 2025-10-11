@@ -17,7 +17,7 @@ const app = express();
 const userRoutes = require('./routes/userRoutes'); // Import user routes
 const partyRoutes = require('./routes/partyRoutes'); // Unified party and playlist functionality
 const searchRoutes = require('./routes/searchRoutes'); // Import search routes
-const songRoutes = require('./routes/songRoutes'); // Import song routes
+const mediaRoutes = require('./routes/mediaRoutes'); // Import media routes (top-tunes, etc.)
 const paymentRoutes = require('./routes/paymentRoutes');
 const youtubeRoutes = require('./routes/youtube');
 const spotifyRoutes = require('./routes/spotifyRoutes'); // Import Spotify routes
@@ -129,7 +129,8 @@ console.log('Registering API routes...');
 app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parties', partyRoutes); // Unified party and playlist functionality
-app.use('/api/songs', songRoutes); // Tunefeed route
+app.use('/api/media', mediaRoutes); // Media routes (top-tunes, etc.)
+app.use('/api/songs', mediaRoutes); // Backward compatibility - routes to same Media handlers
 app.use('/api/payments', paymentRoutes);
 app.use('/api/youtube', youtubeRoutes);
 app.use('/api/spotify', spotifyRoutes); // Spotify routes
