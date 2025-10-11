@@ -919,16 +919,22 @@ const Party: React.FC = () => {
                               key={`playing-${songData.id}-${index}`}
                               className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
                             >
-                              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
-                                <Play className="h-6 w-6 text-white" />
+                              {/* Album Artwork with Play Icon Overlay */}
+                              <div className="relative w-16 h-16 flex-shrink-0">
+                                <img
+                                  src={songData.coverArt || '/default-cover.jpg'}
+                                  alt={songData.title || 'Unknown Song'}
+                                  className="w-full h-full rounded object-cover"
+                                  width="64"
+                                  height="64"
+                                />
+                                {/* Play Icon Overlay */}
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded">
+                                  <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                                    <Play className="h-4 w-4 text-white" fill="currentColor" />
+                                  </div>
+                                </div>
                               </div>
-                              <img
-                                src={songData.coverArt || '/default-cover.jpg'}
-                                alt={songData.title || 'Unknown Song'}
-                                className="w-16 h-16 rounded object-cover"
-                                width="64"
-                                height="64"
-                              />
                               <div className="flex-1">
                                 <h4 className="font-medium text-white text-lg">{songData.title || 'Unknown Song'}</h4>
                                 <p className="text-sm text-gray-400">{Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}</p>
@@ -1056,7 +1062,7 @@ const Party: React.FC = () => {
                               <span className="text-white font-bold text-sm">{index + 1}</span>
                             </div>
                             
-                            {/* Song Thumbnail with Play Button Overlay */}
+                            {/* Song Thumbnail */}
                             <div 
                               className="relative w-32 h-32 flex-shrink-0 cursor-pointer group"
                               onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
@@ -1068,12 +1074,6 @@ const Party: React.FC = () => {
                                 width="128"
                                 height="128"
                               />
-                              {/* Play Button Overlay */}
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
-                                  <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
-                                </div>
-                              </div>
                             </div>
                             
                             {/* Song Details */}
