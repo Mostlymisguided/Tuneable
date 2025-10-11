@@ -1010,8 +1010,8 @@ const Party: React.FC = () => {
                 {/* Sorting Tabs - Only show for Queue, not Vetoed */}
                 {!showVetoed && (
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-white mb-3">Sort by Bid Activity</h3>
-                    <div className="flex flex-wrap gap-2">
+                    <h3 className="text-lg font-semibold text-white text-center mb-3 p-2">Sort by Bid Activity</h3>
+                    <div className="flex flex-wrap gap-2 justify-center">
                       {[
                         { key: 'all-time', label: 'All Time' },
                         { key: 'this-year', label: 'This Year' },
@@ -1056,15 +1056,25 @@ const Party: React.FC = () => {
                               <span className="text-white font-bold text-sm">{index + 1}</span>
                             </div>
                             
-                            {/* Song Thumbnail */}
-                            <img
-                              src={songData.coverArt || '/default-cover.jpg'}
-                              alt={songData.title || 'Unknown Song'}
-                              className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                              width="128"
-                              height="128"
+                            {/* Song Thumbnail with Play Button Overlay */}
+                            <div 
+                              className="relative w-32 h-32 flex-shrink-0 cursor-pointer group"
                               onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
-                            />
+                            >
+                              <img
+                                src={songData.coverArt || '/default-cover.jpg'}
+                                alt={songData.title || 'Unknown Song'}
+                                className="w-full h-full rounded object-cover"
+                                width="128"
+                                height="128"
+                              />
+                              {/* Play Button Overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                  <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
+                                </div>
+                              </div>
+                            </div>
                             
                             {/* Song Details */}
                             <div className="flex-1 min-w-0">
@@ -1315,7 +1325,7 @@ const Party: React.FC = () => {
                         {attendee.username?.charAt(0).toUpperCase() || '?'}
                       </span>
                     </div>
-                    <span className="text-sm text-gray-900">{attendee.username || 'Unknown User'}</span>
+                    <span className="p-2 text-sm text-gray-900">{attendee.username || 'Unknown User'}</span>
                     {attendeeId === hostId && (
                       <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                         Host
@@ -1328,24 +1338,24 @@ const Party: React.FC = () => {
           </div>
 
           {/* Party Info */}
-          <div className="bg-purple-800 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold text-white mb-4">Party Info</h3>
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Party Info</h3>
             <div className="space-y-3 text-sm">
-              <div className="flex items-center">
-                <span className="text-gray-300 mr-2">Type:</span>
-                <span className="text-white capitalize">{party.type}</span>
+              <div className="flex  items-center">
+                <span className="text-gray-600 mr-2">Type:</span>
+                <span className="text-gray-900 capitalize">{party.type}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-300 mr-2">Location:</span>
-                <span className="text-white">{party.location}</span>
+                <span className="text-gray-600 mr-2">Location:</span>
+                <span className="text-gray-900">{party.location}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-300 mr-2">Created:</span>
-                <span className="text-white">{formatDate(party.createdAt)}</span>
+                <span className="text-gray-600 mr-2">Created:</span>
+                <span className="text-gray-900">{formatDate(party.createdAt)}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-300 mr-2">Status:</span>
-                <span className="text-green-400 capitalize">{party.status}</span>
+                <span className="text-gray-600 mr-2">Status:</span>
+                <span className="text-green-600 capitalize">{party.status}</span>
               </div>
             </div>
           </div>
