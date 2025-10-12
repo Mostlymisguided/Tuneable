@@ -106,13 +106,13 @@ const bidSchema = new mongoose.Schema({
     },
     
     // ========================================
-    // USER AGGREGATE TRACKING
+    // AGGREGATE TRACKING
     // ========================================
-    userPartyAggregateBidValue: { 
+    partyAggregateBidValue: { 
         type: Number, 
         default: 0 
     }, // User's total bids for this media in this party
-    userGlobalAggregateBidValue: { 
+    globalAggregateBidValue: { 
         type: Number, 
         default: 0 
     }, // User's total bids for this media across all parties

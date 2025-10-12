@@ -204,8 +204,8 @@ export interface Bid {
   status: 'requested' | 'active' | 'played' | 'vetoed' | 'refunded';
   
   // User aggregate tracking
-  userPartyAggregateBidValue?: number;
-  userGlobalAggregateBidValue?: number;
+  partyAggregateBidValue?: number;
+  globalAggregateBidValue?: number;
 }
 
 export interface PartyMedia {

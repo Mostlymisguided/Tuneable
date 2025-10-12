@@ -9,7 +9,7 @@ const Party = require('../models/Party');
  * @param {string} partyId - Party ID
  * @returns {Promise<number>} Total amount user has bid on this media in this party
  */
-async function calculateUserPartyAggregateBidValue(userId, mediaId, partyId) {
+async function calculatePartyAggregateBidValue(userId, mediaId, partyId) {
     const result = await Bid.aggregate([
         {
             $match: {
@@ -36,7 +36,7 @@ async function calculateUserPartyAggregateBidValue(userId, mediaId, partyId) {
  * @param {string} mediaId - Media ID
  * @returns {Promise<number>} Total amount user has bid on this media globally
  */
-async function calculateUserGlobalAggregateBidValue(userId, mediaId) {
+async function calculateGlobalAggregateBidValue(userId, mediaId) {
     const result = await Bid.aggregate([
         {
             $match: {
@@ -241,8 +241,8 @@ async function updateGlobalBidTracking(mediaId) {
 }
 
 module.exports = {
-    calculateUserPartyAggregateBidValue,
-    calculateUserGlobalAggregateBidValue,
+    calculatePartyAggregateBidValue,
+    calculateGlobalAggregateBidValue,
     findTopPartyAggregateBidUser,
     findTopGlobalAggregateBidUser,
     findTopPartyBidUser,

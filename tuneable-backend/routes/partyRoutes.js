@@ -14,8 +14,8 @@ const { broadcast } = require('../utils/broadcast');
 const { transformResponse } = require('../utils/uuidTransform');
 const { resolvePartyId } = require('../utils/idResolver');
 const { 
-    calculateUserPartyAggregateBidValue, 
-    calculateUserGlobalAggregateBidValue,
+    calculatePartyAggregateBidValue, 
+    calculateGlobalAggregateBidValue,
     updatePartyBidTracking,
     updateGlobalBidTracking 
 } = require('../utils/bidCalculations');
@@ -455,8 +455,8 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             platform: detectedPlatform,
             
             // User aggregate tracking (first bid, so equals bid amount)
-            userPartyAggregateBidValue: userPartyAggregate,
-            userGlobalAggregateBidValue: userGlobalAggregate
+            partyAggregateBidValue: userPartyAggregate,
+            globalAggregateBidValue: userGlobalAggregate
         });
 
         await bid.save();
@@ -606,8 +606,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
 
         // Calculate user aggregate bid values (before saving the new bid)
-        const currentUserPartyAggregate = await calculateUserPartyAggregateBidValue(userId, actualMediaId, partyId);
-        const currentUserGlobalAggregate = await calculateUserGlobalAggregateBidValue(userId, actualMediaId);
+        const currentUserPartyAggregate = await calculatePartyAggregateBidValue(userId, actualMediaId, partyId);
+        const currentUserGlobalAggregate = await calculateGlobalAggregateBidValue(userId, actualMediaId);
         
         // Create bid record with denormalized fields and aggregate tracking
         const bid = new Bid({
@@ -635,8 +635,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             platform: detectedPlatform,
             
             // User aggregate tracking (includes this new bid)
-            userPartyAggregateBidValue: currentUserPartyAggregate + bidAmount,
-            userGlobalAggregateBidValue: currentUserGlobalAggregate + bidAmount
+            partyAggregateBidValue: currentUserPartyAggregate + bidAmount,
+            globalAggregateBidValue: currentUserGlobalAggregate + bidAmount
         });
 
         await bid.save();
