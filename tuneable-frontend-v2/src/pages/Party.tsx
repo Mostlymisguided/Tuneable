@@ -1055,7 +1055,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${songData.id}-${index}`}
-                            className="bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
+                            className="card bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
                           >
                             {/* Number Badge */}
                             <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">

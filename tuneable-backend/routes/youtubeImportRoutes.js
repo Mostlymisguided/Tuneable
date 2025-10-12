@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 const { bulkImportLikedVideos, estimateQuotaUsage } = require('../services/youtubeLikedImport');
 
 /**
  * Estimate quota usage for importing liked videos
  */
-router.get('/liked-videos/estimate', authMiddleware, async (req, res) => {
+router.get('/liked-videos/estimate', adminMiddleware, async (req, res) => {
     try {
         const { maxVideos = 100 } = req.query;
         
@@ -30,9 +31,9 @@ router.get('/liked-videos/estimate', authMiddleware, async (req, res) => {
 /**
  * Bulk import liked music videos
  */
-router.post('/liked-videos/import', authMiddleware, async (req, res) => {
+router.post('/liked-videos/import', adminMiddleware, async (req, res) => {
     try {
-        const { accessToken, maxVideos = 100, maxDurationMinutes = 15 } = req.body;
+         const { accessToken, maxVideos = 100, maxDurationMinutes = 15 } = req.body;
         const userId = req.user._id;
 
         if (!accessToken) {
@@ -78,7 +79,7 @@ router.post('/liked-videos/import', authMiddleware, async (req, res) => {
 /**
  * Get YouTube OAuth URL for authorization
  */
-router.get('/oauth-url', (req, res) => {
+router.get('/oauth-url', adminMiddleware, (req, res) => {
     try {
         const clientId = process.env.YOUTUBE_CLIENT_ID;
         const redirectUri = process.env.YOUTUBE_REDIRECT_URI || 'http://localhost:3000/auth/youtube/callback';
