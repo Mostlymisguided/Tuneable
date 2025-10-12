@@ -259,7 +259,7 @@ const TuneProfile: React.FC = () => {
             Back
           </button>
           
-          <div className="flex items-start space-x-6">
+          <div className="card flex items-start space-x-6">
             {/* Album Art */}
             <div className="flex-shrink-0">
               <img
@@ -317,7 +317,7 @@ const TuneProfile: React.FC = () => {
         {song.bids && song.bids.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">Top Bidders</h2>
-            <div className="bg-black/20 rounded-lg p-6">
+            <div className="card bg-black/20 rounded-lg p-6">
               <TopBidders bids={song.bids} maxDisplay={10} />
             </div>
           </div>
@@ -336,7 +336,7 @@ const TuneProfile: React.FC = () => {
             </button>
           </div>
           
-          <div className="bg-black/20 rounded-lg p-6">
+          <div className="card bg-black/20 rounded-lg p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {visibleFields.map((field, index) => {
                 const IconComponent = field.icon;
@@ -399,7 +399,7 @@ const TuneProfile: React.FC = () => {
           
           {/* Add Comment Form */}
           {user && (
-            <div className="bg-black/20 rounded-lg p-6 mb-6">
+            <div className="card bg-black/20 rounded-lg p-6 mb-6">
               <form onSubmit={handleSubmitComment}>
                 <textarea
                   value={newComment}

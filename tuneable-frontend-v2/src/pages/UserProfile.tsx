@@ -174,7 +174,7 @@ const UserProfile: React.FC = () => {
             Back
           </button>
           
-          <div className="flex items-start space-x-6">
+          <div className="card flex items-start space-x-6">
             {/* Profile Picture */}
             <div className="flex-shrink-0">
               <img
@@ -228,22 +228,22 @@ const UserProfile: React.FC = () => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">Profile Info</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-white">{stats.totalBids || 0}</div>
                 <div className="text-sm text-gray-300">Total Bids</div>
               </div>
-              <div className="bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-white">£{(stats.totalAmountBid || 0).toFixed(2)}</div>
                 <div className="text-sm text-gray-300">Total Spent</div>
               </div>
-              <div className="bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-white">£{(stats.averageBidAmount || 0).toFixed(2)}</div>
                 <div className="text-sm text-gray-300">Avg Bid</div>
               </div>
-              <div className="bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
                 <div className="text-sm text-gray-300">Unique Songs</div>
@@ -259,7 +259,7 @@ const UserProfile: React.FC = () => {
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
                 {songsWithBids.map((songData, index) => (
-                  <div key={songData.song?.uuid || songData.song?._id || 'unknown'} className="flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
+                  <div key={songData.song?.uuid || songData.song?._id || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
                     <div className="flex-shrink-0">
                       <div className="flex items-center justify-center w-12 h-12 bg-purple-600 rounded-full">
                         <span className="text-white font-bold text-lg">#{index + 1}</span>
