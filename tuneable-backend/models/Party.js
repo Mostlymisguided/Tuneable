@@ -54,6 +54,14 @@ const PartySchema = new mongoose.Schema({
       partyBidValue: { type: Number, default: 0 },
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
       
+      // Top bid tracking (individual amounts)
+      topPartyBidValue: { type: Number, default: 0 },
+      topPartyBidUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      
+      // Top aggregate bid tracking (user totals)
+      topPartyAggregateBidValue: { type: Number, default: 0 },
+      topPartyAggregateUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      
       // Status and timing (universal)
       status: { 
         type: String, 
@@ -82,6 +90,14 @@ const PartySchema = new mongoose.Schema({
       addedBy_uuid: { type: String },
       partyBidValue: { type: Number, default: 0 }, // Party-specific total bid value
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
+      
+      // Top bid tracking (individual amounts)
+      topPartyBidValue: { type: Number, default: 0 },
+      topPartyBidUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      
+      // Top aggregate bid tracking (user totals)
+      topPartyAggregateBidValue: { type: Number, default: 0 },
+      topPartyAggregateUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       
       // Content type and status
       contentType: { 

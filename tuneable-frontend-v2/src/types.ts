@@ -165,6 +165,14 @@ export interface Media {
     amount: number;
   }>;
   
+  // Top bid tracking (individual amounts)
+  topGlobalBidValue?: number;
+  topGlobalBidUser?: string;
+  
+  // Top aggregate bid tracking (user totals)
+  topGlobalAggregateBidValue?: number;
+  topGlobalAggregateUser?: string;
+  
   // Relationships
   relationships?: MediaRelationship[];
   
@@ -194,6 +202,10 @@ export interface Bid {
   amount: number;
   createdAt: string;
   status: 'requested' | 'active' | 'played' | 'vetoed' | 'refunded';
+  
+  // User aggregate tracking
+  userPartyAggregateBidValue?: number;
+  userGlobalAggregateBidValue?: number;
 }
 
 export interface PartyMedia {
@@ -208,6 +220,14 @@ export interface PartyMedia {
   completedAt?: string;
   vetoedAt?: string;
   vetoedBy?: string;
+  
+  // Top bid tracking (individual amounts)
+  topPartyBidValue?: number;
+  topPartyBidUser?: string;
+  
+  // Top aggregate bid tracking (user totals)
+  topPartyAggregateBidValue?: number;
+  topPartyAggregateUser?: string;
 }
 
 export interface Party {

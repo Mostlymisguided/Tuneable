@@ -104,6 +104,18 @@ const bidSchema = new mongoose.Schema({
         enum: ['requested', 'active', 'played', 'vetoed', 'refunded'],
         default: 'active'
     },
+    
+    // ========================================
+    // USER AGGREGATE TRACKING
+    // ========================================
+    userPartyAggregateBidValue: { 
+        type: Number, 
+        default: 0 
+    }, // User's total bids for this media in this party
+    userGlobalAggregateBidValue: { 
+        type: Number, 
+        default: 0 
+    }, // User's total bids for this media across all parties
 }, {
     timestamps: true
 });

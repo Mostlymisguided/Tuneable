@@ -13,6 +13,12 @@ const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 const { transformResponse } = require('../utils/uuidTransform');
 const { resolvePartyId } = require('../utils/idResolver');
+const { 
+    calculateUserPartyAggregateBidValue, 
+    calculateUserGlobalAggregateBidValue,
+    updatePartyBidTracking,
+    updateGlobalBidTracking 
+} = require('../utils/bidCalculations');
 require('dotenv').config(); // Load .env variables
 
 // What3words functionality removed for now
@@ -155,7 +161,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category', // ✅ Added `addedBy`, `tags`, `category`
+                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category topGlobalBidValue topGlobalBidUser topGlobalAggregateBidValue topGlobalAggregateUser', // ✅ Added top bid tracking fields
                 populate: {
                     path: 'bids',
                     model: 'Bid',
@@ -207,6 +213,18 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
                 tags: entry.mediaId.tags || [], // ✅ Include tags
                 category: entry.mediaId.category || 'Unknown', // ✅ Include category
+                
+                // Top bid tracking (individual amounts)
+                topPartyBidValue: entry.topPartyBidValue || 0,
+                topPartyBidUser: entry.topPartyBidUser,
+                topGlobalBidValue: entry.mediaId.topGlobalBidValue || 0,
+                topGlobalBidUser: entry.mediaId.topGlobalBidUser,
+                
+                // Top aggregate bid tracking (user totals)
+                topPartyAggregateBidValue: entry.topPartyAggregateBidValue || 0,
+                topPartyAggregateUser: entry.topPartyAggregateUser,
+                topGlobalAggregateBidValue: entry.mediaId.topGlobalAggregateBidValue || 0,
+                topGlobalAggregateUser: entry.mediaId.topGlobalAggregateUser,
                 
                 // ✅ NEW: Song status and timing information
                 status: entry.status || 'queued',
@@ -407,7 +425,11 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         else if (userAgent.includes('Tablet')) detectedPlatform = 'tablet';
         else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
 
-        // Create bid record with denormalized fields
+        // For initial bids, user aggregates are just the bid amount (no previous bids)
+        const userPartyAggregate = bidAmount; // First bid in this party
+        const userGlobalAggregate = bidAmount; // First bid globally
+        
+        // Create bid record with denormalized fields and aggregate tracking
         const bid = new Bid({
             userId,
             partyId,
@@ -430,7 +452,11 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaContentType: media.contentType,
             mediaContentForm: media.contentForm,
             mediaDuration: media.duration,
-            platform: detectedPlatform
+            platform: detectedPlatform,
+            
+            // User aggregate tracking (first bid, so equals bid amount)
+            userPartyAggregateBidValue: userPartyAggregate,
+            userGlobalAggregateBidValue: userGlobalAggregate
         });
 
         await bid.save();
@@ -449,11 +475,23 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             partyBidValue: bidAmount,
             partyBids: [bid._id],
             status: 'queued',
-            queuedAt: new Date()
+            queuedAt: new Date(),
+            // Top bid tracking (first bid is automatically the top bid)
+            topPartyBidValue: bidAmount,
+            topPartyBidUser: userId,
+            topPartyAggregateBidValue: userPartyAggregate,
+            topPartyAggregateUser: userId
         };
 
         party.media.push(partyMediaEntry);
         await party.save();
+
+        // Update global bid tracking (first bid is automatically the top bid)
+        media.topGlobalBidValue = bidAmount;
+        media.topGlobalBidUser = userId;
+        media.topGlobalAggregateBidValue = userGlobalAggregate;
+        media.topGlobalAggregateUser = userId;
+        await media.save();
 
         // Update user balance
         user.balance = (userBalancePence - bidAmountPence) / 100;
@@ -567,7 +605,11 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         else if (userAgent.includes('Tablet')) detectedPlatform = 'tablet';
         else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
 
-        // Create bid record with denormalized fields
+        // Calculate user aggregate bid values (before saving the new bid)
+        const currentUserPartyAggregate = await calculateUserPartyAggregateBidValue(userId, actualMediaId, partyId);
+        const currentUserGlobalAggregate = await calculateUserGlobalAggregateBidValue(userId, actualMediaId);
+        
+        // Create bid record with denormalized fields and aggregate tracking
         const bid = new Bid({
             userId,
             partyId,
@@ -590,7 +632,11 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             mediaContentType: populatedMedia.contentType,
             mediaContentForm: populatedMedia.contentForm,
             mediaDuration: populatedMedia.duration,
-            platform: detectedPlatform
+            platform: detectedPlatform,
+            
+            // User aggregate tracking (includes this new bid)
+            userPartyAggregateBidValue: currentUserPartyAggregate + bidAmount,
+            userGlobalAggregateBidValue: currentUserGlobalAggregate + bidAmount
         });
 
         await bid.save();
@@ -609,6 +655,10 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             media.bids.push(bid._id);
             await media.save();
         }
+
+        // Update all bid tracking fields (top bidders, aggregates, etc.)
+        await updatePartyBidTracking(actualMediaId, partyId);
+        await updateGlobalBidTracking(actualMediaId);
 
         // Update user balance
         user.balance = (userBalancePence - bidAmountPence) / 100;

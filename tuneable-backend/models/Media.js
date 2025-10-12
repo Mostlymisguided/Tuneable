@@ -192,6 +192,14 @@ const mediaSchema = new mongoose.Schema({
   globalBidValue: { type: Number, default: 0 },
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
+  // Top bid tracking (individual amounts)
+  topGlobalBidValue: { type: Number, default: 0 },
+  topGlobalBidUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  
+  // Top aggregate bid tracking (user totals)
+  topGlobalAggregateBidValue: { type: Number, default: 0 },
+  topGlobalAggregateUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  
   // Universal metadata
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   addedBy_uuid: { type: String },

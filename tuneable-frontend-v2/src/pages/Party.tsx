@@ -1153,6 +1153,37 @@ const Party: React.FC = () => {
                                     </div>
                                   </div>
                                 </div>
+                                
+                                {/* Top Bid Metrics */}
+                                <div className="mt-2 p-2 bg-gray-800 rounded-lg">
+                                  <div className="text-xs text-gray-400 mb-1">Top Bids</div>
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                      <div className="text-gray-500">Party Top:</div>
+                                      <div className="text-yellow-400 font-medium">
+                                        £{songData.topPartyBidValue?.toFixed(2) || '0.00'}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-500">Party Fan:</div>
+                                      <div className="text-green-400 font-medium">
+                                        £{songData.topPartyAggregateBidValue?.toFixed(2) || '0.00'}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-500">Global Top:</div>
+                                      <div className="text-yellow-400 font-medium">
+                                        £{songData.topGlobalBidValue?.toFixed(2) || '0.00'}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-500">Global Fan:</div>
+                                      <div className="text-green-400 font-medium">
+                                        £{songData.topGlobalAggregateBidValue?.toFixed(2) || '0.00'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                                 <button
                                   onClick={() => handleBidClick(song)}
                                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
