@@ -677,7 +677,7 @@ const PersistentWebPlayer: React.FC = () => {
               {/* Mute Toggle */}
             <button
                 onClick={toggleMute}
-              className="p-2 text-gray-300 hover:text-white transition-colors rounded-full hover:bg-white/10"
+              className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (
