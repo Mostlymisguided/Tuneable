@@ -23,6 +23,7 @@ const youtubeRoutes = require('./routes/youtube');
 const spotifyRoutes = require('./routes/spotifyRoutes'); // Import Spotify routes
 const authRoutes = require('./routes/authRoutes'); // Import OAuth routes
 const podcastRoutes = require('./routes/podcastRoutes'); // Import consolidated Podcast routes
+const youtubeImportRoutes = require('./routes/youtubeImportRoutes'); // Import YouTube bulk import routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -136,6 +137,7 @@ app.use('/api/youtube', youtubeRoutes);
 app.use('/api/spotify', spotifyRoutes); // Spotify routes
 app.use('/api/auth', authRoutes); // OAuth routes
 app.use('/api/podcasts', podcastRoutes); // Consolidated Podcast routes
+app.use('/api/youtube-import', youtubeImportRoutes); // YouTube bulk import routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 
