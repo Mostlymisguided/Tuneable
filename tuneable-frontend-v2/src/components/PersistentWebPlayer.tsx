@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
@@ -574,9 +575,14 @@ const PersistentWebPlayer: React.FC = () => {
           <div className="flex items-center justify-center">
             {currentSong ? (
               <div className="text-center">
-                <h4 className="text-base font-semibold text-white leading-tight">
-                  {currentSong.title}
-                </h4>
+                <Link 
+                  to={`/tune/${currentSong._id || currentSong.id}`}
+                  className="hover:opacity-80 transition-opacity no-underline"
+                >
+                  <h4 className="text-base font-semibold text-white leading-tight">
+                    {currentSong.title}
+                  </h4>
+                </Link>
                 <p className="text-sm text-gray-300 leading-tight mt-1">
                   {Array.isArray(currentSong.artist) ? currentSong.artist.join(', ') : currentSong.artist}
                 </p>
@@ -597,13 +603,16 @@ const PersistentWebPlayer: React.FC = () => {
           <div className="flex items-center space-x-4 mb-2">
             {/* Left: Artwork */}
             {currentSong ? (
-              <div className="flex w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 shadow-lg">
+              <Link 
+                to={`/tune/${currentSong._id || currentSong.id}`}
+                className="flex w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 shadow-lg hover:opacity-80 transition-opacity"
+              >
                 <img
                   src={currentSong.coverArt || '/default-cover.jpg'}
                   alt={currentSong.title}
                   className="w-full h-full object-cover"
                 />
-              </div>
+              </Link>
             ) : (
               <div className="w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center shadow-lg">
                 <Play className="h-6 w-6 text-gray-400" />

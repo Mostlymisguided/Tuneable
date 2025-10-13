@@ -111,7 +111,10 @@ const UserProfile: React.FC = () => {
   };
 
   const formatJoinDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Unknown';
+    return date.toLocaleDateString('en-US', { 
       month: 'long', 
       year: 'numeric' 
     });
@@ -176,11 +179,12 @@ const UserProfile: React.FC = () => {
           
           <div className="card flex items-start space-x-6">
             {/* Profile Picture */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 p-6">
               <img
                 src={user.profilePic || '/android-chrome-192x192.png'}
                 alt={`${user.username} profile`}
-                className="w-64 h-64 rounded-full shadow-xl object-cover"
+                className="rounded-full shadow-xl object-cover"
+                style={{ width: '200px', height: '200px' }}
               />
             </div>
             
@@ -193,32 +197,27 @@ const UserProfile: React.FC = () => {
                 </span>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-black/20 rounded-lg p-4">
-                  <div className="text-sm text-gray-300">Wallet Balance</div>
-                  <div className="text-2xl font-bold text-green-400">
-                    £{user.balance?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-                <div className="bg-black/20 rounded-lg p-4">
-                  <div className="text-sm text-gray-300">Member Since</div>
-                  <div className="text-2xl font-bold text-blue-400">
-                    {formatJoinDate(user.createdAt)}
-                  </div>
-                </div>
-              </div>
+              <div className="mb-6"></div>
 
               {/* Location */}
               {user.homeLocation && (
                 <div className="mb-6">
                   <div className="flex items-center text-gray-300">
-                    <MapPin className="w-5 h-5 mr-2" />
+                    <MapPin className="w-5 h-5 m-2" />
                     <span>
-                      {user.homeLocation.city}, {user.homeLocation.country}
+                      {user.homeLocation.city}  {user.homeLocation.country}
                     </span>
                   </div>
                 </div>
               )}
+
+              {/* Member Since */}
+              <div className="bg-black/20 rounded-lg mt-4 inline-block">
+                <div className="text-sm text-gray-300">Member Since</div>
+                <div className="text-xl font-bold text-blue-400">
+                  {formatJoinDate(user.createdAt)}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -226,7 +225,7 @@ const UserProfile: React.FC = () => {
         {/* Bidding Statistics */}
         {stats && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">Profile Info</h2>
+            <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
@@ -255,7 +254,7 @@ const UserProfile: React.FC = () => {
         {/* Songs with Bids */}
         {songsWithBids.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">Songs Bid On</h2>
+            <h2 className="text-2xl text-center font-bold text-white mb-4">Top Tunes</h2>
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
                 {songsWithBids.map((songData, index) => (

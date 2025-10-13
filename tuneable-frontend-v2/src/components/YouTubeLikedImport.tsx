@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Music, Download, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 
 interface ImportResults {
@@ -22,6 +22,11 @@ interface ImportResults {
   };
 }
 
+interface User {
+  googleAccessToken?: string;
+  role?: string[];
+}
+
 interface QuotaEstimate {
   success: boolean;
   estimate: {
@@ -43,6 +48,29 @@ const YouTubeLikedImport: React.FC = () => {
   const [quotaEstimate, setQuotaEstimate] = useState<QuotaEstimate | null>(null);
   const [results, setResults] = useState<ImportResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user || data);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
 
   const handleEstimateQuota = async () => {
     try {
@@ -65,8 +93,8 @@ const YouTubeLikedImport: React.FC = () => {
   };
 
   const handleImport = async () => {
-    if (!accessToken.trim()) {
-      setError('Please enter your YouTube access token');
+    if (!accessToken.trim() && !user?.googleAccessToken) {
+      setError('Please enter your YouTube access token or sign in with Google first');
       return;
     }
 
@@ -154,17 +182,34 @@ const YouTubeLikedImport: React.FC = () => {
         </h2>
 
         <div className="space-y-4">
+          {/* Google OAuth Status */}
+          {user?.googleAccessToken && (
+            <div className="bg-green-900 border border-green-700 rounded-lg p-4">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+                <span className="text-green-200">
+                  <strong>Google OAuth Connected!</strong> You can import without providing an access token.
+                </span>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-2">
-              YouTube Access Token
+              YouTube Access Token {!user?.googleAccessToken && <span className="text-red-400">*</span>}
             </label>
             <input
               type="text"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="Paste your YouTube access token here"
+              placeholder={user?.googleAccessToken ? "Optional - Google OAuth will be used if empty" : "Paste your YouTube access token here"}
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
+            {user?.googleAccessToken && (
+              <p className="text-sm text-gray-400 mt-1">
+                Since you're signed in with Google, this field is optional. Leave empty to use your Google OAuth token.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -214,7 +259,7 @@ const YouTubeLikedImport: React.FC = () => {
 
             <button
               onClick={handleImport}
-              disabled={isLoading || !accessToken.trim()}
+              disabled={isLoading || (!accessToken.trim() && !user?.googleAccessToken)}
               className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors flex items-center"
             >
               {isLoading ? (
