@@ -42,7 +42,9 @@ const PartySchema = new mongoose.Schema({
   },  */
   attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   attendee_uuids: [{ type: String }], // UUID references for external API usage
-  bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
+  
+  // Bids are stored in Party.media[].partyBids[] - organized by media for efficient queue rendering
+  // Individual bid documents exist in the Bid collection as the source of truth
   
   // New unified media collection
   media: [
