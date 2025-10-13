@@ -145,7 +145,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           
           // Update profile picture if user doesn't have one
           if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
-            user.profilePic = profile.photos[0].value;
+            // Request larger image by modifying the URL
+            let photoUrl = profile.photos[0].value;
+            photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
+            user.profilePic = photoUrl;
           }
           
           await user.save();
@@ -165,7 +168,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             
             // Update profile picture if user doesn't have one
             if (profile.photos && profile.photos.length > 0 && !existingUser.profilePic) {
-              existingUser.profilePic = profile.photos[0].value;
+              // Request larger image by modifying the URL
+              let photoUrl = profile.photos[0].value;
+              photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
+              existingUser.profilePic = photoUrl;
             }
             
             await existingUser.save();
@@ -193,6 +199,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           familyName: profile.name.familyName
         });
         
+        // Get high-res profile picture
+        let profilePicUrl = null;
+        if (profile.photos && profile.photos.length > 0) {
+          profilePicUrl = profile.photos[0].value;
+          profilePicUrl = profilePicUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
+        }
+
         const newUser = new User({
           googleId: profile.id,
           googleAccessToken: accessToken,
@@ -201,7 +214,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           username: finalUsername,
           givenName: profile.name.givenName,
           familyName: profile.name.familyName,
-          profilePic: profile.photos && profile.photos.length > 0 ? profile.photos[0].value : null,
+          profilePic: profilePicUrl,
           isActive: true,
           role: ['user'],
           balance: 0,
