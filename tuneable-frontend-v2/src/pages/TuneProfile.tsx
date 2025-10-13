@@ -271,8 +271,8 @@ const TuneProfile: React.FC = () => {
             
             {/* Song Info */}
             <div className="flex-1 text-white">
-              <h1 className="text-4xl font-bold mb-2">{song.title}</h1>
-              <p className="text-2xl text-purple-300 mb-4">{song.artist}</p>
+              <h1 className="px-4 text-4xl font-bold mb-2">{song.title}</h1>
+              <p className="px-4 text-2xl text-purple-300 mb-4">{song.artist}</p>
               
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-black/20 rounded-lg p-4">

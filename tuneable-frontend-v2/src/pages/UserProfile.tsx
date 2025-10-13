@@ -190,9 +190,9 @@ const UserProfile: React.FC = () => {
             
             {/* User Info */}
             <div className="flex-1 text-white">
-              <div className="p-4 flex items-center space-x-3 mb-2">
-                <h1 className="text-4xl font-bold">{user.username}</h1>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getRoleColor(user.role)} bg-black/20`}>
+              <div className="p-4 mb-2">
+                <h1 className="text-4xl font-bold mb-2">{user.username}</h1>
+                <span className={`px-2 py-2 bg-purple-600 text-white text-xs rounded-full font-semibold ${getRoleColor(user.role)}`}>
                   {getRoleDisplay(user.role)}
                 </span>
               </div>
@@ -204,7 +204,7 @@ const UserProfile: React.FC = () => {
                 <div className="mb-4">
                   <div className="bg-black/20 rounded-full px-4 py-2 inline-flex items-center text-gray-300">
                     <MapPin className="w-4 h-4 mr-2" />
-                    <span>
+                    <span className="p-2">
                       {user.homeLocation.city},  {user.homeLocation.country}
                     </span>
                   </div>
@@ -213,10 +213,10 @@ const UserProfile: React.FC = () => {
 
               {/* Member Since */}
               <div className="bg-black/20 rounded-full px-4 py-2 inline-flex items-center">
-                <div className="text-sm text-gray-300 mr-2">Member Since</div>
-                <div className="text-sm font-semibold text-blue-400">
+                <div className="text-sm text-gray-300 mb-2">Joined</div>
+                <span className="px-2 py-2 bg-purple-600 text-white text-xs rounded-full font-semibold">
                   {formatJoinDate(user.createdAt)}
-                </div>
+                </span>
               </div>
             </div>
           </div>
@@ -226,7 +226,7 @@ const UserProfile: React.FC = () => {
         {stats && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-white">{stats.totalBids || 0}</div>

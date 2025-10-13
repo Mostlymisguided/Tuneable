@@ -166,7 +166,7 @@ const Parties: React.FC = () => {
           className="btn-primary flex items-center space-x-2"
         >
           <Music className="h-4 w-4" />
-          <span>Create Party</span>
+          <span className="no-underline">Create Party</span>
         </Link>
       </div>
 
