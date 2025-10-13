@@ -606,7 +606,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
 
         // Calculate user aggregate bid values (before saving the new bid)
-        const currentUserPartyAggregate = await calculatePartyAggregateBidValue(userId, actualMediaId, partyId);
+        const currentUserPartyAggregate = await calculatePartyAggregateBidValue(userId, actualMediaId, party._id);
         const currentUserGlobalAggregate = await calculateGlobalAggregateBidValue(userId, actualMediaId);
         
         // Create bid record with denormalized fields and aggregate tracking
@@ -657,7 +657,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }
 
         // Update all bid tracking fields (top bidders, aggregates, etc.)
-        await updatePartyBidTracking(actualMediaId, partyId);
+        await updatePartyBidTracking(actualMediaId, party._id);
         await updateGlobalBidTracking(actualMediaId);
 
         // Update user balance

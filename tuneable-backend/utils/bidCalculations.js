@@ -10,12 +10,19 @@ const Party = require('../models/Party');
  * @returns {Promise<number>} Total amount user has bid on this media in this party
  */
 async function calculatePartyAggregateBidValue(userId, mediaId, partyId) {
+    const mongoose = require('mongoose');
+    
+    // Ensure IDs are ObjectIds for aggregation
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+    const mediaObjectId = mongoose.Types.ObjectId.isValid(mediaId) ? new mongoose.Types.ObjectId(mediaId) : mediaId;
+    const partyObjectId = mongoose.Types.ObjectId.isValid(partyId) ? new mongoose.Types.ObjectId(partyId) : partyId;
+    
     const result = await Bid.aggregate([
         {
             $match: {
-                userId: userId,
-                mediaId: mediaId,
-                partyId: partyId,
+                userId: userObjectId,
+                mediaId: mediaObjectId,
+                partyId: partyObjectId,
                 status: { $in: ['active', 'played'] } // Only count active/played bids
             }
         },
@@ -27,6 +34,8 @@ async function calculatePartyAggregateBidValue(userId, mediaId, partyId) {
         }
     ]);
     
+    console.log(`🔍 calculatePartyAggregateBidValue: Found ${result.length > 0 ? result[0].total : 0} for user ${userId} on media ${mediaId} in party ${partyId}`);
+    
     return result.length > 0 ? result[0].total : 0;
 }
 
@@ -37,11 +46,17 @@ async function calculatePartyAggregateBidValue(userId, mediaId, partyId) {
  * @returns {Promise<number>} Total amount user has bid on this media globally
  */
 async function calculateGlobalAggregateBidValue(userId, mediaId) {
+    const mongoose = require('mongoose');
+    
+    // Ensure IDs are ObjectIds for aggregation
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+    const mediaObjectId = mongoose.Types.ObjectId.isValid(mediaId) ? new mongoose.Types.ObjectId(mediaId) : mediaId;
+    
     const result = await Bid.aggregate([
         {
             $match: {
-                userId: userId,
-                mediaId: mediaId,
+                userId: userObjectId,
+                mediaId: mediaObjectId,
                 status: { $in: ['active', 'played'] } // Only count active/played bids
             }
         },
@@ -52,6 +67,8 @@ async function calculateGlobalAggregateBidValue(userId, mediaId) {
             }
         }
     ]);
+    
+    console.log(`🔍 calculateGlobalAggregateBidValue: Found ${result.length > 0 ? result[0].total : 0} for user ${userId} on media ${mediaId}`);
     
     return result.length > 0 ? result[0].total : 0;
 }
