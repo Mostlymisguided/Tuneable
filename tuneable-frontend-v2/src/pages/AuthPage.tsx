@@ -35,8 +35,6 @@ const AuthPage: React.FC = () => {
 
   // Check if we're coming from a redirect (like after OAuth)
   const isFromOAuth = location.search.includes('error=') || location.search.includes('success=');
-  const urlParams = new URLSearchParams(location.search);
-  const message = urlParams.get('message');
 
   const handleSocialAuth = (provider: 'facebook' | 'google') => {
     // VITE_API_URL already includes /api, so don't add it again

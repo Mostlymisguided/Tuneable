@@ -576,7 +576,7 @@ const PersistentWebPlayer: React.FC = () => {
             {currentSong ? (
               <div className="text-center">
                 <Link 
-                  to={`/tune/${currentSong._id || currentSong.id}`}
+                  to={`/tune/${(currentSong as any)._id || currentSong.id}`}
                   className="hover:opacity-80 transition-opacity no-underline"
                 >
                   <h4 className="text-base font-semibold text-white leading-tight">
@@ -604,7 +604,7 @@ const PersistentWebPlayer: React.FC = () => {
             {/* Left: Artwork */}
             {currentSong ? (
               <Link 
-                to={`/tune/${currentSong._id || currentSong.id}`}
+                to={`/tune/${(currentSong as any)._id || currentSong.id}`}
                 className="flex w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 shadow-lg hover:opacity-80 transition-opacity"
               >
                 <img
