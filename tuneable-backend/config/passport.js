@@ -12,7 +12,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
       callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
-      profileFields: ['id', 'emails', 'name', 'picture', 'location']
+      profileFields: ['id', 'emails', 'name', 'picture.type(large)', 'location']
     },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -27,7 +27,10 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         
         // Update profile picture if user doesn't have one
         if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
-          user.profilePic = profile.photos[0].value;
+          // Request larger image by modifying the URL to 400x400
+          let photoUrl = profile.photos[0].value;
+          photoUrl = photoUrl.replace(/width=\d+/, 'width=400').replace(/height=\d+/, 'height=400');
+          user.profilePic = photoUrl;
         }
         
         // Update location if available and not already set
@@ -56,7 +59,10 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           
           // Update profile picture if user doesn't have one or is linking Facebook for first time
           if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstFacebookLink)) {
-            user.profilePic = profile.photos[0].value;
+            // Request larger image by modifying the URL to 400x400
+            let photoUrl = profile.photos[0].value;
+            photoUrl = photoUrl.replace(/width=\d+/, 'width=400').replace(/height=\d+/, 'height=400');
+            user.profilePic = photoUrl;
           }
           
           // Update location if available and not already set
@@ -94,6 +100,13 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         location: locationData
       });
       
+      // Get high-res profile picture
+      let profilePicUrl = null;
+      if (profile.photos && profile.photos.length > 0) {
+        profilePicUrl = profile.photos[0].value;
+        profilePicUrl = profilePicUrl.replace(/width=\d+/, 'width=400').replace(/height=\d+/, 'height=400');
+      }
+
       const newUser = new User({
         facebookId: profile.id,
         facebookAccessToken: accessToken,
@@ -101,7 +114,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         username: usernameValue,
         givenName: profile.name.givenName,
         familyName: profile.name.familyName,
-        profilePic: profile.photos && profile.photos.length > 0 ? profile.photos[0].value : null,
+        profilePic: profilePicUrl,
         homeLocation: locationData,
         isActive: true,
         role: ['user'],
