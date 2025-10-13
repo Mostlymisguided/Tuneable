@@ -180,7 +180,7 @@ function filterMusicVideos(videos, categoryMapping, maxDurationMinutes = 15) {
 
 /**
  * Bulk import liked music videos to Media collection
- * @param {string} accessToken - YouTube OAuth access token
+ * @param {string} accessToken - YouTube OAuth access token (optional if user has Google OAuth)
  * @param {string} userId - User ID who owns the liked videos
  * @param {number} maxVideos - Maximum videos to import (default 100)
  * @param {number} maxDurationMinutes - Maximum duration in minutes (default 15)

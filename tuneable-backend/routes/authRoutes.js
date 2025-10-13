@@ -50,17 +50,52 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
   });
 }
 
-// Google OAuth routes (for future implementation)
-router.get('/google', (req, res) => {
-  // For now, redirect to frontend with a message
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  res.redirect(`${frontendUrl}/login?message=google_coming_soon`);
-});
+// Google OAuth routes - only available if configured
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  router.get('/google', passport.authenticate('google', { 
+    scope: [
+      'profile', 
+      'email',
+      'https://www.googleapis.com/auth/youtube.readonly'  // For YouTube import feature
+    ] 
+  }));
 
-router.get('/google/callback', (req, res) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  res.redirect(`${frontendUrl}/login?message=google_coming_soon`);
-});
+  router.get('/google/callback', 
+    passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),
+    async (req, res) => {
+      try {
+        // Generate JWT token for the authenticated user using UUID
+        const token = jwt.sign(
+          { 
+            userId: req.user.uuid,  // Use UUID instead of _id
+            email: req.user.email, 
+            username: req.user.username 
+          }, 
+          SECRET_KEY, 
+          { expiresIn: '24h' }
+        );
+
+        // Redirect to frontend with ONLY the token (security improvement)
+        // Frontend will fetch user data using the token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        
+      } catch (error) {
+        console.error('Google callback error:', error);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_auth_failed`);
+      }
+    }
+  );
+} else {
+  // Google OAuth not configured - return 503 Service Unavailable
+  router.get('/google', (req, res) => {
+    res.status(503).json({ error: 'Google OAuth not configured' });
+  });
+  
+  router.get('/google/callback', (req, res) => {
+    res.status(503).json({ error: 'Google OAuth not configured' });
+  });
+}
 
 // Token refresh endpoint
 router.post('/refresh', authMiddleware, async (req, res) => {

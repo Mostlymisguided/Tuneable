@@ -33,11 +33,20 @@ router.get('/liked-videos/estimate', adminMiddleware, async (req, res) => {
  */
 router.post('/liked-videos/import', adminMiddleware, async (req, res) => {
     try {
-         const { accessToken, maxVideos = 100, maxDurationMinutes = 15 } = req.body;
+        const { accessToken, maxVideos = 100, maxDurationMinutes = 15 } = req.body;
         const userId = req.user._id;
 
-        if (!accessToken) {
-            return res.status(400).json({ error: 'YouTube access token is required' });
+        // Try to use Google OAuth token if no access token provided
+        let finalAccessToken = accessToken;
+        if (!finalAccessToken && req.user.googleAccessToken) {
+            finalAccessToken = req.user.googleAccessToken;
+            console.log('🔄 Using Google OAuth token for YouTube import');
+        }
+
+        if (!finalAccessToken) {
+            return res.status(400).json({ 
+                error: 'YouTube access token is required. Please provide one or sign in with Google first.' 
+            });
         }
 
         // Validate maxVideos
@@ -59,7 +68,7 @@ router.post('/liked-videos/import', adminMiddleware, async (req, res) => {
 
         console.log(`🎵 Starting bulk import for user ${userId}, max videos: ${videoCount}, max duration: ${maxDurationMinutes} minutes`);
 
-        const results = await bulkImportLikedVideos(accessToken, userId, videoCount, maxDurationMinutes);
+        const results = await bulkImportLikedVideos(finalAccessToken, userId, videoCount, maxDurationMinutes);
 
         res.json({
             success: true,
