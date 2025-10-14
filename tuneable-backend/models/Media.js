@@ -188,17 +188,23 @@ const mediaSchema = new mongoose.Schema({
     default: {}
   },
   
-  // Bidding system (universal)
-  globalBidValue: { type: Number, default: 0 },
+  // ========================================
+  // BID METRICS (managed by BidMetricsEngine)
+  // ========================================
+  
+  // Global scope metrics (stored for performance)
+  globalBidValue: { type: Number, default: 0 }, // Total bid value across all parties/users
+  globalBidTop: { type: Number, default: 0 }, // Highest individual bid amount
+  globalBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest bid
+  
+  globalAggregateTop: { type: Number, default: 0 }, // Highest user aggregate total
+  globalAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
+  
+  // Reference to bids (for populating if needed)
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
-  // Top bid tracking (individual amounts)
-  topGlobalBidValue: { type: Number, default: 0 },
-  topGlobalBidUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  
-  // Top aggregate bid tracking (user totals)
-  topGlobalAggregateBidValue: { type: Number, default: 0 },
-  topGlobalAggregateUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Note: Other metrics (averages, ranks, etc.) are computed on-demand
+  // via the BidMetricsEngine using the bidMetricsSchema.js definitions
   
   // Universal metadata
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

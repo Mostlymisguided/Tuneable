@@ -56,13 +56,19 @@ const PartySchema = new mongoose.Schema({
       partyBidValue: { type: Number, default: 0 },
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
       
-      // Top bid tracking (individual amounts)
-      topPartyBidValue: { type: Number, default: 0 },
-      topPartyBidUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      // ========================================
+      // PARTY-SPECIFIC BID METRICS (managed by BidMetricsEngine)
+      // ========================================
       
-      // Top aggregate bid tracking (user totals)
-      topPartyAggregateBidValue: { type: Number, default: 0 },
-      topPartyAggregateUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      // Party scope metrics (stored for performance)
+      partyBidValue: { type: Number, default: 0 }, // Total bid value in this party
+      partyBidTop: { type: Number, default: 0 }, // Highest individual bid in party
+      partyBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest bid
+      
+      partyAggregateTop: { type: Number, default: 0 }, // Highest user aggregate in party
+      partyAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
+      
+      // Note: Other party metrics are computed on-demand via BidMetricsEngine
       
       // Status and timing (universal)
       status: { 
@@ -93,13 +99,19 @@ const PartySchema = new mongoose.Schema({
       partyBidValue: { type: Number, default: 0 }, // Party-specific total bid value
       partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
       
-      // Top bid tracking (individual amounts)
-      topPartyBidValue: { type: Number, default: 0 },
-      topPartyBidUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      // ========================================
+      // PARTY-SPECIFIC BID METRICS (managed by BidMetricsEngine)
+      // ========================================
       
-      // Top aggregate bid tracking (user totals)
-      topPartyAggregateBidValue: { type: Number, default: 0 },
-      topPartyAggregateUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      // Party scope metrics (stored for performance)
+      partyBidValue: { type: Number, default: 0 }, // Total bid value in this party
+      partyBidTop: { type: Number, default: 0 }, // Highest individual bid in party
+      partyBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest bid
+      
+      partyAggregateTop: { type: Number, default: 0 }, // Highest user aggregate in party
+      partyAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
+      
+      // Note: Other party metrics are computed on-demand via BidMetricsEngine
       
       // Content type and status
       contentType: { 

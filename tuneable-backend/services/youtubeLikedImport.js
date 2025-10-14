@@ -16,7 +16,7 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const LIKED_PLAYLIST_ID = 'LL'; // YouTube's special "Liked Videos" playlist ID
 
 /**
- * Get user's liked videos playlist (uses minimal quota)
+ * Get user's liked videos playlist with pagination support
  * @param {string} accessToken - YouTube OAuth access token
  * @param {number} maxResults - Maximum videos to fetch (default 50)
  * @returns {Promise<Array>} Array of video IDs
@@ -25,22 +25,46 @@ async function getLikedVideoIds(accessToken, maxResults = 50) {
     try {
         console.log(`🎵 Fetching liked videos (max: ${maxResults})`);
         
-        const response = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', {
-            params: {
-                part: 'contentDetails',
-                playlistId: LIKED_PLAYLIST_ID,
-                maxResults: Math.min(maxResults, 50), // YouTube max is 50 per call
-                access_token: accessToken
-            }
-        });
+        const allVideoIds = [];
+        let nextPageToken = null;
+        let totalFetched = 0;
+        
+        do {
+            const pageSize = Math.min(50, maxResults - totalFetched); // YouTube max is 50 per call
+            
+            console.log(`📄 Fetching page ${Math.floor(totalFetched / 50) + 1} (${pageSize} videos)...`);
+            
+            const response = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', {
+                params: {
+                    part: 'contentDetails',
+                    playlistId: LIKED_PLAYLIST_ID,
+                    maxResults: pageSize,
+                    pageToken: nextPageToken,
+                    access_token: accessToken
+                }
+            });
 
-        const videoIds = response.data.items.map(item => item.contentDetails.videoId);
-        console.log(`✅ Found ${videoIds.length} liked videos`);
+            const pageVideoIds = response.data.items.map(item => item.contentDetails.videoId);
+            allVideoIds.push(...pageVideoIds);
+            
+            totalFetched += pageVideoIds.length;
+            nextPageToken = response.data.nextPageToken;
+            
+            console.log(`✅ Page ${Math.floor(totalFetched / 50)}: Found ${pageVideoIds.length} videos (total: ${totalFetched})`);
+            
+            // Stop if we've reached our limit or no more pages
+            if (totalFetched >= maxResults || !nextPageToken) {
+                break;
+            }
+            
+        } while (nextPageToken && totalFetched < maxResults);
+        
+        console.log(`✅ Total found: ${allVideoIds.length} liked videos`);
         
         return {
-            videoIds,
-            nextPageToken: response.data.nextPageToken,
-            totalResults: response.data.pageInfo?.totalResults || videoIds.length
+            videoIds: allVideoIds.slice(0, maxResults), // Ensure we don't exceed maxResults
+            nextPageToken,
+            totalResults: allVideoIds.length
         };
     } catch (error) {
         console.error('Error fetching liked videos:', error);
@@ -213,16 +237,23 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
             errors: 0,
             importedVideos: [],
             skippedVideos: [],
-            errors: []
+            errorVideos: []
         };
 
-        for (const video of musicVideos) {
+        console.log(`📦 Processing ${musicVideos.length} music videos for import...`);
+        
+        for (let i = 0; i < musicVideos.length; i++) {
+            const video = musicVideos[i];
+            const progress = `[${i + 1}/${musicVideos.length}]`;
+            
             try {
-                // Check if video already exists
+                // Check if video already exists (improved duplicate detection)
                 const existingMedia = await Media.findOne({
                     $or: [
+                        { 'sources.youtube': video.id },
                         { 'sources.youtube': { $regex: video.id, $options: 'i' } },
-                        { 'externalIds.youtube': video.id }
+                        { 'externalIds.youtube': video.id },
+                        { 'sources.youtube': `https://www.youtube.com/watch?v=${video.id}` }
                     ]
                 });
 
@@ -232,6 +263,7 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
                         title: video.title,
                         reason: 'Already exists in database'
                     });
+                    console.log(`${progress} ⏭️  Skipped (duplicate): ${video.title}`);
                     continue;
                 }
 
@@ -263,12 +295,12 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
                     youtubeId: video.id
                 });
 
-                console.log(`✅ Imported: ${video.title} - ${video.channelTitle}`);
+                console.log(`${progress} ✅ Imported: ${video.title} - ${video.channelTitle}`);
 
             } catch (videoError) {
-                console.error(`❌ Error importing video ${video.title}:`, videoError);
+                console.error(`${progress} ❌ Error importing video ${video.title}:`, videoError);
                 results.errors++;
-                results.errors.push({
+                results.errorVideos.push({
                     title: video.title,
                     error: videoError.message
                 });
@@ -293,7 +325,7 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
  * @returns {Object} Quota estimate
  */
 function estimateQuotaUsage(videoCount) {
-    const getLikedVideos = 1; // playlistItems.list
+    const getLikedVideos = Math.ceil(videoCount / 50); // playlistItems.list (1 per page of 50)
     const getCategories = 1; // videoCategories.list  
     const getVideoDetails = Math.ceil(videoCount / 50) * 2; // videos.list (snippet + contentDetails)
     

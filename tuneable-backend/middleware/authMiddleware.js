@@ -26,10 +26,10 @@ module.exports = async (req, res, next) => {
         // Check if userId looks like a UUID (contains hyphens) or ObjectId (24 hex chars)
         if (decoded.userId && decoded.userId.includes('-')) {
             // UUID format - look up by uuid field
-            user = await User.findOne({ uuid: decoded.userId }).select("_id uuid username email");
+            user = await User.findOne({ uuid: decoded.userId }).select("_id uuid username email role googleAccessToken");
         } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
             // Legacy ObjectId format - look up by _id for backward compatibility
-            user = await User.findById(decoded.userId).select("_id uuid username email");
+            user = await User.findById(decoded.userId).select("_id uuid username email role googleAccessToken");
         } else {
             throw new Error("Invalid userId format in token");
         }

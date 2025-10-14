@@ -38,6 +38,13 @@ router.post('/liked-videos/import', adminMiddleware, async (req, res) => {
 
         // Try to use Google OAuth token if no access token provided
         let finalAccessToken = accessToken;
+        console.log('🔍 Debug - User object:', {
+            userId: req.user._id,
+            username: req.user.username,
+            hasGoogleToken: !!req.user.googleAccessToken,
+            googleTokenLength: req.user.googleAccessToken ? req.user.googleAccessToken.length : 0
+        });
+        
         if (!finalAccessToken && req.user.googleAccessToken) {
             finalAccessToken = req.user.googleAccessToken;
             console.log('🔄 Using Google OAuth token for YouTube import');

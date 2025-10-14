@@ -61,11 +61,12 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
                 className="w-full h-full object-cover"
               />
             </div>
-            
+            <div className="inline-block">
             {/* Bid Amount - Permanently displayed */}
             <span className="text-xs text-white font-semibold mt-1">
               £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
             </span>
+            </div>
           </div>
         ))}
         

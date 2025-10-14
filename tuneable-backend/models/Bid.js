@@ -106,16 +106,12 @@ const bidSchema = new mongoose.Schema({
     },
     
     // ========================================
-    // AGGREGATE TRACKING
+    // DYNAMIC METRICS (computed via BidMetricsEngine)
     // ========================================
-    partyAggregateBidValue: { 
-        type: Number, 
-        default: 0 
-    }, // User's total bids for this media in this party
-    globalAggregateBidValue: { 
-        type: Number, 
-        default: 0 
-    }, // User's total bids for this media across all parties
+    // Note: Aggregate values are now computed dynamically using the
+    // BidMetricsEngine rather than stored as static fields.
+    // This allows for flexible metric computation based on the
+    // bid metrics schema defined in utils/bidMetricsSchema.js
 }, {
     timestamps: true
 });
@@ -140,6 +136,38 @@ bidSchema.pre('save', function(next) {
         this.hourOfDay = date.getHours(); // 0-23
     }
     next();
+});
+
+// Update metrics after bid is saved
+bidSchema.post('save', async function(doc) {
+    try {
+        const bidMetricsEngine = require('../services/bidMetricsEngine');
+        await bidMetricsEngine.updateMetricsForBidChange({
+            _id: doc._id,
+            userId: doc.userId,
+            mediaId: doc.mediaId,
+            partyId: doc.partyId,
+            amount: doc.amount
+        }, 'create');
+    } catch (error) {
+        console.error('Error updating metrics after bid save:', error);
+    }
+});
+
+// Update metrics after bid is removed
+bidSchema.post('remove', async function(doc) {
+    try {
+        const bidMetricsEngine = require('../services/bidMetricsEngine');
+        await bidMetricsEngine.updateMetricsForBidChange({
+            _id: doc._id,
+            userId: doc.userId,
+            mediaId: doc.mediaId,
+            partyId: doc.partyId,
+            amount: doc.amount
+        }, 'delete');
+    } catch (error) {
+        console.error('Error updating metrics after bid removal:', error);
+    }
 });
 
 // ========================================
