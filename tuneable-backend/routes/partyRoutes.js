@@ -161,7 +161,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category topGlobalBidValue topGlobalBidUser topGlobalAggregateBidValue topGlobalAggregateUser', // ✅ Added top bid tracking fields
+                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser', // ✅ Updated to schema grammar field names
                 populate: {
                     path: 'bids',
                     model: 'Bid',
@@ -206,25 +206,25 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 duration: entry.mediaId.duration || '666',
                 coverArt: entry.mediaId.coverArt || '/default-cover.jpg',
                 sources: availablePlatforms, // ✅ Store platform data as an array
-                globalBidValue: entry.mediaId.globalBidValue || 0, // Keep for analytics
-                partyBidValue: entry.partyBidValue || 0, // ✅ Use party-specific bid value
+                globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Global total (schema grammar)
+                partyMediaAggregate: entry.partyMediaAggregate || 0, // ✅ Party-media aggregate (schema grammar)
                 bids: entry.mediaId.bids || [], // ✅ Use populated bids from mediaId with user data
                 addedBy: entry.mediaId.addedBy, // ✅ Ensures `addedBy` exists
-                totalBidValue: entry.partyBidValue || 0, // ✅ Use party-specific total for queue ordering
+                totalBidValue: entry.partyMediaAggregate || 0, // ✅ Use party-media aggregate for queue ordering
                 tags: entry.mediaId.tags || [], // ✅ Include tags
                 category: entry.mediaId.category || 'Unknown', // ✅ Include category
                 
-                // Top bid tracking (individual amounts)
-                topPartyBidValue: entry.topPartyBidValue || 0,
-                topPartyBidUser: entry.topPartyBidUser,
-                topGlobalBidValue: entry.mediaId.topGlobalBidValue || 0,
-                topGlobalBidUser: entry.mediaId.topGlobalBidUser,
+                // Party-media top bid metrics (schema grammar)
+                partyMediaBidTop: entry.partyMediaBidTop || 0,
+                partyMediaBidTopUser: entry.partyMediaBidTopUser,
+                partyMediaAggregateTop: entry.partyMediaAggregateTop || 0,
+                partyMediaAggregateTopUser: entry.partyMediaAggregateTopUser,
                 
-                // Top aggregate bid tracking (user totals)
-                topPartyAggregateBidValue: entry.topPartyAggregateBidValue || 0,
-                topPartyAggregateUser: entry.topPartyAggregateUser,
-                topGlobalAggregateBidValue: entry.mediaId.topGlobalAggregateBidValue || 0,
-                topGlobalAggregateUser: entry.mediaId.topGlobalAggregateUser,
+                // Global media top bid metrics (schema grammar)
+                globalMediaBidTop: entry.mediaId.globalMediaBidTop || 0,
+                globalMediaBidTopUser: entry.mediaId.globalMediaBidTopUser,
+                globalMediaAggregateTop: entry.mediaId.globalMediaAggregateTop || 0,
+                globalMediaAggregateTopUser: entry.mediaId.globalMediaAggregateTopUser,
                 
                 // ✅ NEW: Song status and timing information
                 status: entry.status || 'queued',
@@ -472,25 +472,25 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             media_uuid: media.uuid,
             addedBy: userId,
             addedBy_uuid: user.uuid,
-            partyBidValue: bidAmount,
+            partyMediaAggregate: bidAmount, // First bid becomes the aggregate
             partyBids: [bid._id],
             status: 'queued',
             queuedAt: new Date(),
-            // Top bid tracking (first bid is automatically the top bid)
-            topPartyBidValue: bidAmount,
-            topPartyBidUser: userId,
-            topPartyAggregateBidValue: userPartyAggregate,
-            topPartyAggregateUser: userId
+            // Top bid tracking (first bid is automatically the top bid) - schema grammar
+            partyMediaBidTop: bidAmount,
+            partyMediaBidTopUser: userId,
+            partyMediaAggregateTop: userPartyAggregate,
+            partyMediaAggregateTopUser: userId
         };
 
         party.media.push(partyMediaEntry);
         await party.save();
 
-        // Update global bid tracking (first bid is automatically the top bid)
-        media.topGlobalBidValue = bidAmount;
-        media.topGlobalBidUser = userId;
-        media.topGlobalAggregateBidValue = userGlobalAggregate;
-        media.topGlobalAggregateUser = userId;
+        // Update global bid tracking (first bid is automatically the top bid) - schema grammar
+        media.globalMediaBidTop = bidAmount;
+        media.globalMediaBidTopUser = userId;
+        media.globalMediaAggregateTop = userGlobalAggregate;
+        media.globalMediaAggregateTopUser = userId;
         await media.save();
 
         // Update user balance
@@ -641,8 +641,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 
         await bid.save();
 
-        // Update party media entry bid value
-        partyMediaEntry.partyBidValue = (partyMediaEntry.partyBidValue || 0) + bidAmount;
+        // Update party media entry bid aggregate (schema grammar)
+        partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmount;
         partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
         partyMediaEntry.partyBids.push(bid._id);
         await party.save();
@@ -883,8 +883,8 @@ router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) =>
 
         const songsWithStatus = party.songs.filter(song => song.status === status);
         
-        // Sort by bid value (highest first) for all statuses
-        songsWithStatus.sort((a, b) => (b.partyBidValue || 0) - (a.partyBidValue || 0));
+        // Sort by party media aggregate (highest first) for all statuses - schema grammar
+        songsWithStatus.sort((a, b) => (b.partyMediaAggregate || 0) - (a.partyMediaAggregate || 0));
 
         res.json(transformResponse({
             status: status,
@@ -1279,8 +1279,8 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
                     coverArt: entry.mediaId.coverArt,
                     sources: entry.mediaId.sources,
                     availablePlatforms,
-                    globalBidValue: entry.mediaId.globalBidValue || 0,
-                    partyBidValue: entry.partyBidValue || 0, // All-time party bid value
+                    globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Schema grammar
+                    partyMediaAggregate: entry.partyMediaAggregate || 0, // All-time party-media aggregate (schema grammar)
                     timePeriodBidValue, // Bid value for the specific time period
                     bids: entry.mediaId.bids || [], // Include populated bids for TopBidders component
                     tags: entry.mediaId.tags || [], // Include tags for display

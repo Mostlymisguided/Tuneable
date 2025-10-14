@@ -154,8 +154,8 @@ export interface Media {
   // Transcript (for podcasts/videos)
   transcript?: string;
   
-  // Bidding
-  globalBidValue: number;
+  // Bidding metrics (aligned with schema grammar)
+  globalMediaAggregate: number; // Total bid value across all parties/users
   bids?: Array<{
     userId: {
       username: string;
@@ -166,12 +166,12 @@ export interface Media {
   }>;
   
   // Top bid tracking (individual amounts)
-  topGlobalBidValue?: number;
-  topGlobalBidUser?: string;
+  globalMediaBidTop?: number; // Highest individual bid
+  globalMediaBidTopUser?: string; // User who made top bid
   
   // Top aggregate bid tracking (user totals)
-  topGlobalAggregateBidValue?: number;
-  topGlobalAggregateUser?: string;
+  globalMediaAggregateTop?: number; // Highest user aggregate
+  globalMediaAggregateTopUser?: string; // User with highest aggregate
   
   // Relationships
   relationships?: MediaRelationship[];
@@ -213,21 +213,20 @@ export interface PartyMedia {
   media_uuid?: string;
   addedBy: string;
   addedBy_uuid?: string;
-  partyBidValue: number;
+  
+  // Party-media scope metrics (aligned with schema grammar)
+  partyMediaAggregate: number; // Total bid value for this media in party
+  partyMediaBidTop?: number; // Highest individual bid for this media in party
+  partyMediaBidTopUser?: string; // User who made highest bid
+  partyMediaAggregateTop?: number; // Highest user aggregate for this media in party
+  partyMediaAggregateTopUser?: string; // User with highest aggregate
+  
   status: 'queued' | 'playing' | 'played' | 'vetoed';
   queuedAt?: string;
   playedAt?: string;
   completedAt?: string;
   vetoedAt?: string;
   vetoedBy?: string;
-  
-  // Top bid tracking (individual amounts)
-  topPartyBidValue?: number;
-  topPartyBidUser?: string;
-  
-  // Top aggregate bid tracking (user totals)
-  topPartyAggregateBidValue?: number;
-  topPartyAggregateUser?: string;
 }
 
 export interface Party {
@@ -240,6 +239,15 @@ export interface Party {
   attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   media: PartyMedia[];
   songs?: PartyMedia[]; // Legacy support during migration
+  
+  // Party-level metrics (aligned with schema grammar)
+  partyBidTop?: number; // Highest bid across all media in party
+  partyBidTopUser?: string; // User who made highest bid
+  partyUserAggregateTop?: number; // Highest user aggregate in party
+  partyUserAggregateTopUser?: string; // User with highest aggregate
+  partyUserBidTop?: number; // Highest user bid in party
+  partyUserBidTopUser?: string; // User who made highest bid
+  
   startTime: string;
   musicSource: 'youtube' | 'spotify' | 'direct_upload';
   endTime?: string;

@@ -341,10 +341,20 @@ class BidMetricsEngine {
     
     // Determine where to store this metric based on its scope and entities
     if (config.scope === 'global' && config.entities.includes('media')) {
+      // Global media metrics (stored in Media model)
       await this._updateGlobalMediaMetric(metricName, bidData, operation);
     } else if (config.scope === 'party' && config.entities.includes('media')) {
+      // Party-media metrics (stored in Party.media array)
       await this._updatePartyMediaMetric(metricName, bidData, operation);
+    } else if (config.scope === 'party' && config.entities.length === 0) {
+      // Party-level metrics (stored at Party root)
+      // These are updated by _updatePartyLevelMetrics() which is called by _updatePartyMediaMetric
+      // No need to update separately to avoid duplicate calls
+    } else if (config.scope === 'party' && config.entities.includes('user') && !config.entities.includes('media')) {
+      // Party-user metrics (stored at Party root)
+      // These are updated by _updatePartyLevelMetrics()
     } else if (config.entities.includes('user') && config.entities.includes('media')) {
+      // User-media metrics (stored in Bid model)
       await this._updateBidMetric(metricName, bidData, operation);
     }
   }
@@ -375,23 +385,71 @@ class BidMetricsEngine {
   async _updatePartyMediaMetric(metricName, bidData, operation) {
     const partyId = bidData.partyId;
     const mediaId = bidData.mediaId;
-    const newValue = await this.computeMetric(metricName, { partyId, mediaId });
+    const result = await this.computeMetric(metricName, { partyId, mediaId });
     
-    // Update Party.media array with the new metric value
-    const updateField = this._getMetricFieldName(metricName);
+    // Update Party.media array with the new metric value and user references
+    const updateFields = {};
+    const fieldName = this._getMetricFieldName(metricName);
+    
+    // Store the main metric value
+    updateFields[`media.$.${fieldName}`] = result.amount || result;
+    
+    // Store user references for gamification (if applicable)
+    if (metricName === 'PartyMediaBidTop' && result.userId) {
+      updateFields['media.$.partyMediaBidTopUser'] = result.userId;
+    } else if (metricName === 'PartyMediaAggregateTop' && result.userId) {
+      updateFields['media.$.partyMediaAggregateTopUser'] = result.userId;
+    }
+    
     await Party.findOneAndUpdate(
       { 
         _id: partyId, 
         'media.mediaId': mongoose.Types.ObjectId(mediaId) 
       },
       { 
-        $set: { 
-          [`media.$.${updateField}`]: newValue 
-        } 
+        $set: updateFields
       }
     );
     
-    console.log(`📊 Updated ${metricName} for party ${partyId}, media ${mediaId}: ${newValue}`);
+    console.log(`📊 Updated ${metricName} for party ${partyId}, media ${mediaId}: ${result.amount || result}`);
+    
+    // Also update party-level metrics if this affects them
+    await this._updatePartyLevelMetrics(partyId, bidData, operation);
+  }
+
+  async _updatePartyLevelMetrics(partyId, bidData, operation) {
+    // Update party-level metrics based on the bid change
+    try {
+      const updateFields = {};
+      
+      // Compute PartyBidTop (highest bid across all media)
+      const partyBidTopResult = await this.computeMetric('PartyBidTop', { partyId });
+      updateFields.partyBidTop = partyBidTopResult.amount || partyBidTopResult;
+      if (partyBidTopResult.userId) {
+        updateFields.partyBidTopUser = partyBidTopResult.userId;
+      }
+      
+      // Compute PartyUserAggregateTop (highest user aggregate in party)
+      const partyUserAggregateTopResult = await this.computeMetric('PartyUserAggregateTop', { partyId });
+      updateFields.partyUserAggregateTop = partyUserAggregateTopResult.amount || partyUserAggregateTopResult;
+      if (partyUserAggregateTopResult.userId) {
+        updateFields.partyUserAggregateTopUser = partyUserAggregateTopResult.userId;
+      }
+      
+      // Compute PartyUserBidTop (highest user bid in party)
+      // This is computed by finding the highest bid amount any single user has made
+      const partyUserBidTopResult = await this.computeMetric('PartyUserBidTop', { partyId });
+      updateFields.partyUserBidTop = partyUserBidTopResult.amount || partyUserBidTopResult;
+      if (partyUserBidTopResult.userId) {
+        updateFields.partyUserBidTopUser = partyUserBidTopResult.userId;
+      }
+      
+      await Party.findByIdAndUpdate(partyId, updateFields);
+      
+      console.log(`📊 Updated party-level metrics for party ${partyId}`);
+    } catch (error) {
+      console.error(`Error updating party-level metrics for party ${partyId}:`, error);
+    }
   }
 
   async _updateBidMetric(metricName, bidData, operation) {
