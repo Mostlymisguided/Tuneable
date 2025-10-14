@@ -11,18 +11,18 @@ const { transformResponse } = require('../utils/uuidTransform');
 // @access  Public
 router.get('/top-tunes', async (req, res) => {
   try {
-    const { sortBy = 'globalBidValue', limit = 10 } = req.query;
+    const { sortBy = 'globalMediaAggregate', limit = 10 } = req.query;
     
-    // Validate sortBy parameter - map legacy fields to new Media fields
-    const validSortFields = ['globalBidValue', 'title', 'creators', 'duration', 'uploadedAt'];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : 'globalBidValue';
+    // Validate sortBy parameter - map to Media model fields
+    const validSortFields = ['globalMediaAggregate', 'title', 'creators', 'duration', 'uploadedAt'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'globalMediaAggregate';
     
-    // Map legacy field names to Media model fields
+    // Map field names to Media model fields
     const fieldMapping = {
       'title': 'title',
       'artist': 'creators', // Map artist to creators
       'duration': 'duration',
-      'globalBidValue': 'globalBidValue',
+      'globalMediaAggregate': 'globalMediaAggregate', // Updated to schema grammar
       'uploadedAt': 'uploadedAt'
     };
     
@@ -33,7 +33,7 @@ router.get('/top-tunes', async (req, res) => {
     
     // Build sort object
     let sortObj = {};
-    if (mediaSortField === 'globalBidValue') {
+    if (mediaSortField === 'globalMediaAggregate') {
       sortObj[mediaSortField] = -1; // Descending for bid value
     } else if (mediaSortField === 'title' || mediaSortField === 'creators') {
       sortObj[mediaSortField] = 1; // Ascending for text fields
@@ -43,7 +43,7 @@ router.get('/top-tunes', async (req, res) => {
     
     // Use new Media model, filtering for music content
     let media = await Media.find({ 
-      globalBidValue: { $gt: 0 },
+      globalMediaAggregate: { $gt: 0 }, // Updated to schema grammar
       contentType: { $in: ['music'] } // Only music content for now
     })
       .sort(sortObj)
@@ -57,7 +57,7 @@ router.get('/top-tunes', async (req, res) => {
           select: 'username profilePic uuid',
         },
       })
-      .select('title artist producer featuring creatorNames duration coverArt globalBidValue uploadedAt bids uuid contentType contentForm genres category tags');
+      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags'); // Updated to schema grammar
 
     // Ensure proper population by manually checking and populating if needed
     const Bid = require('../models/Bid');
@@ -89,7 +89,7 @@ router.get('/top-tunes', async (req, res) => {
       featuring: item.featuring || [],
       duration: item.duration,
       coverArt: item.coverArt,
-      globalBidValue: item.globalBidValue,
+      globalMediaAggregate: item.globalMediaAggregate, // Updated to schema grammar
       uploadedAt: item.uploadedAt,
       bids: item.bids,
       contentType: item.contentType,
