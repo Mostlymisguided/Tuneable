@@ -42,7 +42,7 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
         console.log('Search criteria:', JSON.stringify(searchCriteria, null, 2));
 
         const media = await Media.find(searchCriteria)
-            .sort({ globalBidValue: -1, popularity: -1 }) // Sort by bid value and popularity
+            .sort({ globalMediaAggregate: -1, popularity: -1 }) // Sort by bid value and popularity
             .limit(limit)
             .populate('addedBy', 'username')
             .lean();
@@ -86,7 +86,7 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
                 coverArt: mediaItem.coverArt || (source === 'youtube' && sources.youtube ? `https://img.youtube.com/vi/${sources.youtube.split('v=')[1]?.split('&')[0]}/hqdefault.jpg` : ''),
                 duration: mediaItem.duration || 0,
                 sources: sources,
-                globalBidValue: mediaItem.globalBidValue || 0,
+                globalMediaAggregate: mediaItem.globalMediaAggregate || 0,
                 addedBy: mediaItem.addedBy?.username || 'Unknown',
                 isLocal: true // Flag to indicate this is from our database
             };
@@ -237,7 +237,7 @@ router.get('/debug', async (req, res) => {
                 title: media.title,
                 artist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown',
                 sources: media.sources,
-                globalBidValue: media.globalBidValue,
+                globalMediaAggregate: media.globalMediaAggregate,
                 contentType: media.contentType,
                 contentForm: media.contentForm
             }))

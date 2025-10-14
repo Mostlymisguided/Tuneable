@@ -172,7 +172,7 @@ class PodcastIndexService {
       language: piEpisode.feedLanguage || 'en',
       playCount: 0,
       popularity: 0,
-      globalBidValue: 0,
+      globalMediaAggregate: 0, // Updated to schema grammar
       // External IDs
       podcastIndexId: piEpisode.id,
       feedId: piEpisode.feedId

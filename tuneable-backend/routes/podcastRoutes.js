@@ -29,7 +29,7 @@ router.get('/trending', async (req, res) => {
     }
     
     const episodes = await PodcastEpisode.find(query)
-      .sort({ globalBidValue: -1, playCount: -1, createdAt: -1 })
+      .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
       .limit(limitNum)
       .populate('addedBy', 'username')
       .lean();
@@ -78,7 +78,7 @@ router.get('/search', async (req, res) => {
           { podcastAuthor: searchRegex }
         ]
       })
-      .sort({ globalBidValue: -1, playCount: -1, createdAt: -1 })
+      .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
       .limit(limitNum)
       .populate('addedBy', 'username')
       .lean();
@@ -133,16 +133,16 @@ router.get('/charts/:type', async (req, res) => {
     let sortBy = {};
     switch (type) {
       case 'boosted':
-        sortBy = { globalBidValue: -1, playCount: -1 };
+        sortBy = { globalMediaAggregate: -1, playCount: -1 };
         break;
       case 'popular':
-        sortBy = { playCount: -1, globalBidValue: -1 };
+        sortBy = { playCount: -1, globalMediaAggregate: -1 };
         break;
       case 'recent':
         sortBy = { createdAt: -1 };
         break;
       case 'trending':
-        sortBy = { globalBidValue: -1, playCount: -1, createdAt: -1 };
+        sortBy = { globalMediaAggregate: -1, playCount: -1, createdAt: -1 };
         break;
       default:
         return res.status(400).json({ error: 'Invalid chart type' });
@@ -188,7 +188,7 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     await bid.save();
     
     // Update episode
-    episode.globalBidValue += amount;
+    episode.globalMediaAggregate += amount;
     episode.bids = episode.bids || [];
     episode.bids.push(bid._id);
     await episode.save();
@@ -276,7 +276,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     await party.save();
     
     // Update global episode
-    episode.globalBidValue += amount;
+    episode.globalMediaAggregate += amount;
     episode.bids = episode.bids || [];
     episode.bids.push(bid._id);
     await episode.save();

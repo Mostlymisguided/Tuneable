@@ -13,12 +13,9 @@ const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 const { transformResponse } = require('../utils/uuidTransform');
 const { resolvePartyId } = require('../utils/idResolver');
-const { 
-    calculatePartyAggregateBidValue, 
-    calculateGlobalAggregateBidValue,
-    updatePartyBidTracking,
-    updateGlobalBidTracking 
-} = require('../utils/bidCalculations');
+// Note: Old bidCalculations utility functions are no longer used
+// All bid metric calculations are now handled by BidMetricsEngine
+// via Bid model hooks (post('save') and post('remove'))
 require('dotenv').config(); // Load .env variables
 
 // What3words functionality removed for now
@@ -406,7 +403,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             tags: videoTags,
             category: videoCategory,
             addedBy: userId,
-            globalBidValue: bidAmount,
+            globalMediaAggregate: bidAmount, // Updated to schema grammar
             contentType: 'music',
             contentForm: 'song'
         });
@@ -454,9 +451,8 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaDuration: media.duration,
             platform: detectedPlatform,
             
-            // User aggregate tracking (first bid, so equals bid amount)
-            partyAggregateBidValue: userPartyAggregate,
-            globalAggregateBidValue: userGlobalAggregate
+            // Note: Aggregate values are computed dynamically by BidMetricsEngine
+            // and are no longer stored in the Bid model
         });
 
         await bid.save();
@@ -605,9 +601,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         else if (userAgent.includes('Tablet')) detectedPlatform = 'tablet';
         else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
 
-        // Calculate user aggregate bid values (before saving the new bid)
-        const currentUserPartyAggregate = await calculatePartyAggregateBidValue(userId, actualMediaId, party._id);
-        const currentUserGlobalAggregate = await calculateGlobalAggregateBidValue(userId, actualMediaId);
+        // Note: User aggregate bid values are now computed dynamically by BidMetricsEngine
+        // No need to calculate them here as they're not stored in the Bid model
         
         // Create bid record with denormalized fields and aggregate tracking
         const bid = new Bid({
@@ -632,11 +627,10 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             mediaContentType: populatedMedia.contentType,
             mediaContentForm: populatedMedia.contentForm,
             mediaDuration: populatedMedia.duration,
-            platform: detectedPlatform,
+            platform: detectedPlatform
             
-            // User aggregate tracking (includes this new bid)
-            partyAggregateBidValue: currentUserPartyAggregate + bidAmount,
-            globalAggregateBidValue: currentUserGlobalAggregate + bidAmount
+            // Note: Aggregate values are computed dynamically by BidMetricsEngine
+            // and are no longer stored in the Bid model
         });
 
         await bid.save();
@@ -650,15 +644,14 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // Update media global bid value
         const media = await Media.findById(actualMediaId);
         if (media) {
-            media.globalBidValue = (media.globalBidValue || 0) + bidAmount;
+            media.globalMediaAggregate = (media.globalMediaAggregate || 0) + bidAmount; // Updated to schema grammar
             media.bids = media.bids || [];
             media.bids.push(bid._id);
             await media.save();
         }
 
-        // Update all bid tracking fields (top bidders, aggregates, etc.)
-        await updatePartyBidTracking(actualMediaId, party._id);
-        await updateGlobalBidTracking(actualMediaId);
+        // Note: Bid tracking is now handled automatically by BidMetricsEngine
+        // via the Bid model's post('save') hook - no need to call manually
 
         // Update user balance
         user.balance = (userBalancePence - bidAmountPence) / 100;
@@ -1194,7 +1187,7 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalBidValue bids addedBy tags category uuid',
+                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category uuid', // Updated to schema grammar
                 populate: {
                     path: 'bids',
                     model: 'Bid',

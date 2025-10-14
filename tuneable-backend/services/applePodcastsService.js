@@ -288,7 +288,7 @@ class ApplePodcastsService {
       language: 'en', // Default to English since Apple provides country codes, not language codes
       playCount: 0,
       popularity: 0,
-      globalBidValue: 0,
+      globalMediaAggregate: 0, // Updated to schema grammar
       // External IDs
       appleId: appleEpisode.trackId?.toString(),
       collectionId: appleEpisode.collectionId?.toString(),

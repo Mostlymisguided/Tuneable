@@ -305,7 +305,7 @@ class TaddyService {
       language: taddyEpisode.podcastSeries?.language || 'en',
       playCount: 0,
       popularity: 0,
-      globalBidValue: 0,
+      globalMediaAggregate: 0, // Updated to schema grammar
       // Taddy-specific fields
       taddyUuid: taddyEpisode.uuid,
       podcastSeriesUuid: taddyEpisode.podcastSeries?.uuid

@@ -296,7 +296,7 @@ router.get('/:userId/profile', async (req, res) => {
       .populate({
         path: 'mediaId',
         model: 'Media',
-        select: 'title artist coverArt duration globalBidValue uuid _id contentType contentForm',
+        select: 'title artist coverArt duration globalMediaAggregate uuid _id contentType contentForm', // Updated to schema grammar
       })
       .populate({
         path: 'partyId',

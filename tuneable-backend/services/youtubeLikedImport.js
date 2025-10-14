@@ -281,7 +281,7 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
                     addedBy: userId,
                     contentType: ['music'],
                     contentForm: ['song'],
-                    globalBidValue: 0,
+                    globalMediaAggregate: 0, // Updated to schema grammar
                     bids: []
                 });
 
