@@ -25,7 +25,7 @@ interface PartySong {
     spotifyId?: string;
     spotifyUrl?: string;
   };
-  globalBidValue?: number;
+  globalMediaAggregate?: number; // Updated to schema grammar
   bids?: any[];
   addedBy: string;
   tags?: string[];
@@ -280,9 +280,9 @@ const Party: React.FC = () => {
             duration: actualSong.duration,
             coverArt: actualSong.coverArt,
             sources: sources,
-            globalBidValue: typeof actualSong.globalBidValue === 'number' ? actualSong.globalBidValue : 0,
-            partyBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0,
-            totalBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0, // Use partyBidValue as totalBidValue
+            globalMediaAggregate: typeof actualSong.globalMediaAggregate === 'number' ? actualSong.globalMediaAggregate : 0,
+            partyMediaAggregate: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
+            totalBidValue: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
             bids: actualSong.bids,
             addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy
           };
@@ -347,9 +347,9 @@ const Party: React.FC = () => {
           duration: song.duration,
           coverArt: song.coverArt,
           sources: sources,
-          globalBidValue: typeof song.globalBidValue === 'number' ? song.globalBidValue : 0,
-          partyBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0,
-          totalBidValue: typeof song.partyBidValue === 'number' ? song.partyBidValue : 0, // Use partyBidValue as totalBidValue
+          globalMediaAggregate: typeof song.globalMediaAggregate === 'number' ? song.globalMediaAggregate : 0,
+          partyMediaAggregate: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
+          totalBidValue: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
           bids: song.bids,
           addedBy: typeof song.addedBy === 'object' ? song.addedBy?.username || 'Unknown' : song.addedBy
         };
@@ -670,7 +670,7 @@ const Party: React.FC = () => {
     
     return media.reduce((total: number, item: any) => {
       const mediaData = item.mediaId || item.songId || item;
-      const bidValue = mediaData.partyBidValue || 0;
+      const bidValue = mediaData.partyMediaAggregate || 0;
       return total + (typeof bidValue === 'number' ? bidValue : 0);
     }, 0);
   };
@@ -1002,7 +1002,7 @@ const Party: React.FC = () => {
                               
                               <div className="text-right">
                                 <p className="text-sm font-medium text-white">
-                                  £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
+                                  £{typeof songData.partyMediaAggregate === 'number' ? songData.partyMediaAggregate.toFixed(2) : '0.00'}
                                 </p>
                                 <p className="text-xs text-gray-400">
                                   {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
@@ -1144,14 +1144,14 @@ const Party: React.FC = () => {
                                     </div>
                                     <div className="text-lg font-bold text-white">
                                       £{selectedTimePeriod === 'all-time' 
-                                        ? (typeof song.partyBidValue === 'number' ? song.partyBidValue.toFixed(2) : '0.00')
+                                        ? (typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate.toFixed(2) : '0.00')
                                         : (typeof song.timePeriodBidValue === 'number' ? song.timePeriodBidValue.toFixed(2) : '0.00')}
                                     </div>
                                   </div>
                                   <div className="text-right border-t border-gray-600 pt-1 w-full">
                                     <div className="text-xs text-gray-500 uppercase tracking-wide">Global</div>
                                     <div className="text-sm text-gray-300">
-                                      £{(typeof songData.globalBidValue === 'number' ? songData.globalBidValue.toFixed(2) : '0.00')}
+                                      £{(typeof songData.globalMediaAggregate === 'number' ? songData.globalMediaAggregate.toFixed(2) : '0.00')}
                                     </div>
                                   </div>
                                 </div>
@@ -1163,25 +1163,25 @@ const Party: React.FC = () => {
                                     <div>
                                       <div className="text-gray-500">Party Top:</div>
                                       <div className="text-yellow-400 font-medium">
-                                        £{songData.topPartyBidValue?.toFixed(2) || '0.00'}
+                                        £{songData.partyMediaBidTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-gray-500">Party Fan:</div>
                                       <div className="text-green-400 font-medium">
-                                        £{songData.topPartyAggregateBidValue?.toFixed(2) || '0.00'}
+                                        £{songData.partyMediaAggregateTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-gray-500">Global Top:</div>
                                       <div className="text-yellow-400 font-medium">
-                                        £{songData.topGlobalBidValue?.toFixed(2) || '0.00'}
+                                        £{songData.globalMediaBidTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-gray-500">Global Fan:</div>
                                       <div className="text-green-400 font-medium">
-                                        £{songData.topGlobalAggregateBidValue?.toFixed(2) || '0.00'}
+                                        £{songData.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                   </div>
@@ -1330,7 +1330,7 @@ const Party: React.FC = () => {
                           </div>
                           <div className="text-right">
                             <p className="text-xs font-medium text-gray-400">
-                              £{typeof songData.partyBidValue === 'number' ? songData.partyBidValue.toFixed(2) : '0.00'}
+                              £{typeof songData.partyMediaAggregate === 'number' ? songData.partyMediaAggregate.toFixed(2) : '0.00'}
                             </p>
                           </div>
                         </div>
@@ -1403,7 +1403,7 @@ const Party: React.FC = () => {
         onConfirm={handleBidConfirm}
         songTitle={selectedSong?.title || ''}
         songArtist={Array.isArray(selectedSong?.artist) ? selectedSong.artist[0]?.name || 'Unknown Artist' : selectedSong?.artist || 'Unknown Artist'}
-        currentBid={selectedSong?.partyBidValue || 0}
+        currentBid={selectedSong?.partyMediaAggregate || 0}
         userBalance={user?.balance || 0}
         isLoading={isBidding}
       />

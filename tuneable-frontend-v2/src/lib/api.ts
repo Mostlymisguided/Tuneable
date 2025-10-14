@@ -300,7 +300,7 @@ export const searchAPI = {
 
 // Top Tunes API
 export const topTunesAPI = {
-  getTopTunes: async (sortBy: string = 'globalBidValue', limit: number = 10) => {
+  getTopTunes: async (sortBy: string = 'globalMediaAggregate', limit: number = 10) => {
     const response = await api.get('/songs/top-tunes', {
       params: { sortBy, limit },
     });

@@ -8,7 +8,7 @@ interface Song {
   duration: number;
   coverArt: string;
   sources: any;
-  globalBidValue: number;
+  globalMediaAggregate: number;
   bids: any[];
   addedBy: any;
   totalBidValue: number;

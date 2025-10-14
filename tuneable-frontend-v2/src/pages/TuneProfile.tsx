@@ -40,7 +40,7 @@ interface Song {
   explicit?: boolean;
   isrc?: string;
   upc?: string;
-  globalBidValue?: number;
+  globalMediaAggregate?: number; // Updated to schema grammar
   bpm?: number;
   pitch?: number;
   key?: string;
@@ -278,7 +278,7 @@ const TuneProfile: React.FC = () => {
                 <div className="bg-black/20 rounded-lg p-4">
                   <div className="text-sm text-gray-300">Global Bid Value</div>
                   <div className="text-2xl font-bold text-green-400">
-                    £{song.globalBidValue?.toFixed(2) || '0.00'}
+                    £{song.globalMediaAggregate?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 <div className="bg-black/20 rounded-lg p-4">

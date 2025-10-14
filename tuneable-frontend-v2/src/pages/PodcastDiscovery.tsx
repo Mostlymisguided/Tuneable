@@ -44,7 +44,7 @@ const PodcastDiscovery: React.FC = () => {
   const [selectedGenre, setSelectedGenre] = useState('all');
   // RSS support removed - Taddy and Apple Podcasts are the primary sources
   // const [popularFeeds, setPopularFeeds] = useState<Array<{name: string, url: string, description: string, category: string}>>([]);
-  const [topBoostedPodcasts, setTopBoostedPodcasts] = useState<Array<{title: string, podcastTitle: string, globalBidValue: number, playCount: number}>>([]);
+  const [topBoostedPodcasts, setTopBoostedPodcasts] = useState<Array<{title: string, podcastTitle: string, globalMediaAggregate: number, playCount: number}>>([]);
 
   useEffect(() => {
     // Load Apple genres
@@ -476,7 +476,7 @@ const PodcastDiscovery: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
-                          <div className="text-sm font-medium text-gray-900">£{episode.globalBidValue.toFixed(2)}</div>
+                          <div className="text-sm font-medium text-gray-900">£{episode.globalMediaAggregate.toFixed(2)}</div>
                           <div className="text-xs text-gray-500">{episode.playCount} plays</div>
                         </div>
                       </div>

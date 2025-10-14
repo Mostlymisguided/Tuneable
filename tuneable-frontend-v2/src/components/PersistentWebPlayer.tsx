@@ -125,7 +125,7 @@ const PersistentWebPlayer: React.FC = () => {
                     duration: actualSong.duration,
                     coverArt: actualSong.coverArt,
                     sources: actualSong.sources,
-                    globalBidValue: actualSong.globalBidValue || 0,
+                    globalMediaAggregate: actualSong.globalMediaAggregate || 0,
                     bids: actualSong.bids || [],
                     addedBy: actualSong.addedBy,
                     totalBidValue: actualSong.totalBidValue || 0

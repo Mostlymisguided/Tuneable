@@ -14,7 +14,7 @@ interface SearchResult {
   coverArt: string;
   duration: number;
   sources: Record<string, string>;
-  globalBidValue?: number;
+  globalMediaAggregate?: number;
   addedBy?: string;
   isLocal?: boolean;
   isPodcast?: boolean;
@@ -152,7 +152,7 @@ const SearchPage: React.FC = () => {
               coverArt: episode.podcastImage,
               duration: episode.duration,
               sources: { audio: episode.audioUrl },
-              globalBidValue: episode.globalBidValue,
+              globalMediaAggregate: episode.globalMediaAggregate,
               addedBy: episode.addedBy?.username,
               isLocal: true,
               isPodcast: true,
@@ -188,7 +188,7 @@ const SearchPage: React.FC = () => {
               coverArt: episode.podcastImage,
               duration: episode.duration,
               sources: { audio: episode.audioUrl },
-              globalBidValue: 0,
+              globalMediaAggregate: 0,
               addedBy: null,
               isLocal: false,
               isPodcast: true,
@@ -226,7 +226,7 @@ const SearchPage: React.FC = () => {
               coverArt: episode.podcastImage,
               duration: episode.duration,
               sources: { audio: episode.audioUrl },
-              globalBidValue: 0,
+              globalMediaAggregate: 0,
               addedBy: null,
               isLocal: false,
               isPodcast: true,
@@ -627,7 +627,7 @@ const SearchPage: React.FC = () => {
                   podcastCategory: '',
                   duration: song.duration,
                   publishedAt: new Date().toISOString(),
-                  globalBidValue: song.globalBidValue || 0,
+                  globalMediaAggregate: song.globalMediaAggregate || 0,
                   playCount: 0,
                   popularity: 0,
                   explicit: false,
@@ -682,11 +682,11 @@ const SearchPage: React.FC = () => {
                           <span className="text-xs text-gray-500">
                             {formatDuration(song.duration)}
                           </span>
-                          {song.isLocal && song.globalBidValue && (
+                          {song.isLocal && song.globalMediaAggregate && (
                             <>
                               <span className="text-xs text-gray-400">•</span>
                               <span className="text-xs text-green-600 font-medium">
-                                £{song.globalBidValue.toFixed(2)} total (all parties)
+                                £{song.globalMediaAggregate.toFixed(2)} total (all parties)
                               </span>
                             </>
                           )}

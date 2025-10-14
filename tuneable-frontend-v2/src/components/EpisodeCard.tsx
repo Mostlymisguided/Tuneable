@@ -13,7 +13,7 @@ interface Episode {
   podcastCategory: string;
   duration: number;
   publishedAt: string;
-  globalBidValue: number;
+  globalMediaAggregate: number;
   playCount: number;
   popularity: number;
   explicit: boolean;
@@ -141,7 +141,7 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
               </span>
               <span className="text-xs text-gray-400 flex items-center">
                 <DollarSign className="w-3 h-3 mr-1" />
-                ${episode.globalBidValue.toFixed(2)}
+                ${episode.globalMediaAggregate.toFixed(2)}
               </span>
             </div>
           </div>
@@ -220,7 +220,7 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
           </div>
           <div className="flex items-center">
             <DollarSign className="w-4 h-4 mr-1" />
-            ${episode.globalBidValue.toFixed(2)} boosted
+            ${episode.globalMediaAggregate.toFixed(2)} boosted
           </div>
           <div className="flex items-center">
             <User className="w-4 h-4 mr-1" />

@@ -11,7 +11,7 @@ interface TopTunesSong {
   artist: string;
   duration: number;
   coverArt: string;
-  globalBidValue: number;
+  globalMediaAggregate: number;
   uploadedAt: string;
   bids?: Array<{
     userId: {
@@ -32,7 +32,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   const navigate = useNavigate();
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('globalBidValue');
+  const [sortBy, setSortBy] = useState('globalMediaAggregate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAll, setShowAll] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -142,7 +142,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               </th>
               <th 
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('globalBidValue')}
+                onClick={() => handleSort('globalMediaAggregate')}
               >
                 <div className="flex items-center space-x-1">
                   <span>Total Bids</span>
@@ -207,7 +207,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                     {formatDuration(song.duration)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
-                    {formatBidValue(song.globalBidValue)}
+                    {formatBidValue(song.globalMediaAggregate)}
                   </td>
                 </tr>
               ))

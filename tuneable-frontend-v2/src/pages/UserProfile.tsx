@@ -42,7 +42,7 @@ interface Bid {
     artist: string;
     coverArt?: string;
     duration?: number;
-    globalBidValue?: number;
+    globalMediaAggregate?: number;
     uuid: string;
     tags?: string[];
   };
@@ -63,7 +63,7 @@ interface SongWithBids {
     artist: string;
     coverArt?: string;
     duration?: number;
-    globalBidValue?: number;
+    globalMediaAggregate?: number;
     uuid: string;
     tags?: string[];
   };

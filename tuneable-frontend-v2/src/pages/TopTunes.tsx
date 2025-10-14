@@ -8,14 +8,14 @@ interface TopTunesSong {
   artist: string;
   duration: number;
   coverArt: string;
-  globalBidValue: number;
+  globalMediaAggregate: number;
   uploadedAt: string;
 }
 
 const TopTunes: React.FC = () => {
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('globalBidValue');
+  const [sortBy, setSortBy] = useState('globalMediaAggregate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
@@ -117,7 +117,7 @@ const TopTunes: React.FC = () => {
                   </th>
                   <th 
                     className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('globalBidValue')}
+                    onClick={() => handleSort('globalMediaAggregate')}
                   >
                     <div className="flex items-center space-x-1">
                       <span>Total Bids (All Parties)</span>
@@ -170,7 +170,7 @@ const TopTunes: React.FC = () => {
                         {formatDuration(song.duration)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                        {formatBidValue(song.globalBidValue)}
+                        {formatBidValue(song.globalMediaAggregate)}
                       </td>
                     </tr>
                   ))
