@@ -16,6 +16,84 @@
  * - storage: whether to store computed values or compute on-demand
  */
 
+// ========================================
+// SCHEMA CONSTANTS & TYPE DEFINITIONS
+// ========================================
+
+/**
+ * @typedef {'global' | 'party'} MetricScope
+ * @typedef {'aggregate' | 'top' | 'average' | 'rank'} MetricType
+ * @typedef {'amount' | 'order'} OutputType
+ * @typedef {'stored' | 'computed'} StorageType
+ * @typedef {'user' | 'media' | 'party'} EntityType
+ */
+
+/**
+ * @typedef {Object} MetricReturns
+ * @property {string} [amount] - Amount value
+ * @property {string} [currency] - Currency code
+ * @property {string} [userId] - User ObjectId
+ * @property {string} [userUuid] - User UUID
+ * @property {string} [username] - Username
+ * @property {string} [mediaId] - Media ObjectId
+ * @property {string} [mediaUuid] - Media UUID
+ * @property {string} [title] - Media title
+ * @property {string} [artist] - Media artist
+ * @property {string} [partyId] - Party ObjectId
+ * @property {string} [partyUuid] - Party UUID
+ * @property {string} [partyName] - Party name
+ * @property {string} [rank] - Rank number
+ * @property {string} [totalCount] - Total count for ranking
+ * @property {string} [percentile] - Percentile (0-100)
+ */
+
+/**
+ * @typedef {Object} MetricConfig
+ * @property {MetricScope} scope - The scope of the metric (global/party)
+ * @property {MetricType} type - The type of metric (aggregate/top/average/rank)
+ * @property {EntityType[]} entities - Required entities for this metric
+ * @property {OutputType} outputType - Primary data type returned
+ * @property {MetricReturns} returns - Detailed structure of returned data
+ * @property {EntityType[]} associatedEntities - Entities returned with primary value
+ * @property {string} description - Human-readable explanation
+ * @property {StorageType} storage - Storage strategy (stored/computed)
+ * @property {string} formula - Mathematical formula for computation
+ */
+
+/**
+ * Valid metric types in the system
+ * @type {MetricType[]}
+ */
+const METRIC_TYPES = ['aggregate', 'top', 'average', 'rank'];
+
+/**
+ * Valid scopes for metrics
+ * @type {MetricScope[]}
+ */
+const SCOPES = ['global', 'party'];
+
+/**
+ * Valid output types for metrics
+ * @type {OutputType[]}
+ */
+const OUTPUT_TYPES = ['amount', 'order'];
+
+/**
+ * Valid storage strategies for metrics
+ * @type {StorageType[]}
+ */
+const STORAGE_TYPES = ['stored', 'computed'];
+
+/**
+ * Valid entity types that can be referenced in metrics
+ * @type {EntityType[]}
+ */
+const ENTITY_TYPES = ['user', 'media', 'party'];
+
+/**
+ * Complete registry of all bid metrics in the Tuneable system
+ * @type {Object<string, MetricConfig>}
+ */
 const BID_METRICS_SCHEMA = {
   // ========================================
   // AGGREGATE METRICS (Sum of bids)
@@ -839,17 +917,26 @@ const BID_METRICS_SCHEMA = {
 };
 
 /**
- * Helper functions for working with the schema
+ * Helper functions for working with the bid metrics schema
+ * @namespace BidMetricsSchema
  */
 const BidMetricsSchema = {
-  // Get all metrics for a given scope
+  /**
+   * Get all metrics for a given scope
+   * @param {MetricScope} scope - The scope to filter by
+   * @returns {Object<string, MetricConfig>} Metrics matching the scope
+   */
   getMetricsByScope(scope) {
     return Object.entries(BID_METRICS_SCHEMA)
       .filter(([_, config]) => config.scope === scope)
       .reduce((acc, [name, config]) => ({ ...acc, [name]: config }), {});
   },
 
-  // Get all metrics for a given type
+  /**
+   * Get all metrics for a given type
+   * @param {MetricType} type - The metric type to filter by
+   * @returns {Object<string, MetricConfig>} Metrics matching the type
+   */
   getMetricsByType(type) {
     return Object.entries(BID_METRICS_SCHEMA)
       .filter(([_, config]) => config.type === type)
@@ -890,10 +977,104 @@ const BidMetricsSchema = {
     return Object.entries(BID_METRICS_SCHEMA)
       .filter(([_, config]) => config.entities.includes(entity))
       .reduce((acc, [name, config]) => ({ ...acc, [name]: config }), {});
+  },
+
+  /**
+   * Validate a metric configuration object
+   * @param {MetricConfig} config - The metric configuration to validate
+   * @returns {{isValid: boolean, errors: string[]}} Validation result
+   */
+  validateMetricConfig(config) {
+    const errors = [];
+    
+    if (!METRIC_TYPES.includes(config.type)) {
+      errors.push(`Invalid metric type: ${config.type}. Must be one of: ${METRIC_TYPES.join(', ')}`);
+    }
+    
+    if (!SCOPES.includes(config.scope)) {
+      errors.push(`Invalid scope: ${config.scope}. Must be one of: ${SCOPES.join(', ')}`);
+    }
+    
+    if (!OUTPUT_TYPES.includes(config.outputType)) {
+      errors.push(`Invalid outputType: ${config.outputType}. Must be one of: ${OUTPUT_TYPES.join(', ')}`);
+    }
+    
+    if (!STORAGE_TYPES.includes(config.storage)) {
+      errors.push(`Invalid storage: ${config.storage}. Must be one of: ${STORAGE_TYPES.join(', ')}`);
+    }
+    
+    if (config.entities && Array.isArray(config.entities)) {
+      const invalidEntities = config.entities.filter(entity => !ENTITY_TYPES.includes(entity));
+      if (invalidEntities.length > 0) {
+        errors.push(`Invalid entities: ${invalidEntities.join(', ')}. Must be one of: ${ENTITY_TYPES.join(', ')}`);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  },
+
+  // Get all possible metric combinations (useful for testing/generation)
+  getAllPossibleCombinations() {
+    const combinations = [];
+    
+    for (const scope of SCOPES) {
+      for (const type of METRIC_TYPES) {
+        // Generate combinations for different entity combinations
+        const entityCombinations = [
+          [], // No entities
+          ['user'], // User only
+          ['media'], // Media only
+          ['user', 'media'], // User + Media
+          ['user', 'party'], // User + Party (for party-scoped metrics)
+          ['media', 'party'], // Media + Party (for party-scoped metrics)
+          ['user', 'media', 'party'] // All entities
+        ];
+        
+        for (const entities of entityCombinations) {
+          // Skip invalid combinations (e.g., global scope with party entity)
+          if (scope === 'global' && entities.includes('party')) {
+            continue;
+          }
+          
+          combinations.push({
+            scope,
+            type,
+            entities,
+            name: this.generateMetricName(scope, type, entities)
+          });
+        }
+      }
+    }
+    
+    return combinations;
+  },
+
+  // Generate metric name from components
+  generateMetricName(scope, type, entities) {
+    const scopePrefix = scope.charAt(0).toUpperCase() + scope.slice(1);
+    const typeSuffix = type.charAt(0).toUpperCase() + type.slice(1);
+    
+    if (entities.length === 0) {
+      return `${scopePrefix}${typeSuffix}`;
+    }
+    
+    const entityNames = entities.map(entity => 
+      entity.charAt(0).toUpperCase() + entity.slice(1)
+    ).join('');
+    
+    return `${scopePrefix}${entityNames}${typeSuffix}`;
   }
 };
 
 module.exports = {
   BID_METRICS_SCHEMA,
-  BidMetricsSchema
+  BidMetricsSchema,
+  METRIC_TYPES,
+  SCOPES,
+  OUTPUT_TYPES,
+  STORAGE_TYPES,
+  ENTITY_TYPES
 };

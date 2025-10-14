@@ -193,12 +193,13 @@ const mediaSchema = new mongoose.Schema({
   // ========================================
   
   // Global scope metrics (stored for performance)
-  globalBidValue: { type: Number, default: 0 }, // Total bid value across all parties/users
-  globalBidTop: { type: Number, default: 0 }, // Highest individual bid amount
-  globalBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest bid
+  globalMediaAggregate: { type: Number, default: 0 }, // GlobalMediaAggregate - Total bid value across all parties/users
+  globalMediaBidTop: { type: Number, default: 0 }, // GlobalMediaBidTop - Highest individual bid amount
+  globalMediaAggregateTop: { type: Number, default: 0 }, // GlobalMediaAggregateTop - Highest user aggregate total
   
-  globalAggregateTop: { type: Number, default: 0 }, // Highest user aggregate total
-  globalAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
+  // Essential user references for gamification (stored for performance)
+  globalMediaBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User who made the top bid
+  globalMediaAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
   
   // Reference to bids (for populating if needed)
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
@@ -260,7 +261,9 @@ mediaSchema.pre('save', function (next) {
 });
 
 // Indexes for performance
-mediaSchema.index({ globalBidValue: -1 });
+mediaSchema.index({ globalMediaAggregate: -1 });
+mediaSchema.index({ globalMediaBidTop: -1 });
+mediaSchema.index({ globalMediaAggregateTop: -1 });
 mediaSchema.index({ addedBy: 1 });
 mediaSchema.index({ "sources.youtube": 1 });
 mediaSchema.index({ "sources.spotify": 1 });
@@ -339,7 +342,7 @@ mediaSchema.virtual('summary').get(function() {
     coverArt: this.coverArt,
     contentType: this.contentType,
     contentForm: this.contentForm,
-    globalBidValue: this.globalBidValue || 0,
+    globalMediaAggregate: this.globalMediaAggregate || 0,
     topBids
   };
 });

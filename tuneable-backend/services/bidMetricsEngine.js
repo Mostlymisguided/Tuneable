@@ -241,9 +241,7 @@ class BidMetricsEngine {
     return context;
   }
 
-  async _computeTopMetric(metricName, params) {
-    const config = BidMetricsSchema.getMetricConfig(metricName);
-    
+  async _computeTopMetric(metricName, params, config) {
     // Build query based on metric requirements
     const query = { status: { $in: ['active', 'played'] } };
     
@@ -264,11 +262,51 @@ class BidMetricsEngine {
       ];
       
       const result = await Bid.aggregate(aggregationPipeline);
-      return result.length > 0 ? result[0].total : 0;
+      const amount = result.length > 0 ? result[0].total : 0;
+      
+      // Build full context
+      const context = { amount, currency: 'GBP' };
+      
+      // Add user information if available
+      if (result.length > 0 && result[0]._id) {
+        const user = await User.findById(result[0]._id).select('username uuid');
+        if (user) {
+          context.userId = user._id;
+          context.userUuid = user.uuid;
+          context.username = user.username;
+        }
+      }
+      
+      return context;
     } else {
       // For individual bid top metrics
       const result = await Bid.findOne(query).sort({ amount: -1 });
-      return result ? result.amount : 0;
+      const amount = result ? result.amount : 0;
+      
+      // Build full context
+      const context = { amount, currency: 'GBP' };
+      
+      // Add user information if available
+      if (result && result.userId) {
+        const user = await User.findById(result.userId).select('username uuid');
+        if (user) {
+          context.userId = user._id;
+          context.userUuid = user.uuid;
+          context.username = user.username;
+        }
+      }
+      
+      // Add party information if available
+      if (result && result.partyId) {
+        const party = await Party.findById(result.partyId).select('name uuid');
+        if (party) {
+          context.partyId = party._id;
+          context.partyUuid = party.uuid;
+          context.partyName = party.name;
+        }
+      }
+      
+      return context;
     }
   }
 
@@ -313,13 +351,25 @@ class BidMetricsEngine {
 
   async _updateGlobalMediaMetric(metricName, bidData, operation) {
     const mediaId = bidData.mediaId;
-    const newValue = await this.computeMetric(metricName, { mediaId });
+    const result = await this.computeMetric(metricName, { mediaId });
     
-    // Update Media model with the new metric value
-    const updateField = this._getMetricFieldName(metricName);
-    await Media.findByIdAndUpdate(mediaId, { [updateField]: newValue });
+    // Update Media model with the new metric value and user references
+    const updateFields = {};
+    const fieldName = this._getMetricFieldName(metricName);
     
-    console.log(`📊 Updated ${metricName} for media ${mediaId}: ${newValue}`);
+    // Store the main metric value
+    updateFields[fieldName] = result.amount;
+    
+    // Store user references for gamification (if applicable)
+    if (metricName === 'GlobalMediaBidTop' && result.userId) {
+      updateFields.globalMediaBidTopUser = result.userId;
+    } else if (metricName === 'GlobalMediaAggregateTop' && result.userId) {
+      updateFields.globalMediaAggregateTopUser = result.userId;
+    }
+    
+    await Media.findByIdAndUpdate(mediaId, updateFields);
+    
+    console.log(`📊 Updated ${metricName} for media ${mediaId}: ${result.amount}`);
   }
 
   async _updatePartyMediaMetric(metricName, bidData, operation) {
