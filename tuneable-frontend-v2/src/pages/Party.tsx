@@ -4,14 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
-import { partyAPI } from '../lib/api';
+import { partyAPI, searchAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TopBidders from '../components/TopBidders';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, RefreshCw } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, RefreshCw, Loader2, Youtube } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -72,6 +72,19 @@ const Party: React.FC = () => {
   
   // Search state
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>([]);
+  
+  // Inline add song search state
+  const [showAddSongPanel, setShowAddSongPanel] = useState(false);
+  const [addSongSearchQuery, setAddSongSearchQuery] = useState('');
+  const [addSongResults, setAddSongResults] = useState<{
+    database: any[];
+    youtube: any[];
+  }>({ database: [], youtube: [] });
+  const [isSearchingNewSongs, setIsSearchingNewSongs] = useState(false);
+  const [isLoadingMoreYouTube, setIsLoadingMoreYouTube] = useState(false);
+  const [youtubeNextPageToken, setYoutubeNextPageToken] = useState<string | null>(null);
+  const [newSongBidAmounts, setNewSongBidAmounts] = useState<Record<string, number>>({});
+  
   const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
@@ -438,6 +451,142 @@ const Party: React.FC = () => {
   const handleTimePeriodChange = (timePeriod: string) => {
     setSelectedTimePeriod(timePeriod);
     fetchSortedSongs(timePeriod);
+  };
+
+  // Inline add song search functions
+  const handleAddSongSearch = async () => {
+    if (!addSongSearchQuery.trim()) return;
+    
+    setIsSearchingNewSongs(true);
+    try {
+      const musicSource = party?.musicSource || 'youtube';
+      
+      // Search local database first
+      console.log('🔍 Searching for new songs:', addSongSearchQuery);
+      const response = await searchAPI.search(addSongSearchQuery, musicSource);
+      
+      let databaseResults = [];
+      let youtubeResults = [];
+      
+      if (response.source === 'local' && response.videos) {
+        databaseResults = response.videos;
+        console.log(`📚 Found ${databaseResults.length} results in database`);
+      } else if (response.source === 'external' && response.videos) {
+        youtubeResults = response.videos;
+        console.log(`🎥 Found ${youtubeResults.length} results from YouTube`);
+      }
+      
+      // If we got local results but want to show YouTube too, fetch YouTube
+      if (databaseResults.length > 0 && response.hasMoreExternal) {
+        console.log('🎥 Also fetching YouTube results...');
+        const youtubeResponse = await searchAPI.search(addSongSearchQuery, musicSource, undefined, undefined, true);
+        if (youtubeResponse.videos) {
+          youtubeResults = youtubeResponse.videos;
+          setYoutubeNextPageToken(youtubeResponse.nextPageToken || null);
+          console.log(`🎥 Found ${youtubeResults.length} YouTube results`);
+        }
+      } else if (response.source === 'external') {
+        // Track next page token for YouTube results
+        setYoutubeNextPageToken(response.nextPageToken || null);
+      }
+      
+      setAddSongResults({ database: databaseResults, youtube: youtubeResults });
+      
+      // Initialize bid amounts for results
+      const minBid = party?.minimumBid || 0.33;
+      const newBidAmounts: Record<string, number> = {};
+      [...databaseResults, ...youtubeResults].forEach(song => {
+        newBidAmounts[song.id] = minBid;
+      });
+      setNewSongBidAmounts(newBidAmounts);
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Search failed. Please try again.');
+    } finally {
+      setIsSearchingNewSongs(false);
+    }
+  };
+
+  const handleLoadMoreYouTube = async () => {
+    if (!youtubeNextPageToken || !addSongSearchQuery) return;
+    
+    setIsLoadingMoreYouTube(true);
+    try {
+      const musicSource = party?.musicSource || 'youtube';
+      const response = await searchAPI.search(addSongSearchQuery, musicSource, youtubeNextPageToken, undefined, true);
+      
+      if (response.videos) {
+        // Append new results to existing YouTube results
+        setAddSongResults(prev => ({
+          ...prev,
+          youtube: [...prev.youtube, ...response.videos]
+        }));
+        
+        setYoutubeNextPageToken(response.nextPageToken || null);
+        
+        // Initialize bid amounts for new results
+        const minBid = party?.minimumBid || 0.33;
+        const newBidAmounts: Record<string, number> = { ...newSongBidAmounts };
+        response.videos.forEach((song: any) => {
+          if (!newBidAmounts[song.id]) {
+            newBidAmounts[song.id] = minBid;
+          }
+        });
+        setNewSongBidAmounts(newBidAmounts);
+        
+        console.log(`✅ Loaded ${response.videos.length} more YouTube results`);
+      }
+    } catch (error) {
+      console.error('Error loading more YouTube results:', error);
+      toast.error('Failed to load more results');
+    } finally {
+      setIsLoadingMoreYouTube(false);
+    }
+  };
+
+  const handleAddSongToParty = async (song: any) => {
+    if (!partyId) return;
+    
+    const bidAmount = newSongBidAmounts[song.id] || party?.minimumBid || 0.33;
+    
+    try {
+      // Get the appropriate URL based on music source
+      const musicSource = party?.musicSource || 'youtube';
+      let url = '';
+      
+      if (musicSource === 'youtube' && song.sources?.youtube) {
+        url = song.sources.youtube;
+      } else if (musicSource === 'spotify' && song.sources?.spotify) {
+        url = song.sources.spotify;
+      } else if (song.sources) {
+        // Fallback to first available source
+        url = Object.values(song.sources)[0] as string;
+      }
+      
+      await partyAPI.addMediaToParty(partyId, {
+        url,
+        title: song.title,
+        artist: song.artist,
+        bidAmount,
+        platform: musicSource,
+        duration: song.duration,
+        tags: song.tags || [],
+        category: song.category || 'Music'
+      });
+      
+      toast.success(`Added ${song.title} to party with £${bidAmount.toFixed(2)} bid!`);
+      
+      // Close search panel and refresh party
+      setShowAddSongPanel(false);
+      setAddSongSearchQuery('');
+      setAddSongResults({ database: [], youtube: [] });
+      fetchPartyDetails();
+      
+    } catch (error: any) {
+      console.error('Error adding song:', error);
+      toast.error(error.response?.data?.error || 'Failed to add song to party');
+    }
   };
 
   // Helper to get media items (support both old songs and new media)
@@ -853,13 +1002,6 @@ const Party: React.FC = () => {
           >
             Vetoed ({getPartyMedia().filter((song: any) => song.status === 'vetoed').length})
           </button>
-          <button 
-            onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-            className="px-4 py-2 shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
-            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-          >
-            Add Songs
-          </button>
           
           {/* Manual refresh button for remote parties */}
           {party.type === 'remote' && (
@@ -907,23 +1049,16 @@ const Party: React.FC = () => {
         {/* Song Queue */}
         <div className="lg:col-span-2">
           {/* Host Controls */}
-          {isHost && (
+         {isHost && (
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-4">
-                <button
-                  onClick={handleResetSongs}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span>Reset Songs</span>
-                </button>
-                <button
+                {/* <button
                   onClick={() => setEndPartyModalOpen(true)}
                   className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
                 >
                   <X className="h-4 w-4" />
                   <span>End Party</span>
-                </button>
+                </button> */}
               </div>
             </div>
           )}
@@ -1080,13 +1215,185 @@ const Party: React.FC = () => {
                     {/* Add Song Button - Centered */}
                     <div className="flex justify-center mt-4">
                       <button
-                        onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-                        className="flex items-center space-x-2 p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                        onClick={() => setShowAddSongPanel(!showAddSongPanel)}
+                        className={`flex items-center space-x-2 p-2 rounded-lg font-medium transition-all shadow-lg ${
+                          showAddSongPanel 
+                            ? 'bg-gray-600 hover:bg-gray-700 text-slate' 
+                            : 'bg-purple-600 hover:bg-purple-700 text-white' 
+                        }`} 
                       >
-                        <Plus className="h-4 w-4" />
-                        <span>Add Song</span>
+                        {showAddSongPanel ? (
+                          <>
+                            <X className="h-4 w-4" />
+                            <span>Close Search</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4" />
+                            <span>Add Song</span>
+                          </>
+                        )}
                       </button>
                     </div>
+                    
+                    {/* Inline Add Song Search Panel */}
+                    {showAddSongPanel && (
+                      <div className="bg-gray-800 justify-center text-center rounded-lg border border-gray-700 p-4 shadow-xl">
+                        <h3 className="text-lg font-semibold text-white mb-4">Search for Songs to Add</h3>
+                        
+                        {/* Search Input */}
+                        <div className="flex justify-center gap-2 mb-4">
+                          <input
+                            type="text"
+                            value={addSongSearchQuery}
+                            onChange={(e) => setAddSongSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddSongSearch();
+                              }
+                            }}
+                            placeholder="Search for songs on YouTube or in our library..."
+                            className="flex-1 bg-gray-900 border border-gray-600 rounded-full p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                          />
+                         
+                        </div>
+                        <div className="flex justify-center">
+                        <button
+                            onClick={handleAddSongSearch}
+                            disabled={isSearchingNewSongs || !addSongSearchQuery.trim()}
+                            className="flex p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                          >
+                            {isSearchingNewSongs ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              'Search'
+                            )}
+                          </button>
+                          </div>
+
+                        {/* Database Results */}
+                        {addSongResults.database.length > 0 && (
+                          <div className="mb-4">
+                            <div className="flex items-center mb-2">
+                              <Music className="h-4 w-4 text-green-400 mr-2" />
+                              <h4 className="text-sm font-semibold text-green-300">From Tuneable Library ({addSongResults.database.length})</h4>
+                            </div>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {addSongResults.database.map((song: any) => (
+                                <div key={song.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                    <img
+                                      src={song.coverArt || '/default-cover.jpg'}
+                                      alt={song.title}
+                                      className="h-12 w-12 rounded object-cover flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-white font-medium truncate">{song.title}</p>
+                                      <p className="text-gray-400 text-sm truncate">{song.artist}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min={party?.minimumBid || 0.33}
+                                      value={newSongBidAmounts[song.id] || party?.minimumBid || 0.33}
+                                      onChange={(e) => setNewSongBidAmounts({
+                                        ...newSongBidAmounts,
+                                        [song.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                      })}
+                                      className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                    />
+                                    <button
+                                      onClick={() => handleAddSongToParty(song)}
+                                      className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
+                                    >
+                                      Add £{(newSongBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* YouTube Results */}
+                        {addSongResults.youtube.length > 0 && (
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <Youtube className="h-4 w-4 text-red-400 mr-2" />
+                              <h4 className="text-sm font-semibold text-red-300">From YouTube ({addSongResults.youtube.length})</h4>
+                            </div>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {addSongResults.youtube.map((song: any) => (
+                                <div key={song.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                    <img
+                                      src={song.coverArt || '/default-cover.jpg'}
+                                      alt={song.title}
+                                      className="h-12 w-12 rounded object-cover flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-white font-medium truncate">{song.title}</p>
+                                      <p className="text-gray-400 text-sm truncate">{song.artist}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min={party?.minimumBid || 0.33}
+                                      value={newSongBidAmounts[song.id] || party?.minimumBid || 0.33}
+                                      onChange={(e) => setNewSongBidAmounts({
+                                        ...newSongBidAmounts,
+                                        [song.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                      })}
+                                      className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                    />
+                                    <button
+                                      onClick={() => handleAddSongToParty(song)}
+                                      className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                                    >
+                                      Add £{(newSongBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* Show More Button for YouTube */}
+                            {youtubeNextPageToken && (
+                              <div className="mt-8 text-center">
+                                <button
+                                  onClick={handleLoadMoreYouTube}
+                                  disabled={isLoadingMoreYouTube}
+                                  className="p-3 bg-red-700 hover:bg-red-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray rounded-lg font-medium transition-colors"
+                                >
+                                  {isLoadingMoreYouTube ? (
+                                    <span className="flex items-center space-x-2">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span>Loading...</span>
+                                    </span>
+                                  ) : (
+                                    'Show More YouTube Results'
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* No Results Message */}
+                        {!isSearchingNewSongs && addSongSearchQuery && addSongResults.database.length === 0 && addSongResults.youtube.length === 0 && (
+                          <div className="text-center py-8">
+                            <Music className="h-12 w-12 text-gray-500 mx-auto mb-3" />
+                            <p className="text-gray-400">No songs found for "{addSongSearchQuery}"</p>
+                            <p className="text-gray-500 text-sm mt-1">Try a different search term</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1203,7 +1510,7 @@ const Party: React.FC = () => {
                                   </div>
                                 </div>
                                 
-                                {/* Top Bid Metrics */}
+                                {/* Top Bid Metrics 
                                 <div className="mt-2 p-2 bg-gray-800 rounded-lg">
                                   <div className="text-xs text-gray-400 mb-1">Top Bids</div>
                                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1232,7 +1539,7 @@ const Party: React.FC = () => {
                                       </div>
                                     </div>
                                   </div>
-                                </div>
+                                </div> */}
                                 <button
                                   onClick={() => handleBidClick(song)}
                                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
@@ -1243,7 +1550,7 @@ const Party: React.FC = () => {
                                 {isHost && (
                                   <button
                                     onClick={() => handleVetoClick(song)}
-                                    className="w-10 h-10 bg-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/30 transition-all duration-200 rounded-lg flex items-center justify-center group relative"
+                                    className="w-10 h-10 bg-red-500/20 bg-slate-600"
                                     title="Veto this song"
                                   >
                                     <X className="h-5 w-5" />
