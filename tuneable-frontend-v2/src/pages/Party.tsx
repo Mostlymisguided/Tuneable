@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -10,8 +10,6 @@ import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TopBidders from '../components/TopBidders';
-import YouTubePlayer from '../components/YouTubePlayer';
-import { setGlobalYouTubePlayerRef } from '../components/PersistentWebPlayer';
 import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, Loader2, Youtube } from 'lucide-react';
 
@@ -90,9 +88,6 @@ const Party: React.FC = () => {
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, number>>({});
   
-  // Ref for seeking state to prevent time updates during seek
-  const isSeeking = useRef(false);
-  
   const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
@@ -118,11 +113,6 @@ const Party: React.FC = () => {
     setGlobalPlayerActive,
     currentPartyId,
     currentSong,
-    isPlaying,
-    volume,
-    isMuted,
-    setCurrentTime,
-    setDuration,
   } = useWebPlayerStore();
 
   // Only use WebSocket for live parties
@@ -1853,51 +1843,7 @@ const Party: React.FC = () => {
         </div>
       )}
 
-      {/* YouTube Player - Only show when YouTube video is playing */}
-      {currentSong && currentSong.sources?.youtube && (
-        <YouTubePlayer 
-          ref={(ref) => {
-            // Set the global ref for PersistentWebPlayer to use
-            setGlobalYouTubePlayerRef(ref);
-          }}
-          videoUrl={currentSong.sources.youtube} 
-          className="mt-12"
-          isPlaying={isPlaying}
-          volume={volume}
-          isMuted={isMuted}
-          onStateChange={(state) => {
-            console.log('YouTube state change:', state);
-            // Handle song end - advance to next song
-            if (state === 0) { // YT.PlayerState.ENDED = 0
-              console.log('YouTube video ended, advancing to next song');
-              const { next, currentPartyId, currentSong, isHost } = useWebPlayerStore.getState();
-              if (currentPartyId && currentSong?.id && isHost) {
-                console.log('Notifying backend that song completed');
-                partyAPI.completeSong(currentPartyId, currentSong.id)
-                  .then(() => {
-                    console.log('Song completion confirmed, advancing to next song');
-                    next();
-                  })
-                  .catch(error => {
-                    console.error('Error notifying song completion:', error);
-                    next();
-                  });
-              } else {
-                console.log('Not host or no party/song, just advancing to next song');
-                next();
-              }
-            }
-          }}
-          onTimeUpdate={(currentTime, duration) => {
-            if (!isSeeking.current) {
-              setCurrentTime(currentTime);
-            }
-            if (duration !== undefined) {
-              setDuration(duration);
-            }
-          }}
-        />
-      )}
+      {/* YouTube Player is now integrated back into PersistentWebPlayer component */}
 
       {/* Footer */}
       <div className="bg-gray-800 border-t border-gray-700 mt-12">

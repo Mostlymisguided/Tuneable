@@ -59,12 +59,11 @@ const extractSourceUrl = (song: any, playerType: string): string | null => {
 };
 
 // Extract YouTube video ID from URL
-// NOTE: Currently unused - YouTube player is now handled by external YouTubePlayer component
-// const getYouTubeVideoId = (url: string): string | null => {
-//   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-//   const match = url.match(regExp);
-//   return match && match[2].length === 11 ? match[2] : null;
-// };
+const getYouTubeVideoId = (url: string): string | null => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+};
 
 // Global flag to prevent multiple instances in StrictMode
 let activePlayerInstance: string | null = null;
@@ -78,8 +77,7 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 };
 
 const PersistentWebPlayer: React.FC = () => {
-  // NOTE: playerRef only used by commented-out YouTube player code
-  // const playerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -182,16 +180,6 @@ const PersistentWebPlayer: React.FC = () => {
 
   // Time polling effect - polls player every 500ms to update currentTime
   useEffect(() => {
-    // YouTube time updates are handled by external YouTubePlayer component via onTimeUpdate
-    // Only poll for audio player
-    if (playerType === 'youtube') {
-      if (timePollingRef.current) {
-        clearInterval(timePollingRef.current);
-        timePollingRef.current = null;
-      }
-      return;
-    }
-
     if (!isPlayerReady || !isPlaying || isSeeking.current) {
       if (timePollingRef.current) {
         clearInterval(timePollingRef.current);
@@ -200,10 +188,17 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
-    // Start polling for audio player only
+    // Start polling
     timePollingRef.current = setInterval(() => {
       try {
-        if (playerType === 'audio' && audioRef.current) {
+        if (playerType === 'youtube' && youtubePlayerRef.current) {
+          const current = youtubePlayerRef.current.getCurrentTime();
+          const dur = youtubePlayerRef.current.getDuration();
+          setCurrentTime(current);
+          if (dur && dur !== duration) {
+            setDuration(dur);
+          }
+        } else if (playerType === 'audio' && audioRef.current) {
           const current = audioRef.current.currentTime;
           const dur = audioRef.current.duration;
           setCurrentTime(current);
@@ -273,18 +268,17 @@ const PersistentWebPlayer: React.FC = () => {
     setPlayerType(detectedPlayerType);
 
     if (detectedPlayerType === 'youtube') {
-      // YouTube player is now handled by the external YouTubePlayer component
-      // rendered in the Party page. Just set the player as ready.
-      console.log('YouTube player type detected - using external YouTubePlayer component');
-      setIsPlayerReady(true);
+      const videoId = getYouTubeVideoId(sourceUrl);
+      if (!videoId) {
+        console.log('No valid YouTube video ID found for:', sourceUrl);
+        return;
+      }
+      initializeYouTubePlayer(videoId);
     } else if (detectedPlayerType === 'audio') {
       initializeAudioPlayer(sourceUrl);
     }
   }, [currentSong, isGlobalPlayerActive]);
 
-  // NOTE: YouTube player initialization moved to external YouTubePlayer component
-  // This function is no longer used but kept for reference
-  /*
   const initializeYouTubePlayer = (videoId: string) => {
     console.log('Initializing YouTube player with video ID:', videoId);
 
@@ -380,7 +374,6 @@ const PersistentWebPlayer: React.FC = () => {
       window.onYouTubeIframeAPIReady = initializePlayer;
     }
   };
-  */
 
   const initializeAudioPlayer = (audioUrl: string) => {
     console.log('Initializing HTML5 audio player with URL:', audioUrl);
@@ -446,19 +439,11 @@ const PersistentWebPlayer: React.FC = () => {
     if (isPlayerReady) {
       console.log('Updating player state, isPlaying:', isPlaying, 'playerType:', playerType);
       try {
-        if (playerType === 'youtube') {
-          if (globalYouTubePlayerRef && typeof globalYouTubePlayerRef.playVideo === 'function' && typeof globalYouTubePlayerRef.pauseVideo === 'function') {
-            if (isPlaying) {
-              globalYouTubePlayerRef.playVideo();
-            } else {
-              globalYouTubePlayerRef.pauseVideo();
-            }
-          } else if (youtubePlayerRef.current) {
-            if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
-              youtubePlayerRef.current.playVideo();
-            } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
-              youtubePlayerRef.current.pauseVideo();
-            }
+        if (playerType === 'youtube' && youtubePlayerRef.current) {
+          if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
+            youtubePlayerRef.current.playVideo();
+          } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
+            youtubePlayerRef.current.pauseVideo();
           }
         } else if (playerType === 'audio' && audioRef.current) {
           if (isPlaying) {
@@ -477,21 +462,12 @@ const PersistentWebPlayer: React.FC = () => {
   useEffect(() => {
     if (isPlayerReady) {
       try {
-        if (playerType === 'youtube') {
-          if (globalYouTubePlayerRef && typeof globalYouTubePlayerRef.setVolume === 'function') {
-            globalYouTubePlayerRef.setVolume(volume);
-            if (isMuted && typeof globalYouTubePlayerRef.mute === 'function') {
-              globalYouTubePlayerRef.mute();
-            } else if (!isMuted && typeof globalYouTubePlayerRef.unMute === 'function') {
-              globalYouTubePlayerRef.unMute();
-            }
-          } else if (youtubePlayerRef.current) {
-            youtubePlayerRef.current.setVolume(volume);
-            if (isMuted) {
-              youtubePlayerRef.current.mute();
-            } else {
-              youtubePlayerRef.current.unMute();
-            }
+        if (playerType === 'youtube' && youtubePlayerRef.current) {
+          youtubePlayerRef.current.setVolume(volume);
+          if (isMuted) {
+            youtubePlayerRef.current.mute();
+          } else {
+            youtubePlayerRef.current.unMute();
           }
         } else if (playerType === 'audio' && audioRef.current) {
           audioRef.current.volume = volume / 100;
@@ -531,12 +507,8 @@ const PersistentWebPlayer: React.FC = () => {
     setCurrentTime(newTime);
     
     try {
-      if (playerType === 'youtube') {
-        if (globalYouTubePlayerRef && typeof globalYouTubePlayerRef.seekTo === 'function') {
-          globalYouTubePlayerRef.seekTo(newTime);
-        } else if (youtubePlayerRef.current) {
-          youtubePlayerRef.current.seekTo(newTime);
-        }
+      if (playerType === 'youtube' && youtubePlayerRef.current) {
+        youtubePlayerRef.current.seekTo(newTime);
       } else if (playerType === 'audio' && audioRef.current) {
         audioRef.current.currentTime = newTime;
       }
@@ -575,7 +547,23 @@ const PersistentWebPlayer: React.FC = () => {
 
   return (
     <>
-      {/* YouTube player is now rendered in main content area, not here */}
+      {/* YouTube Player - Portal to bottom of page, above footer */}
+      {playerType === 'youtube' && (
+        <div 
+          className="bg-gray-900 border-t border-gray-700"
+          style={{
+            position: 'fixed',
+            bottom: '120px', // Above the player controls (controls are ~100px tall)
+            left: 0,
+            right: 0,
+            zIndex: 50, // Below player controls but above page content
+          }}
+        >
+          <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4">
+            <div ref={playerRef} className="w-full aspect-video max-h-[270px] bg-gray-800 rounded-lg overflow-hidden shadow-2xl" />
+          </div>
+        </div>
+      )}
 
       {/* HTML5 Audio Player (always hidden, no visual) */}
       {playerType === 'audio' && (
