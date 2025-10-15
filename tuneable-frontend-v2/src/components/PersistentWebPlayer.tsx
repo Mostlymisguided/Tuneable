@@ -78,7 +78,8 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 };
 
 const PersistentWebPlayer: React.FC = () => {
-  const playerRef = useRef<HTMLDivElement>(null);
+  // NOTE: playerRef only used by commented-out YouTube player code
+  // const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
