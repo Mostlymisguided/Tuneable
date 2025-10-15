@@ -10,6 +10,7 @@ import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TopBidders from '../components/TopBidders';
+import YouTubePlayer from '../components/YouTubePlayer';
 import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, RefreshCw, Loader2, Youtube } from 'lucide-react';
 
@@ -1852,6 +1853,14 @@ const Party: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* YouTube Player - Only show when YouTube video is playing */}
+      {currentSong && currentSong.sources?.youtube && (
+        <YouTubePlayer 
+          videoUrl={currentSong.sources.youtube} 
+          className="mt-12"
+        />
       )}
 
       {/* Footer */}
