@@ -85,6 +85,9 @@ const Party: React.FC = () => {
   const [youtubeNextPageToken, setYoutubeNextPageToken] = useState<string | null>(null);
   const [newSongBidAmounts, setNewSongBidAmounts] = useState<Record<string, number>>({});
   
+  // Queue bidding state (for inline bidding on queue items)
+  const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, number>>({});
+  
   const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
@@ -411,7 +414,7 @@ const Party: React.FC = () => {
   };
 
   // Alias for consistency
-  const fetchParty = fetchPartyDetails;
+  // const fetchParty = fetchPartyDetails; // OLD - no longer used
 
   const copyPartyCode = () => {
     if (party?.partyCode) {
@@ -636,12 +639,40 @@ const Party: React.FC = () => {
     return songs;
   };
 
-  // Bid handling functions
-  const handleBidClick = (song: any) => {
-    // Handle both old songs (songId) and new media (mediaId) structure
+  // Bid handling functions (OLD - using bid modal, now replaced with inline bidding)
+  // const handleBidClick = (song: any) => {
+  //   const songData = song.mediaId || song.songId || song;
+  //   setSelectedSong(songData);
+  //   setBidModalOpen(true);
+  // };
+
+  const handleInlineBid = async (song: any) => {
+    if (!partyId) return;
+    
     const songData = song.mediaId || song.songId || song;
-    setSelectedSong(songData);
-    setBidModalOpen(true);
+    const songId = songData._id || songData.id;
+    const bidAmount = queueBidAmounts[songId] || party?.minimumBid || 0.33;
+    
+    setIsBidding(true);
+    try {
+      await partyAPI.placeBid(partyId, songId, bidAmount);
+      toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${songData.title}!`);
+      
+      // Refresh party to show updated bid values
+      await fetchPartyDetails();
+      
+      // Reset bid amount for this song back to minimum
+      setQueueBidAmounts(prev => ({
+        ...prev,
+        [songId]: party?.minimumBid || 0.33
+      }));
+      
+    } catch (error: any) {
+      console.error('Bid error:', error);
+      toast.error(error.response?.data?.error || 'Failed to place bid');
+    } finally {
+      setIsBidding(false);
+    }
   };
 
   const handleVetoClick = async (song: any) => {
@@ -683,26 +714,23 @@ const Party: React.FC = () => {
   };
 
 
-  const handleResetSongs = async () => {
-    if (!isHost) {
-      toast.error('Only the host can reset songs');
-      return;
-    }
-
-    const confirmed = window.confirm('Are you sure you want to reset all songs to queued status? This will clear all play history.');
-    
-    if (!confirmed) return;
-
-    try {
-      await partyAPI.resetSongs(partyId!);
-      toast.success('All songs reset to queued status');
-      // Refresh party data
-      fetchParty();
-    } catch (error: any) {
-      console.error('Error resetting songs:', error);
-      toast.error(error.response?.data?.error || 'Failed to reset songs');
-    }
-  };
+  // OLD - Reset Songs function (commented out as button was removed)
+  // const handleResetSongs = async () => {
+  //   if (!isHost) {
+  //     toast.error('Only the host can reset songs');
+  //     return;
+  //   }
+  //   const confirmed = window.confirm('Are you sure you want to reset all songs to queued status? This will clear all play history.');
+  //   if (!confirmed) return;
+  //   try {
+  //     await partyAPI.resetSongs(partyId!);
+  //     toast.success('All songs reset to queued status');
+  //     fetchParty();
+  //   } catch (error: any) {
+  //     console.error('Error resetting songs:', error);
+  //     toast.error(error.response?.data?.error || 'Failed to reset songs');
+  //   }
+  // };
 
   const handleBidConfirm = async (bidAmount: number) => {
     if (!selectedSong || !partyId) return;
@@ -1540,13 +1568,28 @@ const Party: React.FC = () => {
                                     </div>
                                   </div>
                                 </div> */}
-                                <button
-                                  onClick={() => handleBidClick(song)}
-                                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-                                  disabled={isBidding}
-                                >
-                                  <span>Bid</span>
-                                </button>
+                                {/* Inline Bidding */}
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min={party?.minimumBid || 0.33}
+                                    value={queueBidAmounts[songData._id || songData.id] || party?.minimumBid || 0.33}
+                                    onChange={(e) => setQueueBidAmounts({
+                                      ...queueBidAmounts,
+                                      [songData._id || songData.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                    })}
+                                    className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <button
+                                    onClick={() => handleInlineBid(song)}
+                                    disabled={isBidding}
+                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm"
+                                  >
+                                    Bid £{(queueBidAmounts[songData._id || songData.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                  </button>
+                                </div>
                                 {isHost && (
                                   <button
                                     onClick={() => handleVetoClick(song)}
