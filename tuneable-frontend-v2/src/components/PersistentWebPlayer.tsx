@@ -73,7 +73,15 @@ const PersistentWebPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [playerType, setPlayerType] = useState<'youtube' | 'audio' | null>(null);
-  const [showYouTubePlayer, setShowYouTubePlayer] = useState(false);
+  // Function to scroll to YouTube player
+  const scrollToYouTubePlayer = () => {
+    if (playerType === 'youtube' && playerRef.current) {
+      playerRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  };
   const timePollingRef = useRef<NodeJS.Timeout | null>(null);
   const isSeeking = useRef(false);
   
@@ -308,8 +316,7 @@ const PersistentWebPlayer: React.FC = () => {
                 setDuration(dur);
                 setIsPlayerReady(true);
                 
-                // Auto-show the YouTube player when a video starts
-                setShowYouTubePlayer(true);
+                // YouTube player is always rendered when active
                 
                 if (isPlaying) {
                   console.log('Auto-playing video...');
@@ -529,17 +536,12 @@ const PersistentWebPlayer: React.FC = () => {
 
   return (
     <>
-      {/* Video Player Container - Bottom Right with Toggle */}
-      {playerType === 'youtube' && showYouTubePlayer && (
-        <div className="fixed bottom-20 right-4 z-50 bg-gray-900 rounded-lg shadow-2xl overflow-hidden w-[480px] h-[270px]">
-          <div ref={playerRef} className="w-full h-full" />
-          <button 
-            onClick={() => setShowYouTubePlayer(false)}
-            className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700 transition-colors"
-            title="Close YouTube Player"
-          >
-            ×
-          </button>
+      {/* Video Player Container - Bottom of page */}
+      {playerType === 'youtube' && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900 border-t border-gray-700">
+          <div className="max-w-4xl mx-auto p-4">
+            <div ref={playerRef} className="w-full h-[270px] bg-gray-800 rounded-lg overflow-hidden" />
+          </div>
         </div>
       )}
 
@@ -710,13 +712,9 @@ const PersistentWebPlayer: React.FC = () => {
               {/* YouTube Player Toggle Button */}
               {playerType === 'youtube' && (
                 <button 
-                  onClick={() => setShowYouTubePlayer(!showYouTubePlayer)}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    showYouTubePlayer 
-                      ? 'bg-red-600 text-white' 
-                      : 'bg-white text-gray-900'
-                  }`}
-                  title={showYouTubePlayer ? "Hide YouTube Player" : "Show YouTube Player"}
+                  onClick={scrollToYouTubePlayer}
+                  className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-white text-gray-900 hover:bg-red-50"
+                  title="Scroll to YouTube Player"
                 >
                   <Youtube className="h-5 w-5" />
                 </button>
