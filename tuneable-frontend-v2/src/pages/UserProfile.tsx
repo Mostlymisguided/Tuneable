@@ -214,8 +214,8 @@ const UserProfile: React.FC = () => {
               )}
 
               {/* Member Since */}
-              <div className="bg-black/20 rounded-full px-4 py-2 inline-flex items-center mb-4">
-                <div className="text-sm text-gray-300 mb-2">Joined</div>
+              <div className="rounded-full px-4 py-2 inline-flex items-center mb-4">
+                <div className="text-sm text-gray-300 mr-2">Joined</div>
                 <span className="px-2 py-2 bg-purple-600 text-white text-xs rounded-full font-semibold">
                   {formatJoinDate(user.createdAt)}
                 </span>

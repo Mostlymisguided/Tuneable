@@ -13,17 +13,17 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/10 shadow-lg border-purple-400">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/80 shadow-lg border-b border-purple-400">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-12 sm:h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
-              <Music className="h-8 w-8 text-purple-400" />
-              <span className="text-xl font-bold text-white">Tuneable</span>
+              <Music className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
+              <span className="text-lg sm:text-xl font-bold text-white">Tuneable</span>
             </Link>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1 sm:space-x-3">
             {user ? (
               <>
                 <Link
@@ -37,14 +37,14 @@ const Navbar: React.FC = () => {
                   <>
                     <Link
                       to="/admin"
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-colors"
+                      className="hidden sm:block px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
                       Admin Panel
                     </Link>
                     <Link
                       to="/create-party"
-                      className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                      className="hidden sm:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
                       style={{ textDecoration: 'none' }}
                       onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                       onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
@@ -64,7 +64,7 @@ const Navbar: React.FC = () => {
                 </Link>
                 <Link
                   to="/top-tunes"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  className="hidden md:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
@@ -82,7 +82,7 @@ const Navbar: React.FC = () => {
                 </Link> */}
                 <Link
                   to="/wallet"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  className="hidden lg:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
@@ -91,29 +91,30 @@ const Navbar: React.FC = () => {
                 </Link>
                 <Link
                   to="/about"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  className="hidden lg:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   About
                 </Link>
-                <div className="flex items-center space-x-3 ml-4">
-                  <span className="text-sm text-gray-300">
+                <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-4">
+                  <span className="hidden sm:block text-sm text-gray-300">
                     £{user.balance?.toFixed(2) || '0.00'}
                   </span>
                   <Link
                     to="/profile"
-                    className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                    className="px-2 sm:px-4 py-1 sm:py-2 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                     style={{ textDecoration: 'none' }}
                     onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                     onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                   >
-                    {user.username}
+                    <span className="hidden sm:inline">{user.username}</span>
+                    <span className="sm:hidden">{user.username?.slice(0, 8)}</span>
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="px-3 py-2 text-gray-300 rounded-lg font-medium transition-colors"
+                    className="px-2 sm:px-3 py-1 sm:py-2 text-gray-300 rounded-lg font-medium transition-colors text-sm sm:text-base"
                     style={{ textDecoration: 'none' }}
                     onMouseEnter={(e) => {
                       (e.target as HTMLElement).style.backgroundColor = '#4B5563';
@@ -124,7 +125,8 @@ const Navbar: React.FC = () => {
                       (e.target as HTMLElement).style.color = '#D1D5DB';
                     }}
                   >
-                    Logout
+                    <span className="hidden sm:inline">Logout</span>
+                    <span className="sm:hidden">Out</span>
                   </button>
                 </div>
               </>

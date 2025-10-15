@@ -921,19 +921,19 @@ const Party: React.FC = () => {
   return (
     <div className="min-h-screen">
       {/* Party Header */}
-      <div className="px-6 py-6">
+      <div className="px-3 sm:px-6 py-4 sm:py-6">
         <div className="card max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div className="flex items-center space-x-4 mb-4 sm:mb-0">
               <div>
-                <h1 className="mb-2 text-3xl font-bold text-white">{party.name}</h1>
+                <h1 className="mb-2 text-xl sm:text-3xl font-bold text-white">{party.name}</h1>
                 <div className="p-1 flex items-center space-x-4 mt-1">
-                  <span className="text-gray-300 text-xl">
+                  <span className="text-gray-300 text-sm sm:text-xl">
                     {party.location}
                   </span>
                 </div>
                 <div className="mt-2 mb-2">
-                  <span className="text-gray-400 text-lg">
+                  <span className="text-gray-400 text-sm sm:text-lg">
                     Host: {typeof party.host === 'object' && party.host.username ? party.host.username : 'Unknown Host'}
                   </span>
                 </div>
@@ -944,20 +944,20 @@ const Party: React.FC = () => {
                   </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <button
                 onClick={copyPartyCode}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
+                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
               >
                 <Copy className="h-4 w-4" />
-                <span>{party.partyCode}</span>
+                <span className="text-sm sm:text-base">{party.partyCode}</span>
               </button>
               <button
                 onClick={shareParty}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
+                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
               >
                 <Share2 className="h-4 w-4" />
-                <span>Share</span>
+                <span className="text-sm sm:text-base">Share</span>
               </button>
             </div>
           </div>
@@ -965,47 +965,47 @@ const Party: React.FC = () => {
       </div>
 
       {/* Metrics Cards */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="justify-center flex flex-wrap gap-4 mb-6">
-          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-4">
-              <Music className="h-6 w-6 text-white" />
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-purple-800/50 border border-gray-600 p-3 sm:p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <Music className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               <div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-xl sm:text-2xl font-bold text-white">
                   {getDisplaySongs().length}
                 </div>
-                <div className="text-sm text-gray-300">
+                <div className="text-xs sm:text-sm text-gray-300">
                   {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-4">
-              <Clock className="h-6 w-6 text-white" />
+          <div className="bg-purple-800/50 border border-gray-600 p-3 sm:p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               <div>
-                <div className="text-2xl font-bold text-white">
+                <div className="text-xl sm:text-2xl font-bold text-white">
                   {getPartyMedia().filter((song: any) => song.status === 'played').length}
                 </div>
-                <div className="text-sm text-gray-300">Played</div>
+                <div className="text-xs sm:text-sm text-gray-300">Played</div>
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-4">
-              <Users className="h-6 w-6 text-white" />
+          <div className="bg-purple-800/50 border border-gray-600 p-3 sm:p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               <div>
-                <div className="text-2xl font-bold text-white">{party.attendees.length}</div>
-                <div className="text-sm text-gray-300">Partiers</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{party.attendees.length}</div>
+                <div className="text-xs sm:text-sm text-gray-300">Partiers</div>
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-4">
-              <Coins className="h-6 w-6 text-yellow-400" />
+          <div className="bg-purple-800/50 border border-gray-600 p-3 sm:p-4 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <Coins className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-400" />
               <div>
-                <div className="text-2xl font-bold text-white">£{calculateTotalBids().toFixed(2)}</div>
-                <div className="text-sm text-gray-300">Total Bids</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">£{calculateTotalBids().toFixed(2)}</div>
+                <div className="text-xs sm:text-sm text-gray-300">Total Bids</div>
               </div>
             </div>
           </div>
@@ -1217,8 +1217,8 @@ const Party: React.FC = () => {
                 {/* Sorting Tabs - Only show for Queue, not Vetoed */}
                 {!showVetoed && (
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-white text-center mb-3 p-2">Sort by Time</h3>
-                    <div className="flex flex-wrap gap-2 justify-center">
+                    <h3 className="text-base sm:text-lg font-semibold text-white text-center mb-3 p-2">Sort by Time</h3>
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 justify-center">
                       {[
                         { key: 'all-time', label: 'All Time' },
                         { key: 'this-year', label: 'This Year' },
@@ -1229,7 +1229,7 @@ const Party: React.FC = () => {
                         <button
                           key={period.key}
                           onClick={() => handleTimePeriodChange(period.key)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                             selectedTimePeriod === period.key
                               ? 'bg-purple-600 text-white'
                               : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -1275,11 +1275,11 @@ const Party: React.FC = () => {
                     
                     {/* Inline Add Song Search Panel */}
                     {showAddSongPanel && (
-                      <div className="justify-center text-center rounded-lg p-4 shadow-xl">
-                        <h3 className="text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
+                      <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
+                        <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
                         
                         {/* Search Input */}
-                        <div className="flex justify-center gap-2 mb-4">
+                        <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
                           <input
                             type="text"
                             value={addSongSearchQuery}
@@ -1291,7 +1291,7 @@ const Party: React.FC = () => {
                               }
                             }}
                             placeholder="Search for Tunes on YouTube or in our library..."
-                            className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                            className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                           />
                          
                         </div>
@@ -1299,7 +1299,7 @@ const Party: React.FC = () => {
                         <button
                             onClick={handleAddSongSearch}
                             disabled={isSearchingNewSongs || !addSongSearchQuery.trim()}
-                            className="flex p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                            className="flex p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                           >
                             {isSearchingNewSongs ? (
                               <Loader2 className="h-5 w-5 animate-spin" />
@@ -1882,8 +1882,8 @@ const Party: React.FC = () => {
 
       {/* Footer */}
       <div className="bg-gray-800 border-t border-gray-700 mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-center text-gray-400 text-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
+          <div className="flex items-center justify-center text-gray-400 text-xs sm:text-sm">
             <span>6,968 songs • 35.5 days • 105.72 GB</span>
           </div>
         </div>
