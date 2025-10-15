@@ -179,6 +179,13 @@ export const partyAPI = {
     return response.data;
   },
   
+  searchPartyQueue: async (partyId: string, query: string) => {
+    const response = await api.get(`/parties/${partyId}/search`, {
+      params: { q: query }
+    });
+    return response.data;
+  },
+  
   playSong: async (partyId: string, songId: string) => {
     const response = await api.post(`/parties/${partyId}/songs/${songId}/play`);
     return response.data;

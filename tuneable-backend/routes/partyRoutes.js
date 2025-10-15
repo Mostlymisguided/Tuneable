@@ -312,6 +312,88 @@ router.post('/geocode-address', async (req, res) => {
     }
 });
 
+/**
+ * Route: GET /:partyId/search
+ * Search within party queue media
+ * Access: Protected
+ */
+router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const { q } = req.query;
+
+        if (!q || typeof q !== 'string') {
+            return res.status(400).json({ error: 'Search query (q) is required' });
+        }
+
+        const party = await Party.findById(partyId)
+            .populate({
+                path: 'media.mediaId',
+                model: 'Media',
+                select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm'
+            });
+
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Search through party media
+        const searchTerms = q.toLowerCase().split(' ').filter(t => t.trim());
+        const matchingMedia = [];
+
+        party.media.forEach(mediaEntry => {
+            const media = mediaEntry.mediaId;
+            if (!media) return;
+
+            // Check if ANY search term matches
+            const hasMatch = searchTerms.some(term => {
+                const title = (media.title || '').toLowerCase();
+                const artist = Array.isArray(media.artist)
+                    ? media.artist.map(a => a.name || '').join(' ').toLowerCase()
+                    : '';
+                const tags = Array.isArray(media.tags)
+                    ? media.tags.join(' ').toLowerCase()
+                    : '';
+                const category = (media.category || '').toLowerCase();
+
+                return title.includes(term) ||
+                       artist.includes(term) ||
+                       tags.includes(term) ||
+                       category.includes(term);
+            });
+
+            if (hasMatch) {
+                matchingMedia.push({
+                    id: media._id,
+                    uuid: media.uuid,
+                    title: media.title,
+                    artist: Array.isArray(media.artist) && media.artist.length > 0
+                        ? media.artist[0].name
+                        : 'Unknown Artist',
+                    coverArt: media.coverArt,
+                    duration: media.duration,
+                    sources: media.sources,
+                    globalMediaAggregate: media.globalMediaAggregate || 0,
+                    partyMediaAggregate: mediaEntry.partyMediaAggregate || 0,
+                    tags: media.tags,
+                    category: media.category,
+                    status: mediaEntry.status
+                });
+            }
+        });
+
+        res.json(transformResponse({
+            success: true,
+            results: matchingMedia,
+            count: matchingMedia.length,
+            query: q
+        }));
+
+    } catch (err) {
+        handleError(res, err, 'Failed to search party queue');
+    }
+});
+
 // Route 1: Add new media to party with initial bid
 router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req, res) => {
     try {

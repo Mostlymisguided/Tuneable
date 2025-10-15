@@ -7,6 +7,7 @@ import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
+import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TopBidders from '../components/TopBidders';
 import '../types/youtube'; // Import YouTube types
@@ -1040,6 +1041,18 @@ const Party: React.FC = () => {
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Party Queue Search */}
+                {!showVetoed && party && (
+                  <div className="mb-6">
+                    <PartyQueueSearch
+                      partyId={partyId!}
+                      partyMedia={getPartyMedia()}
+                      musicSource={party.musicSource || 'youtube'}
+                      onBidClick={handleBidClick}
+                    />
                   </div>
                 )}
 
