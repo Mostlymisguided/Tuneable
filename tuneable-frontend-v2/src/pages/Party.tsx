@@ -1081,7 +1081,7 @@ const Party: React.FC = () => {
                     <div className="flex justify-center mt-4">
                       <button
                         onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-                        className="flex items-center space-x-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                        className="flex items-center space-x-2 p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
                       >
                         <Plus className="h-4 w-4" />
                         <span>Add Song</span>
