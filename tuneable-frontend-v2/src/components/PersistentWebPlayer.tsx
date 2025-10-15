@@ -439,7 +439,7 @@ const PersistentWebPlayer: React.FC = () => {
       console.log('Updating player state, isPlaying:', isPlaying, 'playerType:', playerType);
       try {
         if (playerType === 'youtube') {
-          if (globalYouTubePlayerRef) {
+          if (globalYouTubePlayerRef && typeof globalYouTubePlayerRef.playVideo === 'function' && typeof globalYouTubePlayerRef.pauseVideo === 'function') {
             if (isPlaying) {
               globalYouTubePlayerRef.playVideo();
             } else {
@@ -470,11 +470,11 @@ const PersistentWebPlayer: React.FC = () => {
     if (isPlayerReady) {
       try {
         if (playerType === 'youtube') {
-          if (globalYouTubePlayerRef) {
+          if (globalYouTubePlayerRef && typeof globalYouTubePlayerRef.setVolume === 'function') {
             globalYouTubePlayerRef.setVolume(volume);
-            if (isMuted) {
+            if (isMuted && typeof globalYouTubePlayerRef.mute === 'function') {
               globalYouTubePlayerRef.mute();
-            } else {
+            } else if (!isMuted && typeof globalYouTubePlayerRef.unMute === 'function') {
               globalYouTubePlayerRef.unMute();
             }
           } else if (youtubePlayerRef.current) {
@@ -524,7 +524,7 @@ const PersistentWebPlayer: React.FC = () => {
     
     try {
       if (playerType === 'youtube') {
-        if (globalYouTubePlayerRef) {
+        if (globalYouTubePlayerRef && typeof globalYouTubePlayerRef.seekTo === 'function') {
           globalYouTubePlayerRef.seekTo(newTime);
         } else if (youtubePlayerRef.current) {
           youtubePlayerRef.current.seekTo(newTime);
