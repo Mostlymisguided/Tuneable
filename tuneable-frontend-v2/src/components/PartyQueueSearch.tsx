@@ -50,11 +50,13 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
   // Perform search whenever search terms change
   useEffect(() => {
     if (searchTerms.length > 0) {
+      console.log('🔍 Triggering cascading search for terms:', searchTerms);
       performCascadingSearch();
     } else {
       setResults({ queue: [], database: [], external: [] });
       setShowResults(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerms]);
 
   const addSearchTerm = (term: string) => {
@@ -83,22 +85,39 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
 
   const performCascadingSearch = async () => {
     setIsSearching(true);
+    console.log('🚀 Starting cascading search...');
     
     try {
       // Step 1: Search party queue
-      const queueResults = searchPartyQueue();
+      console.log('📀 Step 1: Searching party queue...');
+      const queueResults = await searchPartyQueue();
+      console.log(`✅ Found ${queueResults.length} results in party queue`);
       
       // Step 2: Search local database (if no queue results)
       let databaseResults: SearchResult[] = [];
       if (queueResults.length === 0) {
+        console.log('📚 Step 2: Searching local database...');
         databaseResults = await searchLocalDatabase();
+        console.log(`✅ Found ${databaseResults.length} results in database`);
+      } else {
+        console.log('⏭️  Skipping database search (found queue results)');
       }
       
       // Step 3: Search YouTube (if no database results)
       let externalResults: SearchResult[] = [];
       if (queueResults.length === 0 && databaseResults.length === 0) {
+        console.log('🎥 Step 3: Searching YouTube...');
         externalResults = await searchExternal();
+        console.log(`✅ Found ${externalResults.length} results on YouTube`);
+      } else if (queueResults.length > 0 || databaseResults.length > 0) {
+        console.log('⏭️  Skipping YouTube search (found local results)');
       }
+      
+      console.log('📊 Final results:', {
+        queue: queueResults.length,
+        database: databaseResults.length,
+        external: externalResults.length
+      });
       
       setResults({
         queue: queueResults,
@@ -107,7 +126,7 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
       });
       
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('❌ Search error:', error);
       toast.error('Search failed. Please try again.');
     } finally {
       setIsSearching(false);
