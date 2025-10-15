@@ -933,12 +933,12 @@ const Party: React.FC = () => {
                     {party.location}
                   </span>
                 </div>
-                <div className="p-1 mt-1">
+                <div className="mt-2 mb-2">
                   <span className="text-gray-400 text-lg">
                     Host: {typeof party.host === 'object' && party.host.username ? party.host.username : 'Unknown Host'}
                   </span>
                 </div>
-                <div className="mt-2">
+                <div className="mt-4">
                   <span className="px-2 py-2 text-white text-xs font-medium rounded-full" style={{backgroundColor: 'rgba(5, 150, 105, 0.5)'}}>
                     {party.status}
                   </span>
