@@ -424,7 +424,7 @@ const BID_METRICS_SCHEMA = {
     storage: 'stored', // Stored in Party.media array
     formula: 'MAX(user aggregate totals WHERE partyId = X AND mediaId = Y)'
   },
-  
+
   PartyUserBidTop: {
     scope: 'party',
     type: 'top',
@@ -455,15 +455,6 @@ const BID_METRICS_SCHEMA = {
     formula: 'MAX(bids WHERE partyId = X AND mediaId = Y)'
   },
   
-  PartyMediaAggregateTop: {
-    scope: 'party',
-    type: 'top',
-    entities: ['media'],
-    outputType: 'amount',
-    description: 'Highest Aggregate amount across Users for given Party and Media',
-    storage: 'stored', // Stored in Party.media array
-    formula: 'MAX(user aggregate totals for party X and media Y)'
-  },
   
   PartyUserMediaBidTop: {
     scope: 'party',
