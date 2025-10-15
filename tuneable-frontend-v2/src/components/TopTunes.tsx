@@ -106,7 +106,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   return (
     <div className="card">
       {showHeader && (
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Tunes</h2>
+        <h2 className="text-center text-xl font-semibold text-gray-900 mb-4">Top Tunes</h2>
       )}
       
       <div className="overflow-x-auto">

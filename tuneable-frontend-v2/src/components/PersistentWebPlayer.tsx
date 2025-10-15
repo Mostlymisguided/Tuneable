@@ -227,6 +227,7 @@ const PersistentWebPlayer: React.FC = () => {
     
     if (!currentSong) {
       console.log('No current song, clearing player');
+      // Don't destroy globalYouTubePlayerRef - it's managed by the external component
       if (youtubePlayerRef.current) {
         youtubePlayerRef.current.destroy();
         youtubePlayerRef.current = null;
@@ -267,12 +268,10 @@ const PersistentWebPlayer: React.FC = () => {
     setPlayerType(detectedPlayerType);
 
     if (detectedPlayerType === 'youtube') {
-      const videoId = getYouTubeVideoId(sourceUrl);
-      if (!videoId) {
-        console.log('No valid YouTube video ID found for:', sourceUrl);
-        return;
-      }
-      initializeYouTubePlayer(videoId);
+      // YouTube player is now handled by the external YouTubePlayer component
+      // rendered in the Party page. Just set the player as ready.
+      console.log('YouTube player type detected - using external YouTubePlayer component');
+      setIsPlayerReady(true);
     } else if (detectedPlayerType === 'audio') {
       initializeAudioPlayer(sourceUrl);
     }
