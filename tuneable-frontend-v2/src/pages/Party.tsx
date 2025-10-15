@@ -69,6 +69,9 @@ const Party: React.FC = () => {
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('all-time');
   const [sortedSongs, setSortedSongs] = useState<any[]>([]);
   const [isLoadingSortedSongs, setIsLoadingSortedSongs] = useState(false);
+  
+  // Search state
+  const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>([]);
   const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
@@ -443,15 +446,45 @@ const Party: React.FC = () => {
     return party.media || party.songs || [];
   };
 
-  // Get songs to display based on selected time period
+  // Get songs to display based on selected time period and search terms
   const getDisplaySongs = () => {
+    let songs;
     if (selectedTimePeriod === 'all-time') {
       // Show regular party media
-      return getPartyMedia().filter((item: any) => item.status === 'queued');
+      songs = getPartyMedia().filter((item: any) => item.status === 'queued');
     } else {
       // Show sorted songs from the selected time period
-      return sortedSongs.filter((song: any) => song.status === 'queued');
+      songs = sortedSongs.filter((song: any) => song.status === 'queued');
     }
+    
+    // Apply search filter if search terms exist
+    if (queueSearchTerms.length > 0) {
+      songs = songs.filter((item: any) => {
+        const media = item.mediaId || item.songId || item;
+        
+        // Check if ANY search term matches title, artist, tags, or category
+        return queueSearchTerms.some(term => {
+          const lowerTerm = term.toLowerCase();
+          const title = (media.title || '').toLowerCase();
+          const artist = Array.isArray(media.artist) 
+            ? media.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
+            : (media.artist || '').toLowerCase();
+          const tags = Array.isArray(media.tags) 
+            ? media.tags.join(' ').toLowerCase() 
+            : '';
+          const category = (media.category || '').toLowerCase();
+          
+          return title.includes(lowerTerm) || 
+                 artist.includes(lowerTerm) || 
+                 tags.includes(lowerTerm) ||
+                 category.includes(lowerTerm);
+        });
+      });
+      
+      console.log(`🔍 Filtered queue: ${songs.length} songs match search terms:`, queueSearchTerms);
+    }
+    
+    return songs;
   };
 
   // Bid handling functions
@@ -1048,9 +1081,7 @@ const Party: React.FC = () => {
                 {!showVetoed && party && (
                   <div className="mb-6">
                     <PartyQueueSearch
-                      partyId={partyId!}
-                      musicSource={party.musicSource || 'youtube'}
-                      onBidClick={handleBidClick}
+                      onSearchTermsChange={setQueueSearchTerms}
                     />
                   </div>
                 )}
