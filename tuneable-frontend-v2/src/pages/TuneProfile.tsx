@@ -295,7 +295,7 @@ const TuneProfile: React.FC = () => {
               {/* Bid Metrics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                 {/* Bid Total */}
-                <div className="card bg-black/20 rounded-lg p-4" style={{ borderLeft: '4px solid rgba(34, 197, 94, 0.5)' }}>
+                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-green-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
                   <div className="text-2xl font-bold text-green-400">
                     £{song.globalMediaAggregate?.toFixed(2) || '0.00'}
@@ -303,41 +303,41 @@ const TuneProfile: React.FC = () => {
                 </div>
                 
                 {/* Top Bid */}
-                <div className="card bg-black/20 rounded-lg p-4" style={{ borderLeft: '4px solid rgba(234, 179, 8, 0.5)' }}>
+                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
-                  <div className="text-2xl font-bold" style={{ color: '#fbbf24' }}>
+                  <div className="text-2xl font-bold text-yellow-400">
                     £{song.globalMediaBidTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
                 {/* Top Fan */}
-                <div className="card bg-black/20 rounded-lg p-4" style={{ borderLeft: '4px solid rgba(168, 85, 247, 0.5)' }}>
+                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-purple-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
-                  <div className="text-2xl font-bold text-purple-600">
+                  <div className="text-2xl font-bold text-purple-400">
                     £{song.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
                 {/* Average Bid */}
-                <div className="card bg-black/20 rounded-lg p-4" style={{ borderLeft: '4px solid rgba(59, 130, 246, 0.5)' }}>
+                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-blue-400">
                     £{calculateGlobalMediaBidAvg(song).toFixed(2)}
                   </div>
                 </div>
                 
                 {/* Total Bids Count */}
-                <div className="card bg-black/20 rounded-lg p-4" style={{ borderLeft: '4px solid rgba(6, 182, 212, 0.5)' }}>
+                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-cyan-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bids</div>
-                  <div className="text-2xl font-bold" style={{ color: '#06b6d4' }}>
+                  <div className="text-2xl font-bold text-cyan-400">
                     {song.bids?.length || 0}
                   </div>
                 </div>
                 
                 {/* Global Rank */}
-                <div className="card bg-black/20 rounded-lg p-4" style={{ borderLeft: '4px solid rgba(236, 72, 153, 0.5)' }}>
+                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-pink-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
-                  <div className="text-2xl font-bold" style={{ color: '#ec4899' }}>
+                  <div className="text-2xl font-bold text-pink-400">
                     #{song.globalMediaAggregateTopRank || '-'}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
