@@ -59,11 +59,12 @@ const extractSourceUrl = (song: any, playerType: string): string | null => {
 };
 
 // Extract YouTube video ID from URL
-const getYouTubeVideoId = (url: string): string | null => {
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return match && match[2].length === 11 ? match[2] : null;
-};
+// NOTE: Currently unused - YouTube player is now handled by external YouTubePlayer component
+// const getYouTubeVideoId = (url: string): string | null => {
+//   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+//   const match = url.match(regExp);
+//   return match && match[2].length === 11 ? match[2] : null;
+// };
 
 // Global flag to prevent multiple instances in StrictMode
 let activePlayerInstance: string | null = null;
@@ -277,6 +278,9 @@ const PersistentWebPlayer: React.FC = () => {
     }
   }, [currentSong, isGlobalPlayerActive]);
 
+  // NOTE: YouTube player initialization moved to external YouTubePlayer component
+  // This function is no longer used but kept for reference
+  /*
   const initializeYouTubePlayer = (videoId: string) => {
     console.log('Initializing YouTube player with video ID:', videoId);
 
@@ -372,6 +376,7 @@ const PersistentWebPlayer: React.FC = () => {
       window.onYouTubeIframeAPIReady = initializePlayer;
     }
   };
+  */
 
   const initializeAudioPlayer = (audioUrl: string) => {
     console.log('Initializing HTML5 audio player with URL:', audioUrl);
