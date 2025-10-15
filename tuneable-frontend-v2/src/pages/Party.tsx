@@ -925,13 +925,6 @@ const Party: React.FC = () => {
                   <span>End Party</span>
                 </button>
               </div>
-              <button
-                onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Song</span>
-              </button>
             </div>
           )}
           
@@ -1083,6 +1076,17 @@ const Party: React.FC = () => {
                     <PartyQueueSearch
                       onSearchTermsChange={setQueueSearchTerms}
                     />
+                    
+                    {/* Add Song Button - Centered */}
+                    <div className="flex justify-center mt-4">
+                      <button
+                        onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
+                        className="flex items-center space-x-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Song</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
