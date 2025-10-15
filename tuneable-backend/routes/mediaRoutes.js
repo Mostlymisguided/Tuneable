@@ -170,6 +170,12 @@ router.get('/:mediaId/profile', async (req, res) => {
     // Add comments to the response
     populatedMedia.comments = recentComments;
 
+    // Compute GlobalMediaAggregateTopRank (rank by top user aggregate)
+    // Count how many media have a higher globalMediaAggregateTop value
+    const rank = await Media.countDocuments({
+      globalMediaAggregateTop: { $gt: populatedMedia.globalMediaAggregateTop || 0 }
+    }) + 1; // +1 because rank is 1-indexed
+
     // Transform Media to match expected frontend format
     const transformedMedia = {
       ...populatedMedia.toObject(),
@@ -177,6 +183,7 @@ router.get('/:mediaId/profile', async (req, res) => {
               populatedMedia.artist[0].name : 'Unknown Artist', // Primary artist name
       artists: populatedMedia.artist || [], // Full artist subdocuments
       creators: populatedMedia.creatorNames || [], // All creator names
+      globalMediaAggregateTopRank: rank, // Add computed rank
     };
 
     res.json(transformResponse({
