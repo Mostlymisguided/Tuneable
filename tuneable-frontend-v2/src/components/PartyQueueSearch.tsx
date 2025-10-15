@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Music, Database, Youtube, Loader2 } from 'lucide-react';
+import { Search, X, Music, Database, Youtube, Loader2, Clock } from 'lucide-react';
 import { searchAPI, partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
@@ -22,14 +22,12 @@ interface SearchResult {
 
 interface PartyQueueSearchProps {
   partyId: string;
-  partyMedia: any[]; // Current party queue
   musicSource: 'youtube' | 'spotify';
   onBidClick: (media: any) => void; // Callback to open bid modal
 }
 
 const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({ 
   partyId, 
-  partyMedia, 
   musicSource,
   onBidClick 
 }) => {
@@ -188,12 +186,6 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
       console.error('External search error:', error);
       return [];
     }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleResultClick = (result: SearchResult) => {

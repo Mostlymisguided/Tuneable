@@ -1049,7 +1049,6 @@ const Party: React.FC = () => {
                   <div className="mb-6">
                     <PartyQueueSearch
                       partyId={partyId!}
-                      partyMedia={getPartyMedia()}
                       musicSource={party.musicSource || 'youtube'}
                       onBidClick={handleBidClick}
                     />
