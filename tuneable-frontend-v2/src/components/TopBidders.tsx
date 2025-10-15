@@ -44,6 +44,9 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
 
   return (
     <div className="mt-4 mb-6">
+      <div>
+        <span className="text-s text-gray-400 pb-2">Top Bids</span>
+      </div>
       <div className="flex items-start space-x-2">
         {topBids.map((bid, index) => (
           <div
@@ -63,7 +66,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
             </div>
             <div className="text-center inline-block">
             {/* Bid Amount - Permanently displayed */}
-            <span className="text-8px md:text-xs text-white font-semibold mt-1">
+            <span className="text-8px md:text-xs text-white text-center font-semibold mt-1">
               £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
             </span>
             </div>

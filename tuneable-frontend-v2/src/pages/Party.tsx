@@ -1485,7 +1485,7 @@ const Party: React.FC = () => {
                               
                               {/* Tags Display */}
                               {songData.tags && songData.tags.length > 0 && (
-                                <div className="hidden md:mt-2">
+                                <div className="hidden md:flex mt-2">
                                   <div className="flex flex-wrap gap-1">
                                     {songData.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
                                       <span
@@ -1504,21 +1504,21 @@ const Party: React.FC = () => {
                                 </div>
                               )}
                               
-                              {/* Category Display */}
-                              {songData.category && songData.category !== 'Unknown' && (
+                             {/* Category Display */}
+                              {/* {songData.category && songData.category !== 'Unknown' && (
                                 <div className="mt-1">
                                   <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
                                     {songData.category}
                                   </span>
-                                </div>
-                              )}
+                                </div> */}
+                              
                             </div>
                             
                             {/* Action Buttons */}
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
                                 {/* Metrics Display */}
-                                <div className="flex flex-col items-end space-y-1 bg-gray-700 px-3 py-2 rounded-lg">
+                                <div className="flex flex-col-2 items-end space-y-1 bg-gray-700 px-3 py-2 rounded-lg">
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-600 tracking-wide">Tune Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
