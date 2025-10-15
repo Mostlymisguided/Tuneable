@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -11,8 +11,9 @@ import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TopBidders from '../components/TopBidders';
 import YouTubePlayer from '../components/YouTubePlayer';
+import { setGlobalYouTubePlayerRef } from '../components/PersistentWebPlayer';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, RefreshCw, Loader2, Youtube } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, Loader2, Youtube } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartySong {
@@ -89,6 +90,9 @@ const Party: React.FC = () => {
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, number>>({});
   
+  // Ref for seeking state to prevent time updates during seek
+  const isSeeking = useRef(false);
+  
   const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
@@ -114,6 +118,11 @@ const Party: React.FC = () => {
     setGlobalPlayerActive,
     currentPartyId,
     currentSong,
+    isPlaying,
+    volume,
+    isMuted,
+    setCurrentTime,
+    setDuration,
   } = useWebPlayerStore();
 
   // Only use WebSocket for live parties
@@ -853,17 +862,6 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleManualRefresh = async () => {
-    if (!partyId) return;
-    
-    try {
-      await fetchPartyDetails();
-      toast.success('Queue refreshed');
-    } catch (error: any) {
-      console.error('Error refreshing party:', error);
-      toast.error('Failed to refresh queue');
-    }
-  };
 
 
 
@@ -923,7 +921,7 @@ const Party: React.FC = () => {
   return (
     <div className="min-h-screen">
       {/* Party Header */}
-      <div className="bg-purple-800 px-6 py-6">
+      <div className="px-6 py-6">
         <div className="card max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
@@ -1041,7 +1039,7 @@ const Party: React.FC = () => {
           </button>
           
           {/* Manual refresh button for remote parties */}
-          {party.type === 'remote' && (
+          {/*{party.type === 'remote' && (
             <button 
               onClick={handleManualRefresh}
               className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 flex items-center space-x-2"
@@ -1051,7 +1049,7 @@ const Party: React.FC = () => {
               <RefreshCw className="h-4 w-4" />
               <span>Refresh</span>
             </button>
-          )}
+          )}*/}
           {party.type === 'live' && (
             <button 
               onClick={() => {
@@ -1067,7 +1065,7 @@ const Party: React.FC = () => {
         </div>
 
         {/* Wallet Balance */}
-        <div className="bg-purple-800 mt-4 rounded-lg mb-6">
+        <div className=" mt-4 rounded-lg mb-6">
           <div className="relative items-center justify-between">
             <div className="flex items-center space-x-4">
               <span className="text-white font-medium">Wallet Balance: £{user?.balance?.toFixed(2) || '0.00'}</span>
@@ -1084,7 +1082,7 @@ const Party: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Song Queue */}
         <div className="lg:col-span-2">
           {/* Host Controls */}
@@ -1277,7 +1275,7 @@ const Party: React.FC = () => {
                     
                     {/* Inline Add Song Search Panel */}
                     {showAddSongPanel && (
-                      <div className="bg-gray-800 justify-center text-center rounded-lg border border-gray-700 p-4 shadow-xl">
+                      <div className="justify-center text-center rounded-lg p-4 shadow-xl">
                         <h3 className="text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
                         
                         {/* Search Input */}
@@ -1293,7 +1291,7 @@ const Party: React.FC = () => {
                               }
                             }}
                             placeholder="Search for Tunes on YouTube or in our library..."
-                            className="flex-1 bg-gray-900 border border-gray-600 rounded-full p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                            className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500"
                           />
                          
                         </div>
@@ -1600,7 +1598,7 @@ const Party: React.FC = () => {
                                 {isHost && (
                                   <button
                                     onClick={() => handleVetoClick(song)}
-                                    className="w-10 h-10 bg-red-500/20 bg-slate-600"
+                                    className="w-5 h-5 bg-red-500/20 bg-slate-600 rounded-md"
                                     title="Veto this song"
                                   >
                                     <X className="h-5 w-5" />
@@ -1858,8 +1856,27 @@ const Party: React.FC = () => {
       {/* YouTube Player - Only show when YouTube video is playing */}
       {currentSong && currentSong.sources?.youtube && (
         <YouTubePlayer 
+          ref={(ref) => {
+            // Set the global ref for PersistentWebPlayer to use
+            setGlobalYouTubePlayerRef(ref);
+          }}
           videoUrl={currentSong.sources.youtube} 
           className="mt-12"
+          isPlaying={isPlaying}
+          volume={volume}
+          isMuted={isMuted}
+          onStateChange={(state) => {
+            console.log('YouTube state change:', state);
+            // Handle state changes if needed
+          }}
+          onTimeUpdate={(currentTime, duration) => {
+            if (!isSeeking.current) {
+              setCurrentTime(currentTime);
+            }
+            if (duration !== undefined) {
+              setDuration(duration);
+            }
+          }}
         />
       )}
 

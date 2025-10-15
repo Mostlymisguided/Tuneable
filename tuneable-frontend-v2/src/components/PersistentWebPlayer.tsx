@@ -5,6 +5,7 @@ import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Youtube } from 'l
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { type YouTubePlayerRef } from './YouTubePlayer';
 
 // Helper function to format time (seconds to MM:SS)
 const formatTime = (seconds: number): string => {
@@ -66,6 +67,14 @@ const getYouTubeVideoId = (url: string): string | null => {
 
 // Global flag to prevent multiple instances in StrictMode
 let activePlayerInstance: string | null = null;
+
+// Global ref for external YouTube player
+export let globalYouTubePlayerRef: YouTubePlayerRef | null = null;
+
+// Function to set the global ref
+export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
+  globalYouTubePlayerRef = ref;
+};
 
 const PersistentWebPlayer: React.FC = () => {
   const playerRef = useRef<HTMLDivElement>(null);
@@ -429,11 +438,19 @@ const PersistentWebPlayer: React.FC = () => {
     if (isPlayerReady) {
       console.log('Updating player state, isPlaying:', isPlaying, 'playerType:', playerType);
       try {
-        if (playerType === 'youtube' && youtubePlayerRef.current) {
-          if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
-            youtubePlayerRef.current.playVideo();
-          } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
-            youtubePlayerRef.current.pauseVideo();
+        if (playerType === 'youtube') {
+          if (globalYouTubePlayerRef) {
+            if (isPlaying) {
+              globalYouTubePlayerRef.playVideo();
+            } else {
+              globalYouTubePlayerRef.pauseVideo();
+            }
+          } else if (youtubePlayerRef.current) {
+            if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
+              youtubePlayerRef.current.playVideo();
+            } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
+              youtubePlayerRef.current.pauseVideo();
+            }
           }
         } else if (playerType === 'audio' && audioRef.current) {
           if (isPlaying) {
@@ -452,12 +469,21 @@ const PersistentWebPlayer: React.FC = () => {
   useEffect(() => {
     if (isPlayerReady) {
       try {
-        if (playerType === 'youtube' && youtubePlayerRef.current) {
-          youtubePlayerRef.current.setVolume(volume);
-          if (isMuted) {
-            youtubePlayerRef.current.mute();
-          } else {
-            youtubePlayerRef.current.unMute();
+        if (playerType === 'youtube') {
+          if (globalYouTubePlayerRef) {
+            globalYouTubePlayerRef.setVolume(volume);
+            if (isMuted) {
+              globalYouTubePlayerRef.mute();
+            } else {
+              globalYouTubePlayerRef.unMute();
+            }
+          } else if (youtubePlayerRef.current) {
+            youtubePlayerRef.current.setVolume(volume);
+            if (isMuted) {
+              youtubePlayerRef.current.mute();
+            } else {
+              youtubePlayerRef.current.unMute();
+            }
           }
         } else if (playerType === 'audio' && audioRef.current) {
           audioRef.current.volume = volume / 100;
@@ -497,8 +523,12 @@ const PersistentWebPlayer: React.FC = () => {
     setCurrentTime(newTime);
     
     try {
-      if (playerType === 'youtube' && youtubePlayerRef.current) {
-        youtubePlayerRef.current.seekTo(newTime);
+      if (playerType === 'youtube') {
+        if (globalYouTubePlayerRef) {
+          globalYouTubePlayerRef.seekTo(newTime);
+        } else if (youtubePlayerRef.current) {
+          youtubePlayerRef.current.seekTo(newTime);
+        }
       } else if (playerType === 'audio' && audioRef.current) {
         audioRef.current.currentTime = newTime;
       }

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import type { YTPlayer } from '../types/youtube';
 
 // Helper function to extract YouTube video ID from URL
@@ -11,12 +11,68 @@ const getYouTubeVideoId = (url: string): string | null => {
 interface YouTubePlayerProps {
   videoUrl?: string;
   className?: string;
+  isPlaying?: boolean;
+  volume?: number;
+  isMuted?: boolean;
+  onStateChange?: (state: any) => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
-const YouTubePlayer: React.FC<YouTubePlayerProps> = ({ videoUrl, className = "" }) => {
+export interface YouTubePlayerRef {
+  playVideo: () => void;
+  pauseVideo: () => void;
+  setVolume: (volume: number) => void;
+  mute: () => void;
+  unMute: () => void;
+  seekTo: (seconds: number) => void;
+}
+
+const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({ 
+  videoUrl, 
+  className = "", 
+  isPlaying = false,
+  volume = 50,
+  isMuted = false,
+  onStateChange,
+  onTimeUpdate 
+}, ref) => {
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
-  // const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const timePollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Expose control methods to parent component
+  useImperativeHandle(ref, () => ({
+    playVideo: () => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.playVideo();
+      }
+    },
+    pauseVideo: () => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.pauseVideo();
+      }
+    },
+    setVolume: (vol: number) => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.setVolume(vol);
+      }
+    },
+    mute: () => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.mute();
+      }
+    },
+    unMute: () => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.unMute();
+      }
+    },
+    seekTo: (seconds: number) => {
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.seekTo(seconds);
+      }
+    }
+  }), []);
 
   useEffect(() => {
     if (!videoUrl) return;
@@ -29,6 +85,31 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({ videoUrl, className = "" 
 
     initializeYouTubePlayer(videoId);
   }, [videoUrl]);
+
+  // Handle external control changes
+  useEffect(() => {
+    if (!youtubePlayerRef.current) return;
+    
+    if (isPlaying) {
+      youtubePlayerRef.current.playVideo();
+    } else {
+      youtubePlayerRef.current.pauseVideo();
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!youtubePlayerRef.current) return;
+    youtubePlayerRef.current.setVolume(volume);
+  }, [volume]);
+
+  useEffect(() => {
+    if (!youtubePlayerRef.current) return;
+    if (isMuted) {
+      youtubePlayerRef.current.mute();
+    } else {
+      youtubePlayerRef.current.unMute();
+    }
+  }, [isMuted]);
 
   const initializeYouTubePlayer = (videoId: string) => {
     console.log('Initializing YouTube player with video ID:', videoId);
@@ -60,11 +141,19 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({ videoUrl, className = "" 
               playsinline: 1
             },
             events: {
-              onReady: (_event: any) => {
+              onReady: (event: any) => {
                 console.log('YouTube player ready!');
+                event.target.setVolume(volume);
+                if (isMuted) {
+                  event.target.mute();
+                }
+                
+                // Start time polling
+                startTimePolling();
               },
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
+                onStateChange?.(event.data);
               },
               onError: (event: any) => {
                 console.error('YouTube player error:', event.data);
@@ -84,9 +173,30 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({ videoUrl, className = "" 
     }
   };
 
+  const startTimePolling = () => {
+    if (timePollingRef.current) {
+      clearInterval(timePollingRef.current);
+    }
+    
+    timePollingRef.current = setInterval(() => {
+      if (youtubePlayerRef.current) {
+        try {
+          const currentTime = youtubePlayerRef.current.getCurrentTime();
+          const duration = youtubePlayerRef.current.getDuration();
+          onTimeUpdate?.(currentTime, duration);
+        } catch (error) {
+          console.log('Error getting YouTube player time:', error);
+        }
+      }
+    }, 1000);
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (timePollingRef.current) {
+        clearInterval(timePollingRef.current);
+      }
       if (youtubePlayerRef.current) {
         youtubePlayerRef.current.destroy();
       }
@@ -104,6 +214,8 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({ videoUrl, className = "" 
       </div>
     </div>
   );
-};
+});
+
+YouTubePlayer.displayName = 'YouTubePlayer';
 
 export default YouTubePlayer;
