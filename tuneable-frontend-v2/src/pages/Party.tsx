@@ -639,6 +639,14 @@ const Party: React.FC = () => {
     return songs;
   };
 
+  // Helper function to calculate average bid for a song
+  const calculateAverageBid = (songData: any) => {
+    const bids = songData.bids || [];
+    if (bids.length === 0) return 0;
+    const total = bids.reduce((sum: number, bid: any) => sum + (bid.amount || 0), 0);
+    return total / bids.length;
+  };
+
   // Bid handling functions (OLD - using bid modal, now replaced with inline bidding)
   // const handleBidClick = (song: any) => {
   //   const songData = song.mediaId || song.songId || song;
@@ -1518,22 +1526,18 @@ const Party: React.FC = () => {
                             {/* Action Buttons */}
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
-                                {/* Dual Bid Display */}
+                                {/* Metrics Display */}
                                 <div className="flex flex-col items-end space-y-1 bg-gray-700 px-3 py-2 rounded-lg">
-                                  <div className="text-right">
-                                    <div className="text-xs text-gray-400 uppercase tracking-wide">
-                                      {selectedTimePeriod === 'all-time' ? 'Party' : selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                    </div>
-                                    <div className="text-lg font-bold text-white">
-                                      £{selectedTimePeriod === 'all-time' 
-                                        ? (typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate.toFixed(2) : '0.00')
-                                        : (typeof song.timePeriodBidValue === 'number' ? song.timePeriodBidValue.toFixed(2) : '0.00')}
+                                  <div className="text-center p-2">
+                                    <div className="text-xs text-gray-600 uppercase tracking-wide">Tune Total</div>
+                                    <div className="text-md text-gray-300">
+                                      £{(typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate.toFixed(2) : '0.00')}
                                     </div>
                                   </div>
-                                  <div className="text-right border-t border-gray-600 pt-1 w-full">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide">Global</div>
-                                    <div className="text-sm text-gray-300">
-                                      £{(typeof songData.globalMediaAggregate === 'number' ? songData.globalMediaAggregate.toFixed(2) : '0.00')}
+                                  <div className="text-center p-2">
+                                    <div className="text-xs text-gray-600 uppercase tracking-wide">Avg Bid</div>
+                                    <div className="text-md text-gray-300">
+                                      £{calculateAverageBid(songData).toFixed(2)}
                                     </div>
                                   </div>
                                 </div>

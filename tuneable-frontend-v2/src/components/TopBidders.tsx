@@ -48,7 +48,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
         {topBids.map((bid, index) => (
           <div
             key={bid.userId.uuid || index}
-            className="flex flex-col items-center"
+            className="block flex-col items-center"
           >
             {/* Profile Picture - Clickable */}
             <div 
@@ -61,7 +61,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="inline-block">
+            <div className="text-center inline-block">
             {/* Bid Amount - Permanently displayed */}
             <span className="text-xs text-white font-semibold mt-1">
               £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
