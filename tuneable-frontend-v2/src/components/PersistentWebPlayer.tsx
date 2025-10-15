@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Youtube } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -82,14 +82,22 @@ const PersistentWebPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [playerType, setPlayerType] = useState<'youtube' | 'audio' | null>(null);
-  // Function to scroll to YouTube player (now in main content)
-  const scrollToYouTubePlayer = () => {
-    if (playerType === 'youtube' && currentSong?.sources?.youtube) {
-      // Scroll to bottom of page where YouTube player will be rendered
-      window.scrollTo({ 
-        top: document.documentElement.scrollHeight, 
-        behavior: 'smooth' 
-      });
+  // Function to open YouTube player in fullscreen
+  const openYouTubeFullscreen = () => {
+    if (playerType === 'youtube' && playerRef.current) {
+      const iframe = playerRef.current.querySelector('iframe');
+      if (iframe) {
+        // Try to request fullscreen on the iframe
+        if (iframe.requestFullscreen) {
+          iframe.requestFullscreen();
+        } else if ((iframe as any).webkitRequestFullscreen) {
+          (iframe as any).webkitRequestFullscreen();
+        } else if ((iframe as any).mozRequestFullScreen) {
+          (iframe as any).mozRequestFullScreen();
+        } else if ((iframe as any).msRequestFullscreen) {
+          (iframe as any).msRequestFullscreen();
+        }
+      }
     }
   };
   const timePollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -719,14 +727,14 @@ const PersistentWebPlayer: React.FC = () => {
                 )}
             </button>
 
-              {/* YouTube Player Toggle Button */}
+              {/* YouTube Fullscreen Button */}
               {playerType === 'youtube' && (
                 <button 
-                  onClick={scrollToYouTubePlayer}
-                  className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-white text-gray-900 hover:bg-red-50"
-                  title="Scroll to YouTube Player"
+                  onClick={openYouTubeFullscreen}
+                  className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-white text-gray-900 hover:bg-purple-50"
+                  title="Open YouTube Fullscreen"
                 >
-                  <Youtube className="h-5 w-5" />
+                  <Maximize className="h-5 w-5" />
                 </button>
               )}
           </div>
