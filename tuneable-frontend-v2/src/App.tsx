@@ -45,7 +45,7 @@ const AppContent = () => {
     <Router>
       <div className="min-h-screen">
         <Navbar />
-        <main className="pt-16 pb-[420px]">
+        <main className="pt-16">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />

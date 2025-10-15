@@ -547,24 +547,6 @@ const PersistentWebPlayer: React.FC = () => {
 
   return (
     <>
-      {/* YouTube Player - Portal to bottom of page, above footer */}
-      {playerType === 'youtube' && (
-        <div 
-          className="bg-gray-900 border-t border-gray-700"
-          style={{
-            position: 'fixed',
-            bottom: '120px', // Above the player controls (controls are ~100px tall)
-            left: 0,
-            right: 0,
-            zIndex: 50, // Below player controls but above page content
-          }}
-        >
-          <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4">
-            <div ref={playerRef} className="w-full aspect-video max-h-[270px] bg-gray-800 rounded-lg overflow-hidden shadow-2xl" />
-          </div>
-        </div>
-      )}
-
       {/* HTML5 Audio Player (always hidden, no visual) */}
       {playerType === 'audio' && (
         <audio ref={audioRef} className="hidden" />
@@ -679,6 +661,14 @@ const PersistentWebPlayer: React.FC = () => {
                 {formatTime(duration)}
               </div>
             </div>
+
+            {/* YouTube Player - Compact inline version */}
+            {playerType === 'youtube' && (
+              <div 
+                ref={playerRef} 
+                className="w-24 h-16 sm:w-32 sm:h-20 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-gray-600"
+              />
+            )}
 
             {/* Right: Controls and Volume */}
             <div className="flex items-center space-x-3">
