@@ -203,7 +203,7 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
   const totalResults = results.queue.length + results.database.length + results.external.length;
 
   return (
-    <div className="w-full">
+    <div className="w-auto">
       {/* Search Input */}
       <div className="relative">
         <div className="flex items-center bg-gray-800 rounded-lg border border-gray-700 focus-within:border-purple-500 transition-colors">
@@ -214,7 +214,7 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search party queue, library, or YouTube... (Press Enter to add term)"
-            className="flex-1 bg-transparent px-3 py-2.5 text-slate placeholder-gray-400 focus:outline-none"
+            className="flex-1 bg-transparent p-3 rounded-lg px-3 py-2.5 text-slate placeholder-gray-400 focus:outline-none"
           />
           {isSearching && (
             <Loader2 className="mr-3 h-5 w-5 text-purple-400 animate-spin" />
