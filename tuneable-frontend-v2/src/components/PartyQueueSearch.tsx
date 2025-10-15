@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 interface PartyQueueSearchProps {
   onSearchTermsChange: (terms: string[]) => void; // Pass search terms to parent
@@ -65,7 +65,7 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
                   onClick={() => removeSearchTerm(term)}
                   className="rounded-xl items-center"
                 >
-                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x rounded-xl items-center" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x rounded-xl items-center" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                 </button>
                 
               </div>
