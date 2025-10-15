@@ -52,7 +52,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
           >
             {/* Profile Picture - Clickable */}
             <div 
-              className="w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-purple-800 flex items-center justify-center cursor-pointer hover:border-purple-600 transition-colors"
+              className="w-6 h-6 md:w-12 md:h-12 rounded-full overflow-hidden bg-white border-2 border-purple-800 flex items-center justify-center cursor-pointer hover:border-purple-600 transition-colors"
               onClick={() => bid.userId.uuid && navigate(`/user/${bid.userId.uuid}`)}
             >
               <img
@@ -63,7 +63,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
             </div>
             <div className="text-center inline-block">
             {/* Bid Amount - Permanently displayed */}
-            <span className="text-xs text-white font-semibold mt-1">
+            <span className="text-8px md:text-xs text-white font-semibold mt-1">
               £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
             </span>
             </div>

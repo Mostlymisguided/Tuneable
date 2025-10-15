@@ -13,7 +13,7 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/80 shadow-lg border-b border-purple-400">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/20 shadow-lg border-purple-400">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between h-12 sm:h-16">
           <div className="flex items-center">
@@ -37,7 +37,7 @@ const Navbar: React.FC = () => {
                   <>
                     <Link
                       to="/admin"
-                      className="hidden sm:block px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition-colors"
+                      className="hidden sm:block px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
                       Admin Panel

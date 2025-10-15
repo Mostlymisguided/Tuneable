@@ -1441,13 +1441,13 @@ const Party: React.FC = () => {
                             className="card bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
                           >
                             {/* Number Badge */}
-                            <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-white font-bold text-sm">{index + 1}</span>
+                            <div className="w-4 h-4 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
                             </div>
                             
                             {/* Song Thumbnail */}
                             <div 
-                              className="relative w-32 h-32 flex-shrink-0 cursor-pointer group"
+                              className="relative w-8 h-8 md:w-32 md:h-32 cursor-pointer group"
                               onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
                             >
                               <img
@@ -1485,7 +1485,7 @@ const Party: React.FC = () => {
                               
                               {/* Tags Display */}
                               {songData.tags && songData.tags.length > 0 && (
-                                <div className="mt-2">
+                                <div className="hidden md:mt-2">
                                   <div className="flex flex-wrap gap-1">
                                     {songData.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
                                       <span
@@ -1520,14 +1520,14 @@ const Party: React.FC = () => {
                                 {/* Metrics Display */}
                                 <div className="flex flex-col items-end space-y-1 bg-gray-700 px-3 py-2 rounded-lg">
                                   <div className="text-center p-2">
-                                    <div className="text-xs text-gray-600 uppercase tracking-wide">Tune Total</div>
-                                    <div className="text-md text-gray-300">
+                                    <div className="text-xs text-gray-600 tracking-wide">Tune Total</div>
+                                    <div className="text-xs md:text-lg text-gray-300">
                                       £{(typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate.toFixed(2) : '0.00')}
                                     </div>
                                   </div>
                                   <div className="text-center p-2">
-                                    <div className="text-xs text-gray-600 uppercase tracking-wide">Avg Bid</div>
-                                    <div className="text-md text-gray-300">
+                                    <div className="text-xs text-gray-600 tracking-wide">Avg Bid</div>
+                                    <div className="text-xs md:text-lg text-gray-300">
                                       £{calculateAverageBid(songData).toFixed(2)}
                                     </div>
                                   </div>
