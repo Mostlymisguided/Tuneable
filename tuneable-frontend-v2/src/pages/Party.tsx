@@ -1867,7 +1867,26 @@ const Party: React.FC = () => {
           isMuted={isMuted}
           onStateChange={(state) => {
             console.log('YouTube state change:', state);
-            // Handle state changes if needed
+            // Handle song end - advance to next song
+            if (state === 0) { // YT.PlayerState.ENDED = 0
+              console.log('YouTube video ended, advancing to next song');
+              const { next, currentPartyId, currentSong, isHost } = useWebPlayerStore.getState();
+              if (currentPartyId && currentSong?.id && isHost) {
+                console.log('Notifying backend that song completed');
+                partyAPI.completeSong(currentPartyId, currentSong.id)
+                  .then(() => {
+                    console.log('Song completion confirmed, advancing to next song');
+                    next();
+                  })
+                  .catch(error => {
+                    console.error('Error notifying song completion:', error);
+                    next();
+                  });
+              } else {
+                console.log('Not host or no party/song, just advancing to next song');
+                next();
+              }
+            }
           }}
           onTimeUpdate={(currentTime, duration) => {
             if (!isSeeking.current) {

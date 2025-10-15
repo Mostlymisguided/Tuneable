@@ -182,6 +182,16 @@ const PersistentWebPlayer: React.FC = () => {
 
   // Time polling effect - polls player every 500ms to update currentTime
   useEffect(() => {
+    // YouTube time updates are handled by external YouTubePlayer component via onTimeUpdate
+    // Only poll for audio player
+    if (playerType === 'youtube') {
+      if (timePollingRef.current) {
+        clearInterval(timePollingRef.current);
+        timePollingRef.current = null;
+      }
+      return;
+    }
+
     if (!isPlayerReady || !isPlaying || isSeeking.current) {
       if (timePollingRef.current) {
         clearInterval(timePollingRef.current);
@@ -190,17 +200,10 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
-    // Start polling
+    // Start polling for audio player only
     timePollingRef.current = setInterval(() => {
       try {
-        if (playerType === 'youtube' && youtubePlayerRef.current) {
-          const current = youtubePlayerRef.current.getCurrentTime();
-          const dur = youtubePlayerRef.current.getDuration();
-          setCurrentTime(current);
-          if (dur && dur !== duration) {
-            setDuration(dur);
-          }
-        } else if (playerType === 'audio' && audioRef.current) {
+        if (playerType === 'audio' && audioRef.current) {
           const current = audioRef.current.currentTime;
           const dur = audioRef.current.duration;
           setCurrentTime(current);
