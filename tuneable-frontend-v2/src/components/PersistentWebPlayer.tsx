@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Youtube } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -73,6 +73,7 @@ const PersistentWebPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [playerType, setPlayerType] = useState<'youtube' | 'audio' | null>(null);
+  const [showYouTubePlayer, setShowYouTubePlayer] = useState(false);
   const timePollingRef = useRef<NodeJS.Timeout | null>(null);
   const isSeeking = useRef(false);
   
@@ -307,6 +308,9 @@ const PersistentWebPlayer: React.FC = () => {
                 setDuration(dur);
                 setIsPlayerReady(true);
                 
+                // Auto-show the YouTube player when a video starts
+                setShowYouTubePlayer(true);
+                
                 if (isPlaying) {
                   console.log('Auto-playing video...');
                   event.target.playVideo();
@@ -525,10 +529,17 @@ const PersistentWebPlayer: React.FC = () => {
 
   return (
     <>
-      {/* Video Player Container - Centered on screen */}
-      {playerType === 'youtube' && (
-        <div className="flex justify-self-center justify-items-center justify-center fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-gray-900 rounded-lg shadow-2xl overflow-hidden max-w-[33vw] w-[480px] h-[270px]">
-          <div ref={playerRef} className="w-1/3 h-full" />
+      {/* Video Player Container - Bottom Right with Toggle */}
+      {playerType === 'youtube' && showYouTubePlayer && (
+        <div className="fixed bottom-20 right-4 z-50 bg-gray-900 rounded-lg shadow-2xl overflow-hidden w-[480px] h-[270px]">
+          <div ref={playerRef} className="w-full h-full" />
+          <button 
+            onClick={() => setShowYouTubePlayer(false)}
+            className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700 transition-colors"
+            title="Close YouTube Player"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -695,6 +706,21 @@ const PersistentWebPlayer: React.FC = () => {
                   <Volume2 className="h-4 w-4" />
                 )}
             </button>
+
+              {/* YouTube Player Toggle Button */}
+              {playerType === 'youtube' && (
+                <button 
+                  onClick={() => setShowYouTubePlayer(!showYouTubePlayer)}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    showYouTubePlayer 
+                      ? 'bg-red-600 text-white' 
+                      : 'bg-white text-gray-900'
+                  }`}
+                  title={showYouTubePlayer ? "Hide YouTube Player" : "Show YouTube Player"}
+                >
+                  <Youtube className="h-5 w-5" />
+                </button>
+              )}
           </div>
         </div>
 
