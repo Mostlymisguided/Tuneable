@@ -3,6 +3,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom base styles using Tailwind's layer system */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    background: linear-gradient(135deg, #1A1A2E 0%, #4A2C81 50%, #3A1C71 100%);
+    background-attachment: fixed;
+    color: #E5E7EB;
+    line-height: 1.5;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+  }
+}
+
 /* Reset and base styles */
 * {
   margin: 0;
@@ -44,24 +63,9 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-html {
-  font-family: 'Inter', system-ui, sans-serif;
-}
+/* HTML font-family now handled by @layer base above */
 
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-}
-
-body {
-  background: linear-gradient(135deg, #1A1A2E 0%, #4A2C81 50%, #3A1C71 100%);
-  background-attachment: fixed;
-  color: #E5E7EB;
-  line-height: 1.5;
-  min-height: 100vh;
-}
+/* Body styles now handled by @layer base above */
 
 /* Utility classes */
 .btn-primary {
