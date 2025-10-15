@@ -47,7 +47,7 @@ const PartyQueueSearch: React.FC<PartyQueueSearchProps> = ({
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Filter party queue... (Press Enter to add search term)"
+            placeholder="Filter party tunes... (Press Enter to add search term)"
             className="flex-1 p-2 rounded-full bg-transparent px-3 py-2.5 text-slate placeholder-gray-400 focus:outline-none"
           />
         </div>

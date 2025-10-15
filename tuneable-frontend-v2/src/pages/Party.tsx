@@ -923,7 +923,7 @@ const Party: React.FC = () => {
     <div className="min-h-screen bg-gray-900">
       {/* Party Header */}
       <div className="bg-purple-800 px-6 py-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="card max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
               <div>
@@ -934,7 +934,7 @@ const Party: React.FC = () => {
                   </span>
                 </div>
                 <div className="p-1 mt-1">
-                  <span className="text-gray-400 text-sm">
+                  <span className="text-gray-400 text-lg">
                     Host: {typeof party.host === 'object' && party.host.username ? party.host.username : 'Unknown Host'}
                   </span>
                 </div>
@@ -967,7 +967,7 @@ const Party: React.FC = () => {
 
       {/* Metrics Cards */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="flex flex-wrap gap-4 mb-6">
+        <div className="justify-center flex flex-wrap gap-4 mb-6">
           <div className="bg-purple-800/50 border border-gray-600 p-4 rounded-lg backdrop-blur-sm">
             <div className="flex items-center space-x-4">
               <Music className="h-6 w-6 text-white" />
@@ -976,7 +976,7 @@ const Party: React.FC = () => {
                   {getDisplaySongs().length}
                 </div>
                 <div className="text-sm text-gray-300">
-                  {selectedTimePeriod === 'all-time' ? 'In Queue' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
+                  {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
                 </div>
               </div>
             </div>
@@ -997,7 +997,7 @@ const Party: React.FC = () => {
               <Users className="h-6 w-6 text-white" />
               <div>
                 <div className="text-2xl font-bold text-white">{party.attendees.length}</div>
-                <div className="text-sm text-gray-300">Contributors</div>
+                <div className="text-sm text-gray-300">Partiers</div>
               </div>
             </div>
           </div>
@@ -1013,7 +1013,7 @@ const Party: React.FC = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 mb-6">
+        <div className="justify-center flex space-x-1 mb-6">
           <button 
             onClick={scrollToWebPlayer}
             className="px-4 py-2 shadow-sm bg-black/20 border-white/20 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-700/30 transition-colors" 
@@ -1066,11 +1066,12 @@ const Party: React.FC = () => {
         </div>
 
         {/* Wallet Balance */}
-        <div className="bg-purple-800 p-4 rounded-lg mb-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-purple-800 mt-4 rounded-lg mb-6">
+          <div className="relative items-center justify-between">
             <div className="flex items-center space-x-4">
               <span className="text-white font-medium">Wallet Balance: £{user?.balance?.toFixed(2) || '0.00'}</span>
             </div>
+            <div className="mt-2 block">
             <button 
               onClick={() => navigate('/wallet')}
               className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
@@ -1078,6 +1079,7 @@ const Party: React.FC = () => {
               <Plus className="h-4 w-4" />
               <span>Top Up</span>
             </button>
+            </div>
           </div>
         </div>
 
@@ -1216,7 +1218,7 @@ const Party: React.FC = () => {
                 {/* Sorting Tabs - Only show for Queue, not Vetoed */}
                 {!showVetoed && (
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-white text-center mb-3 p-2">Sort by Bid Activity</h3>
+                    <h3 className="text-lg font-semibold text-white text-center mb-3 p-2">Sort by Time</h3>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {[
                         { key: 'all-time', label: 'All Time' },
@@ -1266,7 +1268,7 @@ const Party: React.FC = () => {
                         ) : (
                           <>
                             <Plus className="h-4 w-4" />
-                            <span>Add Song</span>
+                            <span>Add Tune</span>
                           </>
                         )}
                       </button>
@@ -1275,7 +1277,7 @@ const Party: React.FC = () => {
                     {/* Inline Add Song Search Panel */}
                     {showAddSongPanel && (
                       <div className="bg-gray-800 justify-center text-center rounded-lg border border-gray-700 p-4 shadow-xl">
-                        <h3 className="text-lg font-semibold text-white mb-4">Search for Songs to Add</h3>
+                        <h3 className="text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
                         
                         {/* Search Input */}
                         <div className="flex justify-center gap-2 mb-4">
@@ -1289,7 +1291,7 @@ const Party: React.FC = () => {
                                 handleAddSongSearch();
                               }
                             }}
-                            placeholder="Search for songs on YouTube or in our library..."
+                            placeholder="Search for Tunes on YouTube or in our library..."
                             className="flex-1 bg-gray-900 border border-gray-600 rounded-full p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500"
                           />
                          
@@ -1686,7 +1688,7 @@ const Party: React.FC = () => {
             ) : (
               <div className="text-center py-8">
                 <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No songs in queue</p>
+                <p className="text-gray-500">No Tunes in queue</p>
                 <button
                   onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
                   className="btn-primary mt-4"
