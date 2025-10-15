@@ -296,7 +296,7 @@ const TuneProfile: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                 {/* Bid Total */}
                 <div className="card bg-black/20 rounded-lg p-4 border border-green-500/20">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">💰 Bid Total</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
                   <div className="text-2xl font-bold text-green-400">
                     £{song.globalMediaAggregate?.toFixed(2) || '0.00'}
                   </div>
@@ -304,7 +304,7 @@ const TuneProfile: React.FC = () => {
                 
                 {/* Top Bid */}
                 <div className="card bg-black/20 rounded-lg p-4 border border-yellow-500/20">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">🏆 Top Bid</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
                   <div className="text-2xl font-bold text-yellow-400">
                     £{song.globalMediaBidTop?.toFixed(2) || '0.00'}
                   </div>
@@ -312,7 +312,7 @@ const TuneProfile: React.FC = () => {
                 
                 {/* Top Fan Total */}
                 <div className="card bg-black/20 rounded-lg p-4 border border-purple-500/20">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">⭐ Top Fan Total</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan Total</div>
                   <div className="text-2xl font-bold text-purple-400">
                     £{song.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                   </div>
@@ -320,7 +320,7 @@ const TuneProfile: React.FC = () => {
                 
                 {/* Average Bid */}
                 <div className="card bg-black/20 rounded-lg p-4 border border-blue-500/20">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">📊 Avg Bid</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
                   <div className="text-2xl font-bold text-blue-400">
                     £{calculateGlobalMediaBidAvg(song).toFixed(2)}
                   </div>
@@ -328,7 +328,7 @@ const TuneProfile: React.FC = () => {
                 
                 {/* Total Bids Count */}
                 <div className="card bg-black/20 rounded-lg p-4 border border-cyan-500/20">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">📈 Total Bids</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bids</div>
                   <div className="text-2xl font-bold text-cyan-400">
                     {song.bids?.length || 0}
                   </div>
@@ -336,7 +336,7 @@ const TuneProfile: React.FC = () => {
                 
                 {/* Global Rank */}
                 <div className="card bg-black/20 rounded-lg p-4 border border-pink-500/20">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">🎯 Global Rank</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
                   <div className="text-2xl font-bold text-pink-400">
                     #{song.globalMediaAggregateTopRank || '-'}
                   </div>

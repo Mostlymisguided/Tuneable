@@ -170,10 +170,10 @@ router.get('/:mediaId/profile', async (req, res) => {
     // Add comments to the response
     populatedMedia.comments = recentComments;
 
-    // Compute GlobalMediaAggregateTopRank (rank by top user aggregate)
-    // Count how many media have a higher globalMediaAggregateTop value
+    // Compute GlobalMediaAggregateRank (rank by total bid value)
+    // Count how many media have a higher globalMediaAggregate value
     const rank = await Media.countDocuments({
-      globalMediaAggregateTop: { $gt: populatedMedia.globalMediaAggregateTop || 0 }
+      globalMediaAggregate: { $gt: populatedMedia.globalMediaAggregate || 0 }
     }) + 1; // +1 because rank is 1-indexed
 
     // Transform Media to match expected frontend format
