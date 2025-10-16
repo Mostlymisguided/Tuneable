@@ -1280,7 +1280,7 @@ const Party: React.FC = () => {
                                 handleAddSongSearch();
                               }
                             }}
-                            placeholder="Search for Tunes on YouTube or in our library..."
+                            placeholder="Search for Tunes in our library or on Youtube..."
                             className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                           />
                          

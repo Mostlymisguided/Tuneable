@@ -84,18 +84,45 @@ const PersistentWebPlayer: React.FC = () => {
   const [playerType, setPlayerType] = useState<'youtube' | 'audio' | null>(null);
   // Function to open YouTube player in fullscreen
   const openYouTubeFullscreen = () => {
-    if (playerType === 'youtube' && playerRef.current) {
-      const iframe = playerRef.current.querySelector('iframe');
-      if (iframe) {
-        // Try to request fullscreen on the iframe
-        if (iframe.requestFullscreen) {
-          iframe.requestFullscreen();
-        } else if ((iframe as any).webkitRequestFullscreen) {
-          (iframe as any).webkitRequestFullscreen();
-        } else if ((iframe as any).mozRequestFullScreen) {
-          (iframe as any).mozRequestFullScreen();
-        } else if ((iframe as any).msRequestFullscreen) {
-          (iframe as any).msRequestFullscreen();
+    if (playerType === 'youtube') {
+      // First try to use the YouTube Player API's native fullscreen
+      if (youtubePlayerRef.current && typeof (youtubePlayerRef.current as any).getIframe === 'function') {
+        const iframe = (youtubePlayerRef.current as any).getIframe();
+        if (iframe) {
+          try {
+            if (iframe.requestFullscreen) {
+              iframe.requestFullscreen();
+            } else if (iframe.webkitRequestFullscreen) {
+              iframe.webkitRequestFullscreen();
+            } else if (iframe.mozRequestFullScreen) {
+              iframe.mozRequestFullScreen();
+            } else if (iframe.msRequestFullscreen) {
+              iframe.msRequestFullscreen();
+            }
+          } catch (error) {
+            console.error('Error requesting fullscreen:', error);
+          }
+        }
+      } 
+      // Fallback: try to find iframe in playerRef
+      else if (playerRef.current) {
+        const iframe = playerRef.current.querySelector('iframe');
+        if (iframe) {
+          try {
+            if (iframe.requestFullscreen) {
+              iframe.requestFullscreen();
+            } else if ((iframe as any).webkitRequestFullscreen) {
+              (iframe as any).webkitRequestFullscreen();
+            } else if ((iframe as any).mozRequestFullScreen) {
+              (iframe as any).mozRequestFullScreen();
+            } else if ((iframe as any).msRequestFullscreen) {
+              (iframe as any).msRequestFullscreen();
+            }
+          } catch (error) {
+            console.error('Error requesting fullscreen:', error);
+          }
+        } else {
+          console.log('No iframe found in playerRef');
         }
       }
     }
