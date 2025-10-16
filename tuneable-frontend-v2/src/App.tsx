@@ -18,7 +18,8 @@ import Dashboard from './pages/Dashboard';
 import Parties from './pages/Parties';
 import Party from './pages/Party';
 import CreateParty from './pages/CreateParty';
-import Profile from './pages/Profile';
+// Profile page deprecated - now using unified UserProfile with edit functionality
+// import Profile from './pages/Profile';
 import Payment from './pages/Payment';
 import Search from './pages/Search';
 import Wallet from './pages/Wallet';
@@ -38,6 +39,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return user ? <>{children}</> : <Navigate to="/login" />;
+};
+
+// Redirect /profile to /user/:uuid for unified profile experience
+const ProfileRedirect = () => {
+  const { user } = useAuth();
+  
+  if (!user || !user.uuid) {
+    return <Navigate to="/login" />;
+  }
+  
+  return <Navigate to={`/user/${user.uuid}`} replace />;
 };
 
 const AppContent = () => {
@@ -107,7 +119,7 @@ const AppContent = () => {
               path="/profile" 
               element={
                 <ProtectedRoute>
-                  <Profile />
+                  <ProfileRedirect />
                 </ProtectedRoute>
               } 
             />

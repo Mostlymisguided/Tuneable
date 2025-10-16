@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
@@ -8,10 +8,15 @@ import {
   TrendingUp,
   Clock,
   BarChart3,
-  Activity
+  Activity,
+  Edit3,
+  Save,
+  X,
+  Loader2
 } from 'lucide-react';
-import { userAPI } from '../lib/api';
+import { userAPI, authAPI } from '../lib/api';
 import CreatorUserToggle from '../components/CreatorUserToggle';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -82,6 +87,7 @@ interface UserStats {
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -89,12 +95,43 @@ const UserProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'creator' | 'user'>('user');
+  
+  // Edit profile state
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editForm, setEditForm] = useState({
+    username: '',
+    givenName: '',
+    familyName: '',
+    cellPhone: '',
+    homeLocation: { city: '', country: '' }
+  });
+  
+  // Check if viewing own profile
+  const isOwnProfile = currentUser && user && currentUser.uuid === user.uuid;
 
   useEffect(() => {
     if (userId) {
       fetchUserProfile();
     }
   }, [userId]);
+
+  // Populate edit form when user data loads
+  useEffect(() => {
+    if (user && isOwnProfile) {
+      setEditForm({
+        username: user.username || '',
+        givenName: (user as any).givenName || '',
+        familyName: (user as any).familyName || '',
+        cellPhone: (user as any).cellPhone || '',
+        homeLocation: {
+          city: user.homeLocation?.city || '',
+          country: user.homeLocation?.country || ''
+        }
+      });
+    }
+  }, [user, isOwnProfile]);
 
   const fetchUserProfile = async () => {
     try {
@@ -141,6 +178,51 @@ const UserProfile: React.FC = () => {
     return 'text-green-400';
   };
 
+  // Edit profile handlers
+  const handleSaveProfile = async () => {
+    try {
+      await authAPI.updateProfile(editForm);
+      toast.success('Profile updated successfully!');
+      setIsEditingProfile(false);
+      // Refresh user data
+      await fetchUserProfile();
+    } catch (err: any) {
+      console.error('Error updating profile:', err);
+      toast.error(err.response?.data?.error || 'Failed to update profile');
+    }
+  };
+
+  const handleProfilePicClick = () => {
+    if (isOwnProfile && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      await authAPI.uploadProfilePic(file);
+      toast.success('Profile picture updated!');
+      
+      // Refresh user data
+      await fetchUserProfile();
+    } catch (err: any) {
+      console.error('Error uploading profile pic:', err);
+      toast.error(err.response?.data?.error || 'Failed to upload profile picture');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -180,13 +262,38 @@ const UserProfile: React.FC = () => {
           </button>
           
           <div className="card flex items-start space-x-6 relative">
+            {/* Edit Profile Button - Only show when viewing own profile */}
+            {isOwnProfile && (
+              <button
+                onClick={() => setIsEditingProfile(true)}
+                className="absolute top-4 right-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+              >
+                <Edit3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Edit Profile</span>
+              </button>
+            )}
+
             {/* Profile Picture */}
-            <div className="flex-shrink-0 p-6">
+            <div className="flex-shrink-0 p-6 relative">
               <img
                 src={user.profilePic || '/android-chrome-192x192.png'}
                 alt={`${user.username} profile`}
-                className="rounded-full shadow-xl object-cover"
+                className={`rounded-full shadow-xl object-cover ${isOwnProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                 style={{ width: '200px', height: '200px' }}
+                onClick={handleProfilePicClick}
+                title={isOwnProfile ? 'Click to change profile picture' : ''}
+              />
+              {isUploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                  <Loader2 className="h-8 w-8 text-white animate-spin" />
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePicUpload}
+                className="hidden"
               />
             </div>
             
@@ -338,6 +445,120 @@ const UserProfile: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditingProfile && isOwnProfile && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="card max-w-2xl w-full my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">Edit Profile</h2>
+              <button
+                onClick={() => setIsEditingProfile(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Username */}
+              <div>
+                <label className="block text-white font-medium mb-2">Username</label>
+                <input
+                  type="text"
+                  value={editForm.username}
+                  onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                  className="input"
+                  placeholder="Enter username"
+                />
+              </div>
+
+              {/* Given Name */}
+              <div>
+                <label className="block text-white font-medium mb-2">First Name</label>
+                <input
+                  type="text"
+                  value={editForm.givenName}
+                  onChange={(e) => setEditForm({ ...editForm, givenName: e.target.value })}
+                  className="input"
+                  placeholder="Enter first name"
+                />
+              </div>
+
+              {/* Family Name */}
+              <div>
+                <label className="block text-white font-medium mb-2">Last Name</label>
+                <input
+                  type="text"
+                  value={editForm.familyName}
+                  onChange={(e) => setEditForm({ ...editForm, familyName: e.target.value })}
+                  className="input"
+                  placeholder="Enter last name"
+                />
+              </div>
+
+              {/* Cell Phone */}
+              <div>
+                <label className="block text-white font-medium mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={editForm.cellPhone}
+                  onChange={(e) => setEditForm({ ...editForm, cellPhone: e.target.value })}
+                  className="input"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              {/* Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">City</label>
+                  <input
+                    type="text"
+                    value={editForm.homeLocation.city}
+                    onChange={(e) => setEditForm({ 
+                      ...editForm, 
+                      homeLocation: { ...editForm.homeLocation, city: e.target.value }
+                    })}
+                    className="input"
+                    placeholder="Enter city"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Country</label>
+                  <input
+                    type="text"
+                    value={editForm.homeLocation.country}
+                    onChange={(e) => setEditForm({ 
+                      ...editForm, 
+                      homeLocation: { ...editForm.homeLocation, country: e.target.value }
+                    })}
+                    className="input"
+                    placeholder="Enter country"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleSaveProfile}
+                className="btn-primary flex-1 flex items-center justify-center space-x-2"
+              >
+                <Save className="h-4 w-4" />
+                <span>Save Changes</span>
+              </button>
+              <button
+                onClick={() => setIsEditingProfile(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

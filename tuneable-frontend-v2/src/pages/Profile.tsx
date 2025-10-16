@@ -185,7 +185,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="backdrop-blur-md bg-gray-900/20 rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-8">
           <div className="flex items-center space-x-6">
@@ -264,12 +264,12 @@ const Profile: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Personal Information */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
+              <h2 className="text-xl font-semibold text-gray-300">Personal Information</h2>
               
               {isEditing ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
                       First Name
                     </label>
                     <input
@@ -282,7 +282,7 @@ const Profile: React.FC = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
                       Last Name
                     </label>
                     <input
@@ -295,7 +295,7 @@ const Profile: React.FC = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
                       Phone Number
                     </label>
                     <input
@@ -360,7 +360,7 @@ const Profile: React.FC = () => {
 
             {/* Location & Social */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900">Location & Social</h2>
+              <h2 className="text-xl font-semibold text-gray-300">Location & Social</h2>
               
               {isEditing ? (
                 <div className="space-y-4">

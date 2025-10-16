@@ -10,10 +10,10 @@ const Dashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl text-center font-bold text-gray-300">
           Welcome back, {user?.username}!
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-center text-gray-400 mt-2">
           Ready to create some amazing music experiences?
         </p>
       </div>
@@ -25,7 +25,7 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <h2 className="text-xl font-semibold text-gray-300 mb-4">Quick Actions</h2>
           <div className="space-y-4">
             <Link
               to="/create-party"
@@ -63,7 +63,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
+          <h2 className="text-xl font-semibold text-gray-300 mb-4">Recent Activity</h2>
           <div className="text-center py-8">
             <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">No recent activity</p>
@@ -93,7 +93,7 @@ const Dashboard: React.FC = () => {
               <Music className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Active Parties</p>
+              <p className="text-sm font-medium text-gray-900">Active Parties</p>
               <p className="text-2xl font-semibold text-gray-900">0</p>
             </div>
           </div>

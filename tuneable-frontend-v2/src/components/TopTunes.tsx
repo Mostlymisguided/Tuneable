@@ -93,11 +93,11 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     return (
       <div className="card">
         {showHeader && (
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Tunes</h2>
+          <h2 className="text-xl font-semibold text-gray-300 mb-4">Top Tunes</h2>
         )}
         <div className="text-center py-8">
-          <Music className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading Top Tunes...</p>
+          <Music className="h-8 w-8 text-gray-300 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-300">Loading Top Tunes...</p>
         </div>
       </div>
     );
@@ -106,24 +106,24 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   return (
     <div className="card">
       {showHeader && (
-        <h2 className="text-center text-xl font-semibold text-gray-900 mb-4">Top Tunes</h2>
+        <h2 className="text-center text-xl font-semibold text-gray-300 mb-4">Top Tunes</h2>
       )}
       
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 #
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Song
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Top Bids
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('artist')}
               >
                 <div className="flex items-center space-x-1">
@@ -132,7 +132,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('duration')}
               >
                 <div className="flex items-center space-x-1">
@@ -141,7 +141,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('globalMediaAggregate')}
               >
                 <div className="flex items-center space-x-1">
@@ -151,18 +151,18 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="">
             {displaySongs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-300">
                   <Music className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm">No songs with bids yet</p>
                 </td>
               </tr>
             ) : (
               displaySongs.map((song, index) => (
-                <tr key={song.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                <tr key={song.id} className="hover:bg-gray-500 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-300">
                     {index + 1}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -185,7 +185,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                       </div>
                       <div className="min-w-0 flex-1">
                         <p 
-                          className="text-sm font-medium text-gray-900 truncate cursor-pointer hover:text-purple-600 transition-colors"
+                          className="text-sm font-medium text-gray-300 truncate cursor-pointer hover:text-purple-600 transition-colors"
                           onClick={() => song.uuid && navigate(`/tune/${song.uuid}`)}
                         >
                           {song.title}
@@ -200,10 +200,10 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                       <span className="text-sm text-gray-400">No bids</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                     {song.artist}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                     {formatDuration(song.duration)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
@@ -218,10 +218,10 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       
       {/* Show More/Less Button */}
       {songs.length > limit && (
-        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+        <div className="px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-500">
           <button
             onClick={isExpanded ? handleShowLess : handleShowMore}
-            className="w-full text-center text-sm font-medium text-purple-600 hover:text-purple-800 transition-colors"
+            className="w-full text-center text-sm font-medium text-white transition-colors"
           >
             {isExpanded ? (
               `Show Less (${limit} songs)`
