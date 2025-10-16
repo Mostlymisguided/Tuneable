@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -1137,19 +1137,15 @@ const Party: React.FC = () => {
                                 {songData.tags && songData.tags.length > 0 && (
                                   <div className="mt-2">
                                     <div className="flex flex-wrap gap-1">
-                                      {songData.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
-                                        <span
+                                      {songData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
+                                        <Link
                                           key={tagIndex}
-                                          className="px-2 py-1 bg-purple-600 text-white text-xs rounded-full"
+                                          to={`/tune/${songData._id || songData.id}`}
+                                          className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
                                         >
                                           #{tag}
-                                        </span>
+                                        </Link>
                                       ))}
-                                      {songData.tags.length > 3 && (
-                                        <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">
-                                          +{songData.tags.length - 3} more
-                                        </span>
-                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1438,7 +1434,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${songData.id}-${index}`}
-                            className="card bg-purple-800 p-4 rounded-lg flex items-center space-x-4"
+                            className="card flex items-center hover:bg-purple-800"
                           >
                             {/* Number Badge */}
                             <div className="w-4 h-4 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1485,21 +1481,17 @@ const Party: React.FC = () => {
                               
                               {/* Tags Display */}
                               {songData.tags && songData.tags.length > 0 && (
-                                <div className="hidden md:flex mt-2">
+                                <div className="mt-2 flex">
                                   <div className="flex flex-wrap gap-1">
-                                    {songData.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
-                                      <span
+                                    {songData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
+                                      <Link
                                         key={tagIndex}
-                                        className="px-2 py-1 bg-purple-600 text-white text-xs rounded-full"
+                                        to={`/tune/${songData._id || songData.id}`}
+                                        className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
                                       >
                                         #{tag}
-                                      </span>
+                                      </Link>
                                     ))}
-                                    {songData.tags.length > 5 && (
-                                      <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">
-                                        +{songData.tags.length - 5} more
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
                               )}
