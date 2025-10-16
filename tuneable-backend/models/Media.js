@@ -212,6 +212,9 @@ const mediaSchema = new mongoose.Schema({
   addedBy_uuid: { type: String },
   uploadedAt: { type: Date, default: Date.now }, // Keep for backward compatibility (maps to createdAt)
   playCount: { type: Number, default: 0 },
+  
+  // Verified creators (users who have proven ownership)
+  verifiedCreators: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   popularity: { type: Number, default: 0 },
   
   // Relationships to other media (content graph)

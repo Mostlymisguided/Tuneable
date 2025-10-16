@@ -17,9 +17,11 @@ import {
   Mic,
   Disc,
   Headphones,
-  Volume2
+  Volume2,
+  Award,
+  X
 } from 'lucide-react';
-import { songAPI } from '../lib/api';
+import { songAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -108,6 +110,12 @@ const TuneProfile: React.FC = () => {
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
+  
+  // Claim tune modals
+  const [showCreatorSignupModal, setShowCreatorSignupModal] = useState(false);
+  const [showClaimVerificationModal, setShowClaimVerificationModal] = useState(false);
+  const [claimProofText, setClaimProofText] = useState('');
+  const [claimProofFiles, setClaimProofFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (songId) {
@@ -213,6 +221,58 @@ const TuneProfile: React.FC = () => {
     return value.toString();
   };
 
+  // Handle claim tune button click
+  const handleClaimTune = () => {
+    if (!user) {
+      toast.info('Please log in to claim this tune');
+      navigate('/login');
+      return;
+    }
+
+    if (!user.role?.includes('creator')) {
+      // User is not a creator - show creator signup modal
+      setShowCreatorSignupModal(true);
+    } else {
+      // User is already a creator - show claim verification modal
+      setShowClaimVerificationModal(true);
+    }
+  };
+
+  // Handle creator signup
+  const handleCreatorSignup = () => {
+    setShowCreatorSignupModal(false);
+    // TODO: Navigate to dedicated creator signup page or update user role
+    navigate('/profile'); // For now, send them to profile where CreatorUserToggle is
+    toast.info('Use the Creator/User toggle on your profile to enable creator mode');
+  };
+
+  // Handle claim submission
+  const handleSubmitClaim = async () => {
+    if (!claimProofText.trim()) {
+      toast.error('Please provide proof of ownership');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('mediaId', song?._id || '');
+      formData.append('proofText', claimProofText);
+      claimProofFiles.forEach((file) => {
+        formData.append('proofFiles', file);
+      });
+
+      await claimAPI.submitClaim(formData);
+      
+      toast.success('Claim submitted for review! We\'ll notify you when it\'s processed.');
+      setShowClaimVerificationModal(false);
+      setClaimProofText('');
+      setClaimProofFiles([]);
+    } catch (err: any) {
+      console.error('Error submitting claim:', err);
+      toast.error(err.response?.data?.error || 'Failed to submit claim');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -277,7 +337,17 @@ const TuneProfile: React.FC = () => {
             Back
           </button>
           
-          <div className="card flex items-start space-x-6">
+          <div className="card flex items-start space-x-6 relative">
+            {/* Claim Tune Button - Top Right */}
+            <button
+              onClick={handleClaimTune}
+              className="absolute top-4 right-4 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+            >
+              <Award className="h-4 w-4" />
+              <span className="hidden sm:inline">Claim Tune</span>
+              <span className="sm:hidden">Claim</span>
+            </button>
+
             {/* Album Art */}
             <div className="flex-shrink-0">
               <img
@@ -535,6 +605,134 @@ const TuneProfile: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Creator Signup Modal */}
+      {showCreatorSignupModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white">Become a Creator</h2>
+              <button
+                onClick={() => setShowCreatorSignupModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <p className="text-gray-300 mb-6">
+              Join Tuneable as a creator to claim your music, earn directly from fan bids, 
+              and connect with your audience in a revolutionary new way.
+            </p>
+            
+            <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4 mb-6">
+              <h3 className="text-white font-semibold mb-2">Creator Benefits:</h3>
+              <ul className="text-gray-300 text-sm space-y-1">
+                <li>✓ Claim ownership of your tracks</li>
+                <li>✓ Earn directly from fan bids</li>
+                <li>✓ Access to creator analytics</li>
+                <li>✓ Verify your identity with badges</li>
+                <li>✓ Connect with your biggest fans</li>
+              </ul>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button onClick={handleCreatorSignup} className="btn-primary flex-1">
+                Enable Creator Mode
+              </button>
+              <button onClick={() => setShowCreatorSignupModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Claim Verification Modal */}
+      {showClaimVerificationModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-lg w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white">
+                Claim "{song?.title}"
+              </h2>
+              <button
+                onClick={() => setShowClaimVerificationModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <p className="text-gray-300 mb-4">
+              To verify you're a creator of this tune, please provide proof of ownership:
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-white font-medium mb-2">
+                Proof of Ownership
+              </label>
+              <textarea
+                value={claimProofText}
+                onChange={(e) => setClaimProofText(e.target.value)}
+                placeholder="Describe your role (artist, producer, songwriter, etc.) and provide links to social media, streaming profiles, distribution platforms, or other verification..."
+                className="input min-h-32"
+                maxLength={2000}
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                {claimProofText.length}/2000 characters
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-white font-medium mb-2">
+                Supporting Documents (Optional)
+              </label>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                onChange={(e) => setClaimProofFiles(Array.from(e.target.files || []))}
+                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Upload screenshots, contracts, distribution receipts, or other proof
+              </p>
+              {claimProofFiles.length > 0 && (
+                <div className="mt-2 text-sm text-gray-300">
+                  {claimProofFiles.length} file(s) selected
+                </div>
+              )}
+            </div>
+            
+            <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3 mb-4">
+              <p className="text-yellow-200 text-sm">
+                <strong>Note:</strong> Claims are reviewed by our team. False claims may result in account suspension.
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button 
+                onClick={handleSubmitClaim}
+                disabled={!claimProofText.trim()}
+                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Claim
+              </button>
+              <button 
+                onClick={() => {
+                  setShowClaimVerificationModal(false);
+                  setClaimProofText('');
+                  setClaimProofFiles([]);
+                }} 
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

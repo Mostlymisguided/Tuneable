@@ -140,6 +140,7 @@ app.use('/api/auth', authRoutes); // OAuth routes
 app.use('/api/podcasts', podcastRoutes); // Consolidated Podcast routes
 app.use('/api/youtube-import', youtubeImportRoutes); // YouTube bulk import routes
 app.use('/api/bid-metrics', bidMetricsRoutes); // Bid metrics API routes
+app.use('/api/claims', require('./routes/claimRoutes')); // Tune ownership claims
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
 

@@ -322,5 +322,33 @@ export const userAPI = {
   },
 };
 
+export const claimAPI = {
+  submitClaim: async (formData: FormData) => {
+    const response = await api.post('/claims/submit', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  
+  getMyClaims: async () => {
+    const response = await api.get('/claims/my-claims');
+    return response.data;
+  },
+  
+  // Admin only
+  getAllClaims: async (status?: string) => {
+    const params = status ? { status } : {};
+    const response = await api.get('/claims/all', { params });
+    return response.data;
+  },
+  
+  // Admin only
+  reviewClaim: async (claimId: string, status: 'approved' | 'rejected', reviewNotes?: string) => {
+    const response = await api.patch(`/claims/${claimId}/review`, { status, reviewNotes });
+    return response.data;
+  },
+};
 
 export default api;
