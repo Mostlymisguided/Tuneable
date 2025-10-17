@@ -14,7 +14,11 @@ import {
   X,
   Loader2,
   Gift,
-  Copy
+  Copy,
+  Facebook,
+  Youtube,
+  Instagram,
+  Music2
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import CreatorUserToggle from '../components/CreatorUserToggle';
@@ -40,6 +44,11 @@ interface UserProfile {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // Social media fields
+  facebookId?: string;
+  googleId?: string;
+  instagramId?: string;
+  soundcloudId?: string;
 }
 
 interface Bid {
@@ -178,6 +187,58 @@ const UserProfile: React.FC = () => {
     if (roles.includes('admin')) return 'text-white';
     if (roles.includes('moderator')) return 'text-blue-400';
     return 'text-green-400';
+  };
+
+  // Get social media links based on connected accounts
+  const getSocialMediaLinks = () => {
+    const socialLinks = [];
+    
+    if (user?.facebookId) {
+      socialLinks.push({
+        name: 'Facebook',
+        icon: Facebook,
+        url: `https://facebook.com/${user.facebookId}`,
+        color: 'hover:bg-blue-600/30 hover:border-blue-500'
+      });
+    }
+    
+    if (user?.googleId) {
+      // YouTube is connected via Google OAuth
+      socialLinks.push({
+        name: 'YouTube',
+        icon: Youtube,
+        url: '#', // Could link to YouTube channel if available
+        color: 'hover:bg-red-600/30 hover:border-red-500'
+      });
+    }
+    
+    if (user?.soundcloudId) {
+      const soundcloudUrl = (user as any).soundcloudUsername 
+        ? `https://soundcloud.com/${(user as any).soundcloudUsername}`
+        : `https://soundcloud.com/user-${user.soundcloudId}`;
+      
+      socialLinks.push({
+        name: 'SoundCloud',
+        icon: Music2,
+        url: soundcloudUrl,
+        color: 'hover:bg-orange-600/30 hover:border-orange-500'
+      });
+    }
+    
+    if (user?.instagramId) {
+      const instagramUrl = (user as any).instagramUsername 
+        ? `https://instagram.com/${(user as any).instagramUsername}`
+        : `https://instagram.com/user-${user.instagramId}`;
+      
+      socialLinks.push({
+        name: 'Instagram',
+        icon: Instagram,
+        url: instagramUrl,
+        color: 'hover:bg-pink-600/30 hover:border-pink-500'
+      });
+    }
+    
+    return socialLinks;
   };
 
   // Copy invite code to clipboard
@@ -338,7 +399,25 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-             
+              {/* Social Media Buttons */}
+              {getSocialMediaLinks().length > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {getSocialMediaLinks().map((social) => (
+                      <a
+                        key={social.name}
+                        href={social.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center space-x-2 px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all ${social.color}`}
+                      >
+                        <social.icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{social.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Personal Invite Code - Only visible to profile owner */}
               {isOwnProfile && user.personalInviteCode && (

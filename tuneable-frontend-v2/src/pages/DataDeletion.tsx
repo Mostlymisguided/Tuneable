@@ -163,7 +163,7 @@ const DataDeletion: React.FC = () => {
               </p>
               <div className="bg-gray-100 p-4 rounded-lg">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> privacy@tuneable.com<br />
+                  <strong>Email:</strong>mostlymisguided@icloud.com<br />
                   <strong>Subject:</strong> Data Deletion Request<br />
                   <strong>Response Time:</strong> Within 7 business days<br />
                   <strong>Note:</strong> Please include your username or email address for faster processing

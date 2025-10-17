@@ -130,7 +130,18 @@ const PrivacyPolicy: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Contact Us</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Related Policies</h2>
+              <p className="text-gray-700">
+                Please also review our{' '}
+                <Link to="/terms-of-service" className="text-primary-600 hover:text-primary-500 font-medium">
+                  Terms of Service
+                </Link>
+                {' '}which govern your use of the Tuneable platform.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Contact Us</h2>
               <p className="text-gray-700">
                 If you have any questions about this privacy policy or our data practices, please contact us at:
               </p>

@@ -97,6 +97,90 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   });
 }
 
+// SoundCloud OAuth routes - only available if configured
+if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
+  router.get('/soundcloud', passport.authenticate('soundcloud'));
+
+  router.get('/soundcloud/callback', 
+    passport.authenticate('soundcloud', { failureRedirect: '/login?error=soundcloud_auth_failed' }),
+    async (req, res) => {
+      try {
+        // Generate JWT token for the authenticated user using UUID
+        const token = jwt.sign(
+          { 
+            userId: req.user.uuid,  // Use UUID instead of _id
+            email: req.user.email, 
+            username: req.user.username 
+          }, 
+          SECRET_KEY, 
+          { expiresIn: '24h' }
+        );
+
+        // Redirect to frontend with ONLY the token (security improvement)
+        // Frontend will fetch user data using the token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        
+      } catch (error) {
+        console.error('SoundCloud callback error:', error);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=soundcloud_auth_failed`);
+      }
+    }
+  );
+} else {
+  // SoundCloud OAuth not configured - return 503 Service Unavailable
+  router.get('/soundcloud', (req, res) => {
+    res.status(503).json({ error: 'SoundCloud OAuth not configured' });
+  });
+  
+  router.get('/soundcloud/callback', (req, res) => {
+    res.status(503).json({ error: 'SoundCloud OAuth not configured' });
+  });
+}
+
+// Instagram OAuth routes - only available if configured
+if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
+  router.get('/instagram', passport.authenticate('instagram', { 
+    scope: ['user_profile', 'user_media'] 
+  }));
+
+  router.get('/instagram/callback', 
+    passport.authenticate('instagram', { failureRedirect: '/login?error=instagram_auth_failed' }),
+    async (req, res) => {
+      try {
+        // Generate JWT token for the authenticated user using UUID
+        const token = jwt.sign(
+          { 
+            userId: req.user.uuid,  // Use UUID instead of _id
+            email: req.user.email, 
+            username: req.user.username 
+          }, 
+          SECRET_KEY, 
+          { expiresIn: '24h' }
+        );
+
+        // Redirect to frontend with ONLY the token (security improvement)
+        // Frontend will fetch user data using the token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        
+      } catch (error) {
+        console.error('Instagram callback error:', error);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=instagram_auth_failed`);
+      }
+    }
+  );
+} else {
+  // Instagram OAuth not configured - return 503 Service Unavailable
+  router.get('/instagram', (req, res) => {
+    res.status(503).json({ error: 'Instagram OAuth not configured' });
+  });
+  
+  router.get('/instagram/callback', (req, res) => {
+    res.status(503).json({ error: 'Instagram OAuth not configured' });
+  });
+}
+
 // Token refresh endpoint
 router.post('/refresh', authMiddleware, async (req, res) => {
   try {

@@ -146,6 +146,12 @@ const Home: React.FC = () => {
                 Privacy Policy
               </Link>
               <Link 
+                to="/terms-of-service" 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Terms of Service
+              </Link>
+              <Link 
                 to="/data-deletion" 
                 className="text-gray-400 hover:text-white transition-colors"
               >

@@ -1,6 +1,8 @@
 const passport = require('passport');
 const FacebookStrategy = require('passport-facebook').Strategy;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const SoundCloudStrategy = require('passport-soundcloud').Strategy;
+const InstagramStrategy = require('passport-instagram-graph').Strategy;
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
@@ -247,6 +249,220 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   ));
 } else {
   console.log('⚠️  Google OAuth not configured - GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET missing');
+}
+
+// SoundCloud OAuth Strategy - only configure if environment variables are available
+if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
+  passport.use(new SoundCloudStrategy({
+      clientID: process.env.SOUNDCLOUD_CLIENT_ID,
+      clientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET,
+      callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback"
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        console.log('SoundCloud profile:', profile);
+        
+        // Check if user already exists with this SoundCloud ID
+        let user = await User.findOne({ soundcloudId: profile.id });
+        
+        if (user) {
+          // User exists, update their SoundCloud access token
+          user.soundcloudAccessToken = accessToken;
+          
+          // Update username if not set
+          if (profile.username && !user.soundcloudUsername) {
+            user.soundcloudUsername = profile.username;
+          }
+          
+          // Update profile picture if user doesn't have one
+          if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
+            user.profilePic = profile.photos[0].value;
+          }
+          
+          await user.save();
+          return done(null, user);
+        }
+        
+        // Check if user exists with the same username (SoundCloud doesn't always provide email)
+        if (profile.username) {
+          user = await User.findOne({ username: profile.username });
+          
+          if (user) {
+            // Check if this is the first time linking SoundCloud
+            const isFirstSoundCloudLink = !user.soundcloudId;
+            
+            // Link SoundCloud account to existing user
+            user.soundcloudId = profile.id;
+            user.soundcloudUsername = profile.username;
+            user.soundcloudAccessToken = accessToken;
+            
+            // Update profile picture if user doesn't have one or is linking SoundCloud for first time
+            if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstSoundCloudLink)) {
+              user.profilePic = profile.photos[0].value;
+            }
+            
+            await user.save();
+            return done(null, user);
+          }
+        }
+        
+        // Create new user
+        const usernameValue = profile.username || `soundcloud_${profile.id}`;
+        
+        // Ensure username is unique
+        let finalUsername = usernameValue;
+        let counter = 1;
+        while (await User.findOne({ username: finalUsername })) {
+          finalUsername = `${usernameValue}${counter}`;
+          counter++;
+        }
+        
+        console.log('Creating new user with:', {
+          soundcloudId: profile.id,
+          username: finalUsername,
+          soundcloudUsername: profile.username
+        });
+        
+        // Get profile picture
+        let profilePicUrl = null;
+        if (profile.photos && profile.photos.length > 0) {
+          profilePicUrl = profile.photos[0].value;
+        }
+
+        const newUser = new User({
+          soundcloudId: profile.id,
+          soundcloudUsername: profile.username,
+          soundcloudAccessToken: accessToken,
+          username: finalUsername,
+          givenName: profile.name ? profile.name.givenName : null,
+          familyName: profile.name ? profile.name.familyName : null,
+          profilePic: profilePicUrl,
+          isActive: true,
+          role: ['user'],
+          balance: 0,
+          // Generate invite codes
+          personalInviteCode: generateInviteCode(),
+          parentInviteCode: '7777' // Default parent code
+        });
+        
+        await newUser.save();
+        return done(null, newUser);
+        
+      } catch (error) {
+        console.error('SoundCloud OAuth error:', error);
+        return done(error, null);
+      }
+    }
+  ));
+} else {
+  console.log('⚠️  SoundCloud OAuth not configured - SOUNDCLOUD_CLIENT_ID or SOUNDCLOUD_CLIENT_SECRET missing');
+}
+
+// Instagram OAuth Strategy - only configure if environment variables are available
+if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
+  passport.use(new InstagramStrategy({
+      clientID: process.env.INSTAGRAM_APP_ID,
+      clientSecret: process.env.INSTAGRAM_APP_SECRET,
+      callbackURL: process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback"
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        console.log('Instagram profile:', profile);
+        
+        // Check if user already exists with this Instagram ID
+        let user = await User.findOne({ instagramId: profile.id });
+        
+        if (user) {
+          // User exists, update their Instagram access token
+          user.instagramAccessToken = accessToken;
+          
+          // Update username if not set
+          if (profile.username && !user.instagramUsername) {
+            user.instagramUsername = profile.username;
+          }
+          
+          // Update profile picture if user doesn't have one
+          if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
+            user.profilePic = profile.photos[0].value;
+          }
+          
+          await user.save();
+          return done(null, user);
+        }
+        
+        // Check if user exists with the same username
+        if (profile.username) {
+          user = await User.findOne({ username: profile.username });
+          
+          if (user) {
+            // Check if this is the first time linking Instagram
+            const isFirstInstagramLink = !user.instagramId;
+            
+            // Link Instagram account to existing user
+            user.instagramId = profile.id;
+            user.instagramUsername = profile.username;
+            user.instagramAccessToken = accessToken;
+            
+            // Update profile picture if user doesn't have one or is linking Instagram for first time
+            if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstInstagramLink)) {
+              user.profilePic = profile.photos[0].value;
+            }
+            
+            await user.save();
+            return done(null, user);
+          }
+        }
+        
+        // Create new user
+        const usernameValue = profile.username || `instagram_${profile.id}`;
+        
+        // Ensure username is unique
+        let finalUsername = usernameValue;
+        let counter = 1;
+        while (await User.findOne({ username: finalUsername })) {
+          finalUsername = `${usernameValue}${counter}`;
+          counter++;
+        }
+        
+        console.log('Creating new user with:', {
+          instagramId: profile.id,
+          username: finalUsername,
+          instagramUsername: profile.username
+        });
+        
+        // Get profile picture
+        let profilePicUrl = null;
+        if (profile.photos && profile.photos.length > 0) {
+          profilePicUrl = profile.photos[0].value;
+        }
+
+        const newUser = new User({
+          instagramId: profile.id,
+          instagramUsername: profile.username,
+          instagramAccessToken: accessToken,
+          username: finalUsername,
+          givenName: profile.name ? profile.name.givenName : null,
+          familyName: profile.name ? profile.name.familyName : null,
+          profilePic: profilePicUrl,
+          isActive: true,
+          role: ['user'],
+          balance: 0,
+          // Generate invite codes
+          personalInviteCode: generateInviteCode(),
+          parentInviteCode: '7777' // Default parent code
+        });
+        
+        await newUser.save();
+        return done(null, newUser);
+        
+      } catch (error) {
+        console.error('Instagram OAuth error:', error);
+        return done(error, null);
+      }
+    }
+  ));
+} else {
+  console.log('⚠️  Instagram OAuth not configured - INSTAGRAM_APP_ID or INSTAGRAM_APP_SECRET missing');
 }
 
 // Generate unique invite code

@@ -13,6 +13,7 @@ import TopTunes from './pages/TopTunes';
 import AuthPage from './pages/AuthPage';
 import AuthCallback from './pages/AuthCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import Dashboard from './pages/Dashboard';
 import Parties from './pages/Parties';
@@ -66,6 +67,7 @@ const AppContent = () => {
             <Route path="/register" element={<AuthPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route 
               path="/dashboard" 
