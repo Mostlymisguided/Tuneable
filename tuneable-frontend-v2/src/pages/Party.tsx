@@ -915,20 +915,26 @@ const Party: React.FC = () => {
         <div className="card max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-              <div>
+              <div className="space-y-3">
                 <h1 className="mb-2 text-xl sm:text-3xl font-bold text-white">{party.name}</h1>
-                <div className="p-1 flex items-center space-x-4 mt-1">
-                  <span className="text-gray-300 text-sm sm:text-xl">
+                <div className="flex items-center mt-1">
+                <span className="text-white text-sm font-semibold md:text-lg">
+                    Location
+                  </span>
+                  <span className="ml-2 text-white text-sm font-semibold md:text-lg bg-purple-600 rounded-full px-2 py-1">
                     {party.location}
                   </span>
                 </div>
-                <div className="mt-2 mb-2">
-                  <span className="text-gray-400 text-sm sm:text-lg">
-                    Host: {typeof party.host === 'object' && party.host.username ? party.host.username : 'Unknown Host'}
+                <div className="">
+                  <span className="text-white text-sm font-semibold md:text-lg">
+                    Host 
+                  </span>
+                  <span className="ml-2 text-white text-sm font-semibold md:text-lg bg-purple-600 rounded-full px-2 py-1">
+                    {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                   </span>
                 </div>
-                <div className="mt-4">
-                  <span className="px-2 py-2 text-white text-xs font-medium rounded-full" style={{backgroundColor: 'rgba(5, 150, 105, 0.5)'}}>
+                <div className="flex mt-4">
+                  <span className="px-2 py-1 text-white text-xs md:text-base font-medium rounded-full bg-green-600/90">
                     {party.status}
                   </span>
                   </div>
@@ -1730,7 +1736,7 @@ const Party: React.FC = () => {
         <div className="space-y-6">
           {/* Attendees */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendees</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Partiers</h3>
             <div className="space-y-2">
               {party.attendees.map((attendee: any, index: number) => {
                 const hostId = typeof party.host === 'string' ? party.host : party.host?.uuid;
@@ -1742,7 +1748,7 @@ const Party: React.FC = () => {
                         {attendee.username?.charAt(0).toUpperCase() || '?'}
                       </span>
                     </div>
-                    <span className="p-2 text-sm text-gray-900">{attendee.username || 'Unknown User'}</span>
+                    <span className="p-2 text-sm text-white">{attendee.username || 'Unknown User'}</span>
                     {attendeeId === hostId && (
                       <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                         Host
@@ -1756,22 +1762,22 @@ const Party: React.FC = () => {
 
           {/* Party Info */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Party Info</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Party Info</h3>
             <div className="space-y-3 text-sm">
               <div className="flex  items-center">
-                <span className="text-gray-600 mr-2">Type:</span>
-                <span className="px-2 text-gray-900 capitalize">{party.type}</span>
+                <span className="text-white mr-2">Type:</span>
+                <span className="px-2 text-white capitalize">{party.type}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-600 mr-2">Location:</span>
-                <span className="px-2 text-gray-900">{party.location}</span>
+                <span className="text-white mr-2">Location:</span>
+                <span className="px-2 text-white">{party.location}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-600 mr-2">Created:</span>
-                <span className="px-2 text-gray-900">{formatDate(party.createdAt)}</span>
+                <span className="text-white mr-2">Created:</span>
+                <span className="px-2 text-white">{formatDate(party.createdAt)}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-600 mr-2">Status:</span>
+                <span className="text-white mr-2">Status:</span>
                 <span className="px-2 text-green-600 capitalize">{party.status}</span>
               </div>
             </div>

@@ -158,22 +158,22 @@ const Parties: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Parties</h1>
-          <p className="text-gray-600 mt-2">Discover and join music parties</p>
+          <h1 className="text-3xl font-bold text-white">Parties</h1>
+          <p className="text-gray-300 mt-2">Discover and join music parties</p>
         </div>
         <Link
           to="/create-party"
           className="btn-primary flex items-center space-x-2"
         >
           <Music className="h-4 w-4" />
-          <span className="no-underline">Create Party</span>
+          <span className="text-base font-semibold no-underline">Create Party</span>
         </Link>
       </div>
 
       {parties.length === 0 ? (
         <div className="text-center py-12">
           <Music className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No parties found</h3>
+          <h3 className="text-lg font-medium text-gray-300 mb-2">No parties found</h3>
           <p className="text-gray-600 mb-6">Be the first to create a party!</p>
           <Link to="/create-party" className="btn-primary">
             Create Your First Party
@@ -184,7 +184,7 @@ const Parties: React.FC = () => {
           {parties.map((party) => (
             <div key={party.id} className="card hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{party.name}</h3>
+                <h3 className="text-lg font-semibold text-white">{party.name}</h3>
                 <span 
                   className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(party.status)}`}
                   style={party.status === 'ended' ? { backgroundColor: '#ec4899', color: 'white', fontWeight: 'bold' } : {}}
@@ -194,30 +194,30 @@ const Parties: React.FC = () => {
               </div>
 
               <div className="space-y-3 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
+                <div className="flex items-center text-sm text-white">
                   <MapPin className="h-4 w-4 mr-2" />
                   <span>{party.location}</span>
                 </div>
                 
 
-                <div className="flex items-center text-sm text-gray-600">
+                <div className="flex items-center text-sm text-white">
                   <Clock className="h-4 w-4 mr-2" />
                   <span>{formatDate(party.startTime)}</span>
                 </div>
 
-                <div className="flex items-center text-sm text-gray-600">
+                <div className="flex items-center text-sm text-white">
                   <Users className="h-4 w-4 mr-2" />
                   <span>{Array.isArray(party.attendees) ? party.attendees.length : 0} attendees</span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-white">
                   Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
                 <button
                   onClick={() => handleJoinParty(party.id, party.name, party.privacy, party.host, party.attendees)}
-                  className="btn-primary text-sm"
+                  className="btn-primary text-base"
                 >
                   Join Party
                 </button>
