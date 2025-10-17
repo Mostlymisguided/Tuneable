@@ -140,8 +140,6 @@ const TuneProfile: React.FC = () => {
     key: '',
     tags: [] as string[],
     lyrics: '',
-    rightsHolder: '',
-    rightsHolderEmail: '',
     description: ''
   });
 
@@ -218,8 +216,6 @@ const TuneProfile: React.FC = () => {
         key: song.key || '',
         tags: song.tags || [],
         lyrics: song.lyrics || '',
-        rightsHolder: song.rightsHolder || '',
-        rightsHolderEmail: song.rightsHolderEmail || '',
         description: (song as any).description || ''
       });
     }
@@ -1136,30 +1132,6 @@ const TuneProfile: React.FC = () => {
                     onChange={(e) => setEditForm({ ...editForm, key: e.target.value })}
                     className="input"
                     placeholder="Musical key (e.g., C Major)"
-                  />
-                </div>
-              </div>
-
-              {/* Rights Holder Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">Rights Holder</label>
-                  <input
-                    type="text"
-                    value={editForm.rightsHolder}
-                    onChange={(e) => setEditForm({ ...editForm, rightsHolder: e.target.value })}
-                    className="input"
-                    placeholder="Rights holder name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Rights Holder Email</label>
-                  <input
-                    type="email"
-                    value={editForm.rightsHolderEmail}
-                    onChange={(e) => setEditForm({ ...editForm, rightsHolderEmail: e.target.value })}
-                    className="input"
-                    placeholder="contact@example.com"
                   />
                 </div>
               </div>
