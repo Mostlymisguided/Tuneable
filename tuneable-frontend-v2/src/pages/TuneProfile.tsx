@@ -146,13 +146,6 @@ const TuneProfile: React.FC = () => {
     return total / bids.length;
   };
 
-  // Calculate total unique fans (users who bid on this song)
-  const calculateTotalFans = (songData: Song) => {
-    const bids = songData.bids || [];
-    const uniqueUsers = new Set(bids.map(bid => bid.userId._id));
-    return uniqueUsers.size;
-  };
-
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !songId || !user) return;
