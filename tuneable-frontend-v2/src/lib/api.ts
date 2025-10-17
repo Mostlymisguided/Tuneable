@@ -312,6 +312,7 @@ export const songAPI = {
     rightsHolder?: string;
     rightsHolderEmail?: string;
     description?: string;
+    sources?: { [key: string]: string };
   }) => {
     const response = await api.put(`/songs/${songId}`, updates);
     return response.data;

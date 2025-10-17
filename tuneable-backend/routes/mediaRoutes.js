@@ -226,7 +226,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       'title', 'producer', 'featuring', 'album', 'genre',
       'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'rightsHolder', 'rightsHolderEmail', 'description'
+      'lyrics', 'rightsHolder', 'rightsHolderEmail', 'description', 'sources'
     ];
     
     allowedUpdates.forEach(field => {

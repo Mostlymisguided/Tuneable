@@ -21,7 +21,9 @@ import {
   X,
   Save,
   Edit3,
-  SquarePlus
+  SquarePlus,
+  Youtube,
+  Music2
 } from 'lucide-react';
 import { songAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
@@ -61,6 +63,7 @@ interface Song {
   playCount?: number;
   popularity?: number;
   sources?: { [key: string]: string };
+  externalIds?: { [key: string]: string };
   bids?: Bid[];
   comments?: Comment[];
   addedBy?: {
@@ -141,6 +144,11 @@ const TuneProfile: React.FC = () => {
     rightsHolderEmail: '',
     description: ''
   });
+
+  // Add Link modal state
+  const [showAddLinkModal, setShowAddLinkModal] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
 
   useEffect(() => {
     if (songId) {
@@ -230,6 +238,135 @@ const TuneProfile: React.FC = () => {
     } catch (err: any) {
       console.error('Error updating tune:', err);
       toast.error(err.response?.data?.error || 'Failed to update tune');
+    }
+  };
+
+  // Get platform icon and color
+  const getPlatformIcon = (platform: string) => {
+    const platformLower = platform.toLowerCase();
+    switch (platformLower) {
+      case 'youtube':
+        return { icon: Youtube, color: 'hover:bg-red-600/30 hover:border-red-500', bgColor: 'bg-red-600/20' };
+      case 'soundcloud':
+        return { icon: Music2, color: 'hover:bg-orange-600/30 hover:border-orange-500', bgColor: 'bg-orange-600/20' };
+      case 'spotify':
+        return { icon: Music, color: 'hover:bg-green-600/30 hover:border-green-500', bgColor: 'bg-green-600/20' };
+      default:
+        return { icon: ExternalLink, color: 'hover:bg-purple-600/30 hover:border-purple-500', bgColor: 'bg-purple-600/20' };
+    }
+  };
+
+  // Get available external links
+  const getExternalLinks = () => {
+    const links: Array<{
+      platform: string;
+      url: string;
+      icon: any;
+      color: string;
+      bgColor: string;
+      displayName: string;
+    }> = [];
+    
+    // Add links from sources
+    if (song?.sources) {
+      Object.entries(song.sources).forEach(([platform, url]) => {
+        const { icon, color, bgColor } = getPlatformIcon(platform);
+        links.push({
+          platform,
+          url,
+          icon,
+          color,
+          bgColor,
+          displayName: platform.charAt(0).toUpperCase() + platform.slice(1)
+        });
+      });
+    }
+    
+    // Auto-populate YouTube link from externalIds if not already in sources
+    if (song?.externalIds?.youtube && !song?.sources?.youtube) {
+      const youtubeId = song.externalIds.youtube;
+      const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+      const { icon, color, bgColor } = getPlatformIcon('youtube');
+      links.push({
+        platform: 'youtube',
+        url: youtubeUrl,
+        icon,
+        color,
+        bgColor,
+        displayName: 'YouTube'
+      });
+    }
+    
+    // Auto-populate Spotify link from externalIds if not already in sources
+    if (song?.externalIds?.spotify && !song?.sources?.spotify) {
+      const spotifyId = song.externalIds.spotify;
+      const spotifyUrl = `https://open.spotify.com/track/${spotifyId}`;
+      const { icon, color, bgColor } = getPlatformIcon('spotify');
+      links.push({
+        platform: 'spotify',
+        url: spotifyUrl,
+        icon,
+        color,
+        bgColor,
+        displayName: 'Spotify'
+      });
+    }
+    
+    return links;
+  };
+
+  // Get platforms that can be added
+  const getMissingPlatforms = () => {
+    if (!canEditTune()) return [];
+    
+    const existingSources = song?.sources || {};
+    const existingExternalIds = song?.externalIds || {};
+    const allPlatforms = ['YouTube', 'SoundCloud', 'Spotify'];
+    
+    return allPlatforms
+      .filter(platform => {
+        const platformLower = platform.toLowerCase();
+        // Don't show "Add" button if link exists in sources OR in externalIds
+        return !existingSources[platformLower] && !existingExternalIds[platformLower];
+      })
+      .map(platform => {
+        const { icon, color } = getPlatformIcon(platform);
+        return {
+          platform: platform.toLowerCase(),
+          displayName: platform,
+          icon,
+          color
+        };
+      });
+  };
+
+  // Handle adding a new link
+  const handleAddLink = (platform: string) => {
+    setSelectedPlatform(platform);
+    setShowAddLinkModal(true);
+  };
+
+  // Save new link
+  const handleSaveLink = async () => {
+    if (!songId || !selectedPlatform || !newLinkUrl.trim()) return;
+    
+    try {
+      const updatedSources = {
+        ...(song?.sources || {}),
+        [selectedPlatform]: newLinkUrl.trim()
+      };
+      
+      await songAPI.updateSong(songId, { sources: updatedSources });
+      toast.success(`${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} link added!`);
+      setShowAddLinkModal(false);
+      setSelectedPlatform('');
+      setNewLinkUrl('');
+      
+      // Refresh song data
+      await fetchSongProfile();
+    } catch (err: any) {
+      console.error('Error adding link:', err);
+      toast.error(err.response?.data?.error || 'Failed to add link');
     }
   };
 
@@ -507,22 +644,40 @@ const TuneProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* Platform Links */}
-              {song.sources && Object.keys(song.sources).length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-3">Listen on:</h3>
-                  <div className="flex space-x-3">
-                    {Object.entries(song.sources).map(([platform, url]) => (
+              {/* External Source Links */}
+              {getExternalLinks().length > 0 && (
+                <div className="mb-4 px-4">
+                  <div className="flex flex-wrap gap-2">
+                    {getExternalLinks().map((link) => (
                       <a
-                        key={platform}
-                        href={url}
+                        key={link.platform}
+                        href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                        className={`flex items-center space-x-2 px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all ${link.color}`}
                       >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                        <link.icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{link.displayName}</span>
                       </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add External Links - Only for admin/verified creators */}
+              {canEditTune() && getMissingPlatforms().length > 0 && (
+                <div className="mb-6 px-4">
+                  <div className="text-xs text-gray-400 mb-2">Add external links:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {getMissingPlatforms().map((platform) => (
+                      <button
+                        key={platform.platform}
+                        onClick={() => handleAddLink(platform.platform)}
+                        className={`flex items-center space-x-2 px-3 py-1.5 bg-black/10 border rounded-lg text-xs font-medium transition-all ${platform.color}`}
+                      >
+                        <platform.icon className="w-3.5 h-3.5" />
+                        <span>Add {platform.displayName}</span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1055,6 +1210,68 @@ const TuneProfile: React.FC = () => {
               </button>
               <button
                 onClick={() => setIsEditingTune(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Link Modal */}
+      {showAddLinkModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-md w-full">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">
+                Add {selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} Link
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddLinkModal(false);
+                  setSelectedPlatform('');
+                  setNewLinkUrl('');
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-white font-medium mb-2">
+                  {selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} URL
+                </label>
+                <input
+                  type="url"
+                  value={newLinkUrl}
+                  onChange={(e) => setNewLinkUrl(e.target.value)}
+                  className="input"
+                  placeholder={`https://${selectedPlatform}.com/...`}
+                  autoFocus
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  Enter the full URL to this track on {selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleSaveLink}
+                disabled={!newLinkUrl.trim()}
+                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add Link
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddLinkModal(false);
+                  setSelectedPlatform('');
+                  setNewLinkUrl('');
+                }}
                 className="btn-secondary"
               >
                 Cancel
