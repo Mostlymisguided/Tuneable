@@ -97,7 +97,6 @@ const UserProfile: React.FC = () => {
   const [songsWithBids, setSongsWithBids] = useState<SongWithBids[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'creator' | 'user'>('user');
   
   // Edit profile state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
