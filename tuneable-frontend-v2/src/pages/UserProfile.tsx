@@ -21,7 +21,6 @@ import {
   Music2
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
-import CreatorUserToggle from '../components/CreatorUserToggle';
 import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfile {
