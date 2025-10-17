@@ -240,6 +240,42 @@ const UserProfile: React.FC = () => {
     return socialLinks;
   };
 
+  // Get list of social accounts that aren't connected yet (for own profile)
+  const getUnconnectedSocialAccounts = () => {
+    if (!isOwnProfile) return [];
+    
+    const unconnected = [];
+    
+    if (!user?.facebookId) {
+      unconnected.push({
+        name: 'Facebook',
+        icon: Facebook,
+        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/facebook`,
+        color: 'border-blue-500 text-blue-300 hover:bg-blue-600/20'
+      });
+    }
+    
+    if (!user?.soundcloudId) {
+      unconnected.push({
+        name: 'SoundCloud',
+        icon: Music2,
+        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/soundcloud`,
+        color: 'border-orange-500 text-orange-300 hover:bg-orange-600/20'
+      });
+    }
+    
+    if (!user?.instagramId) {
+      unconnected.push({
+        name: 'Instagram',
+        icon: Instagram,
+        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/instagram`,
+        color: 'border-pink-500 text-pink-300 hover:bg-pink-600/20'
+      });
+    }
+    
+    return unconnected;
+  };
+
   // Copy invite code to clipboard
   const copyInviteCode = () => {
     if (user?.personalInviteCode) {
@@ -412,6 +448,25 @@ const UserProfile: React.FC = () => {
                       >
                         <social.icon className="w-4 h-4" />
                         <span className="text-sm font-medium">{social.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Connect Social Media Buttons - Only for own profile */}
+              {isOwnProfile && getUnconnectedSocialAccounts().length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs text-gray-400 mb-2">Connect accounts:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {getUnconnectedSocialAccounts().map((social) => (
+                      <a
+                        key={social.name}
+                        href={social.authUrl}
+                        className={`flex items-center space-x-2 px-3 py-1.5 bg-black/10 border rounded-lg text-xs font-medium transition-all ${social.color}`}
+                      >
+                        <social.icon className="w-3.5 h-3.5" />
+                        <span>Add {social.name}</span>
                       </a>
                     ))}
                   </div>
