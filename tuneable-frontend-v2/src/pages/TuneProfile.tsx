@@ -9,7 +9,6 @@ import {
   Heart, 
   ThumbsUp,
   Trash2,
-  Edit,
   Play,
   ExternalLink,
   Globe,
@@ -19,7 +18,10 @@ import {
   Headphones,
   Volume2,
   Award,
-  X
+  X,
+  Save,
+  Edit3,
+  SquarePlus
 } from 'lucide-react';
 import { songAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
@@ -117,6 +119,29 @@ const TuneProfile: React.FC = () => {
   const [claimProofText, setClaimProofText] = useState('');
   const [claimProofFiles, setClaimProofFiles] = useState<File[]>([]);
 
+  // Edit tune state
+  const [isEditingTune, setIsEditingTune] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    artist: '',
+    producer: '',
+    featuring: [] as string[],
+    album: '',
+    genre: '',
+    releaseDate: '',
+    duration: 0,
+    explicit: false,
+    isrc: '',
+    upc: '',
+    bpm: 0,
+    key: '',
+    tags: [] as string[],
+    lyrics: '',
+    rightsHolder: '',
+    rightsHolderEmail: '',
+    description: ''
+  });
+
   useEffect(() => {
     if (songId) {
       fetchSongProfile();
@@ -144,6 +169,68 @@ const TuneProfile: React.FC = () => {
     if (bids.length === 0) return 0;
     const total = bids.reduce((sum, bid) => sum + bid.amount, 0);
     return total / bids.length;
+  };
+
+  // Check if user can edit this tune
+  const canEditTune = () => {
+    if (!user || !song) return false;
+    
+    // Check if user is admin
+    const isAdmin = user.role && user.role.includes('admin');
+    if (isAdmin) return true;
+    
+    // Check if user is a verified creator
+    // Note: verifiedCreators is an array of user IDs
+    const isVerifiedCreator = (song as any).verifiedCreators?.some(
+      (creatorId: any) => {
+        const id = typeof creatorId === 'string' ? creatorId : creatorId._id || creatorId.toString();
+        return id === (user as any).id || id === (user as any)._id || id === user.uuid;
+      }
+    );
+    
+    return isVerifiedCreator;
+  };
+
+  // Populate edit form when song loads
+  useEffect(() => {
+    if (song && canEditTune()) {
+      setEditForm({
+        title: song.title || '',
+        artist: song.artist || '',
+        producer: song.producer || '',
+        featuring: song.featuring || [],
+        album: song.album || '',
+        genre: song.genre || '',
+        releaseDate: song.releaseDate || '',
+        duration: song.duration || 0,
+        explicit: song.explicit || false,
+        isrc: song.isrc || '',
+        upc: song.upc || '',
+        bpm: song.bpm || 0,
+        key: song.key || '',
+        tags: song.tags || [],
+        lyrics: song.lyrics || '',
+        rightsHolder: song.rightsHolder || '',
+        rightsHolderEmail: song.rightsHolderEmail || '',
+        description: (song as any).description || ''
+      });
+    }
+  }, [song, user]);
+
+  // Save tune updates
+  const handleSaveTune = async () => {
+    if (!songId) return;
+    
+    try {
+      await songAPI.updateSong(songId, editForm);
+      toast.success('Tune updated successfully!');
+      setIsEditingTune(false);
+      // Refresh tune data
+      await fetchSongProfile();
+    } catch (err: any) {
+      console.error('Error updating tune:', err);
+      toast.error(err.response?.data?.error || 'Failed to update tune');
+    }
   };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
@@ -321,7 +408,7 @@ const TuneProfile: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 relative">
           <button
             onClick={() => navigate(-1)}
             className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
@@ -329,6 +416,19 @@ const TuneProfile: React.FC = () => {
           >
             Back
           </button>
+          
+          {/* Edit Tune Button - Only show if user can edit */}
+          {canEditTune() && (
+            <div className='inline rounded-full items-center absolute right-3 mb-4'>
+              <button
+                onClick={() => setIsEditingTune(true)}
+                className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+              >
+                <Edit3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Edit Tune</span>
+              </button>
+            </div>
+          )}
           
           <div className="card flex items-start relative">
             {/* Claim Tune Button - Top Right */}
@@ -449,7 +549,7 @@ const TuneProfile: React.FC = () => {
               onClick={() => setShowAllFields(!showAllFields)}
               className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
             >
-              <Edit className="w-4 h-4 mr-2" />
+              <SquarePlus className="w-4 h-4 mr-2" />
               {showAllFields ? 'Show Less' : 'Show All Fields'}
             </button>
           </div>
@@ -716,6 +816,245 @@ const TuneProfile: React.FC = () => {
                   setClaimProofText('');
                   setClaimProofFiles([]);
                 }} 
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Tune Modal */}
+      {isEditingTune && canEditTune() && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="card max-w-4xl w-full my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">Edit Tune</h2>
+              <button
+                onClick={() => setIsEditingTune(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Title *</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="input"
+                    placeholder="Song title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Artist *</label>
+                  <input
+                    type="text"
+                    value={editForm.artist}
+                    onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })}
+                    className="input"
+                    placeholder="Artist name"
+                  />
+                </div>
+              </div>
+
+              {/* Producer and Album */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Producer</label>
+                  <input
+                    type="text"
+                    value={editForm.producer}
+                    onChange={(e) => setEditForm({ ...editForm, producer: e.target.value })}
+                    className="input"
+                    placeholder="Producer name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Album</label>
+                  <input
+                    type="text"
+                    value={editForm.album}
+                    onChange={(e) => setEditForm({ ...editForm, album: e.target.value })}
+                    className="input"
+                    placeholder="Album name"
+                  />
+                </div>
+              </div>
+
+              {/* Genre and Release Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Genre</label>
+                  <input
+                    type="text"
+                    value={editForm.genre}
+                    onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
+                    className="input"
+                    placeholder="Genre"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Release Date</label>
+                  <input
+                    type="date"
+                    value={editForm.releaseDate}
+                    onChange={(e) => setEditForm({ ...editForm, releaseDate: e.target.value })}
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              {/* Duration and Explicit */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Duration (seconds)</label>
+                  <input
+                    type="number"
+                    value={editForm.duration}
+                    onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+                    className="input"
+                    placeholder="Duration in seconds"
+                  />
+                </div>
+                <div className="flex items-center mt-8">
+                  <input
+                    type="checkbox"
+                    id="explicit"
+                    checked={editForm.explicit}
+                    onChange={(e) => setEditForm({ ...editForm, explicit: e.target.checked })}
+                    className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                  />
+                  <label htmlFor="explicit" className="ml-2 text-white font-medium">
+                    Explicit Content
+                  </label>
+                </div>
+              </div>
+
+              {/* ISRC and UPC */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">ISRC</label>
+                  <input
+                    type="text"
+                    value={editForm.isrc}
+                    onChange={(e) => setEditForm({ ...editForm, isrc: e.target.value })}
+                    className="input"
+                    placeholder="ISRC code"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">UPC</label>
+                  <input
+                    type="text"
+                    value={editForm.upc}
+                    onChange={(e) => setEditForm({ ...editForm, upc: e.target.value })}
+                    className="input"
+                    placeholder="UPC code"
+                  />
+                </div>
+              </div>
+
+              {/* BPM and Key */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">BPM</label>
+                  <input
+                    type="number"
+                    value={editForm.bpm}
+                    onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
+                    className="input"
+                    placeholder="Beats per minute"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Key</label>
+                  <input
+                    type="text"
+                    value={editForm.key}
+                    onChange={(e) => setEditForm({ ...editForm, key: e.target.value })}
+                    className="input"
+                    placeholder="Musical key (e.g., C Major)"
+                  />
+                </div>
+              </div>
+
+              {/* Rights Holder Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Rights Holder</label>
+                  <input
+                    type="text"
+                    value={editForm.rightsHolder}
+                    onChange={(e) => setEditForm({ ...editForm, rightsHolder: e.target.value })}
+                    className="input"
+                    placeholder="Rights holder name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Rights Holder Email</label>
+                  <input
+                    type="email"
+                    value={editForm.rightsHolderEmail}
+                    onChange={(e) => setEditForm({ ...editForm, rightsHolderEmail: e.target.value })}
+                    className="input"
+                    placeholder="contact@example.com"
+                  />
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-white font-medium mb-2">Tags (comma-separated)</label>
+                <input
+                  type="text"
+                  value={editForm.tags.join(', ')}
+                  onChange={(e) => setEditForm({ ...editForm, tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) })}
+                  className="input"
+                  placeholder="pop, indie, summer, upbeat"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-white font-medium mb-2">Description</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="input min-h-[100px]"
+                  placeholder="Song description..."
+                />
+              </div>
+
+              {/* Lyrics */}
+              <div>
+                <label className="block text-white font-medium mb-2">Lyrics</label>
+                <textarea
+                  value={editForm.lyrics}
+                  onChange={(e) => setEditForm({ ...editForm, lyrics: e.target.value })}
+                  className="input min-h-[200px] font-mono text-sm"
+                  placeholder="Enter lyrics..."
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleSaveTune}
+                className="btn-primary flex-1 flex items-center justify-center space-x-2"
+              >
+                <Save className="h-4 w-4" />
+                <span>Save Changes</span>
+              </button>
+              <button
+                onClick={() => setIsEditingTune(false)}
                 className="btn-secondary"
               >
                 Cancel

@@ -197,6 +197,67 @@ router.get('/:mediaId/profile', async (req, res) => {
   }
 });
 
+// @route   PUT /api/media/:id
+// @desc    Update media/song details
+// @access  Private (Admin or Verified Creator only)
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    
+    // Find the media
+    const media = await Media.findById(id);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    
+    // Check permissions: must be admin OR verified creator
+    const isAdmin = req.user.role && req.user.role.includes('admin');
+    const isVerifiedCreator = media.verifiedCreators && media.verifiedCreators.some(
+      creatorId => creatorId.toString() === userId.toString()
+    );
+    
+    if (!isAdmin && !isVerifiedCreator) {
+      return res.status(403).json({ error: 'Not authorized to edit this media' });
+    }
+    
+    // Update allowed fields
+    const allowedUpdates = [
+      'title', 'producer', 'featuring', 'album', 'genre',
+      'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
+      'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
+      'lyrics', 'rightsHolder', 'rightsHolderEmail', 'description'
+    ];
+    
+    allowedUpdates.forEach(field => {
+      if (req.body[field] !== undefined) {
+        media[field] = req.body[field];
+      }
+    });
+    
+    // Special handling for artist field (maps to creators array)
+    if (req.body.artist !== undefined) {
+      // Find or update the artist in creators array
+      if (media.artist && media.artist.length > 0) {
+        media.artist[0].name = req.body.artist;
+      }
+    }
+    
+    await media.save();
+    
+    // Transform response to use UUIDs
+    const transformedMedia = transformResponse(media.toObject());
+    
+    res.json({ 
+      message: 'Media updated successfully',
+      media: transformedMedia 
+    });
+  } catch (error) {
+    console.error('Error updating media:', error);
+    res.status(500).json({ error: 'Failed to update media' });
+  }
+});
+
 // @route   GET /api/media/:mediaId/comments
 // @desc    Get all comments for a media item
 // @access  Public

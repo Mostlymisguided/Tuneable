@@ -288,6 +288,34 @@ export const songAPI = {
     const response = await api.delete(`/comments/${commentId}`);
     return response.data;
   },
+
+  updateSong: async (songId: string, updates: {
+    title?: string;
+    artist?: string;
+    producer?: string;
+    featuring?: string[];
+    album?: string;
+    genre?: string;
+    releaseDate?: string;
+    duration?: number;
+    explicit?: boolean;
+    isrc?: string;
+    upc?: string;
+    bpm?: number;
+    pitch?: number;
+    key?: string;
+    elements?: string[];
+    tags?: string[];
+    category?: string;
+    timeSignature?: string;
+    lyrics?: string;
+    rightsHolder?: string;
+    rightsHolderEmail?: string;
+    description?: string;
+  }) => {
+    const response = await api.put(`/songs/${songId}`, updates);
+    return response.data;
+  },
 };
 
 // Search API
