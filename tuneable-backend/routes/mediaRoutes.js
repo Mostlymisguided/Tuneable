@@ -235,11 +235,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     });
     
-    // Special handling for artist field (maps to creators array)
+    // Special handling for artist field (it's an array of subdocuments)
     if (req.body.artist !== undefined) {
-      // Find or update the artist in creators array
       if (media.artist && media.artist.length > 0) {
+        // Update existing first artist
         media.artist[0].name = req.body.artist;
+      } else {
+        // Create new artist entry if array is empty
+        media.artist = [{
+          name: req.body.artist,
+          userId: null,
+          verified: false
+        }];
       }
     }
     
