@@ -5,6 +5,7 @@ const Comment = require('../models/Comment');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 const { transformResponse } = require('../utils/uuidTransform');
+const { resolveId } = require('../utils/idResolver');
 
 // @route   GET /api/media/top-tunes
 // @desc    Get top media by global bid value for Top Tunes
@@ -205,8 +206,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
     
+    // Resolve ID (handles both UUID and ObjectId)
+    const resolvedId = await resolveId(id, Media, 'uuid');
+    if (!resolvedId) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    
     // Find the media
-    const media = await Media.findById(id);
+    const media = await Media.findById(resolvedId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
