@@ -250,7 +250,7 @@ const UserProfile: React.FC = () => {
       unconnected.push({
         name: 'Facebook',
         icon: Facebook,
-        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/facebook`,
+        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/facebook`,
         color: 'border-blue-500 text-blue-300 hover:bg-blue-600/20'
       });
     }
@@ -259,7 +259,7 @@ const UserProfile: React.FC = () => {
       unconnected.push({
         name: 'SoundCloud',
         icon: Music2,
-        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/soundcloud`,
+        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/soundcloud`,
         color: 'border-orange-500 text-orange-300 hover:bg-orange-600/20'
       });
     }
@@ -268,7 +268,7 @@ const UserProfile: React.FC = () => {
       unconnected.push({
         name: 'Instagram',
         icon: Instagram,
-        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/instagram`,
+        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/instagram`,
         color: 'border-pink-500 text-pink-300 hover:bg-pink-600/20'
       });
     }
@@ -425,9 +425,9 @@ const UserProfile: React.FC = () => {
               {/* Location */}
               {user.homeLocation && (
                 <div className="mb-4">
-                  <div className="bg-black/20 rounded-full px-2 inline-flex items-center text-gray-300">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    <span className="p-2">
+                  <div className="bg-purple-600/50 rounded-full pl-3 px-2 inline-flex items-center">
+                    <MapPin className="w-4 h-4" />
+                    <span className="p-2 text-white">
                       {user.homeLocation.city}  {user.homeLocation.country}
                     </span>
                   </div>
