@@ -242,19 +242,50 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     });
     
-    // Special handling for artist field (it's an array of subdocuments)
+    // Special handling for creator fields (convert strings/arrays to subdocument format)
+    
+    // Artist field (string -> array of subdocuments)
     if (req.body.artist !== undefined) {
-      if (media.artist && media.artist.length > 0) {
-        // Update existing first artist
-        media.artist[0].name = req.body.artist;
-      } else {
-        // Create new artist entry if array is empty
+      if (typeof req.body.artist === 'string' && req.body.artist.trim()) {
         media.artist = [{
-          name: req.body.artist,
+          name: req.body.artist.trim(),
           userId: null,
           verified: false
         }];
+      } else if (req.body.artist === '') {
+        media.artist = [];
       }
+    }
+    
+    // Producer field (string -> array of subdocuments)
+    if (req.body.producer !== undefined) {
+      if (typeof req.body.producer === 'string' && req.body.producer.trim()) {
+        media.producer = [{
+          name: req.body.producer.trim(),
+          userId: null,
+          verified: false
+        }];
+      } else if (req.body.producer === '') {
+        media.producer = [];
+      }
+    }
+    
+    // Featuring field (array of strings -> array of subdocuments)
+    if (req.body.featuring !== undefined) {
+      if (Array.isArray(req.body.featuring)) {
+        media.featuring = req.body.featuring
+          .filter(name => name && typeof name === 'string' && name.trim())
+          .map(name => ({
+            name: typeof name === 'string' ? name.trim() : name.name,
+            userId: null,
+            verified: false
+          }));
+      }
+    }
+    
+    // Genre field (singular -> genres array)
+    if (req.body.genre !== undefined) {
+      media.genres = req.body.genre ? [req.body.genre] : [];
     }
     
     await media.save();

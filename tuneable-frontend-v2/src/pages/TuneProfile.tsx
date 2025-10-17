@@ -200,14 +200,31 @@ const TuneProfile: React.FC = () => {
   // Populate edit form when song loads
   useEffect(() => {
     if (song && canEditTune()) {
+      // Extract artist name from subdocument array
+      const artistName = (song as any).artist?.[0]?.name || song.artist || '';
+      
+      // Extract producer name from subdocument array
+      const producerName = (song as any).producer?.[0]?.name || '';
+      
+      // Extract featuring names from subdocument array
+      const featuringNames = (song as any).featuring?.map((f: any) => f.name || f) || [];
+      
+      // Extract first genre from genres array
+      const genreValue = (song as any).genres?.[0] || (song as any).genre || '';
+      
+      // Format release date for date input
+      const releaseDateFormatted = song.releaseDate 
+        ? new Date(song.releaseDate).toISOString().split('T')[0] 
+        : '';
+      
       setEditForm({
         title: song.title || '',
-        artist: song.artist || '',
-        producer: song.producer || '',
-        featuring: song.featuring || [],
+        artist: artistName,
+        producer: producerName,
+        featuring: featuringNames,
         album: song.album || '',
-        genre: song.genre || '',
-        releaseDate: song.releaseDate || '',
+        genre: genreValue,
+        releaseDate: releaseDateFormatted,
         duration: song.duration || 0,
         explicit: song.explicit || false,
         isrc: song.isrc || '',
@@ -1037,6 +1054,18 @@ const TuneProfile: React.FC = () => {
                     placeholder="Album name"
                   />
                 </div>
+              </div>
+
+              {/* Featuring Artists */}
+              <div>
+                <label className="block text-white font-medium mb-2">Featuring (comma-separated)</label>
+                <input
+                  type="text"
+                  value={editForm.featuring.join(', ')}
+                  onChange={(e) => setEditForm({ ...editForm, featuring: e.target.value.split(',').map(t => t.trim()).filter(t => t) })}
+                  className="input"
+                  placeholder="Artist 1, Artist 2, Artist 3"
+                />
               </div>
 
               {/* Genre and Release Date */}
