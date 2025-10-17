@@ -314,7 +314,7 @@ export const songAPI = {
     description?: string;
     sources?: { [key: string]: string };
   }) => {
-    const response = await api.put(`/songs/${songId}`, updates);
+    const response = await api.put(`/media/${songId}`, updates);
     return response.data;
   },
 };
