@@ -360,6 +360,7 @@ router.get('/:userId/profile', async (req, res) => {
         profilePic: user.profilePic,
         email: user.email,
         balance: user.balance,
+        personalInviteCode: user.personalInviteCode,
         homeLocation: user.homeLocation,
         role: user.role,
         isActive: user.isActive,

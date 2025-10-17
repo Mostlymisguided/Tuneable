@@ -12,7 +12,9 @@ import {
   Edit3,
   Save,
   X,
-  Loader2
+  Loader2,
+  Gift,
+  Copy
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import CreatorUserToggle from '../components/CreatorUserToggle';
@@ -25,6 +27,7 @@ interface UserProfile {
   profilePic?: string;
   email: string;
   balance: number;
+  personalInviteCode?: string;
   homeLocation: {
     city: string;
     country: string;
@@ -178,6 +181,14 @@ const UserProfile: React.FC = () => {
     return 'text-green-400';
   };
 
+  // Copy invite code to clipboard
+  const copyInviteCode = () => {
+    if (user?.personalInviteCode) {
+      navigator.clipboard.writeText(user.personalInviteCode);
+      toast.success('Invite code copied to clipboard!');
+    }
+  };
+
   // Edit profile handlers
   const handleSaveProfile = async () => {
     try {
@@ -311,7 +322,7 @@ const UserProfile: React.FC = () => {
               {/* Location */}
               {user.homeLocation && (
                 <div className="mb-4">
-                  <div className="bg-black/20 rounded-full px-4 py-2 inline-flex items-center text-gray-300">
+                  <div className="bg-black/20 rounded-full px-2 inline-flex items-center text-gray-300">
                     <MapPin className="w-4 h-4 mr-2" />
                     <span className="p-2">
                       {user.homeLocation.city},  {user.homeLocation.country}
@@ -327,6 +338,22 @@ const UserProfile: React.FC = () => {
                   {formatJoinDate(user.createdAt)}
                 </span>
               </div>
+
+              {/* Personal Invite Code - Only visible to profile owner */}
+              {isOwnProfile && user.personalInviteCode && (
+                <div className="inline-block px-4 py-2 bg-yellow-600/30 border border-yellow-500/50 rounded-full text-yellow-200 text-sm font-medium mb-4 ml-2">
+                  <Gift className="inline h-4 w-4 mr-2" />
+                  <span className="text-gray-300">Invite Code:</span>{' '}
+                  <span className="font-mono font-bold">{user.personalInviteCode}</span>
+                  <button 
+                    onClick={copyInviteCode}
+                    className="ml-2 text-yellow-300 hover:text-yellow-100 transition-colors inline-flex items-center"
+                    title="Copy invite code"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
 
               {/* Creator/User Toggle */}
               <CreatorUserToggle 

@@ -353,7 +353,7 @@ const TuneProfile: React.FC = () => {
               <img
                 src={song.coverArt || '/android-chrome-192x192.png'}
                 alt={`${song.title} cover`}
-                className="w-48 h-48 rounded-lg shadow-xl object-cover"
+                className="w-auto h-auto rounded-lg shadow-xl object-cover"
               />
             </div>
             
