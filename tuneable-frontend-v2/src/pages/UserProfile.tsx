@@ -176,7 +176,7 @@ const UserProfile: React.FC = () => {
   };
 
   const getRoleColor = (roles: string[]) => {
-    if (roles.includes('admin')) return 'text-red-400';
+    if (roles.includes('admin')) return 'text-white';
     if (roles.includes('moderator')) return 'text-blue-400';
     return 'text-green-400';
   };
@@ -265,7 +265,7 @@ const UserProfile: React.FC = () => {
         <div className="mb-8 relative">
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 text-white hover:bg-gray-700/30"
+            className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors border border-white/20 bg-gray-700/40 text-white hover:bg-purple-500"
           >
             Back
           </button>
@@ -288,7 +288,7 @@ const UserProfile: React.FC = () => {
               {/* Member Since */}
               <div className="flex rounded-full p-4 items-center">
                 {/* <div className="text-sm text-gray-300 mr-2">Joined</div> */}
-                <span className="px-3 py-2 bg-purple-600/50 text-white text-xs rounded-full font-semibold">
+                <span className="px-3 py-2 bg-purple-600/50 text-white text-xs md:text-base rounded-full font-semibold">
                   {formatJoinDate(user.createdAt)}
                 </span>
               </div>
@@ -323,9 +323,6 @@ const UserProfile: React.FC = () => {
             <div className="ml-6 flex-1 text-white">
               <div className="">
                 <h1 className="text-4xl font-bold mb-4">{user.username}</h1>
-                <span className={`px-3 py-2 bg-purple-600/50 text-white text-xs rounded-full font-semibold ${getRoleColor(user.role)}`}>
-                  {getRoleDisplay(user.role)}
-                </span>
               </div>
               
               <div className="mb-6"></div>
@@ -357,12 +354,10 @@ const UserProfile: React.FC = () => {
                   </button>
 
               )}
-              <div className="absolute bottom-4 right-0">
-              {/* Creator/User Toggle */}
-              <CreatorUserToggle 
-                mode={viewMode}
-                onToggle={(mode) => setViewMode(mode)}
-              />
+              <div className="absolute bottom-0 right-0 p-4">
+              <span className={`px-3 py-2 bg-purple-600/50 text-xs md:text-base rounded-full font-semibold ${getRoleColor(user.role)}`}>
+                  {getRoleDisplay(user.role)}
+                </span>
               </div>
             </div>
           </div>
@@ -391,7 +386,7 @@ const UserProfile: React.FC = () => {
               <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
-                <div className="text-sm text-gray-300">Unique Songs</div>
+                <div className="text-sm text-gray-300">Tunes Bid</div>
               </div>
             </div>
           </div>
