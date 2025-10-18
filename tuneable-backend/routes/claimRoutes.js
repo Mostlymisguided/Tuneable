@@ -4,8 +4,10 @@ const multer = require('multer');
 const path = require('path');
 const Claim = require('../models/Claim');
 const Media = require('../models/Media');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const { sendClaimNotification } = require('../utils/emailService');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -84,6 +86,15 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
     });
 
     await claim.save();
+
+    // Send email notification to admin
+    try {
+      const user = await User.findById(userId);
+      await sendClaimNotification(claim, media, user);
+    } catch (emailError) {
+      console.error('Failed to send claim notification email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(201).json({
       message: 'Claim submitted successfully',

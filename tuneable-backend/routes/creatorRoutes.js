@@ -5,6 +5,7 @@ const path = require('path');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const { sendCreatorApplicationNotification } = require('../utils/emailService');
 
 // Configure multer for proof file uploads
 const storage = multer.diskStorage({
@@ -110,6 +111,14 @@ router.post('/apply', authMiddleware, upload.array('proofFiles', 5), async (req,
     }
 
     await user.save();
+
+    // Send email notification to admin
+    try {
+      await sendCreatorApplicationNotification(user);
+    } catch (emailError) {
+      console.error('Failed to send notification email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(200).json({
       message: isOAuthVerified 

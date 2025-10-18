@@ -11,6 +11,7 @@ const geoip = require('geoip-lite'); // Added geoip-lite
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { transformResponse } = require('../utils/uuidTransform');
+const { sendUserRegistrationNotification } = require('../utils/emailService');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -122,6 +123,14 @@ router.post(
       await user.save();
       
       console.log('User registered successfully:', user);
+
+      // Send email notification to admin
+      try {
+        await sendUserRegistrationNotification(user);
+      } catch (emailError) {
+        console.error('Failed to send registration notification email:', emailError);
+        // Don't fail the request if email fails
+      }
 
       // Generate JWT token for auto-login using UUID
       const token = jwt.sign(

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { creatorAPI } from '../lib/api';
-import { useAuth } from '../contexts/AuthContext';
 import {
   User,
   Music,
@@ -18,7 +17,6 @@ import {
 
 const CreatorRegister: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -469,7 +467,7 @@ const CreatorRegister: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 py-8 pb-40">
       <div className="max-w-3xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8 text-center">

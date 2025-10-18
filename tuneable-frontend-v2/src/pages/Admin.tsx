@@ -8,9 +8,15 @@ import {
   Shield, 
   Database,
   Youtube,
-  AlertTriangle
+  AlertTriangle,
+  Award,
+  CheckCircle,
+  XCircle,
+  Clock
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
+import { creatorAPI, claimAPI } from '../lib/api';
+import { toast } from 'react-toastify';
 
 interface User {
   _id: string;
@@ -28,6 +34,10 @@ const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [creatorApplications, setCreatorApplications] = useState<any[]>([]);
+  const [claims, setClaims] = useState<any[]>([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false);
+  const [isLoadingClaims, setIsLoadingClaims] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -55,6 +65,8 @@ const Admin: React.FC = () => {
         if (userData.role && userData.role.includes('admin')) {
           setIsAdmin(true);
           loadUsers();
+          loadCreatorApplications();
+          loadClaims();
         } else {
           setIsAdmin(false);
           navigate('/');
@@ -110,6 +122,54 @@ const Admin: React.FC = () => {
     }
   };
 
+  const loadCreatorApplications = async () => {
+    try {
+      setIsLoadingApplications(true);
+      const response = await creatorAPI.getAllApplications('pending');
+      setCreatorApplications(response.applications || []);
+    } catch (error) {
+      console.error('Error loading creator applications:', error);
+      toast.error('Failed to load creator applications');
+    } finally {
+      setIsLoadingApplications(false);
+    }
+  };
+
+  const loadClaims = async () => {
+    try {
+      setIsLoadingClaims(true);
+      const response = await claimAPI.getAllClaims('pending');
+      setClaims(response.claims || []);
+    } catch (error) {
+      console.error('Error loading claims:', error);
+      toast.error('Failed to load claims');
+    } finally {
+      setIsLoadingClaims(false);
+    }
+  };
+
+  const reviewCreatorApplication = async (userId: string, status: 'verified' | 'rejected', reviewNotes?: string) => {
+    try {
+      await creatorAPI.reviewApplication(userId, status, reviewNotes);
+      toast.success(`Application ${status}!`);
+      loadCreatorApplications(); // Reload
+    } catch (error: any) {
+      console.error('Error reviewing application:', error);
+      toast.error(error.response?.data?.error || 'Failed to review application');
+    }
+  };
+
+  const reviewClaim = async (claimId: string, status: 'approved' | 'rejected', reviewNotes?: string) => {
+    try {
+      await claimAPI.reviewClaim(claimId, status, reviewNotes);
+      toast.success(`Claim ${status}!`);
+      loadClaims(); // Reload
+    } catch (error: any) {
+      console.error('Error reviewing claim:', error);
+      toast.error(error.response?.data?.error || 'Failed to review claim');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -133,6 +193,8 @@ const Admin: React.FC = () => {
   const tabs = [
     { id: 'overview', name: 'Overview', icon: BarChart3 },
     { id: 'users', name: 'Users', icon: Users },
+    { id: 'creators', name: 'Creator Applications', icon: Award },
+    { id: 'claims', name: 'Tune Claims', icon: Music },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
@@ -311,6 +373,267 @@ const Admin: React.FC = () => {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'creators' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Creator Applications</h2>
+              <button
+                onClick={loadCreatorApplications}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+            
+            {isLoadingApplications ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : creatorApplications.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <Clock className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No pending creator applications</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {creatorApplications.map((app) => (
+                  <div key={app._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-4">
+                        {app.profilePic && (
+                          <img
+                            src={app.profilePic}
+                            alt={app.username}
+                            className="w-16 h-16 rounded-full object-cover"
+                          />
+                        )}
+                        <div>
+                          <h3 className="text-xl font-bold text-white">{app.creatorProfile?.artistName}</h3>
+                          <p className="text-gray-400">@{app.username} • {app.email}</p>
+                          <p className="text-sm text-gray-500">
+                            Applied: {new Date(app.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                        app.creatorProfile?.verificationStatus === 'pending'
+                          ? 'bg-yellow-900 text-yellow-200'
+                          : app.creatorProfile?.verificationStatus === 'verified'
+                          ? 'bg-green-900 text-green-200'
+                          : 'bg-red-900 text-red-200'
+                      }`}>
+                        {app.creatorProfile?.verificationStatus?.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <p className="text-sm text-gray-400">Roles:</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {app.creatorProfile?.roles?.map((role: string) => (
+                            <span key={role} className="px-2 py-1 bg-purple-900 text-purple-200 text-xs rounded-full">
+                              {role}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm text-gray-400">Genres:</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {app.creatorProfile?.genres?.slice(0, 3).map((genre: string) => (
+                            <span key={genre} className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded-full">
+                              {genre}
+                            </span>
+                          ))}
+                          {app.creatorProfile?.genres?.length > 3 && (
+                            <span className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full">
+                              +{app.creatorProfile.genres.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-400 mb-2">Bio:</p>
+                      <p className="text-gray-300 text-sm">{app.creatorProfile?.bio}</p>
+                    </div>
+
+                    {app.creatorProfile?.socialMedia && Object.entries(app.creatorProfile.socialMedia).some(([_, v]) => v) && (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-400 mb-2">Social Media:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(app.creatorProfile.socialMedia).map(([platform, url]: [string, any]) => 
+                            url ? (
+                              <a
+                                key={platform}
+                                href={url as string}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-purple-400 hover:text-purple-300"
+                              >
+                                {platform}
+                              </a>
+                            ) : null
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {app.creatorProfile?.proofFiles && app.creatorProfile.proofFiles.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-400 mb-2">Proof Documents:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {app.creatorProfile.proofFiles.map((file: any, idx: number) => (
+                            <a
+                              key={idx}
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
+                            >
+                              Document {idx + 1}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex space-x-3 pt-4 border-t border-gray-700">
+                      <button
+                        onClick={() => {
+                          const notes = prompt('Add review notes (optional):');
+                          reviewCreatorApplication(app._id, 'verified', notes || '');
+                        }}
+                        className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => {
+                          const notes = prompt('Add rejection reason:');
+                          if (notes) {
+                            reviewCreatorApplication(app._id, 'rejected', notes);
+                          }
+                        }}
+                        className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'claims' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Tune Claims</h2>
+              <button
+                onClick={loadClaims}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+            
+            {isLoadingClaims ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : claims.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <Music className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No pending tune claims</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {claims.map((claim) => (
+                  <div key={claim._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-4">
+                        {claim.mediaId?.coverArt && (
+                          <img
+                            src={claim.mediaId.coverArt}
+                            alt={claim.mediaId.title}
+                            className="w-16 h-16 rounded object-cover"
+                          />
+                        )}
+                        <div>
+                          <h3 className="text-xl font-bold text-white">{claim.mediaId?.title}</h3>
+                          <p className="text-gray-400">{claim.mediaId?.artist?.[0]?.name || claim.mediaId?.artist}</p>
+                          <p className="text-sm text-gray-500">
+                            Claimed by: @{claim.userId?.username} ({claim.userId?.email})
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Submitted: {new Date(claim.submittedAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-400 mb-2">Proof:</p>
+                      <p className="text-gray-300 text-sm">{claim.proofText}</p>
+                    </div>
+
+                    {claim.proofFiles && claim.proofFiles.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-400 mb-2">Documents:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {claim.proofFiles.map((file: any, idx: number) => (
+                            <a
+                              key={idx}
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
+                            >
+                              Document {idx + 1}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex space-x-3 pt-4 border-t border-gray-700">
+                      <button
+                        onClick={() => {
+                          const notes = prompt('Add review notes (optional):');
+                          reviewClaim(claim._id, 'approved', notes || '');
+                        }}
+                        className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => {
+                          const notes = prompt('Add rejection reason:');
+                          if (notes) {
+                            reviewClaim(claim._id, 'rejected', notes);
+                          }
+                        }}
+                        className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

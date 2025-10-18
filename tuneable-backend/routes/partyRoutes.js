@@ -13,6 +13,7 @@ const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
 const { transformResponse } = require('../utils/uuidTransform');
 const { resolvePartyId } = require('../utils/idResolver');
+const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
 // via Bid model hooks (post('save') and post('remove'))
@@ -84,6 +85,15 @@ router.post('/', authMiddleware, async (req, res) => {
   
       await party.save();
       console.log('✅ Party Created Successfully:', party);
+
+      // Send email notification to admin
+      try {
+        const host = await User.findById(userId);
+        await sendPartyCreationNotification(party, host);
+      } catch (emailError) {
+        console.error('Failed to send party creation notification email:', emailError);
+        // Don't fail the request if email fails
+      }
   
       broadcast(party._id, { message: 'New party created', party });
       res.status(201).json(transformResponse({ message: 'Party created successfully', party }));
@@ -539,6 +549,14 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         await bid.save();
 
+        // Send email notification for high-value bids
+        try {
+          await sendHighValueBidNotification(bid, media, user, 10);
+        } catch (emailError) {
+          console.error('Failed to send high-value bid notification email:', emailError);
+          // Don't fail the request if email fails
+        }
+
         // Add bid to media's bids array
         media.bids = media.bids || [];
         media.bids.push(bid._id);
@@ -716,6 +734,14 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         });
 
         await bid.save();
+
+        // Send email notification for high-value bids
+        try {
+          await sendHighValueBidNotification(bid, populatedMedia, user, 10);
+        } catch (emailError) {
+          console.error('Failed to send high-value bid notification email:', emailError);
+          // Don't fail the request if email fails
+        }
 
         // Update party media entry bid aggregate (schema grammar)
         partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmount;

@@ -3,6 +3,7 @@ const router = express.Router();
 const Stripe = require('stripe');
 const authMiddleware = require('../middleware/authMiddleware');
 const User = require('../models/User'); // Import user model
+const { sendPaymentNotification } = require('../utils/emailService');
 require('dotenv').config();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -102,6 +103,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
         if (user) {
           console.log(`Wallet top-up successful: User ${userId} added £${amount}, new balance: £${user.balance}`);
+          
+          // Send email notification to admin
+          try {
+            await sendPaymentNotification(user, amount);
+          } catch (emailError) {
+            console.error('Failed to send payment notification email:', emailError);
+            // Don't fail the request if email fails
+          }
         }
       } catch (error) {
         console.error('Error updating user balance from webhook:', error.message);

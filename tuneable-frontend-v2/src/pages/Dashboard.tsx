@@ -79,8 +79,8 @@ const Dashboard: React.FC = () => {
               <DollarSign className="h-6 w-6 text-primary-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Balance</p>
-              <p className="text-2xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-white">Balance</p>
+              <p className="text-2xl font-semibold text-white">
                 £{user?.balance?.toFixed(2) || '0.00'}
               </p>
             </div>
@@ -93,8 +93,8 @@ const Dashboard: React.FC = () => {
               <Music className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-900">Active Parties</p>
-              <p className="text-2xl font-semibold text-gray-900">0</p>
+              <p className="text-sm font-medium text-white">Active Parties</p>
+              <p className="text-2xl font-semibold text-white">0</p>
             </div>
           </div>
         </div>
@@ -105,8 +105,8 @@ const Dashboard: React.FC = () => {
               <Users className="h-6 w-6 text-blue-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Friends</p>
-              <p className="text-2xl font-semibold text-gray-900">0</p>
+              <p className="text-sm font-medium text-white">Friends</p>
+              <p className="text-2xl font-semibold text-white">0</p>
             </div>
           </div>
         </div>
@@ -117,8 +117,8 @@ const Dashboard: React.FC = () => {
               <Music className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Songs Added</p>
-              <p className="text-2xl font-semibold text-gray-900">0</p>
+              <p className="text-sm font-medium text-white">Songs Added</p>
+              <p className="text-2xl font-semibold text-white">0</p>
             </div>
           </div>
         </div>

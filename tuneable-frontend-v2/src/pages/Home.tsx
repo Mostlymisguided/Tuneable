@@ -27,14 +27,14 @@ const Home: React.FC = () => {
             
             {/* Description */}
             <p className="text-xl md:text-2xl mb-12 text-gray-200 max-w-3xl mx-auto leading-relaxed" style={{ marginTop: '20px' }}>
-              The Social Music App - Bid To Boost Songs - Democratically Shape The Party
+              The Social Music App - Bid To Boost Tunes - Democratically Shape The Party
             </p>
             
             {/* CTA Button */}
             <div className="flex justify-center">
               <Link
                 to="/register"
-                className="bg-white text-white rounded-lg font-semibold hover:bg-gray-100 transition-colors text-lg"
+                className="text-white rounded-lg border-2 border-white font-semibold hover:bg-gray-100 transition-colors text-lg"
                 style={{ 
                   textDecoration: 'none', 
                   padding: '10px 24px',
@@ -50,14 +50,14 @@ const Home: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="bg-white" style={{ paddingTop: '4rem', paddingBottom: '5rem' }}>
+      <section className="backdrop-blur-md bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-800" style={{ paddingTop: '4rem', paddingBottom: '5rem' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               How Tuneable Works
             </h2>
             <p className="text-xl text-gray-600">
-              Create parties, bid on songs, and control the music together
+              Create Parties, Bid on Tunes, and Control The Music Together
             </p>
           </div>
 
@@ -79,10 +79,10 @@ const Home: React.FC = () => {
                 <DollarSign className="h-8 w-8 text-primary-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Bid on Songs
+                Bid on Tunes
               </h3>
               <p className="text-gray-600">
-                Bid your credits to get your favorite songs played next
+                Bid your credits to get your favorite Tunes to the top
               </p>
             </div>
 
@@ -136,7 +136,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <p className="text-gray-400">&copy; 2024 Tuneable. All rights reserved.</p>
+              <p className="text-gray-400">&copy; 2025 Tuneable. All rights reserved.</p>
             </div>
             <div className="flex space-x-6">
               <Link 
