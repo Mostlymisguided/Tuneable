@@ -317,6 +317,18 @@ export const songAPI = {
     const response = await api.put(`/media/${songId}`, updates);
     return response.data;
   },
+
+  // Place global bid (chart support)
+  placeGlobalBid: async (songId: string, amount: number) => {
+    const response = await api.post(`/media/${songId}/global-bid`, { amount });
+    return response.data;
+  },
+
+  // Get top parties for a song
+  getTopPartiesForSong: async (songId: string) => {
+    const response = await api.get(`/media/${songId}/top-parties`);
+    return response.data;
+  },
 };
 
 // Search API

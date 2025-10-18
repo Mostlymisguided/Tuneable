@@ -509,5 +509,140 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/media/:mediaId/global-bid
+// @desc    Place a global bid (chart support) on a media item
+// @access  Private
+router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { amount } = req.body;
+    const userId = req.user._id;
+
+    // Validate amount
+    if (!amount || amount < 0.33) {
+      return res.status(400).json({ error: 'Minimum bid is £0.33' });
+    }
+
+    // Get user and check balance
+    const User = require('../models/User');
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userBalancePence = Math.round(user.balance * 100);
+    const bidAmountPence = Math.round(amount * 100);
+
+    if (userBalancePence < bidAmountPence) {
+      return res.status(400).json({ 
+        error: 'Insufficient balance',
+        required: amount,
+        available: user.balance
+      });
+    }
+
+    // Get or resolve media
+    const resolvedMediaId = await resolveId(mediaId, 'Media');
+    if (!resolvedMediaId) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const media = await Media.findById(resolvedMediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    // Create global bid (no party association)
+    const Bid = require('../models/Bid');
+    const bid = new Bid({
+      userId,
+      partyId: null, // Global bid - no party
+      mediaId: media._id,
+      amount,
+      status: 'active',
+      type: 'global_support'
+    });
+
+    await bid.save();
+
+    // Update media's bid array and global aggregate
+    media.bids = media.bids || [];
+    media.bids.push(bid._id);
+    media.globalMediaAggregate = (media.globalMediaAggregate || 0) + amount;
+    await media.save();
+
+    // Update user balance
+    user.balance = (userBalancePence - bidAmountPence) / 100;
+    await user.save();
+
+    // Send high-value bid notification
+    const { sendHighValueBidNotification } = require('../utils/emailService');
+    try {
+      await sendHighValueBidNotification(bid, media, user, 10);
+    } catch (emailError) {
+      console.error('Failed to send high-value bid notification:', emailError);
+    }
+
+    res.json(transformResponse({
+      message: 'Global bid placed successfully',
+      bid,
+      updatedBalance: user.balance,
+      newGlobalAggregate: media.globalMediaAggregate
+    }));
+  } catch (error) {
+    console.error('Error placing global bid:', error);
+    res.status(500).json({ error: 'Failed to place global bid' });
+  }
+});
+
+// @route   GET /api/media/:mediaId/top-parties
+// @desc    Get top parties where this media appears
+// @access  Public
+router.get('/:mediaId/top-parties', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { limit = 10 } = req.query;
+
+    // Resolve media ID
+    const resolvedMediaId = await resolveId(mediaId, 'Media');
+    if (!resolvedMediaId) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    // Find all parties that contain this media
+    const Party = require('../models/Party');
+    const parties = await Party.find({
+      'media.mediaId': resolvedMediaId,
+      status: { $in: ['active', 'scheduled'] }
+    })
+      .populate('host', 'username uuid profilePic')
+      .lean();
+
+    // Extract party info and bid totals for this media
+    const partyStats = parties.map(party => {
+      const mediaEntry = party.media.find(m => m.mediaId.toString() === resolvedMediaId.toString());
+      return {
+        _id: party._id,
+        name: party.name,
+        location: party.location,
+        host: party.host,
+        partyMediaAggregate: mediaEntry?.partyMediaAggregate || 0,
+        bidCount: mediaEntry?.partyBids?.length || 0,
+        status: party.status
+      };
+    })
+      .filter(p => p.partyMediaAggregate > 0) // Only include parties with bids
+      .sort((a, b) => b.partyMediaAggregate - a.partyMediaAggregate) // Sort by bid total
+      .slice(0, parseInt(limit) || 10);
+
+    res.json(transformResponse({
+      parties: partyStats
+    }));
+  } catch (error) {
+    console.error('Error fetching top parties:', error);
+    res.status(500).json({ error: 'Failed to fetch top parties' });
+  }
+});
+
 module.exports = router;
 

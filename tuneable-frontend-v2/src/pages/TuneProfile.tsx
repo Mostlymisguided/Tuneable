@@ -23,11 +23,14 @@ import {
   Edit3,
   SquarePlus,
   Youtube,
-  Music2
+  Music2,
+  Coins,
+  Loader2
 } from 'lucide-react';
 import { songAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import { useAuth } from '../contexts/AuthContext';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 
 interface Song {
   _id: string;
@@ -148,9 +151,18 @@ const TuneProfile: React.FC = () => {
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
 
+  // Global bidding state
+  const [globalBidAmount, setGlobalBidAmount] = useState<number>(0.33);
+  const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
+  const [topParties, setTopParties] = useState<any[]>([]);
+
+  // WebPlayer integration
+  const { setCurrentSong, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
+
   useEffect(() => {
     if (songId) {
       fetchSongProfile();
+      loadTopParties();
     }
   }, [songId]);
 
@@ -502,6 +514,83 @@ const TuneProfile: React.FC = () => {
     }
   };
 
+  // Load top parties for this tune
+  const loadTopParties = async () => {
+    try {
+      // Will implement backend route for this
+      const response = await songAPI.getTopPartiesForSong(songId!);
+      setTopParties(response.parties || []);
+    } catch (err: any) {
+      console.error('Error loading top parties:', err);
+      // Silent fail - not critical
+    }
+  };
+
+  // Handle play button click
+  const handlePlaySong = () => {
+    if (!song) return;
+
+    // Format song for webplayer
+    const formattedSong = {
+      id: song.uuid || song._id,
+      title: song.title,
+      artist: Array.isArray(song.artist) ? song.artist : song.artist,
+      duration: song.duration,
+      coverArt: song.coverArt,
+      sources: song.sources || {},
+      globalMediaAggregate: song.globalMediaAggregate || 0,
+      bids: song.bids || [],
+      addedBy: song.addedBy || 'Unknown',
+      totalBidValue: song.globalMediaAggregate || 0
+    } as any;
+
+    // Set as current song and start playing
+    setCurrentSong(formattedSong, 0, true); // true = autoplay
+    setQueue([formattedSong]);
+    setGlobalPlayerActive(true);
+    setCurrentPartyId(null); // Not in a party context
+    
+    toast.success(`Now playing: ${song.title}`);
+  };
+
+  // Handle global bid (chart support)
+  const handleGlobalBid = async () => {
+    if (!user) {
+      toast.info('Please log in to support this tune');
+      navigate('/login');
+      return;
+    }
+
+    if (globalBidAmount < 0.33) {
+      toast.error('Minimum bid is £0.33');
+      return;
+    }
+
+    if ((user as any)?.balance < globalBidAmount) {
+      toast.error('Insufficient balance. Please top up your wallet.');
+      navigate('/wallet');
+      return;
+    }
+
+    setIsPlacingGlobalBid(true);
+
+    try {
+      await songAPI.placeGlobalBid(songId!, globalBidAmount);
+      
+      toast.success(`Placed £${globalBidAmount.toFixed(2)} bid on "${song?.title}"!`);
+      
+      // Refresh song data to show updated metrics
+      await fetchSongProfile();
+      await loadTopParties();
+      
+    } catch (err: any) {
+      console.error('Error placing global bid:', err);
+      toast.error(err.response?.data?.error || 'Failed to place bid');
+    } finally {
+      setIsPlacingGlobalBid(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -590,13 +679,22 @@ const TuneProfile: React.FC = () => {
               <span className="sm:hidden">Claim</span>
             </button>
 
-            {/* Album Art */}
-            <div className="flex mr-6">
+            {/* Album Art with Play Button Overlay */}
+            <div className="flex mr-6 relative group">
               <img
                 src={song.coverArt || '/android-chrome-192x192.png'}
                 alt={`${song.title} cover`}
                 className="w-auto h-auto rounded-lg shadow-xl object-cover"
               />
+              {/* Play Button Overlay */}
+              <div 
+                className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={handlePlaySong}
+              >
+                <div className="w-20 h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                  <Play className="h-10 w-10 text-white ml-1" fill="currentColor" />
+                </div>
+              </div>
             </div>
             
             {/* Song Info */}
@@ -698,6 +796,71 @@ const TuneProfile: React.FC = () => {
           </div>
         </div>
 
+        {/* Global Bid Section - Support This Tune */}
+        {user && (
+          <div className="mb-8">
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-8 text-center">
+                <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center">
+                  <Coins className="h-7 w-7 mr-3 text-yellow-400" />
+                  Support This Tune
+                </h3>
+                <p className="text-gray-300 text-base mb-6">
+                  Boost this tune's global ranking and support the artist
+                </p>
+                
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                    <span className="px-3 text-gray-400 text-xl">£</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.33"
+                      value={globalBidAmount}
+                      onChange={(e) => setGlobalBidAmount(parseFloat(e.target.value) || 0.33)}
+                      className="w-28 bg-gray-800 p-3 text-white text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
+                    />
+                  </div>
+                  <button
+                    onClick={handleGlobalBid}
+                    disabled={isPlacingGlobalBid || globalBidAmount < 0.33}
+                    className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-lg"
+                  >
+                    {isPlacingGlobalBid ? (
+                      <>
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span>Placing Bid...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Coins className="h-6 w-6" />
+                        <span>Bid £{globalBidAmount.toFixed(2)}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {/* Quick amounts */}
+                <div className="flex flex-wrap justify-center gap-2 mb-4">
+                  {[0.33, 1.00, 5.00, 10.00, 20.00].map(amount => (
+                    <button
+                      key={amount}
+                      onClick={() => setGlobalBidAmount(amount)}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-full transition-colors font-medium"
+                    >
+                      £{amount.toFixed(2)}
+                    </button>
+                  ))}
+                </div>
+                
+                <p className="text-sm text-gray-400">
+                  Your balance: £{(user as any)?.balance?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Top Bidders */}
         {song.bids && song.bids.length > 0 && (
           <div className="mb-8">
@@ -707,6 +870,58 @@ const TuneProfile: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Top Parties */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
+            <Music className="h-6 w-6 mr-2 text-purple-400" />
+            Top Parties
+          </h2>
+          <div className="card bg-black/20 rounded-lg p-6">
+            {topParties.length > 0 ? (
+              <div className="space-y-3">
+                {topParties.map((party, index) => (
+                  <div 
+                    key={party._id} 
+                    className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-bold">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <h3 className="text-white font-semibold text-lg">{party.name}</h3>
+                        <p className="text-sm text-gray-400">{party.location}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-green-400">
+                          £{party.partyMediaAggregate?.toFixed(2) || '0.00'}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {party.bidCount || 0} {party.bidCount === 1 ? 'bid' : 'bids'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/party/${party._id}`)}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        View Party
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
+                <p>This tune hasn't been added to any parties yet</p>
+                <p className="text-sm text-gray-500 mt-2">Be the first to add it to a party!</p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Song Details */}
         <div className="mb-8">
