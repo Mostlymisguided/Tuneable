@@ -552,23 +552,70 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Create global bid (no party association)
+    // Use existing Global Party
+    const Party = require('../models/Party');
+    const mongoose = require('mongoose');
+    const GLOBAL_PARTY_ID = '67c6a02895baad05d3a97cf4'; // Your existing Global Party
+    
+    const globalParty = await Party.findById(GLOBAL_PARTY_ID);
+    
+    if (!globalParty) {
+      return res.status(500).json({ error: 'Global Party not found. Please contact support.' });
+    }
+
+    // Check if media already exists in global party
+    let partyMediaEntry = globalParty.media.find(m => m.mediaId && m.mediaId.toString() === media._id.toString());
+    
+    // Create bid using standard party bid flow
     const Bid = require('../models/Bid');
     const bid = new Bid({
       userId,
-      partyId: null, // Global bid - no party
+      partyId: globalParty._id,
       mediaId: media._id,
       amount,
       status: 'active',
-      type: 'global_support'
+      username: user.username,
+      partyName: globalParty.name, // 'Global Party'
+      partyType: globalParty.type, // 'remote'
+      mediaTitle: media.title,
+      mediaArtist: media.artist?.[0]?.name || 'Unknown',
+      mediaCoverArt: media.coverArt,
+      isInitialBid: !partyMediaEntry,
+      mediaContentType: media.contentType,
+      mediaContentForm: media.contentForm,
+      mediaDuration: media.duration
     });
 
     await bid.save();
 
-    // Update media's bid array and global aggregate
+    // Add or update media in global party
+    if (!partyMediaEntry) {
+      partyMediaEntry = {
+        mediaId: media._id,
+        media_uuid: media.uuid,
+        addedBy: userId,
+        addedBy_uuid: user.uuid,
+        partyMediaAggregate: amount,
+        partyBids: [bid._id],
+        status: 'queued',
+        queuedAt: new Date(),
+        partyMediaBidTop: amount,
+        partyMediaBidTopUser: userId,
+        partyMediaAggregateTop: amount,
+        partyMediaAggregateTopUser: userId
+      };
+      globalParty.media.push(partyMediaEntry);
+    } else {
+      partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + amount;
+      partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
+      partyMediaEntry.partyBids.push(bid._id);
+    }
+    
+    await globalParty.save();
+
+    // Update media's bid array (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
     media.bids.push(bid._id);
-    media.globalMediaAggregate = (media.globalMediaAggregate || 0) + amount;
     await media.save();
 
     // Update user balance
@@ -577,21 +624,23 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
 
     // Send high-value bid notification
     const { sendHighValueBidNotification } = require('../utils/emailService');
-    try {
-      await sendHighValueBidNotification(bid, media, user, 10);
-    } catch (emailError) {
-      console.error('Failed to send high-value bid notification:', emailError);
+    if (amount >= 10) {
+      try {
+        await sendHighValueBidNotification(bid, media, user, 10);
+      } catch (emailError) {
+        console.error('Failed to send high-value bid notification:', emailError);
+      }
     }
 
     res.json(transformResponse({
       message: 'Global bid placed successfully',
       bid,
       updatedBalance: user.balance,
-      newGlobalAggregate: media.globalMediaAggregate
+      globalPartyId: globalParty._id
     }));
   } catch (error) {
     console.error('Error placing global bid:', error);
-    res.status(500).json({ error: 'Failed to place global bid' });
+    res.status(500).json({ error: 'Failed to place global bid', details: error.message });
   }
 });
 
@@ -609,11 +658,14 @@ router.get('/:mediaId/top-parties', async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Find all parties that contain this media
+    // Find all parties that contain this media (exclude Global Party)
     const Party = require('../models/Party');
+    const GLOBAL_PARTY_ID = '67c6a02895baad05d3a97cf4';
+    
     const parties = await Party.find({
       'media.mediaId': resolvedMediaId,
-      status: { $in: ['active', 'scheduled'] }
+      status: { $in: ['active', 'scheduled'] },
+      _id: { $ne: GLOBAL_PARTY_ID } // Exclude Global Party from list
     })
       .populate('host', 'username uuid profilePic')
       .lean();
