@@ -514,6 +514,38 @@ const PersistentWebPlayer: React.FC = () => {
     }
   }, [volume, isMuted, isPlayerReady, playerType]);
 
+  // Keyboard controls - spacebar for play/pause
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle spacebar
+      if (e.code !== 'Space' && e.key !== ' ') return;
+      
+      // Don't interfere with typing in input fields, textareas, or contenteditable elements
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      
+      // Prevent default spacebar behavior (page scroll)
+      e.preventDefault();
+      
+      // Toggle play/pause if there's a current song
+      if (currentSong) {
+        togglePlayPause();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [currentSong, togglePlayPause]);
+
   // Cleanup effect
   useEffect(() => {
     return () => {

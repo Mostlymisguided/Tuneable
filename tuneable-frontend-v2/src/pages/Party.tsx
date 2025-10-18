@@ -852,8 +852,54 @@ const Party: React.FC = () => {
     }
   };
 
-
-
+  // Handle clicking play button on a song in the queue
+  const handlePlaySong = (song: any, index: number) => {
+    const songData = selectedTimePeriod === 'all-time' ? (song.songId || song) : song;
+    
+    // Clean and format the song for the webplayer
+    let sources = {};
+    
+    if (songData.sources) {
+      if (Array.isArray(songData.sources)) {
+        for (const source of songData.sources) {
+          if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+            // Handle Mongoose metadata corruption
+            sources = source.url.sources;
+            break;
+          } else if (source && source.platform === 'youtube' && source.url) {
+            (sources as any).youtube = source.url;
+          } else if (source && source.platform === 'spotify' && source.url) {
+            (sources as any).spotify = source.url;
+          } else if (source?.youtube) {
+            (sources as any).youtube = source.youtube;
+          } else if (source?.spotify) {
+            (sources as any).spotify = source.spotify;
+          }
+        }
+      } else if (typeof songData.sources === 'object') {
+        sources = songData.sources;
+      }
+    }
+    
+    const cleanedSong = {
+      id: songData.id || songData.uuid || songData._id,
+      title: songData.title,
+      artist: Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist,
+      duration: songData.duration,
+      coverArt: songData.coverArt,
+      sources: sources,
+      globalMediaAggregate: typeof songData.globalMediaAggregate === 'number' ? songData.globalMediaAggregate : 0,
+      partyMediaAggregate: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
+      totalBidValue: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
+      bids: songData.bids,
+      addedBy: typeof songData.addedBy === 'object' ? songData.addedBy?.username || 'Unknown' : songData.addedBy
+    };
+    
+    // Set the song in the webplayer and start playing
+    setCurrentSong(cleanedSong, index, true); // true = autoplay
+    
+    toast.success(`Now playing: ${cleanedSong.title}`);
+  };
 
   const formatDuration = (duration: number | string | undefined) => {
     if (!duration) return '3:00';
@@ -1459,6 +1505,18 @@ const Party: React.FC = () => {
                                 width="128"
                                 height="128"
                               />
+                              {/* Play Icon Overlay */}
+                              <div 
+                                className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePlaySong(song, index);
+                                }}
+                              >
+                                <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
+                                  <Play className="h-4 w-4 md:h-6 md:w-6 text-white" fill="currentColor" />
+                                </div>
+                              </div>
                             </div>
                             
                             {/* Song Details */}
