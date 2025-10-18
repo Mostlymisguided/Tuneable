@@ -380,4 +380,41 @@ export const claimAPI = {
   },
 };
 
+export const creatorAPI = {
+  // Submit creator application
+  apply: async (formData: FormData) => {
+    const response = await api.post('/creator/apply', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  
+  // Get creator status
+  getStatus: async () => {
+    const response = await api.get('/creator/status');
+    return response.data;
+  },
+  
+  // Update creator profile
+  updateProfile: async (profileData: any) => {
+    const response = await api.patch('/creator/profile', profileData);
+    return response.data;
+  },
+  
+  // Admin only: Get all applications
+  getAllApplications: async (status?: string) => {
+    const params = status ? { status } : {};
+    const response = await api.get('/creator/applications', { params });
+    return response.data;
+  },
+  
+  // Admin only: Review application
+  reviewApplication: async (userId: string, status: 'verified' | 'rejected', reviewNotes?: string) => {
+    const response = await api.patch(`/creator/applications/${userId}/review`, { status, reviewNotes });
+    return response.data;
+  },
+};
+
 export default api;

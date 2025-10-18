@@ -44,10 +44,47 @@ const userSchema = new mongoose.Schema({
   },
   role: { 
     type: [String], 
-    enum: ['user', 'admin', 'artist', 'host', 'moderator', 'attendee', 'dj'], 
+    enum: ['user', 'admin', 'creator', 'artist', 'host', 'moderator', 'attendee', 'dj'], 
     default: ['user'] 
   },
   isActive: { type: Boolean, default: true },
+  
+  // Creator profile for verified creators/artists
+  creatorProfile: {
+    artistName: { type: String },
+    bio: { type: String, maxlength: 500 },
+    genres: [String],
+    roles: [String], // ['artist', 'producer', 'songwriter', etc.]
+    website: { type: String },
+    socialMedia: {
+      instagram: String,
+      facebook: String,
+      soundcloud: String,
+      spotify: String,
+      youtube: String,
+      twitter: String
+    },
+    label: String,
+    management: String,
+    distributor: String,
+    
+    // Verification status
+    verificationStatus: {
+      type: String,
+      enum: ['unverified', 'pending', 'verified', 'rejected'],
+      default: 'unverified'
+    },
+    verificationMethod: String, // 'oauth', 'manual', 'admin'
+    verifiedAt: Date,
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  },
+  
+  // OAuth verification flags
+  oauthVerified: {
+    instagram: { type: Boolean, default: false },
+    facebook: { type: Boolean, default: false },
+    soundcloud: { type: Boolean, default: false }
+  }
 }, { 
   timestamps: true,
   toJSON: { virtuals: true }, 

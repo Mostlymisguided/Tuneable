@@ -28,6 +28,7 @@ import PodcastDiscovery from './pages/PodcastDiscovery';
 import TuneProfile from './pages/TuneProfile';
 import UserProfile from './pages/UserProfile';
 import Admin from './pages/Admin';
+import CreatorRegister from './pages/CreatorRegister';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -122,6 +123,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <ProfileRedirect />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/register" 
+              element={
+                <ProtectedRoute>
+                  <CreatorRegister />
                 </ProtectedRoute>
               } 
             />

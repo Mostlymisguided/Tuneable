@@ -471,9 +471,8 @@ const TuneProfile: React.FC = () => {
   // Handle creator signup
   const handleCreatorSignup = () => {
     setShowCreatorSignupModal(false);
-    // TODO: Navigate to dedicated creator signup page or update user role
-    navigate('/profile'); // For now, send them to profile where CreatorUserToggle is
-    toast.info('Use the Creator/User toggle on your profile to enable creator mode');
+    // Navigate to creator registration page
+    navigate('/creator/register');
   };
 
   // Handle claim submission
@@ -506,7 +505,7 @@ const TuneProfile: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading song profile...</div>
+        <div className="text-white text-xl">Loading Tune Profile...</div>
       </div>
     );
   }
