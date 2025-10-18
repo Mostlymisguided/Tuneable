@@ -50,62 +50,62 @@ const Home: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="backdrop-blur-md bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-800" style={{ paddingTop: '4rem', paddingBottom: '5rem' }}>
+      <section className="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
               How Tuneable Works
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-gray-300">
               Create Parties, Bid on Tunes, and Control The Music Together
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Music className="h-8 w-8 text-primary-600" />
+            <div className="text-center group">
+              <div className="bg-purple-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-purple-500/30 group-hover:border-purple-400 group-hover:bg-purple-600/30 transition-all">
+                <Music className="h-10 w-10 text-purple-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-xl font-bold text-white mb-3">
                 Create Parties
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-300 leading-relaxed">
                 Start a party and invite friends to join the music experience
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <DollarSign className="h-8 w-8 text-primary-600" />
+            <div className="text-center group">
+              <div className="bg-green-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-500/30 group-hover:border-green-400 group-hover:bg-green-600/30 transition-all">
+                <DollarSign className="h-10 w-10 text-green-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-xl font-bold text-white mb-3">
                 Bid on Tunes
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-300 leading-relaxed">
                 Bid your credits to get your favorite Tunes to the top
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-primary-600" />
+            <div className="text-center group">
+              <div className="bg-blue-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-blue-500/30 group-hover:border-blue-400 group-hover:bg-blue-600/30 transition-all">
+                <Users className="h-10 w-10 text-blue-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-xl font-bold text-white mb-3">
                 Social Music
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-300 leading-relaxed">
                 Connect with friends and discover new music together
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Zap className="h-8 w-8 text-primary-600" />
+            <div className="text-center group">
+              <div className="bg-yellow-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-yellow-500/30 group-hover:border-yellow-400 group-hover:bg-yellow-600/30 transition-all">
+                <Zap className="h-10 w-10 text-yellow-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-xl font-bold text-white mb-3">
                 Real-time Updates
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-300 leading-relaxed">
                 Live queue updates and synchronized playback for everyone
               </p>
             </div>
