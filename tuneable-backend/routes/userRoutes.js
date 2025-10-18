@@ -12,27 +12,13 @@ const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { transformResponse } = require('../utils/uuidTransform');
 const { sendUserRegistrationNotification } = require('../utils/emailService');
+const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-      const uploadDir = path.join(__dirname, '../uploads');
-      if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-      const userId = req.user?.userId || 'placeholder';
-      const timestamp = Date.now();
-      const fileExt = path.extname(file.originalname);
-      cb(null, `${userId}-${timestamp}-profilepic${fileExt}`);
-  }
-});
-
-const upload = multer({ storage: storage });
+// Configure upload using R2 or local fallback
+const upload = createProfilePictureUpload();
     
 // Generate unique personal invite code
 const deriveCodeFromUserId = (userId) => {
@@ -115,9 +101,9 @@ router.post(
       });
       await user.save();
       
-      const timestamp = Date.now();
+      // Set profile picture URL (R2 location or local path)
       const profilePic = req.file 
-        ? `/uploads/${user._id}-${timestamp}-profilepic${req.file.originalname.substring(req.file.originalname.lastIndexOf('.'))}` 
+        ? (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`))
         : null;
       user.profilePic = profilePic;
       await user.save();
@@ -221,7 +207,8 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
           return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const profilePicPath = `/uploads/${req.file.filename}`;
+      // Get profile picture URL (works for both R2 and local)
+      const profilePicPath = req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`);
 
       console.log(`📸 Saving profile pic: ${profilePicPath} for user ${req.user.userId}`);
 

@@ -1,48 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const Claim = require('../models/Claim');
 const Media = require('../models/Media');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { sendClaimNotification } = require('../utils/emailService');
+const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
 
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, '../uploads/claims');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-  console.log('✅ Created claims upload directory');
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `claim-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only images (JPEG, PNG) and PDFs are allowed'));
-    }
-  }
-});
+// Configure upload using R2 or local fallback
+const upload = createClaimUpload();
 
 // Submit a new claim
 router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req, res) => {
@@ -77,10 +44,10 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
       return res.status(400).json({ error: 'You already have a pending claim for this tune' });
     }
 
-    // Process uploaded files
+    // Process uploaded files (works for both R2 and local)
     const proofFiles = req.files ? req.files.map(file => ({
-      filename: file.filename,
-      url: `/uploads/claims/${file.filename}`,
+      filename: file.key || file.filename, // R2 uses key, local uses filename
+      url: file.location || getPublicUrl(`claims/${file.filename}`), // R2 has location, local needs construction
       uploadedAt: new Date()
     })) : [];
 
