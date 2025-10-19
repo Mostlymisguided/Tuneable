@@ -689,8 +689,6 @@ const TuneProfile: React.FC = () => {
     { label: 'Elements', value: song.elements, icon: Tag },
     { label: 'Tags', value: song.tags, icon: Tag },
     { label: 'Category', value: song.category, icon: Tag },
-    { label: 'Play Count', value: song.playCount, icon: Play },
-    { label: 'Popularity', value: song.popularity, icon: Heart },
   ];
 
   const visibleFields = showAllFields ? songFields : songFields.slice(0, 8);

@@ -477,7 +477,6 @@ const PodcastDiscovery: React.FC = () => {
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
                           <div className="text-sm font-medium text-gray-900">£{episode.globalMediaAggregate.toFixed(2)}</div>
-                          <div className="text-xs text-gray-500">{episode.playCount} plays</div>
                         </div>
                       </div>
                     </div>

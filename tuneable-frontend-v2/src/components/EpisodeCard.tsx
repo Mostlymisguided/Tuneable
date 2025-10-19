@@ -215,10 +215,6 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
             {formatDuration(episode.duration)}
           </div>
           <div className="flex items-center">
-            <Headphones className="w-4 h-4 mr-1" />
-            {episode.playCount} plays
-          </div>
-          <div className="flex items-center">
             <DollarSign className="w-4 h-4 mr-1" />
             ${episode.globalMediaAggregate.toFixed(2)} boosted
           </div>

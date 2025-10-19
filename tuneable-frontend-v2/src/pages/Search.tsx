@@ -628,8 +628,6 @@ const SearchPage: React.FC = () => {
                   duration: song.duration,
                   publishedAt: new Date().toISOString(),
                   globalMediaAggregate: song.globalMediaAggregate || 0,
-                  playCount: 0,
-                  popularity: 0,
                   explicit: false,
                   episodeDisplay: song.title,
                   formattedDuration: formatDuration(song.duration),
