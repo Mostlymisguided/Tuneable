@@ -797,10 +797,10 @@ const TuneProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* External Source Links */}
+              {/* External Source Links - Desktop only */}
               {getExternalLinks().length > 0 && (
-                <div className="mb-4 px-2 md:px-4">
-                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                <div className="hidden md:block mb-4 px-4">
+                  <div className="flex flex-wrap gap-2">
                     {getExternalLinks().map((link) => (
                       <a
                         key={link.platform}
@@ -1026,22 +1026,22 @@ const TuneProfile: React.FC = () => {
 
         {/* Links Section */}
         {song.sources && Object.keys(song.sources).length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">Links</h2>
-            <div className="bg-black/20 rounded-lg p-6">
-              <div className="flex flex-wrap gap-4">
+          <div className="mb-8 md:hidden px-2">
+            <h2 className="text-xl font-bold text-white mb-3">Links</h2>
+            <div className="bg-black/20 rounded-lg p-4">
+              <div className="flex flex-wrap gap-3 justify-center">
                 {Object.entries(song.sources).map(([platform, url]) => (
                   <a
                     key={platform}
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors group"
+                    className="flex items-center px-4 py-2.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors group"
                   >
-                    <svg className="w-6 h-6 mr-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="w-5 h-5 mr-2 text-white" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                     </svg>
-                    <span className="text-white font-semibold group-hover:text-gray-200 transition-colors">
+                    <span className="text-white text-sm font-semibold group-hover:text-gray-200 transition-colors">
                       Watch on YouTube
                     </span>
                   </a>
@@ -1052,12 +1052,12 @@ const TuneProfile: React.FC = () => {
         )}
 
         {/* Comments Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-4">Comments</h2>
+        <div className="mb-8 px-2 md:px-0">
+          <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4">Comments</h2>
           
           {/* Add Comment Form */}
           {user && (
-            <div className="card bg-black/20 rounded-lg p-6 mb-6">
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6 mb-6">
               <form onSubmit={handleSubmitComment}>
                 <textarea
                   value={newComment}
