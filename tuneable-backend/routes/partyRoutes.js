@@ -199,10 +199,23 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
         const processedMedia = party.media.map((entry) => {
             if (!entry.mediaId) return null; // Edge case: skip invalid entries
 
-            // ✅ Ensure `sources` is defined to avoid `.map()` errors
-            const availablePlatforms = Object.entries(entry.mediaId.sources || {})
-                .filter(([key, value]) => value) // Remove null values
-                .map(([key, value]) => ({ platform: key, url: value }));
+            // ✅ Convert sources Map to plain object (for consistent frontend handling)
+            let sourcesObj = {};
+            if (entry.mediaId.sources) {
+                if (entry.mediaId.sources instanceof Map) {
+                    // Convert Map to plain object
+                    console.log(`📼 Converting Map sources for media: ${entry.mediaId.title}`);
+                    entry.mediaId.sources.forEach((value, key) => {
+                        if (value) sourcesObj[key] = value;
+                    });
+                } else if (typeof entry.mediaId.sources === 'object') {
+                    // Already an object, just copy and filter null values
+                    Object.entries(entry.mediaId.sources).forEach(([key, value]) => {
+                        if (value) sourcesObj[key] = value;
+                    });
+                }
+                console.log(`📼 Sources for "${entry.mediaId.title}":`, Object.keys(sourcesObj).join(', '));
+            }
 
             return {
                 _id: entry.mediaId._id,
@@ -212,7 +225,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 artist: entry.mediaId.artist,
                 duration: entry.mediaId.duration || '666',
                 coverArt: entry.mediaId.coverArt || '/default-cover.jpg',
-                sources: availablePlatforms, // ✅ Store platform data as an array
+                sources: sourcesObj, // ✅ Store sources as object { youtube: '...', upload: '...' }
                 globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Global total (schema grammar)
                 partyMediaAggregate: entry.partyMediaAggregate || 0, // ✅ Party-media aggregate (schema grammar)
                 bids: entry.mediaId.bids || [], // ✅ Use populated bids from mediaId with user data

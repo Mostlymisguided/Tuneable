@@ -217,7 +217,16 @@ const createMediaUpload = () => {
         s3: s3Client,
         bucket: process.env.R2_BUCKET_NAME,
         acl: 'public-read',
-        contentType: multerS3.AUTO_CONTENT_TYPE,
+        contentType: (req, file, cb) => {
+          // Explicitly set audio/mpeg for MP3 files
+          cb(null, 'audio/mpeg');
+        },
+        metadata: function (req, file, cb) {
+          cb(null, {
+            'Content-Disposition': 'inline', // Enable streaming in browser
+            'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+          });
+        },
         key: function (req, file, cb) {
           const username = req.user?.username || 'unknown';
           const timestamp = Date.now();
