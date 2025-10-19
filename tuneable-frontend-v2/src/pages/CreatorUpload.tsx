@@ -15,6 +15,7 @@ const CreatorUpload: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
+    artistName: '', // For admins or to override creatorProfile name
     album: '',
     genre: '',
     releaseDate: '',
@@ -25,19 +26,20 @@ const CreatorUpload: React.FC = () => {
     coverArt: ''
   });
 
-  // Check if user is verified creator
+  // Check if user is verified creator or admin
+  const isAdmin = user && (user as any).role?.includes('admin');
   const isVerifiedCreator = user && 
     (user as any).creatorProfile && 
     (user as any).creatorProfile.verificationStatus === 'verified';
 
-  if (!isVerifiedCreator) {
+  if (!isVerifiedCreator && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full card bg-black/40 border border-red-500/30 rounded-lg p-8 text-center">
           <Music className="h-16 w-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
           <p className="text-gray-300 mb-4">
-            Only verified creators can upload media
+            Only verified creators and admins can upload media
           </p>
           <button
             onClick={() => navigate('/creator-register')}
@@ -104,6 +106,7 @@ const CreatorUpload: React.FC = () => {
       const uploadData = new FormData();
       uploadData.append('audioFile', file);
       uploadData.append('title', formData.title.trim());
+      if (formData.artistName) uploadData.append('artistName', formData.artistName.trim());
       if (formData.album) uploadData.append('album', formData.album.trim());
       if (formData.genre) uploadData.append('genre', formData.genre);
       if (formData.releaseDate) uploadData.append('releaseDate', formData.releaseDate);
@@ -239,6 +242,28 @@ const CreatorUpload: React.FC = () => {
                 placeholder="Enter track title"
                 required
               />
+            </div>
+
+            {/* Artist Name */}
+            <div>
+              <label className="block text-white font-medium mb-2">
+                Artist Name
+              </label>
+              <input
+                type="text"
+                name="artistName"
+                value={formData.artistName}
+                onChange={handleChange}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                placeholder={
+                  (user as any).creatorProfile?.artistName || 
+                  user?.username || 
+                  'Artist name (defaults to your username)'
+                }
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Leave blank to use {(user as any).creatorProfile?.artistName ? 'your artist name' : 'your username'}
+              </p>
             </div>
 
             {/* Album */}

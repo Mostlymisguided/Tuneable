@@ -14,20 +14,23 @@ const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const mediaUpload = createMediaUpload();
 
 // @route   POST /api/media/upload
-// @desc    Upload media file (MP3) - Creator only
-// @access  Private (Verified creators only)
+// @desc    Upload media file (MP3) - Creator/Admin only
+// @access  Private (Verified creators and admins)
 router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (req, res) => {
   try {
     const userId = req.user._id;
     
-    // Check if user is a verified creator
+    // Check if user is a verified creator or admin
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    if (!user.creatorProfile || user.creatorProfile.verificationStatus !== 'verified') {
-      return res.status(403).json({ error: 'Only verified creators can upload media' });
+    const isAdmin = user.role && user.role.includes('admin');
+    const isVerifiedCreator = user.creatorProfile && user.creatorProfile.verificationStatus === 'verified';
+    
+    if (!isAdmin && !isVerifiedCreator) {
+      return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
     
     if (!req.file) {
@@ -37,6 +40,7 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     // Extract metadata from request
     const {
       title,
+      artistName,
       album,
       genre,
       releaseDate,
@@ -58,11 +62,14 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     // Parse tags (comma-separated string to array)
     const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
     
+    // Determine artist name (priority: provided artistName > creatorProfile > username)
+    const finalArtistName = artistName?.trim() || user.creatorProfile?.artistName || user.username;
+    
     // Create Media entry
     const media = new Media({
       title,
       artist: toCreatorSubdocs([{
-        name: user.creatorProfile.artistName || user.username,
+        name: finalArtistName,
         userId: userId
       }]),
       album: album || undefined,
