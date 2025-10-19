@@ -17,7 +17,8 @@ async function migrateAttendeesToPartiers() {
     console.log('🚀 Starting attendees → partiers migration...');
     
     // Connect to MongoDB
-    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tuneable';
+    const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/tuneable';
+    console.log('🔗 Connecting to:', MONGODB_URI.includes('mongodb+srv') ? 'Atlas Cloud Database' : 'Local Database');
     await mongoose.connect(MONGODB_URI);
     console.log('📦 Connected to MongoDB');
     
