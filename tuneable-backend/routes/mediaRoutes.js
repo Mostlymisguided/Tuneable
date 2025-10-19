@@ -777,11 +777,16 @@ router.get('/:mediaId/top-parties', async (req, res) => {
     const { mediaId } = req.params;
     const { limit = 10 } = req.query;
 
+    console.log('🎪 Top parties request for media:', mediaId);
+
     // Resolve media ID
     const resolvedMediaId = await resolveId(mediaId, 'Media');
     if (!resolvedMediaId) {
+      console.log('❌ Media not found:', mediaId);
       return res.status(404).json({ error: 'Media not found' });
     }
+
+    console.log('✅ Resolved media ID:', resolvedMediaId);
 
     // Find all parties that contain this media
     const Party = require('../models/Party');
@@ -796,9 +801,12 @@ router.get('/:mediaId/top-parties', async (req, res) => {
       .populate('host', 'username uuid profilePic')
       .lean();
 
+    console.log('📊 Found parties containing this media:', parties.length);
+
     // Extract party info and bid totals for this media
     const partyStats = parties.map(party => {
       const mediaEntry = party.media.find(m => m.mediaId.toString() === resolvedMediaId.toString());
+      console.log(`  Party "${party.name}": aggregate=${mediaEntry?.partyMediaAggregate || 0}, bids=${mediaEntry?.partyBids?.length || 0}`);
       return {
         _id: party._id,
         name: party.name,
@@ -812,6 +820,8 @@ router.get('/:mediaId/top-parties', async (req, res) => {
       .filter(p => p.partyMediaAggregate > 0) // Only include parties with bids
       .sort((a, b) => b.partyMediaAggregate - a.partyMediaAggregate) // Sort by bid total
       .slice(0, parseInt(limit) || 10);
+
+    console.log('✅ Returning', partyStats.length, 'parties with bids');
 
     res.json(transformResponse({
       parties: partyStats

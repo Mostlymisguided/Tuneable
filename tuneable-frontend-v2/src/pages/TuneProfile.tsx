@@ -532,12 +532,19 @@ const TuneProfile: React.FC = () => {
   // Load top parties for this tune
   const loadTopParties = async () => {
     try {
-      // Will implement backend route for this
+      console.log('🔍 Loading top parties for song:', songId);
       const response = await songAPI.getTopPartiesForSong(songId!);
+      console.log('📊 Top parties response:', response);
+      console.log('📊 Parties data:', response.parties);
       setTopParties(response.parties || []);
+      console.log('✅ Top parties state set:', response.parties?.length || 0, 'parties');
     } catch (err: any) {
-      console.error('Error loading top parties:', err);
-      // Silent fail - not critical
+      console.error('❌ Error loading top parties:', err);
+      console.error('Error response:', err.response);
+      console.error('Error data:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      // Temporarily show error to user for debugging
+      toast.error(`Top Parties Error: ${err.response?.data?.error || err.message}`);
     }
   };
 
@@ -934,9 +941,14 @@ const TuneProfile: React.FC = () => {
         <div className="mb-8 px-2 md:px-0">
           <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
             <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
-            Top Parties
+            Top Parties {topParties.length > 0 && `(${topParties.length})`}
           </h2>
           <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+            {(() => {
+              console.log('🎪 Rendering Top Parties section, length:', topParties.length);
+              console.log('🎪 Top Parties data:', topParties);
+              return null;
+            })()}
             {topParties.length > 0 ? (
               <div className="space-y-2 md:space-y-3">
                 {topParties.map((party, index) => (
