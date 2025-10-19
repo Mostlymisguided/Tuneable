@@ -681,14 +681,15 @@ router.get('/:mediaId/top-parties', async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Find all parties that contain this media (exclude Global Party)
+    // Find all parties that contain this media
     const Party = require('../models/Party');
-    const GLOBAL_PARTY_ID = '67c6a02895baad05d3a97cf4';
+    // TODO: Exclude Global Party once we have many parties
+    // const GLOBAL_PARTY_ID = '67c6a02895baad05d3a97cf4';
     
     const parties = await Party.find({
       'media.mediaId': resolvedMediaId,
-      status: { $in: ['active', 'scheduled'] },
-      _id: { $ne: GLOBAL_PARTY_ID } // Exclude Global Party from list
+      status: { $in: ['active', 'scheduled'] }
+      // _id: { $ne: GLOBAL_PARTY_ID } // Temporarily include Global Party for visibility
     })
       .populate('host', 'username uuid profilePic')
       .lean();
