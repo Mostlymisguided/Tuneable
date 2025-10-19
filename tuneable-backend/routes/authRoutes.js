@@ -126,6 +126,13 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
     passport.authenticate('soundcloud', { failureRedirect: '/login?error=soundcloud_auth_failed' }),
     async (req, res) => {
       try {
+        console.log('🎵 SoundCloud OAuth callback - user:', req.user?.username);
+        
+        if (!req.user) {
+          console.error('❌ No user in SoundCloud callback');
+          return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=no_user`);
+        }
+        
         // Generate JWT token for the authenticated user using UUID
         const token = jwt.sign(
           { 
@@ -140,10 +147,11 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         // Redirect to frontend with ONLY the token (security improvement)
         // Frontend will fetch user data using the token
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        console.log('✅ Redirecting to:', `${frontendUrl}/auth/callback?token=${token.substring(0, 20)}...`);
         res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
         
       } catch (error) {
-        console.error('SoundCloud callback error:', error);
+        console.error('❌ SoundCloud callback error:', error);
         res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=soundcloud_auth_failed`);
       }
     }
