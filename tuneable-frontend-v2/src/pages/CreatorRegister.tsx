@@ -48,12 +48,13 @@ const CreatorRegister: React.FC = () => {
   const availableGenres = [
     'Pop', 'Rock', 'Hip Hop', 'R&B', 'Electronic', 'Country', 'Jazz', 
     'Classical', 'Reggae', 'Metal', 'Indie', 'Folk', 'Blues', 'Soul', 
-    'Funk', 'Punk', 'Alternative', 'Dance', 'Latin', 'World'
+    'Funk', 'Punk', 'Alternative', 'Dance', 'Latin', 'World',
+    'Techno', 'House', 'Minimal', 'D&B', 'Jungle', 'Trance'
   ];
 
   const availableRoles = [
     'artist', 'producer', 'songwriter', 'composer', 'host', 
-    'narrator', 'director', 'editor', 'author'
+    'narrator', 'director', 'editor', 'author', 'dj', 'vocalist', 'instrumentalist'
   ];
 
   const distributors = [
