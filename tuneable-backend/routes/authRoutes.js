@@ -113,7 +113,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // SoundCloud OAuth routes - only available if configured
 if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
-  router.get('/soundcloud', passport.authenticate('soundcloud'));
+  router.get('/soundcloud', (req, res, next) => {
+    // Store invite code in session if provided
+    if (req.query.invite) {
+      req.session = req.session || {};
+      req.session.pendingInviteCode = req.query.invite;
+    }
+    passport.authenticate('soundcloud')(req, res, next);
+  });
 
   router.get('/soundcloud/callback', 
     passport.authenticate('soundcloud', { failureRedirect: '/login?error=soundcloud_auth_failed' }),
@@ -153,10 +160,17 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 }
 
 // Instagram OAuth routes - only available if configured
-if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
-  router.get('/instagram', passport.authenticate('instagram', { 
-    scope: ['user_profile', 'user_media'] 
-  }));
+if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
+  router.get('/instagram', (req, res, next) => {
+    // Store invite code in session if provided
+    if (req.query.invite) {
+      req.session = req.session || {};
+      req.session.pendingInviteCode = req.query.invite;
+    }
+    passport.authenticate('instagram', { 
+      scope: ['user_profile', 'user_media'] 
+    })(req, res, next);
+  });
 
   router.get('/instagram/callback', 
     passport.authenticate('instagram', { failureRedirect: '/login?error=instagram_auth_failed' }),

@@ -407,10 +407,10 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 }
 
 // Instagram OAuth Strategy - only configure if environment variables are available
-if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
+if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   passport.use(new InstagramStrategy({
-      clientID: process.env.INSTAGRAM_APP_ID,
-      clientSecret: process.env.INSTAGRAM_APP_SECRET,
+      clientID: process.env.INSTAGRAM_CLIENT_ID,
+      clientSecret: process.env.INSTAGRAM_CLIENT_SECRET,
       callbackURL: process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback"
     },
     async (accessToken, refreshToken, profile, done) => {
@@ -526,7 +526,7 @@ if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
     }
   ));
 } else {
-  console.log('⚠️  Instagram OAuth not configured - INSTAGRAM_APP_ID or INSTAGRAM_APP_SECRET missing');
+  console.log('⚠️  Instagram OAuth not configured - INSTAGRAM_CLIENT_ID or INSTAGRAM_CLIENT_SECRET missing');
 }
 
 // Generate unique invite code
