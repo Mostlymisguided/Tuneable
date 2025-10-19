@@ -442,10 +442,10 @@ const Party: React.FC = () => {
     setIsLoadingSortedSongs(true);
     try {
       const response = await partyAPI.getSongsSortedByTime(partyId, timePeriod);
-      setSortedSongs(response.songs);
+      setSortedSongs(response.media || response.songs || []);
     } catch (error) {
-      console.error('Error fetching sorted songs:', error);
-      toast.error('Failed to load sorted songs');
+      console.error('Error fetching sorted media:', error);
+      toast.error('Failed to load sorted media');
     } finally {
       setIsLoadingSortedSongs(false);
     }
