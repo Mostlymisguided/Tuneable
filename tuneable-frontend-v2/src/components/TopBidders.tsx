@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Clock } from 'lucide-react';
 
 interface Bid {
   userId: {
@@ -8,6 +9,7 @@ interface Bid {
     uuid: string;
   };
   amount: number;
+  createdAt: string;
   _doc?: any; // Mongoose document property
 }
 
@@ -42,47 +44,72 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
     return null;
   }
 
+  // Format date to relative time
+  const getRelativeTime = (dateString: string) => {
+    if (!dateString) return 'Recently';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return `${Math.floor(diffDays / 30)}mo ago`;
+  };
+
   return (
-    <div className="mt-4 mb-6">
-      <div>
-        <span className="text-s text-gray-400 pb-2">Top Bids</span>
-      </div>
-      <div className="flex items-start space-x-2">
-        {topBids.map((bid, index) => (
-          <div
-            key={bid.userId.uuid || index}
-            className="flex-col items-center"
-          >
-            {/* Profile Picture - Clickable */}
-            <div 
-              className="w-6 h-6 md:w-12 md:h-12 rounded-full overflow-hidden bg-white border-2 border-purple-800 flex items-center justify-center cursor-pointer hover:border-purple-600 transition-colors"
-              onClick={() => bid.userId.uuid && navigate(`/user/${bid.userId.uuid}`)}
-            >
+    <div className="space-y-2">
+      {topBids.map((bid, index) => (
+        <div
+          key={bid.userId.uuid || index}
+          className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-900/10 to-pink-900/10 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
+          onClick={() => bid.userId.uuid && navigate(`/user/${bid.userId.uuid}`)}
+        >
+          {/* Left: Profile + Username */}
+          <div className="flex items-center space-x-3 flex-1 min-w-0">
+            {/* Profile Picture */}
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 border-2 border-yellow-500 flex-shrink-0">
               <img
                 src={bid.userId.profilePic || '/android-chrome-192x192.png'}
                 alt={bid.userId.username}
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="justify-center text-center block">
-            {/* Bid Amount - Permanently displayed */}
-            <span className="text-8px md:text-xs text-white text-center font-semibold mt-1">
+            
+            {/* Username */}
+            <div className="flex-1 min-w-0">
+              <div className="text-white font-semibold truncate">
+                {bid.userId.username}
+              </div>
+              <div className="flex items-center space-x-1 text-xs text-gray-400">
+                <Clock className="h-3 w-3" />
+                <span>{getRelativeTime(bid.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Right: Bid Amount */}
+          <div className="text-right flex-shrink-0">
+            <div className="text-xl font-bold text-yellow-400">
               £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
-            </span>
             </div>
           </div>
-        ))}
-        
-        {/* Show count if more than maxDisplay */}
-        {bids.length > maxDisplay && (
-          <div className="flex flex-col items-center">
-            <div className="w-12 h-12 rounded-full bg-gray-700 border-2 border-purple-800 flex items-center justify-center">
-              <span className="text-sm text-white font-semibold">+{bids.length - maxDisplay}</span>
-            </div>
-            <span className="text-xs text-gray-400 mt-1">more</span>
-          </div>
-        )}
-      </div>
+        </div>
+      ))}
+      
+      {/* Show count if more bids exist */}
+      {bids.length > maxDisplay && (
+        <div className="text-center py-2 text-sm text-gray-400">
+          +{bids.length - maxDisplay} more {bids.length - maxDisplay === 1 ? 'bid' : 'bids'}
+        </div>
+      )}
     </div>
   );
 };
