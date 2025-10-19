@@ -110,6 +110,11 @@ export const authAPI = {
     const response = await api.post('/auth/refresh');
     return response.data;
   },
+  
+  getReferrals: async () => {
+    const response = await api.get('/users/referrals');
+    return response.data;
+  },
 };
 
 // Payment API
@@ -359,6 +364,25 @@ export const topTunesAPI = {
 export const userAPI = {
   getProfile: async (userId: string) => {
     const response = await api.get(`/users/${userId}/profile`);
+    return response.data;
+  },
+  
+  // Admin: Get invite requests
+  getInviteRequests: async (status?: string) => {
+    const params = status ? { status } : {};
+    const response = await api.get('/users/admin/invite-requests', { params });
+    return response.data;
+  },
+  
+  // Admin: Approve invite request
+  approveInviteRequest: async (requestId: string) => {
+    const response = await api.patch(`/users/admin/invite-requests/${requestId}/approve`);
+    return response.data;
+  },
+  
+  // Admin: Reject invite request
+  rejectInviteRequest: async (requestId: string, reason?: string) => {
+    const response = await api.patch(`/users/admin/invite-requests/${requestId}/reject`, { reason });
     return response.data;
   },
 };

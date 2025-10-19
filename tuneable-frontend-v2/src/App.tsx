@@ -29,6 +29,7 @@ import TuneProfile from './pages/TuneProfile';
 import UserProfile from './pages/UserProfile';
 import Admin from './pages/Admin';
 import CreatorRegister from './pages/CreatorRegister';
+import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -66,6 +67,7 @@ const AppContent = () => {
             <Route path="/top-tunes" element={<TopTunes />} />
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage />} />
+            <Route path="/request-invite" element={<RequestInvite />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />

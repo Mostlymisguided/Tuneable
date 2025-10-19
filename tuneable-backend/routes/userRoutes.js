@@ -506,4 +506,107 @@ router.get('/referrals', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/admin/invite-requests
+// @desc    Get all invite requests (admin only)
+// @access  Private (Admin)
+router.get('/admin/invite-requests', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+    
+    const requests = await InviteRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    res.json(transformResponse({
+      requests,
+      count: requests.length
+    }));
+  } catch (error) {
+    console.error('Error fetching invite requests:', error);
+    res.status(500).json({ error: 'Failed to fetch invite requests' });
+  }
+});
+
+// @route   PATCH /api/users/admin/invite-requests/:id/approve
+// @desc    Approve an invite request and send code (admin only)
+// @access  Private (Admin)
+router.patch('/admin/invite-requests/:id/approve', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const request = await InviteRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: 'Request already processed' });
+    }
+
+    // Generate a one-time use invite code
+    const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase().substring(0, 5);
+    
+    request.status = 'approved';
+    request.inviteCode = inviteCode;
+    request.approvedBy = req.user._id;
+    request.approvedAt = new Date();
+    await request.save();
+
+    // TODO: Send email with invite code
+    
+    res.json(transformResponse({
+      message: 'Invite request approved',
+      request,
+      inviteCode
+    }));
+  } catch (error) {
+    console.error('Error approving invite request:', error);
+    res.status(500).json({ error: 'Failed to approve invite request' });
+  }
+});
+
+// @route   PATCH /api/users/admin/invite-requests/:id/reject
+// @desc    Reject an invite request (admin only)
+// @access  Private (Admin)
+router.patch('/admin/invite-requests/:id/reject', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { reason } = req.body;
+    const request = await InviteRequest.findById(req.params.id);
+    
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: 'Request already processed' });
+    }
+
+    request.status = 'rejected';
+    request.rejectedReason = reason || null;
+    await request.save();
+
+    res.json(transformResponse({
+      message: 'Invite request rejected',
+      request
+    }));
+  } catch (error) {
+    console.error('Error rejecting invite request:', error);
+    res.status(500).json({ error: 'Failed to reject invite request' });
+  }
+});
+
 module.exports = router;

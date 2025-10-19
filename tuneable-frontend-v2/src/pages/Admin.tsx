@@ -12,9 +12,11 @@ import {
   Award,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Mail
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
+import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import { creatorAPI, claimAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
@@ -195,6 +197,7 @@ const Admin: React.FC = () => {
     { id: 'users', name: 'Users', icon: Users },
     { id: 'creators', name: 'Creator Applications', icon: Award },
     { id: 'claims', name: 'Tune Claims', icon: Music },
+    { id: 'invites', name: 'Invite Requests', icon: Mail },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
@@ -634,6 +637,12 @@ const Admin: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'invites' && (
+          <div>
+            <InviteRequestsAdmin />
           </div>
         )}
 
