@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Mail, User, MessageSquare, CheckCircle, XCircle, Clock, Copy } from 'lucide-react';
+import { Mail, MessageSquare, CheckCircle, XCircle, Clock, Copy } from 'lucide-react';
 import { userAPI } from '../lib/api';
 
 interface InviteRequest {

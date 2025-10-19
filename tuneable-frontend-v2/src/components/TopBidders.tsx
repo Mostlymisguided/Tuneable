@@ -9,7 +9,7 @@ interface Bid {
     uuid: string;
   };
   amount: number;
-  createdAt: string;
+  createdAt?: string; // Optional - may not be present in all contexts
   _doc?: any; // Mongoose document property
 }
 
@@ -88,10 +88,12 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
               <div className="text-white font-semibold truncate">
                 {bid.userId.username}
               </div>
-              <div className="flex items-center space-x-1 text-xs text-gray-400">
-                <Clock className="h-3 w-3" />
-                <span>{getRelativeTime(bid.createdAt)}</span>
-              </div>
+              {bid.createdAt && (
+                <div className="flex items-center space-x-1 text-xs text-gray-400">
+                  <Clock className="h-3 w-3" />
+                  <span>{getRelativeTime(bid.createdAt)}</span>
+                </div>
+              )}
             </div>
           </div>
           
