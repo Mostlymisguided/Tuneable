@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
-import { creatorAPI, claimAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -53,28 +53,19 @@ const Admin: React.FC = () => {
         return;
       }
 
-      const response = await fetch('/api/users/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const userData = data.user || data;
-        setUser(userData);
-        
-        if (userData.role && userData.role.includes('admin')) {
-          setIsAdmin(true);
-          loadUsers();
-          loadCreatorApplications();
-          loadClaims();
-        } else {
-          setIsAdmin(false);
-          navigate('/');
-        }
+      // Use authAPI instead of raw fetch to get correct base URL
+      const data = await authAPI.getProfile();
+      const userData = data.user || data;
+      setUser(userData);
+      
+      if (userData.role && userData.role.includes('admin')) {
+        setIsAdmin(true);
+        loadUsers();
+        loadCreatorApplications();
+        loadClaims();
       } else {
-        navigate('/login');
+        setIsAdmin(false);
+        navigate('/');
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
