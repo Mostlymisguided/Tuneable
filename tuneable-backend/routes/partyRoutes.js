@@ -73,7 +73,6 @@ router.post('/', authMiddleware, async (req, res) => {
         host: userId,
         partyCode,
         partiers: [userId],
-        songs: [],
         bids: [],
         startTime: startTime || new Date(), // Use provided startTime or current time for automatic
         privacy: privacy || 'public',
@@ -821,28 +820,28 @@ router.post('/:partyId/songs/:songId/play', authMiddleware, async (req, res) => 
             return res.status(403).json({ error: 'Only the host can start songs' });
         }
 
-        const songIndex = party.songs.findIndex(song => song.songId.toString() === songId);
-        if (songIndex === -1) {
-            return res.status(404).json({ error: 'Song not found in this party' });
+        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === songId);
+        if (mediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in this party' });
         }
 
-        const songEntry = party.songs[songIndex];
+        const mediaEntry = party.media[mediaIndex];
         
-        // Can only play queued songs
-        if (songEntry.status !== 'queued') {
-            return res.status(400).json({ error: 'Can only play queued songs' });
+        // Can only play queued media
+        if (mediaEntry.status !== 'queued') {
+            return res.status(400).json({ error: 'Can only play queued media' });
         }
 
-        // Mark all other songs as queued
-        party.songs.forEach((song, index) => {
-            if (index !== songIndex && song.status === 'playing') {
-                song.status = 'queued';
+        // Mark all other media as queued
+        party.media.forEach((media, index) => {
+            if (index !== mediaIndex && media.status === 'playing') {
+                media.status = 'queued';
             }
         });
 
-        // Mark this song as playing
-        songEntry.status = 'playing';
-        songEntry.playedAt = new Date();
+        // Mark this media as playing
+        mediaEntry.status = 'playing';
+        mediaEntry.playedAt = new Date();
 
         await party.save();
 
@@ -885,24 +884,24 @@ router.post('/:partyId/songs/reset', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Only the host can reset songs' });
         }
 
-        // Reset all songs to queued status
-        party.songs.forEach(song => {
-            song.status = 'queued';
-            song.playedAt = null;
-            song.completedAt = null;
-            song.vetoedAt = null;
-            song.vetoedBy = null;
+        // Reset all media to queued status
+        party.media.forEach(media => {
+            media.status = 'queued';
+            media.playedAt = null;
+            media.completedAt = null;
+            media.vetoedAt = null;
+            media.vetoedBy = null;
         });
 
         await party.save();
 
         res.json({
-            message: 'All songs reset to queued status',
-            songsCount: party.songs.length
+            message: 'All media reset to queued status',
+            mediaCount: party.media.length
         });
     } catch (err) {
-        console.error('Error resetting songs:', err);
-        res.status(500).json({ error: 'Error resetting songs', details: err.message });
+        console.error('Error resetting media:', err);
+        res.status(500).json({ error: 'Error resetting media', details: err.message });
     }
 });
 
@@ -926,44 +925,44 @@ router.post('/:partyId/songs/:songId/complete', authMiddleware, async (req, res)
             return res.status(403).json({ error: 'Only the host can complete songs' });
         }
 
-        const songIndex = party.songs.findIndex(song => song.songId.toString() === songId);
-        if (songIndex === -1) {
-            return res.status(404).json({ error: 'Song not found in this party' });
+        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === songId);
+        if (mediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in this party' });
         }
 
-        const songEntry = party.songs[songIndex];
+        const mediaEntry = party.media[mediaIndex];
         
-        console.log(`Attempting to complete song ${songId} with status: ${songEntry.status}`);
+        console.log(`Attempting to complete media ${songId} with status: ${mediaEntry.status}`);
         
-        // Can complete playing songs or queued songs (for auto-playback)
-        if (songEntry.status !== 'playing' && songEntry.status !== 'queued') {
-            console.log(`Song ${songId} is in status '${songEntry.status}', cannot complete`);
-            return res.status(400).json({ error: 'Can only complete playing or queued songs' });
+        // Can complete playing media or queued media (for auto-playback)
+        if (mediaEntry.status !== 'playing' && mediaEntry.status !== 'queued') {
+            console.log(`Media ${songId} is in status '${mediaEntry.status}', cannot complete`);
+            return res.status(400).json({ error: 'Can only complete playing or queued media' });
         }
 
-        // Mark song as played
-        songEntry.status = 'played';
-        songEntry.completedAt = new Date();
+        // Mark media as played
+        mediaEntry.status = 'played';
+        mediaEntry.completedAt = new Date();
 
         await party.save();
 
         // Broadcast completion event via WebSocket
         const { broadcastToParty } = require('../utils/broadcast');
-        console.log(`Broadcasting SONG_COMPLETED for song ${songId} in party ${partyId}`);
+        console.log(`Broadcasting MEDIA_COMPLETED for media ${songId} in party ${partyId}`);
         broadcastToParty(partyId, {
-            type: 'SONG_COMPLETED',
-            songId: songId,
-            completedAt: songEntry.completedAt
+            type: 'MEDIA_COMPLETED',
+            mediaId: songId,
+            completedAt: mediaEntry.completedAt
         });
 
         res.json({
-            message: 'Song completed',
-            songId: songId,
-            completedAt: songEntry.completedAt
+            message: 'Media completed',
+            mediaId: songId,
+            completedAt: mediaEntry.completedAt
         });
     } catch (err) {
-        console.error('Error completing song:', err);
-        res.status(500).json({ error: 'Error completing song', details: err.message });
+        console.error('Error completing media:', err);
+        res.status(500).json({ error: 'Error completing media', details: err.message });
     }
 });
 
@@ -990,24 +989,24 @@ router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) =>
                     },
                 },
             })
-            .populate('songs.addedBy', 'username');
+            .populate('media.addedBy', 'username');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        const songsWithStatus = party.songs.filter(song => song.status === status);
+        const mediaWithStatus = party.media.filter(media => media.status === status);
         
         // Sort by party media aggregate (highest first) for all statuses - schema grammar
-        songsWithStatus.sort((a, b) => (b.partyMediaAggregate || 0) - (a.partyMediaAggregate || 0));
+        mediaWithStatus.sort((a, b) => (b.partyMediaAggregate || 0) - (a.partyMediaAggregate || 0));
 
         res.json(transformResponse({
             status: status,
-            songs: songsWithStatus,
-            count: songsWithStatus.length
+            media: mediaWithStatus,
+            count: mediaWithStatus.length
         }));
     } catch (err) {
-        console.error('Error fetching songs by status:', err);
-        res.status(500).json({ error: 'Error fetching songs by status', details: err.message });
+        console.error('Error fetching media by status:', err);
+        res.status(500).json({ error: 'Error fetching media by status', details: err.message });
     }
 });
 
@@ -1032,32 +1031,32 @@ router.post('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => 
             return res.status(403).json({ error: 'Only the host can veto songs' });
         }
 
-        const songIndex = party.songs.findIndex(song => song.songId.toString() === songId);
-        if (songIndex === -1) {
-            return res.status(404).json({ error: 'Song not found in this party' });
+        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === songId);
+        if (mediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in this party' });
         }
 
-        const songEntry = party.songs[songIndex];
+        const mediaEntry = party.media[mediaIndex];
         
-        // Can only veto queued songs
-        if (songEntry.status !== 'queued') {
-            return res.status(400).json({ error: 'Can only veto queued songs' });
+        // Can only veto queued media
+        if (mediaEntry.status !== 'queued') {
+            return res.status(400).json({ error: 'Can only veto queued media' });
         }
 
-        songEntry.status = 'vetoed';
-        songEntry.vetoedAt = new Date();
-        songEntry.vetoedBy = userId;
+        mediaEntry.status = 'vetoed';
+        mediaEntry.vetoedAt = new Date();
+        mediaEntry.vetoedBy = userId;
 
         await party.save();
 
         // Broadcast veto via WebSocket
         const { broadcastToParty } = require('../utils/broadcast');
         broadcastToParty(partyId, {
-            type: 'SONG_VETOED',
-            songId: songId,
+            type: 'MEDIA_VETOED',
+            mediaId: songId,
             vetoedBy: userId,
             reason: reason,
-            vetoedAt: songEntry.vetoedAt
+            vetoedAt: mediaEntry.vetoedAt
         });
 
         res.json({
@@ -1091,7 +1090,7 @@ router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
         const { partyId } = req.params;
         const userId = req.user._id;
 
-        const party = await Party.findById(partyId).populate('songs.songId');
+        const party = await Party.findById(partyId).populate('media.mediaId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
@@ -1101,38 +1100,38 @@ router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
         }
 
-        // Find current playing song
-        const currentPlayingIndex = party.songs.findIndex(song => song.status === 'playing');
+        // Find current playing media
+        const currentPlayingIndex = party.media.findIndex(media => media.status === 'playing');
         if (currentPlayingIndex === -1) {
-            return res.status(400).json({ error: 'No song currently playing' });
+            return res.status(400).json({ error: 'No media currently playing' });
         }
 
-        // Mark current song as played
-        party.songs[currentPlayingIndex].status = 'played';
-        party.songs[currentPlayingIndex].completedAt = new Date();
+        // Mark current media as played
+        party.media[currentPlayingIndex].status = 'played';
+        party.media[currentPlayingIndex].completedAt = new Date();
 
-        // Find next queued song
-        const nextQueuedIndex = party.songs.findIndex((song, index) => 
-            index > currentPlayingIndex && song.status === 'queued'
+        // Find next queued media
+        const nextQueuedIndex = party.media.findIndex((media, index) => 
+            index > currentPlayingIndex && media.status === 'queued'
         );
 
         if (nextQueuedIndex !== -1) {
-            // Mark next song as playing
-            party.songs[nextQueuedIndex].status = 'playing';
-            party.songs[nextQueuedIndex].playedAt = new Date();
+            // Mark next media as playing
+            party.media[nextQueuedIndex].status = 'playing';
+            party.media[nextQueuedIndex].playedAt = new Date();
         }
 
         await party.save();
 
         res.json({ 
             success: true, 
-            message: 'Skipped to next song',
-            currentSong: nextQueuedIndex !== -1 ? party.songs[nextQueuedIndex] : null
+            message: 'Skipped to next media',
+            currentMedia: nextQueuedIndex !== -1 ? party.media[nextQueuedIndex] : null
         });
 
     } catch (error) {
-        console.error('Error skipping to next song:', error);
-        res.status(500).json({ error: 'Failed to skip to next song' });
+        console.error('Error skipping to next media:', error);
+        res.status(500).json({ error: 'Failed to skip to next media' });
     }
 });
 
@@ -1142,7 +1141,7 @@ router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
         const { partyId } = req.params;
         const userId = req.user._id;
 
-        const party = await Party.findById(partyId).populate('songs.songId');
+        const party = await Party.findById(partyId).populate('media.mediaId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
@@ -1152,38 +1151,38 @@ router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
         }
 
-        // Find current playing song
-        const currentPlayingIndex = party.songs.findIndex(song => song.status === 'playing');
+        // Find current playing media
+        const currentPlayingIndex = party.media.findIndex(media => media.status === 'playing');
         if (currentPlayingIndex === -1) {
-            return res.status(400).json({ error: 'No song currently playing' });
+            return res.status(400).json({ error: 'No media currently playing' });
         }
 
-        // Find previous played song
-        const previousPlayedIndex = party.songs.findIndex((song, index) => 
-            index < currentPlayingIndex && song.status === 'played'
+        // Find previous played media
+        const previousPlayedIndex = party.media.findIndex((media, index) => 
+            index < currentPlayingIndex && media.status === 'played'
         );
 
         if (previousPlayedIndex !== -1) {
-            // Mark current song as queued
-            party.songs[currentPlayingIndex].status = 'queued';
-            party.songs[currentPlayingIndex].playedAt = undefined;
+            // Mark current media as queued
+            party.media[currentPlayingIndex].status = 'queued';
+            party.media[currentPlayingIndex].playedAt = undefined;
 
-            // Mark previous song as playing
-            party.songs[previousPlayedIndex].status = 'playing';
-            party.songs[previousPlayedIndex].completedAt = undefined;
+            // Mark previous media as playing
+            party.media[previousPlayedIndex].status = 'playing';
+            party.media[previousPlayedIndex].completedAt = undefined;
         }
 
         await party.save();
 
         res.json({ 
             success: true, 
-            message: 'Skipped to previous song',
-            currentSong: previousPlayedIndex !== -1 ? party.songs[previousPlayedIndex] : null
+            message: 'Skipped to previous media',
+            currentMedia: previousPlayedIndex !== -1 ? party.media[previousPlayedIndex] : null
         });
 
     } catch (error) {
-        console.error('Error skipping to previous song:', error);
-        res.status(500).json({ error: 'Failed to skip to previous song' });
+        console.error('Error skipping to previous media:', error);
+        res.status(500).json({ error: 'Failed to skip to previous media' });
     }
 });
 
@@ -1258,37 +1257,37 @@ router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Only the party host can veto songs' });
         }
 
-        // Find the song in the party's queue
-        const songIndex = party.songs.findIndex(entry => entry.songId.toString() === songId);
-        if (songIndex === -1) {
-            return res.status(404).json({ error: 'Song not found in party queue' });
+        // Find the media in the party's queue
+        const mediaIndex = party.media.findIndex(entry => entry.mediaId.toString() === songId);
+        if (mediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in party queue' });
         }
 
-        // Update the song status to vetoed instead of removing it completely
-        party.songs[songIndex].status = 'vetoed';
-        party.songs[songIndex].vetoedAt = new Date();
-        party.songs[songIndex].vetoedBy = userId;
+        // Update the media status to vetoed instead of removing it completely
+        party.media[mediaIndex].status = 'vetoed';
+        party.media[mediaIndex].vetoedAt = new Date();
+        party.media[mediaIndex].vetoedBy = userId;
 
         await party.save();
 
         // Broadcast the veto event to all party members
         const { broadcastToParty } = require('../utils/broadcast');
         broadcastToParty(partyId, {
-            type: 'SONG_VETOED',
-            songId: songId,
-            vetoedAt: party.songs[songIndex].vetoedAt,
+            type: 'MEDIA_VETOED',
+            mediaId: songId,
+            vetoedAt: party.media[mediaIndex].vetoedAt,
             vetoedBy: userId
         });
 
         res.json({
-            message: 'Song vetoed successfully',
-            songId: songId,
-            vetoedAt: party.songs[songIndex].vetoedAt
+            message: 'Media vetoed successfully',
+            mediaId: songId,
+            vetoedAt: party.media[mediaIndex].vetoedAt
         });
 
     } catch (err) {
-        console.error('Error vetoing song:', err);
-        res.status(500).json({ error: 'Error vetoing song', details: err.message });
+        console.error('Error vetoing media:', err);
+        res.status(500).json({ error: 'Error vetoing media', details: err.message });
     }
 });
 
@@ -1414,16 +1413,16 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
 
         res.json(transformResponse({
             timePeriod: timePeriod,
-            songs: processedSongs,
+            media: processedSongs,
             count: processedSongs.length,
             periodStartDate: startDate,
             periodEndDate: now
         }));
 
     } catch (err) {
-        console.error('Error fetching songs sorted by time period:', err);
+        console.error('Error fetching media sorted by time period:', err);
         res.status(500).json({ 
-            error: 'Error fetching songs sorted by time period', 
+            error: 'Error fetching media sorted by time period', 
             details: err.message 
         });
     }
@@ -1446,23 +1445,21 @@ router.put('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Only the host can veto songs' });
         }
         
-        // Find the song in the party
-        const songEntry = party.songs.find(s => 
-            (s.songId && s.songId.toString() === songId) || 
-            (s.song_uuid === songId) ||
-            (s.episodeId && s.episodeId.toString() === songId) ||
-            (s.episode_uuid === songId)
+        // Find the media in the party
+        const mediaEntry = party.media.find(m => 
+            (m.mediaId && m.mediaId.toString() === songId) || 
+            (m.media_uuid === songId)
         );
         
-        if (!songEntry) {
-            return res.status(404).json({ error: 'Song not found in party' });
+        if (!mediaEntry) {
+            return res.status(404).json({ error: 'Media not found in party' });
         }
         
-        // Update song status to vetoed
-        songEntry.status = 'vetoed';
-        songEntry.vetoedAt = new Date();
-        songEntry.vetoedBy = req.user._id;
-        songEntry.vetoedBy_uuid = req.user.uuid;
+        // Update media status to vetoed
+        mediaEntry.status = 'vetoed';
+        mediaEntry.vetoedAt = new Date();
+        mediaEntry.vetoedBy = req.user._id;
+        mediaEntry.vetoedBy_uuid = req.user.uuid;
         
         await party.save();
         
@@ -1498,22 +1495,20 @@ router.put('/:partyId/songs/:songId/unveto', authMiddleware, async (req, res) =>
         }
         
         // Find the song in the party
-        const songEntry = party.songs.find(s => 
-            (s.songId && s.songId.toString() === songId) || 
-            (s.song_uuid === songId) ||
-            (s.episodeId && s.episodeId.toString() === songId) ||
-            (s.episode_uuid === songId)
+        const mediaEntry = party.media.find(m => 
+            (m.mediaId && m.mediaId.toString() === songId) || 
+            (m.media_uuid === songId)
         );
         
-        if (!songEntry) {
-            return res.status(404).json({ error: 'Song not found in party' });
+        if (!mediaEntry) {
+            return res.status(404).json({ error: 'Media not found in party' });
         }
         
-        // Restore song to queued status
-        songEntry.status = 'queued';
-        songEntry.vetoedAt = null;
-        songEntry.vetoedBy = null;
-        songEntry.vetoedBy_uuid = null;
+        // Restore media to queued status
+        mediaEntry.status = 'queued';
+        mediaEntry.vetoedAt = null;
+        mediaEntry.vetoedBy = null;
+        mediaEntry.vetoedBy_uuid = null;
         
         await party.save();
         

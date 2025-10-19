@@ -242,21 +242,22 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     }
     console.log('✅ User is in party');
     
-    // Check if episode is already in party
-    let partyEpisodeEntry = party.songs.find(entry => 
-      entry.episodeId && entry.episodeId.toString() === episodeId
+    // Check if episode is already in party (episodes are now Media)
+    let partyMediaEntry = party.media.find(entry => 
+      entry.mediaId && entry.mediaId.toString() === episodeId
     );
     
-    if (!partyEpisodeEntry) {
-      // Add episode to party
-      partyEpisodeEntry = {
-        episodeId: episode._id,
+    if (!partyMediaEntry) {
+      // Add episode to party media
+      partyMediaEntry = {
+        mediaId: episode._id,
         addedBy: userId,
-        partyBidValue: 0,
+        partyMediaAggregate: 0,
         partyBids: [],
-        contentType: 'episode'
+        status: 'queued',
+        queuedAt: new Date()
       };
-      party.songs.push(partyEpisodeEntry);
+      party.media.push(partyMediaEntry);
     }
     
     // Create bid

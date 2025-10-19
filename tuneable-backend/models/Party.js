@@ -96,54 +96,6 @@ const PartySchema = new mongoose.Schema({
     }
   ],
   
-  // Legacy songs collection (for backward compatibility during migration)
-  songs: [
-    {
-      // Support both songs and podcast episodes
-      songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song' },
-      episodeId: { type: mongoose.Schema.Types.ObjectId, ref: 'PodcastEpisode' },
-      addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      // UUID references for external API usage
-      song_uuid: { type: String },
-      episode_uuid: { type: String },
-      addedBy_uuid: { type: String },
-      partyBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }], // Party-specific bids
-      
-      // ========================================
-      // PARTY-SPECIFIC BID METRICS (managed by BidMetricsEngine)
-      // ========================================
-      
-      // Party-media scope metrics (stored for performance)
-      partyMediaAggregate: { type: Number, default: 0 }, // PartyMediaAggregate - total bid value for this media in party
-      partyMediaBidTop: { type: Number, default: 0 }, // PartyMediaBidTop - highest individual bid for this media in party
-      partyMediaBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User who made highest bid
-      
-      partyMediaAggregateTop: { type: Number, default: 0 }, // PartyMediaAggregateTop - highest user aggregate for this media in party
-      partyMediaAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
-      
-      // Note: Other party metrics are computed on-demand via BidMetricsEngine
-      
-      // Content type and status
-      contentType: { 
-        type: String, 
-        enum: ['song', 'episode'], 
-        required: true 
-      },
-      status: { 
-        type: String, 
-        enum: ['queued', 'playing', 'played', 'vetoed'], 
-        default: 'queued' 
-      },
-      
-      // Timing information
-      queuedAt: { type: Date, default: Date.now }, // When added to queue
-      playedAt: { type: Date, default: null }, // When started playing
-      completedAt: { type: Date, default: null }, // When finished playing
-      vetoedAt: { type: Date, default: null }, // When vetoed
-      vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who vetoed it
-      vetoedBy_uuid: { type: String }, // UUID reference for external API usage
-    },
-  ],
   startTime:{ type: Date, default: Date.now },
   endTime: { type: Date, default: null},
   privacy: {
@@ -211,26 +163,6 @@ PartySchema.statics.updateAllStatuses = async function() {
   
   return updates.length;
 };
-
-// Automatically populate `songs` and nested `bids` when querying parties
-const autoPopulateSongs = function (next) {
-  this.populate({
-    path: 'songs',
-    populate: {
-      path: 'bids',
-      populate: {
-        path: 'userId', // Populate `userId` inside `bids`
-        select: 'username avatar', // Select specific user fields
-      },
-    },
-  });
-  next();
-};
-
-PartySchema
-  .pre('find', autoPopulateSongs)
-  .pre('findOne', autoPopulateSongs)
-  .pre('findById', autoPopulateSongs);
 
 // Add indexes for performance
 PartySchema.index({ host: 1 });
