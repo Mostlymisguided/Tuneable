@@ -211,6 +211,22 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         }
         
         // Create new user
+        // Check for invite code in session (passed from OAuth initiation)
+        let parentInviteCode = null;
+        if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
+          const code = arguments[4].session.pendingInviteCode;
+          // Validate invite code
+          const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+          if (inviter) {
+            parentInviteCode = code.toUpperCase();
+          }
+        }
+        
+        // Require invite code for new users
+        if (!parentInviteCode) {
+          return done(new Error('Valid invite code required to create account'), null);
+        }
+        
         const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
         const usernameValue = profile.displayName || profile.emails[0].value.split('@')[0];
         
@@ -251,7 +267,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           balance: 0,
           // Generate invite codes
           personalInviteCode: generateInviteCode(),
-          parentInviteCode: '7777' // Default parent code
+          parentInviteCode: parentInviteCode
         });
         
         await newUser.save();
@@ -323,6 +339,22 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         }
         
         // Create new user
+        // Check for invite code in session (passed from OAuth initiation)
+        let parentInviteCode = null;
+        if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
+          const code = arguments[4].session.pendingInviteCode;
+          // Validate invite code
+          const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+          if (inviter) {
+            parentInviteCode = code.toUpperCase();
+          }
+        }
+        
+        // Require invite code for new users
+        if (!parentInviteCode) {
+          return done(new Error('Valid invite code required to create account'), null);
+        }
+        
         const usernameValue = profile.username || `soundcloud_${profile.id}`;
         
         // Ensure username is unique
@@ -358,7 +390,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           balance: 0,
           // Generate invite codes
           personalInviteCode: generateInviteCode(),
-          parentInviteCode: '7777' // Default parent code
+          parentInviteCode: parentInviteCode
         });
         
         await newUser.save();
@@ -430,6 +462,22 @@ if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
         }
         
         // Create new user
+        // Check for invite code in session (passed from OAuth initiation)
+        let parentInviteCode = null;
+        if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
+          const code = arguments[4].session.pendingInviteCode;
+          // Validate invite code
+          const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+          if (inviter) {
+            parentInviteCode = code.toUpperCase();
+          }
+        }
+        
+        // Require invite code for new users
+        if (!parentInviteCode) {
+          return done(new Error('Valid invite code required to create account'), null);
+        }
+        
         const usernameValue = profile.username || `instagram_${profile.id}`;
         
         // Ensure username is unique
@@ -465,7 +513,7 @@ if (process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) {
           balance: 0,
           // Generate invite codes
           personalInviteCode: generateInviteCode(),
-          parentInviteCode: '7777' // Default parent code
+          parentInviteCode: parentInviteCode
         });
         
         await newUser.save();
