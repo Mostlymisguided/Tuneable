@@ -654,7 +654,6 @@ const TuneProfile: React.FC = () => {
           <button
             onClick={() => navigate(-1)}
             className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
-            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
           >
             Go Back
           </button>
@@ -691,119 +690,117 @@ const TuneProfile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
         {/* Header */}
-        <div className="mb-8 relative">
+        <div className="mb-6 md:mb-8 relative">
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
-            style={{ backgroundColor: 'rgba(55, 65, 81, 0.2)' }}
-          >
+            className="px-3 md:px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 text-sm md:text-base"   >
             Back
           </button>
           
           {/* Edit Tune Button - Only show if user can edit */}
           {canEditTune() && (
-            <div className='inline rounded-full items-center absolute right-3 mb-4'>
+            <div className='inline rounded-full items-center absolute right-0 md:right-3 mb-4'>
               <button
                 onClick={() => setIsEditingTune(true)}
-                className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+                className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <span className="hidden sm:inline">Edit Tune</span>
+                <span className="sm:hidden">Edit</span>
               </button>
             </div>
           )}
           
-          <div className="card flex items-start relative">
+          <div className="card flex flex-col md:flex-row items-start relative">
             {/* Claim Tune Button - Top Right */}
             <button
               onClick={handleClaimTune}
-              className="absolute top-6 right-6 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+              className="absolute top-3 right-3 md:top-6 md:right-6 px-3 py-2 md:px-4 md:py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-xs md:text-base z-10"
             >
-              <Award className="h-4 w-4" />
+              <Award className="h-3 w-3 md:h-4 md:w-4" />
               <span className="hidden sm:inline">Claim Tune</span>
               <span className="sm:hidden">Claim</span>
             </button>
 
             {/* Album Art with Play Button Overlay */}
-            <div className="flex mr-6 relative group">
+            <div className="w-full md:w-auto flex justify-center md:justify-start mb-6 md:mb-0 md:mr-6 relative group">
               <img
                 src={song.coverArt || '/android-chrome-192x192.png'}
                 alt={`${song.title} cover`}
-                className="w-auto h-auto rounded-lg shadow-xl object-cover"
+                className="w-48 h-48 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
               {/* Play Button Overlay */}
               <div 
                 className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={handlePlaySong}
               >
-                <div className="w-20 h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
-                  <Play className="h-10 w-10 text-white ml-1" fill="currentColor" />
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                  <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
                 </div>
               </div>
             </div>
             
             {/* Song Info */}
-            <div className="flex-1 text-white">
-              <h1 className="px-4 text-base md:text-4xl font-bold mb-2">{song.title}</h1>
-              <p className="px-4 text-sm md:text-3xl text-purple-300 mb-4">{song.artist}</p>
+            <div className="flex-1 w-full text-white">
+              <h1 className="text-2xl md:text-4xl font-bold mb-2 text-center md:text-left px-2 md:px-4">{song.title}</h1>
+              <p className="text-lg md:text-3xl text-purple-300 mb-4 text-center md:text-left px-2 md:px-4">{song.artist}</p>
               
               {/* Bid Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 px-2 md:px-0">
                 {/* Bid Total */}
-                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-green-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
-                  <div className="text-2xl font-bold text-green-400">
+                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
+                  <div className="text-base md:text-2xl font-bold text-green-400">
                     £{song.globalMediaAggregate?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
-                {/* Top Bid */}
-                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
+                {/* Total Bids Count */}
+                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-cyan-500/50">
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bids</div>
+                  <div className="text-base md:text-2xl font-bold text-cyan-400">
+                    {song.bids?.length || 0}
+                  </div>
+                </div>
+                
+                {/* Global Rank */}
+                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-pink-500/50">
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
+                  <div className="text-base md:text-2xl font-bold text-pink-400">
+                    #{song.globalMediaAggregateTopRank || '-'}
+                  </div>
+                </div>
+                
+                {/* Top Bid - Hidden on mobile */}
+                <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
                   <div className="text-2xl font-bold text-yellow-400">
                     £{song.globalMediaBidTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
-                {/* Top Fan */}
-                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-purple-500/50">
+                {/* Top Fan - Hidden on mobile */}
+                <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-purple-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
                   <div className="text-2xl font-bold text-purple-400">
                     £{song.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
-                {/* Average Bid */}
-                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
+                {/* Average Bid - Hidden on mobile */}
+                <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
                   <div className="text-2xl font-bold text-blue-400">
                     £{calculateGlobalMediaBidAvg(song).toFixed(2)}
                   </div>
                 </div>
-                
-                {/* Total Bids Count */}
-                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-cyan-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bids</div>
-                  <div className="text-2xl font-bold text-cyan-400">
-                    {song.bids?.length || 0}
-                  </div>
-                </div>
-                
-                {/* Global Rank */}
-                <div className="card bg-black/20 rounded-lg p-4 border-l-4 border-pink-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
-                  <div className="text-2xl font-bold text-pink-400">
-                    #{song.globalMediaAggregateTopRank || '-'}
-                  </div>
-                  
-                </div>
               </div>
 
               {/* External Source Links */}
               {getExternalLinks().length > 0 && (
-                <div className="mb-4 px-4">
-                  <div className="flex flex-wrap gap-2">
+                <div className="mb-4 px-2 md:px-4">
+                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                     {getExternalLinks().map((link) => (
                       <a
                         key={link.platform}
@@ -844,42 +841,42 @@ const TuneProfile: React.FC = () => {
 
         {/* Global Bid Section - Support This Tune */}
         {user && (
-          <div className="mb-8">
+          <div className="mb-8 px-2 md:px-0">
             <div className="max-w-2xl mx-auto">
-              <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-8 text-center">
-                <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center">
-                  <Coins className="h-7 w-7 mr-3 text-yellow-400" />
+              <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
+                <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
+                  <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
                   Support This Tune
                 </h3>
-                <p className="text-gray-300 text-base mb-6">
+                <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
                   Boost this tune's global ranking and support the artist
                 </p>
                 
-                <div className="flex items-center justify-center space-x-3 mb-4">
+                <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                   <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                    <span className="px-3 text-gray-400 text-xl">£</span>
+                    <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
                     <input
                       type="number"
                       step="0.01"
                       min="0.33"
                       value={globalBidAmount}
                       onChange={(e) => setGlobalBidAmount(parseFloat(e.target.value) || 0.33)}
-                      className="w-28 bg-gray-800 p-3 text-white text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
+                      className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
                     />
                   </div>
                   <button
                     onClick={handleGlobalBid}
                     disabled={isPlacingGlobalBid || globalBidAmount < 0.33}
-                    className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-lg"
+                    className="w-full md:w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
                   >
                     {isPlacingGlobalBid ? (
                       <>
-                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <Loader2 className="h-5 w-5 md:h-6 md:w-6 animate-spin" />
                         <span>Placing Bid...</span>
                       </>
                     ) : (
                       <>
-                        <Coins className="h-6 w-6" />
+                        <Coins className="h-5 w-5 md:h-6 md:w-6" />
                         <span>Bid £{globalBidAmount.toFixed(2)}</span>
                       </>
                     )}
@@ -892,14 +889,14 @@ const TuneProfile: React.FC = () => {
                     <button
                       key={amount}
                       onClick={() => setGlobalBidAmount(amount)}
-                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-full transition-colors font-medium"
+                      className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
                     >
                       £{amount.toFixed(2)}
                     </button>
                   ))}
                 </div>
                 
-                <p className="text-sm text-gray-400">
+                <p className="text-xs md:text-sm text-gray-400">
                   Your balance: £{(user as any)?.balance?.toFixed(2) || '0.00'}
                 </p>
               </div>
@@ -909,12 +906,12 @@ const TuneProfile: React.FC = () => {
 
         {/* Top Bids */}
         {song.bids && song.bids.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
-              <Coins className="h-6 w-6 mr-2 text-yellow-400" />
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
               Top Bids
             </h2>
-            <div className="card bg-black/20 rounded-lg p-6">
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
               <TopBidders bids={song.bids} maxDisplay={5} />
             </div>
           </div>
@@ -922,26 +919,26 @@ const TuneProfile: React.FC = () => {
 
         {/* Top Supporters */}
         {song.bids && song.bids.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
-              <Heart className="h-6 w-6 mr-2 text-pink-400" />
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400" />
               Top Supporters
             </h2>
-            <div className="card bg-black/20 rounded-lg p-6">
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
               <TopSupporters bids={song.bids} maxDisplay={10} />
             </div>
           </div>
         )}
 
         {/* Top Parties */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
-            <Music className="h-6 w-6 mr-2 text-purple-400" />
+        <div className="mb-8 px-2 md:px-0">
+          <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+            <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
             Top Parties
           </h2>
-          <div className="card bg-black/20 rounded-lg p-6">
+          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
             {topParties.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2 md:space-y-3">
                 {topParties.map((party, index) => (
                   <div 
                     key={party._id} 
@@ -986,19 +983,19 @@ const TuneProfile: React.FC = () => {
         </div>
 
         {/* Song Details */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-white">Song Details</h2>
+        <div className="mb-8 px-2 md:px-0">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <h2 className="text-xl md:text-2xl font-bold text-white">Song Details</h2>
             <button
               onClick={() => setShowAllFields(!showAllFields)}
-              className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
+              className="flex items-center px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm md:text-base"
             >
-              {showAllFields ? 'Show Less' : 'Show All Fields'}
+              {showAllFields ? 'Show Less' : 'Show All'}
             </button>
           </div>
           
-          <div className="card bg-black/20 rounded-lg p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               {visibleFields.map((field, index) => {
                 const IconComponent = field.icon;
                 return (
