@@ -126,6 +126,7 @@ const TuneProfile: React.FC = () => {
 
   // Edit tune state
   const [isEditingTune, setIsEditingTune] = useState(false);
+  const [tagInput, setTagInput] = useState(''); // Separate state for tag input
   const [editForm, setEditForm] = useState({
     title: '',
     artist: '',
@@ -246,6 +247,8 @@ const TuneProfile: React.FC = () => {
         lyrics: song.lyrics || '',
         description: (song as any).description || ''
       });
+      // Set tag input as comma-separated string
+      setTagInput(song.tags?.join(', ') || '');
     }
   }, [song, user]);
 
@@ -262,6 +265,19 @@ const TuneProfile: React.FC = () => {
     } catch (err: any) {
       console.error('Error updating tune:', err);
       toast.error(err.response?.data?.error || 'Failed to update tune');
+    }
+  };
+
+  // Process tags from input string
+  const handleTagInputBlur = () => {
+    const tags = tagInput.split(',').map(t => t.trim()).filter(t => t);
+    setEditForm({ ...editForm, tags });
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTagInputBlur();
     }
   };
 
@@ -1429,11 +1445,16 @@ const TuneProfile: React.FC = () => {
                 <label className="block text-white font-medium mb-2">Tags (comma-separated)</label>
                 <input
                   type="text"
-                  value={editForm.tags.join(', ')}
-                  onChange={(e) => setEditForm({ ...editForm, tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) })}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onBlur={handleTagInputBlur}
+                  onKeyDown={handleTagInputKeyDown}
                   className="input"
                   placeholder="pop, indie, summer, upbeat"
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Type tags separated by commas. Press Enter or click away to save.
+                </p>
               </div>
 
               {/* Description */}
