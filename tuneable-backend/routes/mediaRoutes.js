@@ -178,8 +178,24 @@ router.get('/:mediaId/profile', async (req, res) => {
     }) + 1; // +1 because rank is 1-indexed
 
     // Transform Media to match expected frontend format
+    const mediaObj = populatedMedia.toObject();
+    
+    // Explicitly convert sources Map to plain object
+    let sourcesObj = {};
+    if (mediaObj.sources) {
+      if (mediaObj.sources instanceof Map) {
+        // Convert Map to plain object
+        mediaObj.sources.forEach((value, key) => {
+          sourcesObj[key] = value;
+        });
+      } else if (typeof mediaObj.sources === 'object') {
+        sourcesObj = mediaObj.sources;
+      }
+    }
+    
     const transformedMedia = {
-      ...populatedMedia.toObject(),
+      ...mediaObj,
+      sources: sourcesObj, // Use converted sources
       artist: populatedMedia.artist && populatedMedia.artist.length > 0 ? 
               populatedMedia.artist[0].name : 'Unknown Artist', // Primary artist name
       artists: populatedMedia.artist || [], // Full artist subdocuments

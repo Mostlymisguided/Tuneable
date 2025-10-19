@@ -530,6 +530,9 @@ const TuneProfile: React.FC = () => {
   const handlePlaySong = () => {
     if (!song) return;
 
+    console.log('🎵 Raw song object:', song);
+    console.log('🎵 Raw sources:', song.sources, typeof song.sources);
+
     // Clean and format sources (same logic as Party page)
     let sources = {};
     
