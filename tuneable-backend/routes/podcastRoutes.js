@@ -236,9 +236,9 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     console.log('✅ Party found:', party.name);
     
     // Check if user is in the party
-    if (!party.attendees.includes(userId)) {
-      console.log('❌ User not in party:', { userId, attendees: party.attendees });
-      return res.status(403).json({ error: 'You must be a party attendee to bid' });
+    if (!party.partiers.includes(userId)) {
+      console.log('❌ User not in party:', { userId, partiers: party.partiers });
+      return res.status(403).json({ error: 'You must be a party member to bid' });
     }
     console.log('✅ User is in party');
     

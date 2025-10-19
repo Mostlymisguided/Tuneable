@@ -14,7 +14,7 @@ interface PartyType {
   location: string;
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   partyCode: string;
-  attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
+  partiers: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   media?: any[];
   songs?: any[]; // Legacy support
   startTime: string;
@@ -54,7 +54,7 @@ const Parties: React.FC = () => {
     fetchParties();
   }, []);
 
-  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string, partyHost: any, partyAttendees: any[]) => {
+  const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string, partyHost: any, partyPartiers: any[]) => {
     try {
       // Check if this is a different party than the current one
       const isDifferentParty = currentPartyId && currentPartyId !== partyId;
@@ -62,18 +62,18 @@ const Parties: React.FC = () => {
       if (isDifferentParty) {
         showWarning(
           `join "${partyName}"`,
-          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost, partyAttendees)
+          () => joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost, partyPartiers)
         );
       } else {
         // Same party or no current party, join directly
-        await joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost, partyAttendees);
+        await joinPartyWithPrivacyCheck(partyId, partyPrivacy, partyHost, partyPartiers);
       }
     } catch (error) {
       console.error('Error joining party:', error);
     }
   };
 
-  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string, partyHost: any, partyAttendees: any[]) => {
+  const joinPartyWithPrivacyCheck = async (partyId: string, partyPrivacy: string, partyHost: any, partyPartiers: any[]) => {
     try {
       // Check if current user is the host
       const currentUserId = user?.id;
@@ -82,24 +82,24 @@ const Parties: React.FC = () => {
         (typeof partyHost === 'object' && partyHost.id === currentUserId)
       );
 
-      // Check if user is already an attendee
-      const isAlreadyAttendee = partyAttendees.some(attendee => {
-        if (typeof attendee === 'string') {
-          return attendee === currentUserId;
-        } else if (typeof attendee === 'object' && attendee.id) {
-          return attendee.id === currentUserId;
+      // Check if user is already a partier
+      const isAlreadyPartier = partyPartiers.some(partier => {
+        if (typeof partier === 'string') {
+          return partier === currentUserId;
+        } else if (typeof partier === 'object' && partier.id) {
+          return partier.id === currentUserId;
         }
         return false;
       });
 
-      // If user is already an attendee, just navigate without calling join API
-      if (isAlreadyAttendee) {
+      // If user is already a partier, just navigate without calling join API
+      if (isAlreadyPartier) {
         navigate(`/party/${partyId}`);
         return;
       }
 
       if (partyPrivacy === 'private' && !isHost) {
-        // Prompt for party code (only if not host and not already attendee)
+        // Prompt for party code (only if not host and not already a partier)
         const inviteCode = prompt('This is a private party. Please enter the party code:');
         if (!inviteCode) {
           return; // User cancelled
@@ -207,7 +207,7 @@ const Parties: React.FC = () => {
 
                 <div className="flex items-center text-sm text-white">
                   <Users className="h-4 w-4 mr-2" />
-                  <span>{Array.isArray(party.attendees) ? party.attendees.length : 0} attendees</span>
+                  <span>{Array.isArray(party.partiers) ? party.partiers.length : 0} partiers</span>
                 </div>
               </div>
 
@@ -216,7 +216,7 @@ const Parties: React.FC = () => {
                   Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
                 </div>
                 <button
-                  onClick={() => handleJoinParty(party.id, party.name, party.privacy, party.host, party.attendees)}
+                  onClick={() => handleJoinParty(party.id, party.name, party.privacy, party.host, party.partiers)}
                   className="btn-primary text-base"
                 >
                   Join Party

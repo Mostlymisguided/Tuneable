@@ -1037,7 +1037,7 @@ const Party: React.FC = () => {
             <div className="flex items-center space-x-3 sm:space-x-4">
               <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{party.attendees.length}</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{party.partiers.length}</div>
                 <div className="text-xs sm:text-sm text-gray-300">Partiers</div>
               </div>
             </div>
@@ -1792,22 +1792,22 @@ const Party: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Attendees */}
+          {/* Partiers */}
           <div className="card">
             <h3 className="text-lg font-semibold text-white mb-4">Partiers</h3>
             <div className="space-y-2">
-              {party.attendees.map((attendee: any, index: number) => {
+              {party.partiers.map((partier: any, index: number) => {
                 const hostId = typeof party.host === 'string' ? party.host : party.host?.uuid;
-                const attendeeId = attendee.uuid || attendee.id;
+                const partierId = partier.uuid || partier.id;
                 return (
-                  <div key={`${attendeeId}-${index}`} className="flex items-center space-x-3">
+                  <div key={`${partierId}-${index}`} className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-600">
-                        {attendee.username?.charAt(0).toUpperCase() || '?'}
+                        {partier.username?.charAt(0).toUpperCase() || '?'}
                       </span>
                     </div>
-                    <span className="p-2 text-sm text-white">{attendee.username || 'Unknown User'}</span>
-                    {attendeeId === hostId && (
+                    <span className="p-2 text-sm text-white">{partier.username || 'Unknown User'}</span>
+                    {partierId === hostId && (
                       <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                         Host
                       </span>
@@ -1877,7 +1877,7 @@ const Party: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900">End Party</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to end this party? This action cannot be undone and all attendees will be notified.
+              Are you sure you want to end this party? This action cannot be undone and all partiers will be notified.
             </p>
             <div className="flex space-x-3">
               <button

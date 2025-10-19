@@ -40,8 +40,8 @@ const PartySchema = new mongoose.Schema({
       required: true
     }
   },  */
-  attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  attendee_uuids: [{ type: String }], // UUID references for external API usage
+  partiers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  partier_uuids: [{ type: String }], // UUID references for external API usage
   
   // ========================================
   // PARTY-LEVEL BID METRICS (managed by BidMetricsEngine)
@@ -234,7 +234,7 @@ PartySchema
 
 // Add indexes for performance
 PartySchema.index({ host: 1 });
-PartySchema.index({ attendees: 1 });
+PartySchema.index({ partiers: 1 });
 PartySchema.index({ partyBidTop: -1 });
 PartySchema.index({ partyUserAggregateTop: -1 });
 PartySchema.index({ partyUserBidTop: -1 });

@@ -27,7 +27,7 @@ interface Party {
   location: string;
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   partyCode: string;
-  attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
+  partiers: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   media: any[];
   songs?: any[]; // Legacy support during migration
   startTime: string;

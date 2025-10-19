@@ -26,7 +26,7 @@ const TermsOfService: React.FC = () => {
                 ("Terms"). If you do not agree to these Terms, please do not use the Service.
               </p>
               <p className="text-gray-700">
-                These Terms apply to all users of the Service, including hosts, attendees, creators, and visitors.
+                These Terms apply to all users of the Service, including hosts, partiers, creators, and visitors.
               </p>
             </section>
 

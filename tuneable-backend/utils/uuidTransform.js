@@ -75,16 +75,16 @@ function transformDocument(doc, options = {}) {
       };
     }
     
-    // Handle attendees array - preserve username for display
-    if (transformed.attendees && Array.isArray(transformed.attendees)) {
-      transformed.attendees = transformed.attendees.map(attendee => {
-        if (attendee.uuid) {
+    // Handle partiers array - preserve username for display
+    if (transformed.partiers && Array.isArray(transformed.partiers)) {
+      transformed.partiers = transformed.partiers.map(partier => {
+        if (partier.uuid) {
           return {
-            uuid: attendee.uuid,
-            username: attendee.username
+            uuid: partier.uuid,
+            username: partier.username
           };
         }
-        return attendee;
+        return partier;
       });
     }
     

@@ -72,7 +72,7 @@ router.post('/', authMiddleware, async (req, res) => {
         location,
         host: userId,
         partyCode,
-        attendees: [userId],
+        partiers: [userId],
         songs: [],
         bids: [],
         startTime: startTime || new Date(), // Use provided startTime or current time for automatic
@@ -129,8 +129,8 @@ router.post("/join/:partyId", authMiddleware, resolvePartyId(), async (req, res)
         //     }
         // }
 
-        if (!party.attendees.includes(userId)) {
-            party.attendees.push(userId);
+        if (!party.partiers.includes(userId)) {
+            party.partiers.push(userId);
             await party.save();
         }
 
@@ -179,7 +179,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 },
             })
             .populate({
-                path: 'attendees',
+                path: 'partiers',
                 model: 'User',
                 select: 'username uuid',
             })
@@ -262,7 +262,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             location: party.location,
             host: party.host,
             partyCode: party.partyCode,
-            attendees: party.attendees,
+            partiers: party.partiers,
             startTime: party.startTime,
             endTime: party.endTime,
             watershed: party.watershed,

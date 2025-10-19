@@ -116,17 +116,17 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 #
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Song
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Top Bids
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('artist')}
               >
-                <div className="flex items-center space-x-1">
+                <div className="flex justify-center items-center space-x-1">
                   <span>Artist</span>
                   <ArrowUpDown className="h-3 w-3" />
                 </div>
@@ -200,13 +200,13 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                       <span className="text-sm text-gray-400">No bids</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">
                     {song.artist}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">
                     {formatDuration(song.duration)}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-semibold text-green-600">
                     {formatBidValue(song.globalMediaAggregate)}
                   </td>
                 </tr>

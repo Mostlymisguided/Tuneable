@@ -236,7 +236,7 @@ export interface Party {
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
   host_uuid?: string; // UUID reference for host
   partyCode: string;
-  attendees: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
+  partiers: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   media: PartyMedia[];
   songs?: PartyMedia[]; // Legacy support during migration
   
