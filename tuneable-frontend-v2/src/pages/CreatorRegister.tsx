@@ -54,7 +54,7 @@ const CreatorRegister: React.FC = () => {
 
   const availableRoles = [
     'artist', 'producer', 'songwriter', 'composer', 'host', 
-    'narrator', 'director', 'editor', 'author', 'dj', 'vocalist', 'instrumentalist'
+    'narrator', 'director', 'editor', 'author', 'DJ', 'vocalist', 'instrumentalist'
   ];
 
   const distributors = [

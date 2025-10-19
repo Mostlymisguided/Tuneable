@@ -209,11 +209,77 @@ const createProfilePictureUpload = () => {
   }
 };
 
+// Create multer upload for media files (creator uploads)
+const createMediaUpload = () => {
+  if (isR2Configured()) {
+    return multer({
+      storage: multerS3({
+        s3: s3Client,
+        bucket: process.env.R2_BUCKET_NAME,
+        acl: 'public-read',
+        contentType: multerS3.AUTO_CONTENT_TYPE,
+        key: function (req, file, cb) {
+          const username = req.user?.username || 'unknown';
+          const timestamp = Date.now();
+          const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const filename = `media-uploads/${username}-${timestamp}-${safeFilename}`;
+          cb(null, filename);
+        }
+      }),
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+      fileFilter: (req, file, cb) => {
+        // Only MP3 files for MVP
+        const allowedTypes = /mp3/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
+        
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Only MP3 files are allowed for MVP'));
+        }
+      }
+    });
+  } else {
+    // Fallback to local filesystem
+    const fs = require('fs');
+    const localUploadDir = path.join(__dirname, '../uploads/media-uploads');
+    if (!fs.existsSync(localUploadDir)) {
+      fs.mkdirSync(localUploadDir, { recursive: true });
+    }
+    
+    return multer({
+      storage: multer.diskStorage({
+        destination: (req, file, cb) => cb(null, localUploadDir),
+        filename: (req, file, cb) => {
+          const username = req.user?.username || 'unknown';
+          const timestamp = Date.now();
+          const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+          cb(null, `${username}-${timestamp}-${safeFilename}`);
+        }
+      }),
+      limits: { fileSize: 50 * 1024 * 1024 },
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = /mp3/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
+        
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Only MP3 files are allowed for MVP'));
+        }
+      }
+    });
+  }
+};
+
 module.exports = {
   isR2Configured,
   getPublicUrl,
   createCreatorApplicationUpload,
   createClaimUpload,
-  createProfilePictureUpload
+  createProfilePictureUpload,
+  createMediaUpload
 };
 

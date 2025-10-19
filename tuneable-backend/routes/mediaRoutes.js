@@ -2,10 +2,105 @@ const express = require('express');
 const router = express.Router();
 const Media = require('../models/Media');
 const Comment = require('../models/Comment');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 const { transformResponse } = require('../utils/uuidTransform');
 const { resolveId } = require('../utils/idResolver');
+const { createMediaUpload, getPublicUrl } = require('../utils/r2Upload');
+const { toCreatorSubdocs } = require('../utils/creatorHelpers');
+
+// Configure media upload
+const mediaUpload = createMediaUpload();
+
+// @route   POST /api/media/upload
+// @desc    Upload media file (MP3) - Creator only
+// @access  Private (Verified creators only)
+router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Check if user is a verified creator
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (!user.creatorProfile || user.creatorProfile.verificationStatus !== 'verified') {
+      return res.status(403).json({ error: 'Only verified creators can upload media' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    // Extract metadata from request
+    const {
+      title,
+      album,
+      genre,
+      releaseDate,
+      duration,
+      explicit,
+      tags,
+      description,
+      coverArt
+    } = req.body;
+    
+    // Validate required fields
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    // Get file URL (R2 or local)
+    const fileUrl = req.file.location || getPublicUrl(`media-uploads/${req.file.filename}`);
+    
+    // Parse tags (comma-separated string to array)
+    const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+    
+    // Create Media entry
+    const media = new Media({
+      title,
+      artist: toCreatorSubdocs([{
+        name: user.creatorProfile.artistName || user.username,
+        userId: userId
+      }]),
+      album: album || undefined,
+      genres: genre ? [genre] : [],
+      releaseDate: releaseDate || undefined,
+      duration: duration ? parseInt(duration) : undefined,
+      explicit: explicit === 'true' || explicit === true,
+      tags: parsedTags,
+      description: description || '',
+      coverArt: coverArt || undefined,
+      sources: { upload: fileUrl },
+      contentType: ['music'],
+      contentForm: ['song'],
+      addedBy: userId,
+      uploadedAt: new Date()
+    });
+    
+    await media.save();
+    
+    console.log(`✅ Creator ${user.username} uploaded: ${title} (${media.uuid})`);
+    
+    res.status(201).json(transformResponse({
+      message: 'Media uploaded successfully',
+      media: {
+        uuid: media.uuid,
+        _id: media._id,
+        title: media.title,
+        artist: media.artist,
+        coverArt: media.coverArt,
+        sources: media.sources
+      }
+    }));
+    
+  } catch (error) {
+    console.error('Error uploading media:', error);
+    res.status(500).json({ error: 'Failed to upload media', details: error.message });
+  }
+});
 
 // @route   GET /api/media/top-tunes
 // @desc    Get top media by global bid value for Top Tunes

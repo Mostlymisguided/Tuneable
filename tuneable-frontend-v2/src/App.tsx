@@ -29,6 +29,7 @@ import TuneProfile from './pages/TuneProfile';
 import UserProfile from './pages/UserProfile';
 import Admin from './pages/Admin';
 import CreatorRegister from './pages/CreatorRegister';
+import CreatorUpload from './pages/CreatorUpload';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -133,6 +134,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <CreatorRegister />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/upload" 
+              element={
+                <ProtectedRoute>
+                  <CreatorUpload />
                 </ProtectedRoute>
               } 
             />
