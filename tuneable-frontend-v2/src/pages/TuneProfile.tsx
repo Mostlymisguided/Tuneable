@@ -530,23 +530,52 @@ const TuneProfile: React.FC = () => {
   const handlePlaySong = () => {
     if (!song) return;
 
+    // Clean and format sources (same logic as Party page)
+    let sources = {};
+    
+    if (song.sources) {
+      if (Array.isArray(song.sources)) {
+        for (const source of song.sources) {
+          if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+            // Handle Mongoose metadata corruption
+            sources = source.url.sources;
+            break;
+          } else if (source && source.platform === 'youtube' && source.url) {
+            (sources as any).youtube = source.url;
+          } else if (source && source.platform === 'spotify' && source.url) {
+            (sources as any).spotify = source.url;
+          } else if (source?.youtube) {
+            (sources as any).youtube = source.youtube;
+          } else if (source?.spotify) {
+            (sources as any).spotify = source.spotify;
+          }
+        }
+      } else if (typeof song.sources === 'object') {
+        // Preserve the original sources object
+        sources = song.sources;
+      }
+    }
+
     // Format song for webplayer
     const formattedSong = {
       id: song.uuid || song._id,
       title: song.title,
-      artist: Array.isArray(song.artist) ? song.artist : song.artist,
+      artist: Array.isArray(song.artist) ? song.artist[0]?.name || 'Unknown Artist' : song.artist,
       duration: song.duration,
       coverArt: song.coverArt,
-      sources: song.sources || {},
+      sources: sources, // Use cleaned sources
       globalMediaAggregate: song.globalMediaAggregate || 0,
       bids: song.bids || [],
-      addedBy: song.addedBy || 'Unknown',
+      addedBy: song.addedBy?.username || 'Unknown',
       totalBidValue: song.globalMediaAggregate || 0
     } as any;
 
-    // Set as current song and start playing
-    setCurrentSong(formattedSong, 0, true); // true = autoplay
+    console.log('🎵 Playing from TuneProfile:', formattedSong);
+    console.log('Sources:', sources);
+
+    // Clear any existing queue and set new song
     setQueue([formattedSong]);
+    setCurrentSong(formattedSong, 0, true); // true = autoplay
     setGlobalPlayerActive(true);
     setCurrentPartyId(null); // Not in a party context
     
