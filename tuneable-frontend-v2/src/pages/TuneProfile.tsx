@@ -20,8 +20,6 @@ import {
   Award,
   X,
   Save,
-  Edit3,
-  SquarePlus,
   Youtube,
   Music2,
   Coins,
@@ -695,7 +693,6 @@ const TuneProfile: React.FC = () => {
                 onClick={() => setIsEditingTune(true)}
                 className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
               >
-                <Edit3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Edit Tune</span>
               </button>
             </div>
@@ -980,7 +977,6 @@ const TuneProfile: React.FC = () => {
               onClick={() => setShowAllFields(!showAllFields)}
               className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors"
             >
-              <SquarePlus className="w-4 h-4 mr-2" />
               {showAllFields ? 'Show Less' : 'Show All Fields'}
             </button>
           </div>

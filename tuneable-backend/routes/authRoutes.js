@@ -9,9 +9,16 @@ const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
 // Facebook OAuth routes - only available if configured
 if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
-  router.get('/facebook', passport.authenticate('facebook', { 
-    scope: ['email', 'user_location'] 
-  }));
+  router.get('/facebook', (req, res, next) => {
+    // Store invite code in session if provided
+    if (req.query.invite) {
+      req.session = req.session || {};
+      req.session.pendingInviteCode = req.query.invite;
+    }
+    passport.authenticate('facebook', { 
+      scope: ['email', 'user_location'] 
+    })(req, res, next);
+  });
 
   router.get('/facebook/callback', 
     passport.authenticate('facebook', { failureRedirect: '/login?error=facebook_auth_failed' }),
@@ -52,13 +59,20 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 
 // Google OAuth routes - only available if configured
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  router.get('/google', passport.authenticate('google', { 
-    scope: [
-      'profile', 
-      'email',
-      'https://www.googleapis.com/auth/youtube.readonly'  // For YouTube import feature
-    ] 
-  }));
+  router.get('/google', (req, res, next) => {
+    // Store invite code in session if provided
+    if (req.query.invite) {
+      req.session = req.session || {};
+      req.session.pendingInviteCode = req.query.invite;
+    }
+    passport.authenticate('google', { 
+      scope: [
+        'profile', 
+        'email',
+        'https://www.googleapis.com/auth/youtube.readonly'  // For YouTube import feature
+      ] 
+    })(req, res, next);
+  });
 
   router.get('/google/callback', 
     passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),

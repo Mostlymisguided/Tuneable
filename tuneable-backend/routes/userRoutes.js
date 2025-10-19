@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const geoip = require('geoip-lite'); // Added geoip-lite
 const User = require('../models/User');
+const InviteRequest = require('../models/InviteRequest');
 const authMiddleware = require('../middleware/authMiddleware');
 const { transformResponse } = require('../utils/uuidTransform');
 const { sendUserRegistrationNotification } = require('../utils/emailService');
@@ -24,6 +25,33 @@ const upload = createProfilePictureUpload();
 const deriveCodeFromUserId = (userId) => {
   return crypto.createHash('md5').update(userId.toString()).digest('hex').substring(0, 5).toUpperCase();
 };
+
+// @route   GET /api/users/validate-invite/:code
+// @desc    Validate an invite code
+// @access  Public
+router.get('/validate-invite/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    
+    if (!code || code.length !== 5) {
+      return res.json({ valid: false });
+    }
+    
+    const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+    
+    if (inviter) {
+      return res.json({ 
+        valid: true, 
+        inviterUsername: inviter.username 
+      });
+    } else {
+      return res.json({ valid: false });
+    }
+  } catch (error) {
+    console.error('Error validating invite code:', error);
+    res.json({ valid: false });
+  }
+});
 
 // Register a new user with profile picture upload
 router.post(
@@ -48,7 +76,17 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { username, email, password, cellPhone, givenName, familyName, homeLocation } = req.body;
+      const { username, email, password, cellPhone, givenName, familyName, homeLocation, parentInviteCode } = req.body;
+      
+      // Validate invite code (required)
+      if (!parentInviteCode || parentInviteCode.length !== 5) {
+        return res.status(400).json({ error: 'Valid invite code is required to register' });
+      }
+      
+      const inviter = await User.findOne({ personalInviteCode: parentInviteCode.toUpperCase() });
+      if (!inviter) {
+        return res.status(400).json({ error: 'Invalid invite code' });
+      }
       
       // Extract IP address using x-forwarded-for if available, otherwise fallback to connection IP
       const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -93,7 +131,7 @@ router.post(
         email,
         password,
         personalInviteCode,
-        parentInviteCode: null,
+        parentInviteCode: parentInviteCode.toUpperCase(),
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
@@ -376,6 +414,95 @@ router.get('/:userId/profile', async (req, res) => {
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ error: 'Error fetching user profile', details: error.message });
+  }
+});
+
+// @route   POST /api/users/request-invite
+// @desc    Submit a request for an invite code
+// @access  Public
+router.post('/request-invite', async (req, res) => {
+  try {
+    const { email, name, reason } = req.body;
+    
+    if (!email || !name || !reason) {
+      return res.status(400).json({ error: 'Email, name, and reason are required' });
+    }
+    
+    // Check if email already has a pending request
+    const existingRequest = await InviteRequest.findOne({ 
+      email: email.toLowerCase().trim(),
+      status: 'pending'
+    });
+    
+    if (existingRequest) {
+      return res.status(400).json({ 
+        error: 'You already have a pending invite request. We will review it soon!' 
+      });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: 'An account with this email already exists' 
+      });
+    }
+    
+    // Extract IP address
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    
+    const inviteRequest = new InviteRequest({
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+      reason: reason.trim(),
+      ipAddress: ip
+    });
+    
+    await inviteRequest.save();
+    
+    res.status(201).json(transformResponse({
+      message: 'Invite request submitted successfully. We will review it and get back to you soon!',
+      request: {
+        email: inviteRequest.email,
+        name: inviteRequest.name,
+        status: inviteRequest.status
+      }
+    }));
+  } catch (error) {
+    console.error('Error submitting invite request:', error);
+    res.status(500).json({ error: 'Failed to submit invite request' });
+  }
+});
+
+// @route   GET /api/users/referrals
+// @desc    Get user's referrals (people they invited)
+// @access  Private
+router.get('/referrals', authMiddleware, async (req, res) => {
+  try {
+    const user = req.user;
+    
+    // Find all users who used this user's invite code
+    const referrals = await User.find({ 
+      parentInviteCode: user.personalInviteCode 
+    })
+      .select('username profilePic createdAt homeLocation uuid')
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    res.json(transformResponse({
+      personalInviteCode: user.personalInviteCode,
+      referralCount: referrals.length,
+      referrals: referrals.map(r => ({
+        username: r.username,
+        profilePic: r.profilePic,
+        joinedAt: r.createdAt,
+        location: r.homeLocation,
+        uuid: r.uuid
+      }))
+    }));
+  } catch (error) {
+    console.error('Error fetching referrals:', error);
+    res.status(500).json({ error: 'Failed to fetch referrals' });
   }
 });
 

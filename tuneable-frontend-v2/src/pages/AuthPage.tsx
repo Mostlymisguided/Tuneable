@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import { 
   Eye, 
   EyeOff,
-  
+  Gift,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
+import axios from 'axios';
 
 const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [inviterUsername, setInviterUsername] = useState<string>('');
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -20,6 +26,7 @@ const AuthPage: React.FC = () => {
     cellPhone: '',
     givenName: '',
     familyName: '',
+    parentInviteCode: '',
     homeLocation: {
       city: '',
       country: '',
@@ -36,13 +43,62 @@ const AuthPage: React.FC = () => {
   // Check if we're coming from a redirect (like after OAuth)
   const isFromOAuth = location.search.includes('error=') || location.search.includes('success=');
 
+  // Capture invite code from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const inviteParam = params.get('invite');
+    
+    if (inviteParam && isRegisterPage) {
+      setFormData(prev => ({ ...prev, parentInviteCode: inviteParam.toUpperCase() }));
+      validateInviteCode(inviteParam.toUpperCase());
+    }
+  }, [location.search, isRegisterPage]);
+
+  // Validate invite code against backend
+  const validateInviteCode = async (code: string) => {
+    if (!code || code.length !== 5) {
+      setInviteCodeValid(false);
+      setInviterUsername('');
+      return;
+    }
+
+    setIsValidatingCode(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const response = await axios.get(`${API_URL}/users/validate-invite/${code}`);
+      
+      if (response.data.valid) {
+        setInviteCodeValid(true);
+        setInviterUsername(response.data.inviterUsername || '');
+      } else {
+        setInviteCodeValid(false);
+        setInviterUsername('');
+      }
+    } catch (error) {
+      setInviteCodeValid(false);
+      setInviterUsername('');
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
   const handleSocialAuth = (provider: 'facebook' | 'google') => {
+    // Check if invite code is required for registration
+    if (isRegisterPage && !inviteCodeValid) {
+      toast.error('Please enter a valid invite code to sign up');
+      return;
+    }
+
     // VITE_API_URL already includes /api, so don't add it again
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    
+    // Pass invite code as state parameter for OAuth
+    const inviteParam = formData.parentInviteCode ? `?invite=${formData.parentInviteCode}` : '';
+    
     if (provider === 'facebook') {
-      window.location.href = `${baseUrl}/auth/facebook`;
+      window.location.href = `${baseUrl}/auth/facebook${inviteParam}`;
     } else if (provider === 'google') {
-      window.location.href = `${baseUrl}/auth/google`;
+      window.location.href = `${baseUrl}/auth/google${inviteParam}`;
     }
   };
 
@@ -61,6 +117,20 @@ const AuthPage: React.FC = () => {
           [name]: value,
         },
       });
+    } else if (name === 'parentInviteCode') {
+      const upperCode = value.toUpperCase();
+      setFormData({
+        ...formData,
+        [name]: upperCode,
+      });
+      
+      // Validate invite code if 5 characters
+      if (upperCode.length === 5) {
+        validateInviteCode(upperCode);
+      } else {
+        setInviteCodeValid(null);
+        setInviterUsername('');
+      }
     } else {
       setFormData({
         ...formData,
@@ -87,6 +157,12 @@ const AuthPage: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check invite code is valid
+    if (!inviteCodeValid) {
+      toast.error('Please enter a valid invite code to sign up');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -231,6 +307,50 @@ const AuthPage: React.FC = () => {
       </div>
 
       <form className="w-full space-y-4" onSubmit={handleRegister}>
+        {/* Invite Code Field */}
+        <div className="flex flex-col flex items-center justify-center">
+          <div className="relative w-full">
+            <input
+              id="parentInviteCode"
+              name="parentInviteCode"
+              type="text"
+              required
+              maxLength={5}
+              className={`block w-full rounded-lg border px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-offset-1 ${
+                inviteCodeValid === true
+                  ? 'border-green-500 focus:ring-green-500'
+                  : inviteCodeValid === false
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-black'
+              }`}
+              placeholder="Invite Code (Required)"
+              value={formData.parentInviteCode}
+              onChange={handleChange}
+            />
+            {isValidatingCode ? (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin h-5 w-5 border-2 border-gray-300 border-t-purple-600 rounded-full"></div>
+              </div>
+            ) : inviteCodeValid === true ? (
+              <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
+            ) : inviteCodeValid === false ? (
+              <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
+            ) : null}
+          </div>
+          {inviterUsername && inviteCodeValid && (
+            <div className="flex items-center mt-2 text-sm text-green-600">
+              <Gift className="h-4 w-4 mr-1" />
+              <span>Invited by <strong>@{inviterUsername}</strong></span>
+            </div>
+          )}
+          {inviteCodeValid === false && formData.parentInviteCode.length === 5 && (
+            <p className="text-xs text-red-500 mt-1">Invalid invite code</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            Don't have a code? <Link to="/request-invite" className="text-purple-600 hover:underline">Request an invite</Link>
+          </p>
+        </div>
+
         <div className="flex flex-col flex items-center justify-center">
           {/* <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
             Username

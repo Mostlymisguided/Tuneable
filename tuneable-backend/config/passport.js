@@ -81,6 +81,22 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       }
       
       // Create new user
+      // Check for invite code in session (passed from OAuth initiation)
+      let parentInviteCode = null;
+      if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
+        const code = arguments[4].session.pendingInviteCode;
+        // Validate invite code
+        const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+        if (inviter) {
+          parentInviteCode = code.toUpperCase();
+        }
+      }
+      
+      // Require invite code for new users
+      if (!parentInviteCode) {
+        return done(new Error('Valid invite code required to create account'), null);
+      }
+      
       const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
       const usernameValue = (profile.name.givenName + profile.name.familyName + Math.random().toString(36).substr(2, 4)).replace(/\s+/g, '');
       
@@ -123,7 +139,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         balance: 0,
         // Generate invite codes
         personalInviteCode: generateInviteCode(),
-        parentInviteCode: '7777' // Default parent code
+        parentInviteCode: parentInviteCode
       });
       
       await newUser.save();
