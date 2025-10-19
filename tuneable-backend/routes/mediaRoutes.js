@@ -780,7 +780,7 @@ router.get('/:mediaId/top-parties', async (req, res) => {
     console.log('🎪 Top parties request for media:', mediaId);
 
     // Resolve media ID
-    const resolvedMediaId = await resolveId(mediaId, 'Media');
+    const resolvedMediaId = await resolveId(mediaId, Media);
     if (!resolvedMediaId) {
       console.log('❌ Media not found:', mediaId);
       return res.status(404).json({ error: 'Media not found' });
