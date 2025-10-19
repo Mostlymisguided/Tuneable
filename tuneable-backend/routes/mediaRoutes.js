@@ -177,25 +177,32 @@ router.get('/:mediaId/profile', async (req, res) => {
       globalMediaAggregate: { $gt: populatedMedia.globalMediaAggregate || 0 }
     }) + 1; // +1 because rank is 1-indexed
 
-    // Transform Media to match expected frontend format
-    const mediaObj = populatedMedia.toObject();
-    
-    // Explicitly convert sources Map to plain object
+    // Convert sources Map to plain object BEFORE toObject()
     let sourcesObj = {};
-    if (mediaObj.sources) {
-      if (mediaObj.sources instanceof Map) {
+    if (populatedMedia.sources) {
+      if (populatedMedia.sources instanceof Map) {
         // Convert Map to plain object
-        mediaObj.sources.forEach((value, key) => {
+        populatedMedia.sources.forEach((value, key) => {
           sourcesObj[key] = value;
         });
-      } else if (typeof mediaObj.sources === 'object') {
-        sourcesObj = mediaObj.sources;
+      } else if (typeof populatedMedia.sources === 'object' && populatedMedia.sources !== null) {
+        // Handle if it's already an object
+        sourcesObj = { ...populatedMedia.sources };
       }
     }
     
+    console.log('📡 Backend sources conversion:', {
+      originalType: populatedMedia.sources?.constructor?.name,
+      isMap: populatedMedia.sources instanceof Map,
+      convertedSources: sourcesObj
+    });
+    
+    // Transform Media to match expected frontend format
+    const mediaObj = populatedMedia.toObject();
+    
     const transformedMedia = {
       ...mediaObj,
-      sources: sourcesObj, // Use converted sources
+      sources: sourcesObj, // Use pre-converted sources
       artist: populatedMedia.artist && populatedMedia.artist.length > 0 ? 
               populatedMedia.artist[0].name : 'Unknown Artist', // Primary artist name
       artists: populatedMedia.artist || [], // Full artist subdocuments
