@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, Heart, DollarSign, Clock, User, Headphones } from 'lucide-react';
+import { Play, Pause, Heart, DollarSign, Clock, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 
@@ -14,8 +14,8 @@ interface Episode {
   duration: number;
   publishedAt: string;
   globalMediaAggregate: number;
-  playCount: number;
-  popularity: number;
+  playCount?: number;
+  popularity?: number;
   explicit: boolean;
   episodeDisplay: string;
   formattedDuration: string;

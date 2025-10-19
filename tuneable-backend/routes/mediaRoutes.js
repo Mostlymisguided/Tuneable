@@ -82,7 +82,7 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
       coverArt: coverArt || undefined,
       sources: { upload: fileUrl },
       contentType: ['music'],
-      contentForm: ['song'],
+      contentForm: ['tune'],
       addedBy: userId,
       uploadedAt: new Date()
     });

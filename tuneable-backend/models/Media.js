@@ -24,7 +24,7 @@ const mediaSchema = new mongoose.Schema({
   
   contentForm: { 
     type: [String], 
-    enum: ['song', 'album', 'podcast', 'episode', 'audiobook', 'interview', 
+    enum: ['tune', 'album', 'podcast', 'episode', 'audiobook', 'interview', 
            'performance', 'mix', 'remix', 'meme', 'article', 'book', 'video'],
     required: true 
   },

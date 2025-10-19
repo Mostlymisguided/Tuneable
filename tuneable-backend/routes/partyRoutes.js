@@ -510,7 +510,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             addedBy: userId,
             globalMediaAggregate: bidAmount, // Updated to schema grammar
             contentType: 'music',
-            contentForm: 'song'
+            contentForm: 'tune'
         });
 
         await media.save();
