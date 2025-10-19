@@ -32,11 +32,21 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
             ]
         };
 
-        // If source is specified, filter by platform
+        // If source is specified, filter by platform (always include uploads)
         if (source === 'youtube') {
-            searchCriteria.$and.push({ 'sources.youtube': { $exists: true, $ne: null } });
+            searchCriteria.$and.push({ 
+                $or: [
+                    { 'sources.youtube': { $exists: true, $ne: null } },
+                    { 'sources.upload': { $exists: true, $ne: null } }  // Include uploaded media
+                ]
+            });
         } else if (source === 'spotify') {
-            searchCriteria.$and.push({ 'sources.spotify': { $exists: true, $ne: null } });
+            searchCriteria.$and.push({ 
+                $or: [
+                    { 'sources.spotify': { $exists: true, $ne: null } },
+                    { 'sources.upload': { $exists: true, $ne: null } }  // Include uploaded media
+                ]
+            });
         }
 
         console.log('Search criteria:', JSON.stringify(searchCriteria, null, 2));

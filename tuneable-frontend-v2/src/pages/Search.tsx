@@ -375,9 +375,21 @@ const SearchPage: React.FC = () => {
         }
       }
       } else {
-        // Handle regular song
-        const platform = musicSource === 'spotify' ? 'spotify' : 'youtube';
-        const url = musicSource === 'spotify' ? song.sources.spotify : song.sources.youtube;
+        // Handle regular song - detect platform from available sources
+        let platform = 'youtube';
+        let url = song.sources.youtube;
+        
+        // Check for uploaded media first
+        if (song.sources.upload) {
+          platform = 'upload';
+          url = song.sources.upload;
+        } else if (musicSource === 'spotify' && song.sources.spotify) {
+          platform = 'spotify';
+          url = song.sources.spotify;
+        } else if (song.sources.youtube) {
+          platform = 'youtube';
+          url = song.sources.youtube;
+        }
         
         const response = await partyAPI.addMediaToParty(partyId, {
           title: song.title,
