@@ -16,12 +16,12 @@ const formatTime = (seconds: number): string => {
 };
 
 // Helper function to detect player type
-const detectPlayerType = (song: any): 'youtube' | 'audio' | 'spotify' | null => {
-  if (!song || !song.sources) return null;
+const detectPlayerType = (media: any): 'youtube' | 'audio' | 'spotify' | null => {
+  if (!media || !media.sources) return null;
   
   // Check if sources is an array
-  if (Array.isArray(song.sources)) {
-    for (const source of song.sources) {
+  if (Array.isArray(media.sources)) {
+    for (const source of media.sources) {
       if (source?.platform === 'youtube' && source.url) return 'youtube';
       if (source?.platform === 'upload' && source.url) return 'audio';
       if (source?.platform === 'spotify' && source.url) return 'spotify';
@@ -29,30 +29,30 @@ const detectPlayerType = (song: any): 'youtube' | 'audio' | 'spotify' | null => 
       if (source?.youtube) return 'youtube';
       if (source?.spotify) return 'spotify';
     }
-  } else if (typeof song.sources === 'object') {
-    if (song.sources.youtube) return 'youtube';
-    if (song.sources.upload) return 'audio';
-    if (song.sources.spotify) return 'spotify';
+  } else if (typeof media.sources === 'object') {
+    if (media.sources.youtube) return 'youtube';
+    if (media.sources.upload) return 'audio';
+    if (media.sources.spotify) return 'spotify';
   }
   
   return null;
 };
 
 // Helper function to extract source URL
-const extractSourceUrl = (song: any, playerType: string): string | null => {
-  if (!song || !song.sources) return null;
+const extractSourceUrl = (media: any, playerType: string): string | null => {
+  if (!media || !media.sources) return null;
   
-  if (Array.isArray(song.sources)) {
-    for (const source of song.sources) {
+  if (Array.isArray(media.sources)) {
+    for (const source of media.sources) {
       if (source?.platform === playerType && source.url) return source.url;
       if (playerType === 'youtube' && source?.youtube) return source.youtube;
       if (playerType === 'audio' && source?.upload) return source.upload;
       if (playerType === 'spotify' && source?.spotify) return source.spotify;
     }
-  } else if (typeof song.sources === 'object') {
-    if (playerType === 'youtube' && song.sources.youtube) return song.sources.youtube;
-    if (playerType === 'audio' && song.sources.upload) return song.sources.upload;
-    if (playerType === 'spotify' && song.sources.spotify) return song.sources.spotify;
+  } else if (typeof media.sources === 'object') {
+    if (playerType === 'youtube' && media.sources.youtube) return media.sources.youtube;
+    if (playerType === 'audio' && media.sources.upload) return media.sources.upload;
+    if (playerType === 'spotify' && media.sources.spotify) return media.sources.spotify;
   }
   
   return null;
@@ -136,8 +136,8 @@ const PersistentWebPlayer: React.FC = () => {
 
   const {
     isPlaying,
-    currentSong,
-    currentSongIndex,
+    currentMedia,
+    currentMediaIndex,
     queue,
     volume,
     isMuted,
@@ -162,38 +162,38 @@ const PersistentWebPlayer: React.FC = () => {
       console.log('PersistentWebPlayer received WebSocket message:', message);
       
       switch (message.type) {
-        case 'SONG_COMPLETED':
-          console.log('Song completed via WebSocket, refreshing queue');
+        case 'MEDIA_COMPLETED':
+          console.log('Media completed via WebSocket, refreshing queue');
           if (currentPartyId) {
             partyAPI.getPartyDetails(currentPartyId)
               .then(response => {
-                const songs = response.party?.songs || [];
-                const queuedSongs = songs.filter((song: any) => song.status === 'queued');
+                const mediaItems = response.party?.media || [];
+                const queuedMedia = mediaItems.filter((item: any) => item.status === 'queued');
                 
-                const mappedSongs = queuedSongs.map((song: any) => {
-                  const actualSong = song.songId || song;
+                const mappedMedia = queuedMedia.map((item: any) => {
+                  const actualMedia = item.mediaId || item;
                   return {
-                    id: actualSong.id,
-                    title: actualSong.title,
-                    artist: actualSong.artist,
-                    duration: actualSong.duration,
-                    coverArt: actualSong.coverArt,
-                    sources: actualSong.sources,
-                    globalMediaAggregate: actualSong.globalMediaAggregate || 0,
-                    bids: actualSong.bids || [],
-                    addedBy: actualSong.addedBy,
-                    totalBidValue: actualSong.totalBidValue || 0
+                    id: actualMedia.id,
+                    title: actualMedia.title,
+                    artist: actualMedia.artist,
+                    duration: actualMedia.duration,
+                    coverArt: actualMedia.coverArt,
+                    sources: actualMedia.sources,
+                    globalMediaAggregate: actualMedia.globalMediaAggregate || 0,
+                    bids: actualMedia.bids || [],
+                    addedBy: actualMedia.addedBy,
+                    totalBidValue: actualMedia.totalBidValue || 0
                   };
                 });
                 
-                setQueue(mappedSongs);
+                setQueue(mappedMedia);
                 
-                if (queuedSongs.length === 0) {
-                  useWebPlayerStore.getState().setCurrentSong(null);
+                if (queuedMedia.length === 0) {
+                  useWebPlayerStore.getState().setCurrentMedia(null);
                 }
               })
               .catch(error => {
-                console.error('Error refreshing queue after song completion:', error);
+                console.error('Error refreshing queue after media completion:', error);
               });
           }
           break;
@@ -201,11 +201,11 @@ const PersistentWebPlayer: React.FC = () => {
         case 'UPDATE_QUEUE':
           console.log('Queue updated via WebSocket');
           if (message.queue) {
-            const queuedSongs = message.queue.filter((song: any) => song.status === 'queued');
-            setQueue(queuedSongs);
+            const queuedMedia = message.queue.filter((item: any) => item.status === 'queued');
+            setQueue(queuedMedia);
             
-            if (queuedSongs.length === 0) {
-              useWebPlayerStore.getState().setCurrentSong(null);
+            if (queuedMedia.length === 0) {
+              useWebPlayerStore.getState().setCurrentMedia(null);
             }
           }
           break;
@@ -257,11 +257,11 @@ const PersistentWebPlayer: React.FC = () => {
 
   // Initialize player when song changes
   useEffect(() => {
-    console.log('PersistentWebPlayer useEffect - currentSong:', currentSong);
+    console.log('PersistentWebPlayer useEffect - currentMedia:', currentMedia);
     console.log('PersistentWebPlayer useEffect - isPlaying:', isPlaying);
     
-    if (!currentSong) {
-      console.log('No current song, clearing player');
+    if (!currentMedia) {
+      console.log('No current media, clearing player');
       // Don't destroy globalYouTubePlayerRef - it's managed by the external component
       if (youtubePlayerRef.current) {
         youtubePlayerRef.current.destroy();
@@ -278,7 +278,7 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
-    const detectedPlayerType = detectPlayerType(currentSong);
+    const detectedPlayerType = detectPlayerType(currentMedia);
     console.log('Detected player type:', detectedPlayerType);
     
     if (!detectedPlayerType) {
@@ -292,7 +292,7 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
-    const sourceUrl = extractSourceUrl(currentSong, detectedPlayerType);
+    const sourceUrl = extractSourceUrl(currentMedia, detectedPlayerType);
     console.log('Source URL:', sourceUrl);
     
     if (!sourceUrl) {
@@ -312,7 +312,7 @@ const PersistentWebPlayer: React.FC = () => {
     } else if (detectedPlayerType === 'audio') {
       initializeAudioPlayer(sourceUrl);
     }
-  }, [currentSong, isGlobalPlayerActive]);
+  }, [currentMedia, isGlobalPlayerActive]);
 
   const initializeYouTubePlayer = (videoId: string) => {
     console.log('Initializing YouTube player with video ID:', videoId);
@@ -372,9 +372,9 @@ const PersistentWebPlayer: React.FC = () => {
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
                 if (event.data === window.YT.PlayerState.ENDED) {
-                  if (currentPartyId && currentSong?.id && isHost) {
+                  if (currentPartyId && currentMedia?.id && isHost) {
                     console.log('Notifying backend that song completed');
-                    partyAPI.completeSong(currentPartyId, currentSong.id)
+                    partyAPI.completeMedia(currentPartyId, currentMedia.id)
                       .then(() => {
                         console.log('Song completion confirmed, advancing to next song');
                         next();
@@ -441,8 +441,8 @@ const PersistentWebPlayer: React.FC = () => {
 
       audioRef.current.onended = () => {
         console.log('Audio ended');
-        if (currentPartyId && currentSong?.id && isHost) {
-          partyAPI.completeSong(currentPartyId, currentSong.id)
+        if (currentPartyId && currentMedia?.id && isHost) {
+          partyAPI.completeMedia(currentPartyId, currentMedia.id)
             .then(() => {
               console.log('Song completion confirmed, advancing to next song');
               next();
@@ -534,7 +534,7 @@ const PersistentWebPlayer: React.FC = () => {
       e.preventDefault();
       
       // Toggle play/pause if there's a current song
-      if (currentSong) {
+      if (currentMedia) {
         togglePlayPause();
       }
     };
@@ -544,7 +544,7 @@ const PersistentWebPlayer: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [currentSong, togglePlayPause]);
+  }, [currentMedia, togglePlayPause]);
 
   // Cleanup effect
   useEffect(() => {
@@ -634,7 +634,7 @@ const PersistentWebPlayer: React.FC = () => {
       >
         {/* Progress Bar Row */}
         <div className="w-full bg-gray-800/50 h-1 group cursor-pointer" onClick={(e) => {
-          if (duration && currentSong) {
+          if (duration && currentMedia) {
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const percentage = x / rect.width;
@@ -655,18 +655,18 @@ const PersistentWebPlayer: React.FC = () => {
           
           {/* Row 1: Title and Artist */}
           <div className="flex items-center justify-center">
-            {currentSong ? (
+            {currentMedia ? (
               <div className="text-center">
                 <Link 
-                  to={`/tune/${(currentSong as any)._id || currentSong.id}`}
+                  to={`/tune/${(currentMedia as any)._id || currentMedia.id}`}
                   className="hover:opacity-80 transition-opacity no-underline"
                 >
                   <h4 className="text-base font-semibold text-white leading-tight">
-                    {currentSong.title}
+                    {currentMedia.title}
                   </h4>
                 </Link>
                 <p className="text-sm text-gray-300 leading-tight mt-1">
-                  {Array.isArray(currentSong.artist) ? currentSong.artist.join(', ') : currentSong.artist}
+                  {Array.isArray(currentMedia.artist) ? currentMedia.artist.join(', ') : currentMedia.artist}
                 </p>
               </div>
             ) : (
@@ -684,14 +684,14 @@ const PersistentWebPlayer: React.FC = () => {
           {/* Row 2: Artwork, Scrubber, Playback Controls, and Volume */}
           <div className="flex items-center space-x-4 mb-2">
             {/* Left: Artwork */}
-            {currentSong ? (
+            {currentMedia ? (
               <Link 
-                to={`/tune/${(currentSong as any)._id || currentSong.id}`}
+                to={`/tune/${(currentMedia as any)._id || currentMedia.id}`}
                 className="flex w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 shadow-lg hover:opacity-80 transition-opacity"
               >
                 <img
-                  src={currentSong.coverArt || '/default-cover.jpg'}
-                  alt={currentSong.title}
+                  src={currentMedia.coverArt || '/default-cover.jpg'}
+                  alt={currentMedia.title}
                   className="w-full h-full object-cover"
                 />
               </Link>
@@ -715,10 +715,10 @@ const PersistentWebPlayer: React.FC = () => {
                   max={duration || 100}
                   value={currentTime}
                   onChange={handleScrubberChange}
-                  disabled={!currentSong}
+                  disabled={!currentMedia}
                   className="w-full h-2 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    background: currentSong && duration 
+                    background: currentMedia && duration 
                       ? `linear-gradient(to right, #9333ea 0%, #9333ea ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) 100%)`
                       : 'rgba(75, 85, 99, 0.5)'
                   }}
@@ -743,7 +743,7 @@ const PersistentWebPlayer: React.FC = () => {
             <div className="flex items-center space-x-2">
               <button
                   onClick={() => previous()}
-                disabled={currentSongIndex === 0 || !currentSong}
+                disabled={currentMediaIndex === 0 || !currentMedia}
                   className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Previous Song"
               >
@@ -752,9 +752,9 @@ const PersistentWebPlayer: React.FC = () => {
 
               <button
                   onClick={() => togglePlayPause()}
-              disabled={!currentSong}
+              disabled={!currentMedia}
                   className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={currentSong ? (isPlaying ? 'Pause' : 'Play') : 'No song playing'}
+              title={currentMedia ? (isPlaying ? 'Pause' : 'Play') : 'No song playing'}
               >
                 {isPlaying ? (
                   <Pause className="h-6 w-6 ml-0.5" />
@@ -765,7 +765,7 @@ const PersistentWebPlayer: React.FC = () => {
 
               <button
                   onClick={() => next()}
-                disabled={currentSongIndex >= queue.length - 1 || !currentSong}
+                disabled={currentMediaIndex >= queue.length - 1 || !currentMedia}
                   className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Next Song"
               >

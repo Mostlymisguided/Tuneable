@@ -14,7 +14,7 @@ import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, Loader2, Youtube } from 'lucide-react';
 
 // Define types directly to avoid import issues
-interface PartySong {
+interface PartyMedia {
   _id: string;
   title: string;
   artist: string;
@@ -23,6 +23,7 @@ interface PartySong {
   sources?: {
     youtube?: string;
     spotify?: string;
+    upload?: string;
     spotifyId?: string;
     spotifyUrl?: string;
   };
@@ -36,12 +37,12 @@ interface PartySong {
 
 
 interface WebSocketMessage {
-  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT' | 'SONG_STARTED' | 'SONG_COMPLETED' | 'SONG_VETOED' | 'PARTY_ENDED';
+  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_MEDIA' | 'SET_HOST' | 'PLAY_NEXT' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED';
   partyId?: string;
   userId?: string;
-  queue?: PartySong[];
-  song?: PartySong;
-  songId?: string;
+  queue?: PartyMedia[];
+  media?: PartyMedia;
+  mediaId?: string;
   playedAt?: string;
   completedAt?: string;
   vetoedAt?: string;
@@ -58,7 +59,7 @@ const Party: React.FC = () => {
   
   // Bid modal state
   const [bidModalOpen, setBidModalOpen] = useState(false);
-  const [selectedSong, setSelectedSong] = useState<any>(null);
+  const [selectedMedia, setSelectedMedia] = useState<any>(null);
   const [isBidding, setIsBidding] = useState(false);
 
   // End party modal state
@@ -67,23 +68,23 @@ const Party: React.FC = () => {
 
   // Sorting state
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('all-time');
-  const [sortedSongs, setSortedSongs] = useState<any[]>([]);
-  const [isLoadingSortedSongs, setIsLoadingSortedSongs] = useState(false);
+  const [sortedMedia, setSortedMedia] = useState<any[]>([]);
+  const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   
   // Search state
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>([]);
   
-  // Inline add song search state
-  const [showAddSongPanel, setShowAddSongPanel] = useState(false);
-  const [addSongSearchQuery, setAddSongSearchQuery] = useState('');
-  const [addSongResults, setAddSongResults] = useState<{
+  // Inline add media search state
+  const [showAddMediaPanel, setShowAddMediaPanel] = useState(false);
+  const [addMediaSearchQuery, setAddMediaSearchQuery] = useState('');
+  const [addMediaResults, setAddMediaResults] = useState<{
     database: any[];
     youtube: any[];
   }>({ database: [], youtube: [] });
-  const [isSearchingNewSongs, setIsSearchingNewSongs] = useState(false);
+  const [isSearchingNewMedia, setIsSearchingNewMedia] = useState(false);
   const [isLoadingMoreYouTube, setIsLoadingMoreYouTube] = useState(false);
   const [youtubeNextPageToken, setYoutubeNextPageToken] = useState<string | null>(null);
-  const [newSongBidAmounts, setNewSongBidAmounts] = useState<Record<string, number>>({});
+  const [newMediaBidAmounts, setNewMediaBidAmounts] = useState<Record<string, number>>({});
   
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, number>>({});
@@ -91,7 +92,7 @@ const Party: React.FC = () => {
   const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
-  const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
+  const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
 
   // Function to scroll to webplayer
   const scrollToWebPlayer = () => {
@@ -104,7 +105,7 @@ const Party: React.FC = () => {
 
   // Use global WebPlayer store
   const {
-    setCurrentSong,
+    setCurrentMedia,
     isHost,
     setIsHost,
     setQueue,
@@ -112,7 +113,7 @@ const Party: React.FC = () => {
     setCurrentPartyId,
     setGlobalPlayerActive,
     currentPartyId,
-    currentSong,
+    currentMedia,
   } = useWebPlayerStore();
 
   // Only use WebSocket for live parties
@@ -130,9 +131,9 @@ const Party: React.FC = () => {
       switch (message.type) {
         case 'UPDATE_QUEUE':
           if (message.queue) {
-            setParty((prev: any) => prev ? { ...prev, songs: message.queue! } : null);
+            setParty((prev: any) => prev ? { ...prev, media: message.queue! } : null);
             
-            // Note: WebSocket UPDATE_QUEUE messages don't contain song status information,
+            // Note: WebSocket UPDATE_QUEUE messages don't contain media status information,
             // so we don't update the global player queue here. The queue is managed
             // by the party data from the API calls which include proper status information.
             console.log('WebSocket UPDATE_QUEUE received but not updating global queue (no status info)');
@@ -145,76 +146,76 @@ const Party: React.FC = () => {
           // Global store will handle these
           break;
           
-        case 'SONG_STARTED':
-          console.log('WebSocket SONG_STARTED received');
-          if (message.songId) {
+        case 'MEDIA_STARTED':
+          console.log('WebSocket MEDIA_STARTED received');
+          if (message.mediaId) {
             setParty((prev: any) => {
               if (!prev) return null;
               return {
                 ...prev,
-                songs: prev.songs.map((song: any) => {
-                  const songData = song.songId || song;
-                  if (songData.id === message.songId) {
+                media: prev.media.map((item: any) => {
+                  const mediaData = item.mediaId || item;
+                  if (mediaData.id === message.mediaId) {
                     return {
-                      ...song,
+                      ...item,
                       status: 'playing',
                       playedAt: message.playedAt || new Date()
                     };
                   }
-                  // Mark other playing songs as queued
-                  if (song.status === 'playing') {
-                    return { ...song, status: 'queued' };
+                  // Mark other playing media as queued
+                  if (item.status === 'playing') {
+                    return { ...item, status: 'queued' };
                   }
-                  return song;
+                  return item;
                 })
               };
             });
           }
           break;
           
-        case 'SONG_COMPLETED':
-          console.log('WebSocket SONG_COMPLETED received for songId:', message.songId);
-          if (message.songId) {
+        case 'MEDIA_COMPLETED':
+          console.log('WebSocket MEDIA_COMPLETED received for mediaId:', message.mediaId);
+          if (message.mediaId) {
             setParty((prev: any) => {
               if (!prev) return null;
-              console.log('Updating party state for completed song:', message.songId);
+              console.log('Updating party state for completed media:', message.mediaId);
               return {
                 ...prev,
-                songs: prev.songs.map((song: any) => {
-                  const songData = song.songId || song;
-                  if (songData.id === message.songId) {
-                    console.log('Found song to mark as played:', songData.title);
+                media: prev.media.map((item: any) => {
+                  const mediaData = item.mediaId || item;
+                  if (mediaData.id === message.mediaId) {
+                    console.log('Found media to mark as played:', mediaData.title);
                     return {
-                      ...song,
+                      ...item,
                       status: 'played',
                       completedAt: message.completedAt || new Date()
                     };
                   }
-                  return song;
+                  return item;
                 })
               };
             });
           }
           break;
           
-        case 'SONG_VETOED':
-          console.log('WebSocket SONG_VETOED received');
-          if (message.songId) {
+        case 'MEDIA_VETOED':
+          console.log('WebSocket MEDIA_VETOED received');
+          if (message.mediaId) {
             setParty((prev: any) => {
               if (!prev) return null;
               return {
                 ...prev,
-                songs: prev.songs.map((song: any) => {
-                  const songData = song.songId || song;
-                  if (songData.id === message.songId) {
+                media: prev.media.map((item: any) => {
+                  const mediaData = item.mediaId || item;
+                  if (mediaData.id === message.mediaId) {
                     return {
-                      ...song,
+                      ...item,
                       status: 'vetoed',
                       vetoedAt: message.vetoedAt || new Date(),
                       vetoedBy: message.vetoedBy
                     };
                   }
-                  return song;
+                  return item;
                 })
               };
             });
@@ -244,7 +245,7 @@ const Party: React.FC = () => {
   useEffect(() => {
     if (partyId) {
       fetchPartyDetails();
-      fetchSortedSongs(selectedTimePeriod);
+      fetchSortedMedia(selectedTimePeriod);
     }
   }, [partyId]);
 
@@ -260,19 +261,19 @@ const Party: React.FC = () => {
       // This ensures the queue is updated even if it's the "same" party (e.g., on page reload)
       console.log('Updating global player queue for party:', partyId);
         
-        // Filter to only include queued songs for the WebPlayer
-        const queuedSongs = getPartyMedia().filter((song: any) => song.status === 'queued');
-        console.log('Queued songs for WebPlayer:', queuedSongs.length);
-        console.log('All party songs statuses:', getPartyMedia().map((s: any) => ({ title: s.songId?.title || s.mediaId?.title, status: s.status })));
+        // Filter to only include queued media for the WebPlayer
+        const queuedMedia = getPartyMedia().filter((item: any) => item.status === 'queued');
+        console.log('Queued media for WebPlayer:', queuedMedia.length);
+        console.log('All party media statuses:', getPartyMedia().map((s: any) => ({ title: s.mediaId?.title, status: s.status })));
         
         // Clean and set the queue in global store
-        const cleanedQueue = queuedSongs.map((song: any) => {
-          const actualSong = song.songId || song;
+        const cleanedQueue = queuedMedia.map((item: any) => {
+          const actualMedia = item.mediaId || item;
           let sources = {};
           
-          if (actualSong.sources) {
-            if (Array.isArray(actualSong.sources)) {
-              for (const source of actualSong.sources) {
+          if (actualMedia.sources) {
+            if (Array.isArray(actualMedia.sources)) {
+              for (const source of actualMedia.sources) {
                 if (source && source.platform === '$__parent' && source.url && source.url.sources) {
                   // Handle Mongoose metadata corruption
                   sources = source.url.sources;
@@ -287,24 +288,24 @@ const Party: React.FC = () => {
                   (sources as any).spotify = source.spotify;
                 }
               }
-            } else if (typeof actualSong.sources === 'object') {
+            } else if (typeof actualMedia.sources === 'object') {
               // Preserve the original sources object
-              sources = actualSong.sources;
+              sources = actualMedia.sources;
             }
           }
           
           return {
-            id: actualSong.id || actualSong.uuid || actualSong._id, // Prefer UUID for external API
-            title: actualSong.title,
-            artist: Array.isArray(actualSong.artist) ? actualSong.artist[0]?.name || 'Unknown Artist' : actualSong.artist,
-            duration: actualSong.duration,
-            coverArt: actualSong.coverArt,
+            id: actualMedia.id || actualMedia.uuid || actualMedia._id, // Prefer UUID for external API
+            title: actualMedia.title,
+            artist: Array.isArray(actualMedia.artist) ? actualMedia.artist[0]?.name || 'Unknown Artist' : actualMedia.artist,
+            duration: actualMedia.duration,
+            coverArt: actualMedia.coverArt,
             sources: sources,
-            globalMediaAggregate: typeof actualSong.globalMediaAggregate === 'number' ? actualSong.globalMediaAggregate : 0,
-            partyMediaAggregate: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
-            totalBidValue: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
-            bids: actualSong.bids,
-            addedBy: typeof actualSong.addedBy === 'object' ? actualSong.addedBy?.username || 'Unknown' : actualSong.addedBy
+            globalMediaAggregate: typeof actualMedia.globalMediaAggregate === 'number' ? actualMedia.globalMediaAggregate : 0,
+            partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+            totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
+            bids: actualMedia.bids,
+            addedBy: typeof actualMedia.addedBy === 'object' ? actualMedia.addedBy?.username || 'Unknown' : actualMedia.addedBy
           };
         });
         
@@ -313,12 +314,12 @@ const Party: React.FC = () => {
         setGlobalPlayerActive(true);
         
       if (cleanedQueue.length > 0) {
-        console.log('Setting current song to:', cleanedQueue[0].title);
-        setCurrentSong(cleanedQueue[0], 0, true); // Auto-play for jukebox experience
+        console.log('Setting current media to:', cleanedQueue[0].title);
+        setCurrentMedia(cleanedQueue[0], 0, true); // Auto-play for jukebox experience
       } else {
-        // If no queued songs, clear the current song to stop the WebPlayer
-        console.log('No queued songs, clearing WebPlayer');
-        setCurrentSong(null, 0);
+        // If no queued media, clear the current media to stop the WebPlayer
+        console.log('No queued media, clearing WebPlayer');
+        setCurrentMedia(null, 0);
       }
     }
     
@@ -333,56 +334,56 @@ const Party: React.FC = () => {
       setIsHost(checkIsHost);
       console.log('🔍 isHost check:', { userUuid, hostUuid, isHost: checkIsHost, partyHost: party.host });
     }
-  }, [party, user, partyId, currentPartyId, setQueue, setCurrentSong, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
+  }, [party, user, partyId, currentPartyId, setQueue, setCurrentMedia, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
   // Update WebPlayer queue when sorting changes
   useEffect(() => {
-    if (party && selectedTimePeriod !== 'all-time' && sortedSongs.length > 0) {
-      // Update the global player queue with sorted songs
-      const queuedSortedSongs = sortedSongs.filter((song: any) => song.status === 'queued');
-      console.log('Updating WebPlayer queue with sorted songs:', queuedSortedSongs.length);
+    if (party && selectedTimePeriod !== 'all-time' && sortedMedia.length > 0) {
+      // Update the global player queue with sorted media
+      const queuedSortedMedia = sortedMedia.filter((media: any) => media.status === 'queued');
+      console.log('Updating WebPlayer queue with sorted media:', queuedSortedMedia.length);
       
       // Clean and set the queue in global store
-      const cleanedQueue = queuedSortedSongs.map((song: any) => {
+      const cleanedQueue = queuedSortedMedia.map((item: any) => {
         let sources = {};
         
-        if (song.sources) {
-          if (Array.isArray(song.sources)) {
-            for (const source of song.sources) {
+        if (item.sources) {
+          if (Array.isArray(item.sources)) {
+            for (const source of item.sources) {
               if (source && source.platform === 'youtube' && source.url) {
                 (sources as any).youtube = source.url;
               } else if (source && source.platform === 'spotify' && source.url) {
                 (sources as any).spotify = source.url;
               }
             }
-          } else if (typeof song.sources === 'object') {
-            sources = song.sources;
+          } else if (typeof item.sources === 'object') {
+            sources = item.sources;
           }
         }
         
         return {
-          id: song.id || song.uuid || song._id, // Prefer UUID for external API
-          title: song.title,
-          artist: Array.isArray(song.artist) ? song.artist[0]?.name || 'Unknown Artist' : song.artist,
-          duration: song.duration,
-          coverArt: song.coverArt,
+          id: item.id || item.uuid || item._id, // Prefer UUID for external API
+          title: item.title,
+          artist: Array.isArray(item.artist) ? item.artist[0]?.name || 'Unknown Artist' : item.artist,
+          duration: item.duration,
+          coverArt: item.coverArt,
           sources: sources,
-          globalMediaAggregate: typeof song.globalMediaAggregate === 'number' ? song.globalMediaAggregate : 0,
-          partyMediaAggregate: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
-          totalBidValue: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
-          bids: song.bids,
-          addedBy: typeof song.addedBy === 'object' ? song.addedBy?.username || 'Unknown' : song.addedBy
+          globalMediaAggregate: typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0,
+          partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+          totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
+          bids: item.bids,
+          addedBy: typeof item.addedBy === 'object' ? item.addedBy?.username || 'Unknown' : item.addedBy
         };
       });
       
       setQueue(cleanedQueue);
       
-      // If there are songs and no current song, set the first one
-      if (cleanedQueue.length > 0 && !currentSong) {
-        setCurrentSong(cleanedQueue[0], 0, true);
+      // If there is media and no current media, set the first one
+      if (cleanedQueue.length > 0 && !currentMedia) {
+        setCurrentMedia(cleanedQueue[0], 0, true);
       }
     }
-  }, [sortedSongs, selectedTimePeriod, party, setQueue, setCurrentSong, currentSong]);
+  }, [sortedMedia, selectedTimePeriod, party, setQueue, setCurrentMedia, currentMedia]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -436,37 +437,37 @@ const Party: React.FC = () => {
   };
 
   // Sorting functions
-  const fetchSortedSongs = async (timePeriod: string) => {
+  const fetchSortedMedia = async (timePeriod: string) => {
     if (!partyId) return;
     
-    setIsLoadingSortedSongs(true);
+    setIsLoadingSortedMedia(true);
     try {
-      const response = await partyAPI.getSongsSortedByTime(partyId, timePeriod);
-      setSortedSongs(response.media || response.songs || []);
+      const response = await partyAPI.getMediaSortedByTime(partyId, timePeriod);
+      setSortedMedia(response.media || response.songs || []);
     } catch (error) {
       console.error('Error fetching sorted media:', error);
       toast.error('Failed to load sorted media');
     } finally {
-      setIsLoadingSortedSongs(false);
+      setIsLoadingSortedMedia(false);
     }
   };
 
   const handleTimePeriodChange = (timePeriod: string) => {
     setSelectedTimePeriod(timePeriod);
-    fetchSortedSongs(timePeriod);
+    fetchSortedMedia(timePeriod);
   };
 
-  // Inline add song search functions
-  const handleAddSongSearch = async () => {
-    if (!addSongSearchQuery.trim()) return;
+  // Inline add media search functions
+  const handleAddMediaSearch = async () => {
+    if (!addMediaSearchQuery.trim()) return;
     
-    setIsSearchingNewSongs(true);
+    setIsSearchingNewMedia(true);
     try {
       const musicSource = party?.musicSource || 'youtube';
       
       // Search local database first
-      console.log('🔍 Searching for new songs:', addSongSearchQuery);
-      const response = await searchAPI.search(addSongSearchQuery, musicSource);
+      console.log('🔍 Searching for new media:', addMediaSearchQuery);
+      const response = await searchAPI.search(addMediaSearchQuery, musicSource);
       
       let databaseResults = [];
       let youtubeResults = [];
@@ -482,7 +483,7 @@ const Party: React.FC = () => {
       // If we got local results but want to show YouTube too, fetch YouTube
       if (databaseResults.length > 0 && response.hasMoreExternal) {
         console.log('🎥 Also fetching YouTube results...');
-        const youtubeResponse = await searchAPI.search(addSongSearchQuery, musicSource, undefined, undefined, true);
+        const youtubeResponse = await searchAPI.search(addMediaSearchQuery, musicSource, undefined, undefined, true);
         if (youtubeResponse.videos) {
           youtubeResults = youtubeResponse.videos;
           setYoutubeNextPageToken(youtubeResponse.nextPageToken || null);
@@ -493,7 +494,7 @@ const Party: React.FC = () => {
         setYoutubeNextPageToken(response.nextPageToken || null);
       }
       
-      setAddSongResults({ database: databaseResults, youtube: youtubeResults });
+      setAddMediaResults({ database: databaseResults, youtube: youtubeResults });
       
       // Initialize bid amounts for results
       const minBid = party?.minimumBid || 0.33;
@@ -501,27 +502,27 @@ const Party: React.FC = () => {
       [...databaseResults, ...youtubeResults].forEach(song => {
         newBidAmounts[song.id] = minBid;
       });
-      setNewSongBidAmounts(newBidAmounts);
+      setNewMediaBidAmounts(newBidAmounts);
       
     } catch (error) {
       console.error('Search error:', error);
       toast.error('Search failed. Please try again.');
     } finally {
-      setIsSearchingNewSongs(false);
+      setIsSearchingNewMedia(false);
     }
   };
 
   const handleLoadMoreYouTube = async () => {
-    if (!youtubeNextPageToken || !addSongSearchQuery) return;
+    if (!youtubeNextPageToken || !addMediaSearchQuery) return;
     
     setIsLoadingMoreYouTube(true);
     try {
       const musicSource = party?.musicSource || 'youtube';
-      const response = await searchAPI.search(addSongSearchQuery, musicSource, youtubeNextPageToken, undefined, true);
+      const response = await searchAPI.search(addMediaSearchQuery, musicSource, youtubeNextPageToken, undefined, true);
       
       if (response.videos) {
         // Append new results to existing YouTube results
-        setAddSongResults(prev => ({
+        setAddMediaResults(prev => ({
           ...prev,
           youtube: [...prev.youtube, ...response.videos]
         }));
@@ -530,13 +531,13 @@ const Party: React.FC = () => {
         
         // Initialize bid amounts for new results
         const minBid = party?.minimumBid || 0.33;
-        const newBidAmounts: Record<string, number> = { ...newSongBidAmounts };
+        const newBidAmounts: Record<string, number> = { ...newMediaBidAmounts };
         response.videos.forEach((song: any) => {
           if (!newBidAmounts[song.id]) {
             newBidAmounts[song.id] = minBid;
           }
         });
-        setNewSongBidAmounts(newBidAmounts);
+        setNewMediaBidAmounts(newBidAmounts);
         
         console.log(`✅ Loaded ${response.videos.length} more YouTube results`);
       }
@@ -548,10 +549,10 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleAddSongToParty = async (song: any) => {
+  const handleAddMediaToParty = async (song: any) => {
     if (!partyId) return;
     
-    const bidAmount = newSongBidAmounts[song.id] || party?.minimumBid || 0.33;
+    const bidAmount = newMediaBidAmounts[song.id] || party?.minimumBid || 0.33;
     
     try {
       // Get the appropriate URL based on music source
@@ -581,9 +582,9 @@ const Party: React.FC = () => {
       toast.success(`Added ${song.title} to party with £${bidAmount.toFixed(2)} bid!`);
       
       // Close search panel and refresh party
-      setShowAddSongPanel(false);
-      setAddSongSearchQuery('');
-      setAddSongResults({ database: [], youtube: [] });
+      setShowAddMediaPanel(false);
+      setAddMediaSearchQuery('');
+      setAddMediaResults({ database: [], youtube: [] });
       fetchPartyDetails();
       
     } catch (error: any) {
@@ -598,33 +599,33 @@ const Party: React.FC = () => {
     return party.media || party.songs || [];
   };
 
-  // Get songs to display based on selected time period and search terms
-  const getDisplaySongs = () => {
-    let songs;
+  // Get media to display based on selected time period and search terms
+  const getDisplayMedia = () => {
+    let media;
     if (selectedTimePeriod === 'all-time') {
       // Show regular party media
-      songs = getPartyMedia().filter((item: any) => item.status === 'queued');
+      media = getPartyMedia().filter((item: any) => item.status === 'queued');
     } else {
-      // Show sorted songs from the selected time period
-      songs = sortedSongs.filter((song: any) => song.status === 'queued');
+      // Show sorted media from the selected time period
+      media = sortedMedia.filter((item: any) => item.status === 'queued');
     }
     
     // Apply search filter if search terms exist
     if (queueSearchTerms.length > 0) {
-      songs = songs.filter((item: any) => {
-        const media = item.mediaId || item.songId || item;
+      media = media.filter((item: any) => {
+        const mediaItem = item.mediaId || item;
         
         // Check if ANY search term matches title, artist, tags, or category
         return queueSearchTerms.some(term => {
           const lowerTerm = term.toLowerCase();
-          const title = (media.title || '').toLowerCase();
-          const artist = Array.isArray(media.artist) 
-            ? media.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
-            : (media.artist || '').toLowerCase();
-          const tags = Array.isArray(media.tags) 
-            ? media.tags.join(' ').toLowerCase() 
+          const title = (mediaItem.title || '').toLowerCase();
+          const artist = Array.isArray(mediaItem.artist) 
+            ? mediaItem.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
+            : (mediaItem.artist || '').toLowerCase();
+          const tags = Array.isArray(mediaItem.tags) 
+            ? mediaItem.tags.join(' ').toLowerCase() 
             : '';
-          const category = (media.category || '').toLowerCase();
+          const category = (mediaItem.category || '').toLowerCase();
           
           return title.includes(lowerTerm) || 
                  artist.includes(lowerTerm) || 
@@ -633,10 +634,10 @@ const Party: React.FC = () => {
         });
       });
       
-      console.log(`🔍 Filtered queue: ${songs.length} songs match search terms:`, queueSearchTerms);
+      console.log(`🔍 Filtered queue: ${media.length} media items match search terms:`, queueSearchTerms);
     }
     
-    return songs;
+    return media;
   };
 
   // Helper function to calculate average bid for a song
@@ -650,29 +651,29 @@ const Party: React.FC = () => {
   // Bid handling functions (OLD - using bid modal, now replaced with inline bidding)
   // const handleBidClick = (song: any) => {
   //   const songData = song.mediaId || song.songId || song;
-  //   setSelectedSong(songData);
+  //   setSelectedMedia(songData);
   //   setBidModalOpen(true);
   // };
 
-  const handleInlineBid = async (song: any) => {
+  const handleInlineBid = async (media: any) => {
     if (!partyId) return;
     
-    const songData = song.mediaId || song.songId || song;
-    const songId = songData._id || songData.id;
-    const bidAmount = queueBidAmounts[songId] || party?.minimumBid || 0.33;
+    const mediaData = media.mediaId || media;
+    const mediaId = mediaData._id || mediaData.id;
+    const bidAmount = queueBidAmounts[mediaId] || party?.minimumBid || 0.33;
     
     setIsBidding(true);
     try {
-      await partyAPI.placeBid(partyId, songId, bidAmount);
-      toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${songData.title}!`);
+      await partyAPI.placeBid(partyId, mediaId, bidAmount);
+      toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${mediaData.title}!`);
       
       // Refresh party to show updated bid values
       await fetchPartyDetails();
       
-      // Reset bid amount for this song back to minimum
+      // Reset bid amount for this media back to minimum
       setQueueBidAmounts(prev => ({
         ...prev,
-        [songId]: party?.minimumBid || 0.33
+        [mediaId]: party?.minimumBid || 0.33
       }));
       
     } catch (error: any) {
@@ -683,16 +684,16 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleVetoClick = async (song: any) => {
+  const handleVetoClick = async (media: any) => {
     if (!isHost) {
-      toast.error('Only the host can veto songs');
+      toast.error('Only the host can veto media');
       return;
     }
 
     try {
-      // Veto the song (sets status to 'vetoed')
-      await partyAPI.vetoSong(partyId!, song.id);
-      toast.success('Song vetoed');
+      // Veto the media (sets status to 'vetoed')
+      await partyAPI.vetoMedia(partyId!, media.id);
+      toast.success('Media vetoed');
       
       // Refresh party data
       await fetchPartyDetails();
@@ -702,22 +703,22 @@ const Party: React.FC = () => {
     }
   };
   
-  const handleUnvetoClick = async (song: any) => {
+  const handleUnvetoClick = async (media: any) => {
     if (!isHost) {
-      toast.error('Only the host can restore songs');
+      toast.error('Only the host can restore media');
       return;
     }
 
     try {
-      // Un-veto the song (restore to 'queued' status)
-      await partyAPI.unvetoSong(partyId!, song.id);
-      toast.success('Song restored to queue');
+      // Un-veto the media (restore to 'queued' status)
+      await partyAPI.unvetoMedia(partyId!, media.id);
+      toast.success('Media restored to queue');
       
       // Refresh party data
       await fetchPartyDetails();
     } catch (error) {
-      console.error('Error restoring song:', error);
-      toast.error('Failed to restore song');
+      console.error('Error restoring media:', error);
+      toast.error('Failed to restore media');
     }
   };
 
@@ -741,12 +742,12 @@ const Party: React.FC = () => {
   // };
 
   const handleBidConfirm = async (bidAmount: number) => {
-    if (!selectedSong || !partyId) return;
+    if (!selectedMedia || !partyId) return;
 
     setIsBidding(true);
     try {
       // Get the media/song ID - try various ID fields
-      const mediaId = selectedSong.uuid || selectedSong.id || selectedSong._id;
+      const mediaId = selectedMedia.uuid || selectedMedia.id || selectedMedia._id;
       if (!mediaId) {
         toast.error('Unable to identify media item');
         setIsBidding(false);
@@ -766,11 +767,11 @@ const Party: React.FC = () => {
       
       // Refresh sorted songs if viewing a time-filtered period
       if (selectedTimePeriod !== 'all-time') {
-        await fetchSortedSongs(selectedTimePeriod);
+        await fetchSortedMedia(selectedTimePeriod);
       }
       
       setBidModalOpen(false);
-      setSelectedSong(null);
+      setSelectedMedia(null);
     } catch (error: any) {
       console.error('Error placing bid:', error);
       if (error.response?.data?.error === 'Insufficient funds') {
@@ -785,7 +786,7 @@ const Party: React.FC = () => {
 
   const handleBidModalClose = () => {
     setBidModalOpen(false);
-    setSelectedSong(null);
+    setSelectedMedia(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -853,7 +854,7 @@ const Party: React.FC = () => {
   };
 
   // Handle clicking play button on a song in the queue
-  const handlePlaySong = (song: any, index: number) => {
+  const handlePlayMedia = (song: any, index: number) => {
     const songData = selectedTimePeriod === 'all-time' ? (song.songId || song) : song;
     
     // Clean and format the song for the webplayer
@@ -896,7 +897,7 @@ const Party: React.FC = () => {
     };
     
     // Set the song in the webplayer and start playing
-    setCurrentSong(cleanedSong, index, true); // true = autoplay
+    setCurrentMedia(cleanedSong, index, true); // true = autoplay
     
     toast.success(`Now playing: ${cleanedSong.title}`);
   };
@@ -1014,7 +1015,7 @@ const Party: React.FC = () => {
               <Music className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white">
-                  {getDisplaySongs().length}
+                  {getDisplayMedia().length}
                 </div>
                 <div className="text-xs sm:text-sm text-gray-300">
                   {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
@@ -1069,7 +1070,7 @@ const Party: React.FC = () => {
           >
             {selectedTimePeriod === 'all-time' 
               ? `Queue (${getPartyMedia().filter((song: any) => song.status === 'queued').length})`
-              : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplaySongs().length})`
+              : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplayMedia().length})`
             }
           </button>
           <button 
@@ -1290,14 +1291,14 @@ const Party: React.FC = () => {
                     {/* Add Song Button - Centered */}
                     <div className="flex justify-center mt-4">
                       <button
-                        onClick={() => setShowAddSongPanel(!showAddSongPanel)}
+                        onClick={() => setShowAddMediaPanel(!showAddMediaPanel)}
                         className={`flex items-center space-x-2 p-2 rounded-lg font-medium transition-all shadow-lg ${
-                          showAddSongPanel 
+                          showAddMediaPanel 
                             ? 'bg-gray-600 hover:bg-gray-700 text-slate' 
                             : 'bg-purple-600 hover:bg-purple-700 text-white' 
                         }`} 
                       >
-                        {showAddSongPanel ? (
+                        {showAddMediaPanel ? (
                           <>
                             <X className="h-4 w-4" />
                             <span>Close Search</span>
@@ -1312,7 +1313,7 @@ const Party: React.FC = () => {
                     </div>
                     
                     {/* Inline Add Song Search Panel */}
-                    {showAddSongPanel && (
+                    {showAddMediaPanel && (
                       <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
                         <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
                         
@@ -1320,12 +1321,12 @@ const Party: React.FC = () => {
                         <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
                           <input
                             type="text"
-                            value={addSongSearchQuery}
-                            onChange={(e) => setAddSongSearchQuery(e.target.value)}
+                            value={addMediaSearchQuery}
+                            onChange={(e) => setAddMediaSearchQuery(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleAddSongSearch();
+                                handleAddMediaSearch();
                               }
                             }}
                             placeholder="Search for Tunes in our library or on Youtube..."
@@ -1335,11 +1336,11 @@ const Party: React.FC = () => {
                         </div>
                         <div className="flex justify-center">
                         <button
-                            onClick={handleAddSongSearch}
-                            disabled={isSearchingNewSongs || !addSongSearchQuery.trim()}
+                            onClick={handleAddMediaSearch}
+                            disabled={isSearchingNewMedia || !addMediaSearchQuery.trim()}
                             className="flex p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                           >
-                            {isSearchingNewSongs ? (
+                            {isSearchingNewMedia ? (
                               <Loader2 className="h-5 w-5 animate-spin" />
                             ) : (
                               'Search'
@@ -1348,14 +1349,14 @@ const Party: React.FC = () => {
                           </div>
 
                         {/* Database Results */}
-                        {addSongResults.database.length > 0 && (
+                        {addMediaResults.database.length > 0 && (
                           <div className="mb-4">
                             <div className="flex items-center mb-2">
                               <Music className="h-4 w-4 text-green-400 mr-2" />
-                              <h4 className="text-sm font-semibold text-green-300">From Tuneable Library ({addSongResults.database.length})</h4>
+                              <h4 className="text-sm font-semibold text-green-300">From Tuneable Library ({addMediaResults.database.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                              {addSongResults.database.map((song: any) => (
+                              {addMediaResults.database.map((song: any) => (
                                 <div key={song.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
@@ -1373,18 +1374,18 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.33}
-                                      value={newSongBidAmounts[song.id] || party?.minimumBid || 0.33}
-                                      onChange={(e) => setNewSongBidAmounts({
-                                        ...newSongBidAmounts,
+                                      value={newMediaBidAmounts[song.id] || party?.minimumBid || 0.33}
+                                      onChange={(e) => setNewMediaBidAmounts({
+                                        ...newMediaBidAmounts,
                                         [song.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
                                     <button
-                                      onClick={() => handleAddSongToParty(song)}
+                                      onClick={() => handleAddMediaToParty(song)}
                                       className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
                                     >
-                                      Add £{(newSongBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1394,14 +1395,14 @@ const Party: React.FC = () => {
                         )}
 
                         {/* YouTube Results */}
-                        {addSongResults.youtube.length > 0 && (
+                        {addMediaResults.youtube.length > 0 && (
                           <div>
                             <div className="flex items-center mb-2">
                               <Youtube className="h-4 w-4 text-red-400 mr-2" />
-                              <h4 className="text-sm font-semibold text-red-300">From YouTube ({addSongResults.youtube.length})</h4>
+                              <h4 className="text-sm font-semibold text-red-300">From YouTube ({addMediaResults.youtube.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                              {addSongResults.youtube.map((song: any) => (
+                              {addMediaResults.youtube.map((song: any) => (
                                 <div key={song.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
@@ -1419,18 +1420,18 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.33}
-                                      value={newSongBidAmounts[song.id] || party?.minimumBid || 0.33}
-                                      onChange={(e) => setNewSongBidAmounts({
-                                        ...newSongBidAmounts,
+                                      value={newMediaBidAmounts[song.id] || party?.minimumBid || 0.33}
+                                      onChange={(e) => setNewMediaBidAmounts({
+                                        ...newMediaBidAmounts,
                                         [song.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
                                     <button
-                                      onClick={() => handleAddSongToParty(song)}
+                                      onClick={() => handleAddMediaToParty(song)}
                                       className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                                     >
-                                      Add £{(newSongBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1460,10 +1461,10 @@ const Party: React.FC = () => {
                         )}
 
                         {/* No Results Message */}
-                        {!isSearchingNewSongs && addSongSearchQuery && addSongResults.database.length === 0 && addSongResults.youtube.length === 0 && (
+                        {!isSearchingNewMedia && addMediaSearchQuery && addMediaResults.database.length === 0 && addMediaResults.youtube.length === 0 && (
                           <div className="text-center py-8">
                             <Music className="h-12 w-12 text-gray-500 mx-auto mb-3" />
-                            <p className="text-gray-400">No songs found for "{addSongSearchQuery}"</p>
+                            <p className="text-gray-400">No songs found for "{addMediaSearchQuery}"</p>
                             <p className="text-gray-500 text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
@@ -1473,14 +1474,14 @@ const Party: React.FC = () => {
                 )}
 
                 {/* Song Queue - Show when NOT viewing vetoed */}
-                {!showVetoed && getDisplaySongs().length > 0 && (
+                {!showVetoed && getDisplayMedia().length > 0 && (
                   <div className="space-y-3">
-                    {isLoadingSortedSongs && selectedTimePeriod !== 'all-time' ? (
+                    {isLoadingSortedMedia && selectedTimePeriod !== 'all-time' ? (
                       <div className="text-center py-8">
-                        <div className="text-gray-400">Loading sorted songs...</div>
+                        <div className="text-gray-400">Loading sorted media...</div>
                       </div>
                     ) : (
-                      getDisplaySongs().map((song: any, index: number) => {
+                      getDisplayMedia().map((song: any, index: number) => {
                         // For sorted songs, the data is already flattened, for regular party songs it's nested under songId
                         const songData = selectedTimePeriod === 'all-time' ? (song.songId || song) : song;
                         return (
@@ -1510,7 +1511,7 @@ const Party: React.FC = () => {
                                 className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handlePlaySong(song, index);
+                                  handlePlayMedia(song, index);
                                 }}
                               >
                                 <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
@@ -1849,9 +1850,9 @@ const Party: React.FC = () => {
         isOpen={bidModalOpen}
         onClose={handleBidModalClose}
         onConfirm={handleBidConfirm}
-        songTitle={selectedSong?.title || ''}
-        songArtist={Array.isArray(selectedSong?.artist) ? selectedSong.artist[0]?.name || 'Unknown Artist' : selectedSong?.artist || 'Unknown Artist'}
-        currentBid={selectedSong?.partyMediaAggregate || 0}
+        songTitle={selectedMedia?.title || ''}
+        songArtist={Array.isArray(selectedMedia?.artist) ? selectedMedia.artist[0]?.name || 'Unknown Artist' : selectedMedia?.artist || 'Unknown Artist'}
+        currentBid={selectedMedia?.partyMediaAggregate || 0}
         userBalance={user?.balance || 0}
         isLoading={isBidding}
       />
@@ -1862,8 +1863,8 @@ const Party: React.FC = () => {
         onConfirm={onConfirm}
         onCancel={onCancel}
         action={warningAction}
-        currentSongTitle={currentSongTitle}
-        currentSongArtist={currentSongArtist}
+        currentMediaTitle={currentMediaTitle}
+        currentMediaArtist={currentMediaArtist}
       />
 
       {/* End Party Confirmation Modal */}

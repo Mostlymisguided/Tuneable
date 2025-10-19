@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 
 // Define types directly to avoid import issues
 interface WebSocketMessage {
-  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_SONG' | 'SET_HOST' | 'PLAY_NEXT' | 'SONG_STARTED' | 'SONG_COMPLETED' | 'SONG_VETOED';
+  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_MEDIA' | 'SET_HOST' | 'PLAY_NEXT' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED';
   partyId?: string;
   userId?: string;
   queue?: any[];
-  song?: any;
-  songId?: string;
+  media?: any;
+  mediaId?: string;
   playedAt?: string;
   completedAt?: string;
   vetoedAt?: string;
   vetoedBy?: string;
+  endedAt?: string;
 }
 
 interface UseWebSocketOptions {

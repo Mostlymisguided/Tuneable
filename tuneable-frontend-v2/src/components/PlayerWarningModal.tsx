@@ -6,8 +6,8 @@ interface PlayerWarningModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   action: string;
-  currentSongTitle?: string;
-  currentSongArtist?: string;
+  currentMediaTitle?: string;
+  currentMediaArtist?: string;
 }
 
 const PlayerWarningModal: React.FC<PlayerWarningModalProps> = ({
@@ -15,8 +15,8 @@ const PlayerWarningModal: React.FC<PlayerWarningModalProps> = ({
   onConfirm,
   onCancel,
   action,
-  currentSongTitle,
-  currentSongArtist,
+  currentMediaTitle,
+  currentMediaArtist,
 }) => {
   if (!isOpen) return null;
 
@@ -42,10 +42,10 @@ const PlayerWarningModal: React.FC<PlayerWarningModalProps> = ({
             <div className="min-w-0 flex-1">
               <p className="text-xs text-gray-300 mb-1">Currently playing:</p>
               <p className="text-sm font-medium text-white truncate">
-                {currentSongTitle || 'Unknown song'}
+                {currentMediaTitle || 'Unknown media'}
               </p>
-              {currentSongArtist && (
-                <p className="text-xs text-gray-400 truncate">by {currentSongArtist}</p>
+              {currentMediaArtist && (
+                <p className="text-xs text-gray-400 truncate">by {currentMediaArtist}</p>
               )}
             </div>
           </div>

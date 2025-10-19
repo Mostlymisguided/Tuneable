@@ -7,8 +7,8 @@ interface UsePlayerWarningReturn {
   warningAction: string;
   onConfirm: () => void;
   onCancel: () => void;
-  currentSongTitle?: string;
-  currentSongArtist?: string;
+  currentMediaTitle?: string;
+  currentMediaArtist?: string;
 }
 
 export const usePlayerWarning = (): UsePlayerWarningReturn => {
@@ -16,11 +16,11 @@ export const usePlayerWarning = (): UsePlayerWarningReturn => {
   const [warningAction, setWarningAction] = useState('');
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   
-  const { currentSong, isPlaying } = useWebPlayerStore();
+  const { currentMedia, isPlaying } = useWebPlayerStore();
 
   const showWarning = useCallback((action: string, onConfirm: () => void) => {
     // Only show warning if music is currently playing
-    if (isPlaying && currentSong) {
+    if (isPlaying && currentMedia) {
       setWarningAction(action);
       setPendingAction(() => onConfirm);
       setIsWarningOpen(true);
@@ -58,7 +58,7 @@ export const usePlayerWarning = (): UsePlayerWarningReturn => {
       // No music playing, proceed directly
       onConfirm();
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentMedia]);
 
   const handleConfirm = useCallback(() => {
     if (pendingAction) {
@@ -81,7 +81,7 @@ export const usePlayerWarning = (): UsePlayerWarningReturn => {
     warningAction,
     onConfirm: handleConfirm,
     onCancel: handleCancel,
-    currentSongTitle: currentSong?.title,
-    currentSongArtist: currentSong?.artist,
+    currentMediaTitle: currentMedia?.title,
+    currentMediaArtist: currentMedia?.artist,
   };
 };

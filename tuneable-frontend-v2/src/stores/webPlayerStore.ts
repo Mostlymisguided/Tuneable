@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface Song {
+// Lightweight Media interface for webplayer (subset of full Media)
+interface PlayerMedia {
   id: string;
   title: string;
   artist: string;
@@ -24,8 +25,8 @@ interface TopBidder {
 interface WebPlayerState {
   // Player state
   isPlaying: boolean;
-  currentSong: Song | null;
-  currentSongIndex: number;
+  currentMedia: PlayerMedia | null;
+  currentMediaIndex: number;
   volume: number;
   isMuted: boolean;
   isHost: boolean;
@@ -47,7 +48,7 @@ interface WebPlayerState {
   setTopBidder: (bidder: TopBidder | null) => void;
   
   // Player actions
-  setCurrentSong: (song: Song | null, index?: number, autoPlay?: boolean) => void;
+  setCurrentMedia: (media: PlayerMedia | null, index?: number, autoPlay?: boolean) => void;
   play: () => void;
   pause: () => void;
   togglePlayPause: () => void;
@@ -58,10 +59,10 @@ interface WebPlayerState {
   setIsHost: (isHost: boolean) => void;
   
   // Queue management
-  queue: Song[];
-  setQueue: (queue: Song[]) => void;
-  addToQueue: (song: Song) => void;
-  removeFromQueue: (songId: string) => void;
+  queue: PlayerMedia[];
+  setQueue: (queue: PlayerMedia[]) => void;
+  addToQueue: (media: PlayerMedia) => void;
+  removeFromQueue: (mediaId: string) => void;
   moveToNext: () => void;
   
   // Party management
@@ -82,8 +83,8 @@ export const useWebPlayerStore = create<WebPlayerState>()(
     (set, get) => ({
       // Initial state
       isPlaying: false,
-      currentSong: null,
-      currentSongIndex: 0,
+      currentMedia: null,
+      currentMediaIndex: 0,
       volume: 50,
       isMuted: false,
       isHost: false,
@@ -132,14 +133,14 @@ export const useWebPlayerStore = create<WebPlayerState>()(
         set({ topBidder: bidder });
       },
       
-      setCurrentSong: (song, index = 0, autoPlay = false) => {
+      setCurrentMedia: (media, index = 0, autoPlay = false) => {
         set({ 
-          currentSong: song, 
-          currentSongIndex: index,
+          currentMedia: media, 
+          currentMediaIndex: index,
           isPlaying: autoPlay, // Auto-play if requested (for jukebox experience)
-          currentTime: 0, // Reset time when changing songs
+          currentTime: 0, // Reset time when changing media
           duration: 0,
-          topBidder: null // Clear top bidder when changing songs
+          topBidder: null // Clear top bidder when changing media
         });
       },
       
@@ -169,54 +170,54 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       },
       
       next: () => {
-        const { queue, currentSongIndex, sendWebSocketMessage, isHost } = get();
+        const { queue, currentMediaIndex, sendWebSocketMessage, isHost } = get();
         if (queue.length > 0) {
-          const nextIndex = currentSongIndex + 1;
+          const nextIndex = currentMediaIndex + 1;
           
           // If we've reached the end of the queue, stop the player
           if (nextIndex >= queue.length) {
             set({ 
-              currentSong: null, 
-              currentSongIndex: 0,
+              currentMedia: null, 
+              currentMediaIndex: 0,
               isPlaying: false
             });
             return;
           }
           
-          // Move to next song and auto-play for jukebox experience
+          // Move to next media and auto-play for jukebox experience
           set({ 
-            currentSong: queue[nextIndex], 
-            currentSongIndex: nextIndex,
-            isPlaying: true // Auto-play next song for smooth jukebox experience
+            currentMedia: queue[nextIndex], 
+            currentMediaIndex: nextIndex,
+            isPlaying: true // Auto-play next media for smooth jukebox experience
           });
           
           if (isHost && sendWebSocketMessage) {
             sendWebSocketMessage({ type: 'NEXT' });
           }
         } else {
-          // No songs in queue, stop the player
+          // No media in queue, stop the player
           set({ 
-            currentSong: null, 
-            currentSongIndex: 0,
+            currentMedia: null, 
+            currentMediaIndex: 0,
             isPlaying: false
           });
         }
       },
       
       previous: () => {
-        const { queue, currentSongIndex, isPlaying, sendWebSocketMessage, isHost } = get();
+        const { queue, currentMediaIndex, isPlaying, sendWebSocketMessage, isHost } = get();
         if (queue.length > 0) {
-          const prevIndex = currentSongIndex - 1;
+          const prevIndex = currentMediaIndex - 1;
           
           // If we're at the beginning, don't go back
           if (prevIndex < 0) {
             return;
           }
           
-          // Move to previous song
+          // Move to previous media
           set({ 
-            currentSong: queue[prevIndex], 
-            currentSongIndex: prevIndex,
+            currentMedia: queue[prevIndex], 
+            currentMediaIndex: prevIndex,
             isPlaying: isPlaying // Keep the current playing state
           });
           
@@ -242,15 +243,15 @@ export const useWebPlayerStore = create<WebPlayerState>()(
         set({ queue });
       },
       
-      addToQueue: (song) => {
+      addToQueue: (media) => {
         set((state) => ({ 
-          queue: [...state.queue, song] 
+          queue: [...state.queue, media] 
         }));
       },
       
-      removeFromQueue: (songId) => {
+      removeFromQueue: (mediaId) => {
         set((state) => ({
-          queue: state.queue.filter(song => song.id !== songId)
+          queue: state.queue.filter(media => media.id !== mediaId)
         }));
       },
       
@@ -279,8 +280,8 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       partialize: (state) => ({
         volume: state.volume,
         isMuted: state.isMuted,
-        currentSong: state.currentSong,
-        currentSongIndex: state.currentSongIndex,
+        currentMedia: state.currentMedia,
+        currentMediaIndex: state.currentMediaIndex,
         queue: state.queue,
         currentPartyId: state.currentPartyId,
         isGlobalPlayerActive: state.isGlobalPlayerActive,

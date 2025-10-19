@@ -40,29 +40,8 @@ export interface Creator {
   verified: boolean;
 }
 
-// Legacy Song interface (for backward compatibility)
-export interface Song {
-  id: string;
-  title: string;
-  artist: string;
-  producer?: string;
-  featuring?: string[];
-  rightsHolder?: string;
-  album?: string;
-  genre?: string;
-  releaseDate?: string;
-  duration: number;
-  coverArt?: string;
-  explicit: boolean;
-  sources: Record<string, string>;
-  globalBidValue: number;
-  addedBy: string;
-  uploadedAt: string;
-  updatedAt: string;
-  playCount: number;
-  popularity: number;
-  lyrics?: string;
-}
+// Legacy Song type - now points to Media for backwards compatibility
+export type Song = Media;
 
 // Media relationship interface
 export interface MediaRelationship {

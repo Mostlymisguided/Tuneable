@@ -32,7 +32,7 @@ const Parties: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentSongTitle, currentSongArtist } = usePlayerWarning();
+  const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
   const { currentPartyId } = useWebPlayerStore();
 
   useEffect(() => {
@@ -232,8 +232,8 @@ const Parties: React.FC = () => {
         onConfirm={onConfirm}
         onCancel={onCancel}
         action={warningAction}
-        currentSongTitle={currentSongTitle}
-        currentSongArtist={currentSongArtist}
+        currentMediaTitle={currentMediaTitle}
+        currentMediaArtist={currentMediaArtist}
       />
     </div>
   );

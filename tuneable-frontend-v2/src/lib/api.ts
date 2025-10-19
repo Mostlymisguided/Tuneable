@@ -196,29 +196,47 @@ export const partyAPI = {
     return response.data;
   },
   
-  completeSong: async (partyId: string, songId: string) => {
-    const response = await api.post(`/parties/${partyId}/songs/${songId}/complete`);
+  // Media playback control
+  completeMedia: async (partyId: string, mediaId: string) => {
+    const response = await api.post(`/parties/${partyId}/songs/${mediaId}/complete`);
     return response.data;
   },
   
-  removeSong: async (partyId: string, songId: string) => {
-    const response = await api.delete(`/parties/${partyId}/songs/${songId}`);
+  removeMedia: async (partyId: string, mediaId: string) => {
+    const response = await api.delete(`/parties/${partyId}/songs/${mediaId}`);
     return response.data;
   },
   
-  vetoSong: async (partyId: string, songId: string) => {
-    const response = await api.put(`/parties/${partyId}/songs/${songId}/veto`);
+  vetoMedia: async (partyId: string, mediaId: string) => {
+    const response = await api.put(`/parties/${partyId}/songs/${mediaId}/veto`);
     return response.data;
   },
   
-  unvetoSong: async (partyId: string, songId: string) => {
-    const response = await api.put(`/parties/${partyId}/songs/${songId}/unveto`);
+  unvetoMedia: async (partyId: string, mediaId: string) => {
+    const response = await api.put(`/parties/${partyId}/songs/${mediaId}/unveto`);
     return response.data;
   },
   
-  resetSongs: async (partyId: string) => {
+  resetMedia: async (partyId: string) => {
     const response = await api.post(`/parties/${partyId}/songs/reset`);
     return response.data;
+  },
+  
+  // Legacy aliases for backwards compatibility
+  completeSong: async (partyId: string, songId: string) => {
+    return partyAPI.completeMedia(partyId, songId);
+  },
+  removeSong: async (partyId: string, songId: string) => {
+    return partyAPI.removeMedia(partyId, songId);
+  },
+  vetoSong: async (partyId: string, songId: string) => {
+    return partyAPI.vetoMedia(partyId, songId);
+  },
+  unvetoSong: async (partyId: string, songId: string) => {
+    return partyAPI.unvetoMedia(partyId, songId);
+  },
+  resetSongs: async (partyId: string) => {
+    return partyAPI.resetMedia(partyId);
   },
   updateStatuses: async () => {
     const response = await api.post('/parties/update-statuses');
@@ -240,9 +258,14 @@ export const partyAPI = {
     return response.data;
   },
   
-  getSongsSortedByTime: async (partyId: string, timePeriod: string) => {
+  getMediaSortedByTime: async (partyId: string, timePeriod: string) => {
     const response = await api.get(`/parties/${partyId}/songs/sorted/${timePeriod}`);
     return response.data;
+  },
+  
+  // Legacy alias
+  getSongsSortedByTime: async (partyId: string, timePeriod: string) => {
+    return partyAPI.getMediaSortedByTime(partyId, timePeriod);
   },
 };
 

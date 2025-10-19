@@ -157,7 +157,7 @@ const TuneProfile: React.FC = () => {
   const [topParties, setTopParties] = useState<any[]>([]);
 
   // WebPlayer integration
-  const { setCurrentSong, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
 
   useEffect(() => {
     if (songId) {
@@ -600,7 +600,7 @@ const TuneProfile: React.FC = () => {
 
     // Clear any existing queue and set new song
     setQueue([formattedSong]);
-    setCurrentSong(formattedSong, 0, true); // true = autoplay
+    setCurrentMedia(formattedSong, 0, true); // true = autoplay
     setGlobalPlayerActive(true);
     setCurrentPartyId(null); // Not in a party context
     
