@@ -772,19 +772,19 @@ const TuneProfile: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* Top Fan - Now visible on mobile */}
+                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-purple-500/50">
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
+                  <div className="text-base md:text-2xl font-bold text-purple-400">
+                    £{song.globalMediaAggregateTop?.toFixed(2) || '0.00'}
+                  </div>
+                </div>
+                
                 {/* Top Bid - Hidden on mobile */}
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
                   <div className="text-2xl font-bold text-yellow-400">
                     £{song.globalMediaBidTop?.toFixed(2) || '0.00'}
-                  </div>
-                </div>
-                
-                {/* Top Fan - Hidden on mobile */}
-                <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-purple-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
-                  <div className="text-2xl font-bold text-purple-400">
-                    £{song.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
