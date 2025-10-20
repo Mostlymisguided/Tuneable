@@ -446,7 +446,7 @@ const AuthPage: React.FC = () => {
   );
 
   return (
-    <div className="bg-black/50 overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 h-full items-center justify-center flex">
+    <div className="bg-black/50 overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 h-full items-center justify-center flex" style={{ zIndex: 10000 }}>
       <div className="relative p-4 w-2/3 max-w-xl h-full md:h-auto">
         <div className="relative bg-white p-4 rounded-lg shadow">
           {/* Close Button */}
