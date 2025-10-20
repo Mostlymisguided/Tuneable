@@ -252,9 +252,9 @@ const Party: React.FC = () => {
   // Manual refresh only for remote parties (no automatic polling)
   // Remote parties will refresh on user actions (bids, adds, skips) and manual refresh button
 
-  // Set current song and host status when party loads
+  // Set current media and host status when party loads
   useEffect(() => {
-    console.log('Party useEffect triggered - party:', !!party, 'songs:', party?.songs?.length, 'currentPartyId:', currentPartyId, 'partyId:', partyId);
+    console.log('Party useEffect triggered - party:', !!party, 'media:', party?.media?.length, 'currentPartyId:', currentPartyId, 'partyId:', partyId);
     
     if (party && getPartyMedia().length > 0) {
       // Always update the global player queue when party data loads
@@ -404,7 +404,7 @@ const Party: React.FC = () => {
       setIsHost(checkIsHost);
       console.log('🔍 fetchPartyDetails isHost check:', { userUuid, hostUuid, isHost: checkIsHost, partyHost: response.party.host });
       
-      // Note: Song setting is now handled by the useEffect hook
+      // Note: Media setting is now handled by the useEffect hook
       // to prevent interference with global player state
     } catch (error) {
       console.error('Error fetching party details:', error);
@@ -443,7 +443,7 @@ const Party: React.FC = () => {
     setIsLoadingSortedMedia(true);
     try {
       const response = await partyAPI.getMediaSortedByTime(partyId, timePeriod);
-      setSortedMedia(response.media || response.songs || []);
+      setSortedMedia(response.media || []);
     } catch (error) {
       console.error('Error fetching sorted media:', error);
       toast.error('Failed to load sorted media');
@@ -499,8 +499,8 @@ const Party: React.FC = () => {
       // Initialize bid amounts for results
       const minBid = party?.minimumBid || 0.33;
       const newBidAmounts: Record<string, number> = {};
-      [...databaseResults, ...youtubeResults].forEach(song => {
-        newBidAmounts[song.id] = minBid;
+      [...databaseResults, ...youtubeResults].forEach(media => {
+        newBidAmounts[media.id] = minBid;
       });
       setNewMediaBidAmounts(newBidAmounts);
       
@@ -532,9 +532,9 @@ const Party: React.FC = () => {
         // Initialize bid amounts for new results
         const minBid = party?.minimumBid || 0.33;
         const newBidAmounts: Record<string, number> = { ...newMediaBidAmounts };
-        response.videos.forEach((song: any) => {
-          if (!newBidAmounts[song.id]) {
-            newBidAmounts[song.id] = minBid;
+        response.videos.forEach((media: any) => {
+          if (!newBidAmounts[media.id]) {
+            newBidAmounts[media.id] = minBid;
           }
         });
         setNewMediaBidAmounts(newBidAmounts);
@@ -549,37 +549,37 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleAddMediaToParty = async (song: any) => {
+  const handleAddMediaToParty = async (media: any) => {
     if (!partyId) return;
     
-    const bidAmount = newMediaBidAmounts[song.id] || party?.minimumBid || 0.33;
+    const bidAmount = newMediaBidAmounts[media.id] || party?.minimumBid || 0.33;
     
     try {
       // Get the appropriate URL based on music source
       const musicSource = party?.musicSource || 'youtube';
       let url = '';
       
-      if (musicSource === 'youtube' && song.sources?.youtube) {
-        url = song.sources.youtube;
-      } else if (musicSource === 'spotify' && song.sources?.spotify) {
-        url = song.sources.spotify;
-      } else if (song.sources) {
+      if (musicSource === 'youtube' && media.sources?.youtube) {
+        url = media.sources.youtube;
+      } else if (musicSource === 'spotify' && media.sources?.spotify) {
+        url = media.sources.spotify;
+      } else if (media.sources) {
         // Fallback to first available source
-        url = Object.values(song.sources)[0] as string;
+        url = Object.values(media.sources)[0] as string;
       }
       
       await partyAPI.addMediaToParty(partyId, {
         url,
-        title: song.title,
-        artist: song.artist,
+        title: media.title,
+        artist: media.artist,
         bidAmount,
         platform: musicSource,
-        duration: song.duration,
-        tags: song.tags || [],
-        category: song.category || 'Music'
+        duration: media.duration,
+        tags: media.tags || [],
+        category: media.category || 'Music'
       });
       
-      toast.success(`Added ${song.title} to party with £${bidAmount.toFixed(2)} bid!`);
+      toast.success(`Added ${media.title} to party with £${bidAmount.toFixed(2)} bid!`);
       
       // Close search panel and refresh party
       setShowAddMediaPanel(false);
@@ -588,15 +588,14 @@ const Party: React.FC = () => {
       fetchPartyDetails();
       
     } catch (error: any) {
-      console.error('Error adding song:', error);
-      toast.error(error.response?.data?.error || 'Failed to add song to party');
+      console.error('Error adding media:', error);
+      toast.error(error.response?.data?.error || 'Failed to add media to party');
     }
   };
 
-  // Helper to get media items (support both old songs and new media)
+  // Helper to get media items
   const getPartyMedia = () => {
-    // Use media if available, fall back to songs for backward compatibility
-    return party.media || party.songs || [];
+    return party.media || [];
   };
 
   // Get media to display based on selected time period and search terms
@@ -640,18 +639,18 @@ const Party: React.FC = () => {
     return media;
   };
 
-  // Helper function to calculate average bid for a song
-  const calculateAverageBid = (songData: any) => {
-    const bids = songData.bids || [];
+  // Helper function to calculate average bid for media
+  const calculateAverageBid = (mediaData: any) => {
+    const bids = mediaData.bids || [];
     if (bids.length === 0) return 0;
     const total = bids.reduce((sum: number, bid: any) => sum + (bid.amount || 0), 0);
     return total / bids.length;
   };
 
   // Bid handling functions (OLD - using bid modal, now replaced with inline bidding)
-  // const handleBidClick = (song: any) => {
-  //   const songData = song.mediaId || song.songId || song;
-  //   setSelectedMedia(songData);
+  // const handleBidClick = (media: any) => {
+  //   const mediaData = media.mediaId || media;
+  //   setSelectedMedia(mediaData);
   //   setBidModalOpen(true);
   // };
 
@@ -698,8 +697,8 @@ const Party: React.FC = () => {
       // Refresh party data
       await fetchPartyDetails();
     } catch (error) {
-      console.error('Error vetoing song:', error);
-      toast.error('Failed to veto song');
+      console.error('Error vetoing media:', error);
+      toast.error('Failed to veto media');
     }
   };
   
@@ -723,21 +722,21 @@ const Party: React.FC = () => {
   };
 
 
-  // OLD - Reset Songs function (commented out as button was removed)
-  // const handleResetSongs = async () => {
+  // OLD - Reset Media function (commented out as button was removed)
+  // const handleResetMedia = async () => {
   //   if (!isHost) {
-  //     toast.error('Only the host can reset songs');
+  //     toast.error('Only the host can reset media');
   //     return;
   //   }
-  //   const confirmed = window.confirm('Are you sure you want to reset all songs to queued status? This will clear all play history.');
+  //   const confirmed = window.confirm('Are you sure you want to reset all media to queued status? This will clear all play history.');
   //   if (!confirmed) return;
   //   try {
-  //     await partyAPI.resetSongs(partyId!);
-  //     toast.success('All songs reset to queued status');
+  //     await partyAPI.resetMedia(partyId!);
+  //     toast.success('All media reset to queued status');
   //     fetchParty();
   //   } catch (error: any) {
-  //     console.error('Error resetting songs:', error);
-  //     toast.error(error.response?.data?.error || 'Failed to reset songs');
+  //     console.error('Error resetting media:', error);
+  //     toast.error(error.response?.data?.error || 'Failed to reset media');
   //   }
   // };
 
@@ -746,7 +745,7 @@ const Party: React.FC = () => {
 
     setIsBidding(true);
     try {
-      // Get the media/song ID - try various ID fields
+      // Get the media ID - try various ID fields
       const mediaId = selectedMedia.uuid || selectedMedia.id || selectedMedia._id;
       if (!mediaId) {
         toast.error('Unable to identify media item');
@@ -765,7 +764,7 @@ const Party: React.FC = () => {
       // Refresh party data to get updated bid information
       await fetchPartyDetails();
       
-      // Refresh sorted songs if viewing a time-filtered period
+      // Refresh sorted media if viewing a time-filtered period
       if (selectedTimePeriod !== 'all-time') {
         await fetchSortedMedia(selectedTimePeriod);
       }
@@ -830,12 +829,12 @@ const Party: React.FC = () => {
     
     try {
       await partyAPI.skipNext(partyId);
-      toast.success('Skipped to next song');
+      toast.success('Skipped to next media');
       // Refresh party data to show updated queue
       await fetchPartyDetails();
     } catch (error: any) {
-      console.error('Error skipping to next song:', error);
-      toast.error(error.response?.data?.error || 'Failed to skip to next song');
+      console.error('Error skipping to next media:', error);
+      toast.error(error.response?.data?.error || 'Failed to skip to next media');
     }
   };
 
@@ -844,25 +843,25 @@ const Party: React.FC = () => {
     
     try {
       await partyAPI.skipPrevious(partyId);
-      toast.success('Skipped to previous song');
+      toast.success('Skipped to previous media');
       // Refresh party data to show updated queue
       await fetchPartyDetails();
     } catch (error: any) {
-      console.error('Error skipping to previous song:', error);
-      toast.error(error.response?.data?.error || 'Failed to skip to previous song');
+      console.error('Error skipping to previous media:', error);
+      toast.error(error.response?.data?.error || 'Failed to skip to previous media');
     }
   };
 
-  // Handle clicking play button on a song in the queue
-  const handlePlayMedia = (song: any, index: number) => {
-    const songData = selectedTimePeriod === 'all-time' ? (song.songId || song) : song;
+  // Handle clicking play button on media in the queue
+  const handlePlayMedia = (item: any, index: number) => {
+    const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
     
-    // Clean and format the song for the webplayer
+    // Clean and format the media for the webplayer
     let sources = {};
     
-    if (songData.sources) {
-      if (Array.isArray(songData.sources)) {
-        for (const source of songData.sources) {
+    if (mediaData.sources) {
+      if (Array.isArray(mediaData.sources)) {
+        for (const source of mediaData.sources) {
           if (source && source.platform === '$__parent' && source.url && source.url.sources) {
             // Handle Mongoose metadata corruption
             sources = source.url.sources;
@@ -877,29 +876,29 @@ const Party: React.FC = () => {
             (sources as any).spotify = source.spotify;
           }
         }
-      } else if (typeof songData.sources === 'object') {
-        sources = songData.sources;
+      } else if (typeof mediaData.sources === 'object') {
+        sources = mediaData.sources;
       }
     }
     
-    const cleanedSong = {
-      id: songData.id || songData.uuid || songData._id,
-      title: songData.title,
-      artist: Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist,
-      duration: songData.duration,
-      coverArt: songData.coverArt,
+    const cleanedMedia = {
+      id: mediaData.id || mediaData.uuid || mediaData._id,
+      title: mediaData.title,
+      artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
+      duration: mediaData.duration,
+      coverArt: mediaData.coverArt,
       sources: sources,
-      globalMediaAggregate: typeof songData.globalMediaAggregate === 'number' ? songData.globalMediaAggregate : 0,
-      partyMediaAggregate: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
-      totalBidValue: typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate : 0,
-      bids: songData.bids,
-      addedBy: typeof songData.addedBy === 'object' ? songData.addedBy?.username || 'Unknown' : songData.addedBy
+      globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
+      partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+      totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+      bids: mediaData.bids,
+      addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
     };
     
-    // Set the song in the webplayer and start playing
-    setCurrentMedia(cleanedSong, index, true); // true = autoplay
+    // Set the media in the webplayer and start playing
+    setCurrentMedia(cleanedMedia, index, true); // true = autoplay
     
-    toast.success(`Now playing: ${cleanedSong.title}`);
+    toast.success(`Now playing: ${cleanedMedia.title}`);
   };
 
   const formatDuration = (duration: number | string | undefined) => {
@@ -924,7 +923,7 @@ const Party: React.FC = () => {
     if (!media) return 0;
     
     return media.reduce((total: number, item: any) => {
-      const mediaData = item.mediaId || item.songId || item;
+                        const mediaData = item.mediaId || item;
       const bidValue = mediaData.partyMediaAggregate || 0;
       return total + (typeof bidValue === 'number' ? bidValue : 0);
     }, 0);
@@ -1028,7 +1027,7 @@ const Party: React.FC = () => {
               <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white">
-                  {getPartyMedia().filter((song: any) => song.status === 'played').length}
+                  {getPartyMedia().filter((item: any) => item.status === 'played').length}
                 </div>
                 <div className="text-xs sm:text-sm text-gray-300">Played</div>
               </div>
@@ -1069,7 +1068,7 @@ const Party: React.FC = () => {
             style={!showVetoed ? {backgroundColor: '#9333EA'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
           >
             {selectedTimePeriod === 'all-time' 
-              ? `Queue (${getPartyMedia().filter((song: any) => song.status === 'queued').length})`
+              ? `Queue (${getPartyMedia().filter((item: any) => item.status === 'queued').length})`
               : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplayMedia().length})`
             }
           </button>
@@ -1078,7 +1077,7 @@ const Party: React.FC = () => {
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${showVetoed ? 'bg-red-600 text-white' : 'bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30'}`}
             style={showVetoed ? {backgroundColor: '#DC2626'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
           >
-            Vetoed ({getPartyMedia().filter((song: any) => song.status === 'vetoed').length})
+            Vetoed ({getPartyMedia().filter((item: any) => item.status === 'vetoed').length})
           </button>
           
           {/* Manual refresh button for remote parties */}
@@ -1126,7 +1125,7 @@ const Party: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Song Queue */}
+        {/* Media Queue */}
         <div className="lg:col-span-2">
           {/* Host Controls */}
          {isHost && (
@@ -1147,7 +1146,7 @@ const Party: React.FC = () => {
             {getPartyMedia().length > 0 ? (
               <div className="space-y-6">
                 {/* Currently Playing */}
-                {getPartyMedia().filter((song: any) => song.status === 'playing').length > 0 && (
+                {getPartyMedia().filter((item: any) => item.status === 'playing').length > 0 && (
                   <div>
                     <h3 className="text-lg font-medium text-purple-400 mb-3 flex items-center">
                       <Play className="h-5 w-5 mr-2" />
@@ -1155,19 +1154,19 @@ const Party: React.FC = () => {
                     </h3>
                     <div className="space-y-3">
                       {getPartyMedia()
-                        .filter((song: any) => song.status === 'playing')
-                        .map((song: any, index: number) => {
-                          const songData = song.songId || song;
+                        .filter((item: any) => item.status === 'playing')
+                        .map((item: any, index: number) => {
+                          const mediaData = item.mediaId || item;
                           return (
                             <div
-                              key={`playing-${songData.id}-${index}`}
+                              key={`playing-${mediaData.id}-${index}`}
                               className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
                             >
                               {/* Album Artwork with Play Icon Overlay */}
                               <div className="relative w-16 h-16 flex-shrink-0">
                                 <img
-                                  src={songData.coverArt || '/default-cover.jpg'}
-                                  alt={songData.title || 'Unknown Song'}
+                                  src={mediaData.coverArt || '/default-cover.jpg'}
+                                  alt={mediaData.title || 'Unknown Media'}
                                   className="w-full h-full rounded object-cover"
                                   width="64"
                                   height="64"
@@ -1180,20 +1179,20 @@ const Party: React.FC = () => {
                                 </div>
                               </div>
                               <div className="flex-1">
-                                <h4 className="font-medium text-white text-lg">{songData.title || 'Unknown Song'}</h4>
-                                <p className="text-sm text-gray-400">{Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}</p>
+                                <h4 className="font-medium text-white text-lg">{mediaData.title || 'Unknown Media'}</h4>
+                                <p className="text-sm text-gray-400">{Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}</p>
                                 <p className="text-xs text-purple-300">
-                                  Started: {song.playedAt ? new Date(song.playedAt).toLocaleTimeString() : 'Now'}
+                                  Started: {item.playedAt ? new Date(item.playedAt).toLocaleTimeString() : 'Now'}
                                 </p>
                                 
                                 {/* Tags Display for Currently Playing */}
-                                {songData.tags && songData.tags.length > 0 && (
+                                {mediaData.tags && mediaData.tags.length > 0 && (
                                   <div className="mt-2">
                                     <div className="flex flex-wrap gap-1">
-                                      {songData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
+                                      {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
                                         <Link
                                           key={tagIndex}
-                                          to={`/tune/${songData._id || songData.id}`}
+                                          to={`/tune/${mediaData._id || mediaData.id}`}
                                           className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
                                         >
                                           #{tag}
@@ -1204,17 +1203,17 @@ const Party: React.FC = () => {
                                 )}
                                 
                               {/* Category Display for Currently Playing */}
-                              {songData.category && songData.category !== 'Unknown' && (
+                              {mediaData.category && mediaData.category !== 'Unknown' && (
                                 <div className="mt-1">
                                   <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
-                                    {songData.category}
+                                    {mediaData.category}
                                   </span>
                                 </div>
                               )}
                               
                               {/* Top Bidders Display for Currently Playing */}
-                              {songData.bids && songData.bids.length > 0 && (
-                                <TopBidders bids={songData.bids} maxDisplay={5} />
+                              {mediaData.bids && mediaData.bids.length > 0 && (
+                                <TopBidders bids={mediaData.bids} maxDisplay={5} />
                               )}
                             </div>
                               
@@ -1224,14 +1223,14 @@ const Party: React.FC = () => {
                                   <button
                                     onClick={handleSkipPrevious}
                                     className="p-2 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors"
-                                    title="Skip to previous song"
+                                    title="Skip to previous media"
                                   >
                                     <SkipBack className="h-4 w-4 text-white" />
                                   </button>
                                   <button
                                     onClick={handleSkipNext}
                                     className="p-2 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors"
-                                    title="Skip to next song"
+                                    title="Skip to next media"
                                   >
                                     <SkipForward className="h-4 w-4 text-white" />
                                   </button>
@@ -1240,10 +1239,10 @@ const Party: React.FC = () => {
                               
                               <div className="text-right">
                                 <p className="text-sm font-medium text-white">
-                                  £{typeof songData.partyMediaAggregate === 'number' ? songData.partyMediaAggregate.toFixed(2) : '0.00'}
+                                  £{typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate.toFixed(2) : '0.00'}
                                 </p>
                                 <p className="text-xs text-gray-400">
-                                  {Array.isArray(songData.bids) ? songData.bids.length : 0} bids
+                                  {Array.isArray(mediaData.bids) ? mediaData.bids.length : 0} bids
                                 </p>
                               </div>
                             </div>
@@ -1288,7 +1287,7 @@ const Party: React.FC = () => {
                       onSearchTermsChange={setQueueSearchTerms}
                     />
                     
-                    {/* Add Song Button - Centered */}
+                    {/* Add Media Button - Centered */}
                     <div className="flex justify-center mt-4">
                       <button
                         onClick={() => setShowAddMediaPanel(!showAddMediaPanel)}
@@ -1312,7 +1311,7 @@ const Party: React.FC = () => {
                       </button>
                     </div>
                     
-                    {/* Inline Add Song Search Panel */}
+                    {/* Inline Add Media Search Panel */}
                     {showAddMediaPanel && (
                       <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
                         <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
@@ -1356,17 +1355,17 @@ const Party: React.FC = () => {
                               <h4 className="text-sm font-semibold text-green-300">From Tuneable Library ({addMediaResults.database.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                              {addMediaResults.database.map((song: any) => (
-                                <div key={song.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                              {addMediaResults.database.map((media: any) => (
+                                <div key={media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
-                                      src={song.coverArt || '/default-cover.jpg'}
-                                      alt={song.title}
+                                      src={media.coverArt || '/default-cover.jpg'}
+                                      alt={media.title}
                                       className="h-12 w-12 rounded object-cover flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-white font-medium truncate">{song.title}</p>
-                                      <p className="text-gray-400 text-sm truncate">{song.artist}</p>
+                                      <p className="text-white font-medium truncate">{media.title}</p>
+                                      <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">
@@ -1374,18 +1373,18 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.33}
-                                      value={newMediaBidAmounts[song.id] || party?.minimumBid || 0.33}
+                                      value={newMediaBidAmounts[media.id] || party?.minimumBid || 0.33}
                                       onChange={(e) => setNewMediaBidAmounts({
                                         ...newMediaBidAmounts,
-                                        [song.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                        [media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
                                     <button
-                                      onClick={() => handleAddMediaToParty(song)}
+                                      onClick={() => handleAddMediaToParty(media)}
                                       className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
                                     >
-                                      Add £{(newMediaBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[media.id] || party?.minimumBid || 0.33).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1402,17 +1401,17 @@ const Party: React.FC = () => {
                               <h4 className="text-sm font-semibold text-red-300">From YouTube ({addMediaResults.youtube.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                              {addMediaResults.youtube.map((song: any) => (
-                                <div key={song.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                              {addMediaResults.youtube.map((media: any) => (
+                                <div key={media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
-                                      src={song.coverArt || '/default-cover.jpg'}
-                                      alt={song.title}
+                                      src={media.coverArt || '/default-cover.jpg'}
+                                      alt={media.title}
                                       className="h-12 w-12 rounded object-cover flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-white font-medium truncate">{song.title}</p>
-                                      <p className="text-gray-400 text-sm truncate">{song.artist}</p>
+                                      <p className="text-white font-medium truncate">{media.title}</p>
+                                      <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">
@@ -1420,18 +1419,18 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.33}
-                                      value={newMediaBidAmounts[song.id] || party?.minimumBid || 0.33}
+                                      value={newMediaBidAmounts[media.id] || party?.minimumBid || 0.33}
                                       onChange={(e) => setNewMediaBidAmounts({
                                         ...newMediaBidAmounts,
-                                        [song.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                        [media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
                                     <button
-                                      onClick={() => handleAddMediaToParty(song)}
+                                      onClick={() => handleAddMediaToParty(media)}
                                       className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                                     >
-                                      Add £{(newMediaBidAmounts[song.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[media.id] || party?.minimumBid || 0.33).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1464,7 +1463,7 @@ const Party: React.FC = () => {
                         {!isSearchingNewMedia && addMediaSearchQuery && addMediaResults.database.length === 0 && addMediaResults.youtube.length === 0 && (
                           <div className="text-center py-8">
                             <Music className="h-12 w-12 text-gray-500 mx-auto mb-3" />
-                            <p className="text-gray-400">No songs found for "{addMediaSearchQuery}"</p>
+                            <p className="text-gray-400">No media found for "{addMediaSearchQuery}"</p>
                             <p className="text-gray-500 text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
@@ -1473,7 +1472,7 @@ const Party: React.FC = () => {
                   </div>
                 )}
 
-                {/* Song Queue - Show when NOT viewing vetoed */}
+                {/* Media Queue - Show when NOT viewing vetoed */}
                 {!showVetoed && getDisplayMedia().length > 0 && (
                   <div className="space-y-3">
                     {isLoadingSortedMedia && selectedTimePeriod !== 'all-time' ? (
@@ -1481,12 +1480,12 @@ const Party: React.FC = () => {
                         <div className="text-gray-400">Loading sorted media...</div>
                       </div>
                     ) : (
-                      getDisplayMedia().map((song: any, index: number) => {
-                        // For sorted songs, the data is already flattened, for regular party songs it's nested under songId
-                        const songData = selectedTimePeriod === 'all-time' ? (song.songId || song) : song;
+                      getDisplayMedia().map((item: any, index: number) => {
+                        // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
+                        const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
                         return (
                           <div
-                            key={`queued-${songData.id}-${index}`}
+                            key={`queued-${mediaData.id}-${index}`}
                             className="card flex items-center hover:bg-purple-800/20"
                           >
                             {/* Number Badge */}
@@ -1494,14 +1493,14 @@ const Party: React.FC = () => {
                               <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
                             </div>
                             
-                            {/* Song Thumbnail */}
+                            {/* Media Thumbnail */}
                             <div 
                               className="ml-4 relative w-8 h-8 md:w-32 md:h-32 cursor-pointer group"
-                              onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
+                              onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                             >
                               <img
-                                src={songData.coverArt || '/default-cover.jpg'}
-                                alt={songData.title || 'Unknown Song'}
+                                src={mediaData.coverArt || '/default-cover.jpg'}
+                                alt={mediaData.title || 'Unknown Media'}
                                 className="w-full h-full rounded object-cover"
                                 width="128"
                                 height="128"
@@ -1511,7 +1510,7 @@ const Party: React.FC = () => {
                                 className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handlePlayMedia(song, index);
+                                  handlePlayMedia(item, index);
                                 }}
                               >
                                 <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
@@ -1520,38 +1519,38 @@ const Party: React.FC = () => {
                               </div>
                             </div>
                             
-                            {/* Song Details */}
+                            {/* Media Details */}
                             <div className="ml-4 flex-1 min-w-0">
                               <div className="flex items-center space-x-2">
                                 <h4 
                                   className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
-                                  onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
+                                  onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                                 >
-                                  {songData.title || 'Unknown Song'}
+                                  {mediaData.title || 'Unknown Media'}
                                 </h4>
                                 <span className="text-gray-400">•</span>
                                 <span className="text-gray-300 text-lg truncate font-light">
-                                  {Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}
+                                  {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
                                 </span>
                                 <div className="flex items-center space-x-1 ml-2">
                                   <Clock className="h-4 w-4 text-gray-400" />
-                                  <span className="p-2 text-sm text-gray-300">{formatDuration(songData.duration)}</span>
+                                  <span className="p-2 text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
                                 </div>
                               </div>
                               
                               {/* Top Bidders Display */}
-                              {songData.bids && songData.bids.length > 0 && (
-                                <TopBidders bids={songData.bids} maxDisplay={5} />
+                              {mediaData.bids && mediaData.bids.length > 0 && (
+                                <TopBidders bids={mediaData.bids} maxDisplay={5} />
                               )}
                               
                               {/* Tags Display */}
-                              {songData.tags && songData.tags.length > 0 && (
+                              {mediaData.tags && mediaData.tags.length > 0 && (
                                 <div className="mt-2 flex">
                                   <div className="flex flex-wrap gap-1">
-                                    {songData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
+                                    {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
                                       <Link
                                         key={tagIndex}
-                                        to={`/tune/${songData._id || songData.id}`}
+                                        to={`/tune/${mediaData._id || mediaData.id}`}
                                         className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
                                       >
                                         #{tag}
@@ -1562,10 +1561,10 @@ const Party: React.FC = () => {
                               )}
                               
                              {/* Category Display */}
-                              {/* {songData.category && songData.category !== 'Unknown' && (
+                              {/* {mediaData.category && mediaData.category !== 'Unknown' && (
                                 <div className="mt-1">
                                   <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
-                                    {songData.category}
+                                    {mediaData.category}
                                   </span>
                                 </div> */}
                               
@@ -1579,13 +1578,13 @@ const Party: React.FC = () => {
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Tune Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
-                                      £{(typeof song.partyMediaAggregate === 'number' ? song.partyMediaAggregate.toFixed(2) : '0.00')}
+                                      £{(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate.toFixed(2) : '0.00')}
                                     </div>
                                   </div>
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Avg Bid</div>
                                     <div className="text-xs md:text-lg text-gray-300">
-                                      £{calculateAverageBid(songData).toFixed(2)}
+                                      £{calculateAverageBid(mediaData).toFixed(2)}
                                     </div>
                                   </div>
                                 </div>
@@ -1597,25 +1596,25 @@ const Party: React.FC = () => {
                                     <div>
                                       <div className="text-gray-500">Party Top:</div>
                                       <div className="text-yellow-400 font-medium">
-                                        £{songData.partyMediaBidTop?.toFixed(2) || '0.00'}
+                                        £{mediaData.partyMediaBidTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-gray-500">Party Fan:</div>
                                       <div className="text-green-400 font-medium">
-                                        £{songData.partyMediaAggregateTop?.toFixed(2) || '0.00'}
+                                        £{mediaData.partyMediaAggregateTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-gray-500">Global Top:</div>
                                       <div className="text-yellow-400 font-medium">
-                                        £{songData.globalMediaBidTop?.toFixed(2) || '0.00'}
+                                        £{mediaData.globalMediaBidTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                     <div>
                                       <div className="text-gray-500">Global Fan:</div>
                                       <div className="text-green-400 font-medium">
-                                        £{songData.globalMediaAggregateTop?.toFixed(2) || '0.00'}
+                                        £{mediaData.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                                       </div>
                                     </div>
                                   </div>
@@ -1626,27 +1625,27 @@ const Party: React.FC = () => {
                                     type="number"
                                     step="0.01"
                                     min={party?.minimumBid || 0.33}
-                                    value={queueBidAmounts[songData._id || songData.id] || party?.minimumBid || 0.33}
+                                    value={queueBidAmounts[mediaData._id || mediaData.id] || party?.minimumBid || 0.33}
                                     onChange={(e) => setQueueBidAmounts({
                                       ...queueBidAmounts,
-                                      [songData._id || songData.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                      [mediaData._id || mediaData.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                     })}
                                     className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                   <button
-                                    onClick={() => handleInlineBid(song)}
+                                    onClick={() => handleInlineBid(item)}
                                     disabled={isBidding}
                                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm"
                                   >
-                                    Bid £{(queueBidAmounts[songData._id || songData.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                    Bid £{(queueBidAmounts[mediaData._id || mediaData.id] || party?.minimumBid || 0.33).toFixed(2)}
                                   </button>
                                 </div>
                                 {isHost && (
                                   <button
-                                    onClick={() => handleVetoClick(song)}
+                                    onClick={() => handleVetoClick(item)}
                                     className="w-5 h-5 bg-red-500/20 bg-slate-600 rounded-md"
-                                    title="Veto this song"
+                                    title="Veto this tune"
                                   >
                                     <X className="h-5 w-5" />
                                   </button>
@@ -1664,51 +1663,51 @@ const Party: React.FC = () => {
                 {/* Vetoed Songs - Show when Vetoed tab is active */}
                 {showVetoed && (
                   <div className="space-y-3">
-                    {getPartyMedia().filter((song: any) => song.status === 'vetoed').length === 0 ? (
+                    {getPartyMedia().filter((item: any) => item.status === 'vetoed').length === 0 ? (
                       <div className="text-center py-8">
                         <X className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-500">No vetoed songs</p>
                       </div>
                     ) : (
                       getPartyMedia()
-                        .filter((song: any) => song.status === 'vetoed')
-                        .map((song: any, index: number) => {
-                          const songData = song.songId || song;
+                        .filter((item: any) => item.status === 'vetoed')
+                        .map((item: any, index: number) => {
+                          const mediaData = item.mediaId || item;
                           return (
                             <div
-                              key={`vetoed-${songData.id}-${index}`}
+                              key={`vetoed-${mediaData.id}-${index}`}
                               className="bg-red-900/20 border border-red-800/30 p-4 rounded-lg flex items-center space-x-4"
                             >
                               <img
-                                src={songData.coverArt || '/default-cover.jpg'}
-                                alt={songData.title || 'Unknown Song'}
+                                src={mediaData.coverArt || '/default-cover.jpg'}
+                                alt={mediaData.title || 'Unknown Media'}
                                 className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                                 width="128"
                                 height="128"
-                                onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
+                                onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                               />
                               
-                              {/* Song Details */}
+                              {/* Media Details */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center space-x-2">
                                   <h4 
                                     className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
-                                    onClick={() => songData.uuid && navigate(`/tune/${songData.uuid}`)}
+                                    onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                                   >
-                                    {songData.title || 'Unknown Song'}
+                                    {mediaData.title || 'Unknown Media'}
                                   </h4>
                                   <span className="text-gray-400">•</span>
                                   <span className="text-gray-300 text-lg truncate font-light">
-                                    {Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}
+                                    {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
                                   </span>
                                   <div className="flex items-center space-x-1 ml-2">
                                     <Clock className="h-4 w-4 text-gray-400" />
-                                    <span className="text-sm text-gray-300">{formatDuration(songData.duration)}</span>
+                                    <span className="text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
                                   </div>
                                 </div>
                                 <div className="mt-2">
                                   <p className="text-xs text-red-400">
-                                    Vetoed {song.vetoedAt ? new Date(song.vetoedAt).toLocaleString() : 'recently'}
+                                    Vetoed {item.vetoedAt ? new Date(item.vetoedAt).toLocaleString() : 'recently'}
                                   </p>
                                 </div>
                               </div>
@@ -1717,7 +1716,7 @@ const Party: React.FC = () => {
                               {isHost && (
                                 <div className="flex flex-col space-y-2">
                                   <button
-                                    onClick={() => handleUnvetoClick(song)}
+                                    onClick={() => handleUnvetoClick(item)}
                                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
                                   >
                                     <span>Restore</span>
@@ -1739,47 +1738,47 @@ const Party: React.FC = () => {
                   onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
                   className="btn-primary mt-4"
                 >
-                  Add First Song
+                  Add First Tune
                 </button>
               </div>
             )}
 
             {/* Previously Played Songs - Only show for live parties */}
             {/* NOTE: This section is for future live jukebox feature. MVP uses remote parties only. */}
-            {party.type === 'live' && getPartyMedia().filter((song: any) => song.status === 'played').length > 0 && (
+            {party.type === 'live' && getPartyMedia().filter((item: any) => item.status === 'played').length > 0 && (
               <div id="previously-played" className="mt-8">
                 <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
                   <CheckCircle className="h-5 w-5 mr-2" />
-                  Previously Played ({getPartyMedia().filter((song: any) => song.status === 'played').length})
+                  Previously Played ({getPartyMedia().filter((item: any) => item.status === 'played').length})
                 </h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {party.songs
-                    .filter((song: any) => song.status === 'played')
-                    .map((song: any, index: number) => {
-                      const songData = song.songId || song;
+                  {getPartyMedia()
+                    .filter((item: any) => item.status === 'played')
+                    .map((item: any, index: number) => {
+                      const mediaData = item.mediaId || item;
                       return (
                         <div
-                          key={`played-${songData.id}-${index}`}
+                          key={`played-${mediaData.id}-${index}`}
                           className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700"
                         >
                           <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
                           <img
-                            src={songData.coverArt || '/default-cover.jpg'}
-                            alt={songData.title || 'Unknown Song'}
+                            src={mediaData.coverArt || '/default-cover.jpg'}
+                            alt={mediaData.title || 'Unknown Media'}
                             className="w-10 h-10 rounded object-cover"
                             width="40"
                             height="40"
                           />
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-300 text-sm truncate">{songData.title || 'Unknown Song'}</h4>
-                            <p className="text-xs text-gray-500 truncate">{Array.isArray(songData.artist) ? songData.artist[0]?.name || 'Unknown Artist' : songData.artist || 'Unknown Artist'}</p>
+                            <h4 className="font-medium text-gray-300 text-sm truncate">{mediaData.title || 'Unknown Media'}</h4>
+                            <p className="text-xs text-gray-500 truncate">{Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}</p>
                             <p className="text-xs text-gray-600">
-                              {song.completedAt ? new Date(song.completedAt).toLocaleTimeString() : 'Completed'}
+                              {item.completedAt ? new Date(item.completedAt).toLocaleTimeString() : 'Completed'}
                             </p>
                           </div>
                           <div className="text-right">
                             <p className="text-xs font-medium text-gray-400">
-                              £{typeof songData.partyMediaAggregate === 'number' ? songData.partyMediaAggregate.toFixed(2) : '0.00'}
+                              £{typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate.toFixed(2) : '0.00'}
                             </p>
                           </div>
                         </div>
