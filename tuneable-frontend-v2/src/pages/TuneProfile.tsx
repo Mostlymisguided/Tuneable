@@ -23,11 +23,13 @@ import {
   Youtube,
   Music2,
   Coins,
-  Loader2
+  Loader2,
+  Flag
 } from 'lucide-react';
 import { songAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
+import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 
@@ -156,6 +158,9 @@ const TuneProfile: React.FC = () => {
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [topParties, setTopParties] = useState<any[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
+
+  // Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // WebPlayer integration
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
@@ -720,9 +725,19 @@ const TuneProfile: React.FC = () => {
             Back
           </button>
           
-          {/* Edit Tune Button - Only show if user can edit */}
-          {canEditTune() && (
-            <div className='inline rounded-full items-center absolute right-0 md:right-3 mb-4'>
+          {/* Edit Tune & Report Buttons */}
+          <div className='inline rounded-full items-center absolute right-0 md:right-3 mb-4 flex space-x-2'>
+            {/* Report Button - Always visible */}
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+            >
+              <Flag className="h-4 w-4" />
+              <span className="hidden sm:inline">Report</span>
+            </button>
+            
+            {/* Edit Tune Button - Only show if user can edit */}
+            {canEditTune() && (
               <button
                 onClick={() => setIsEditingTune(true)}
                 className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
@@ -730,8 +745,8 @@ const TuneProfile: React.FC = () => {
                 <span className="hidden sm:inline">Edit Tune</span>
                 <span className="sm:hidden">Edit</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
           
           <div className="card flex flex-col md:flex-row items-start relative">
             {/* Claim Tune Button - Top Right */}
@@ -1616,6 +1631,16 @@ const TuneProfile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Report Modal */}
+      {song && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          mediaId={song.uuid}
+          mediaTitle={`${song.title} by ${Array.isArray(song.artist) ? song.artist.map((a: any) => a.name).join(', ') : song.artist}`}
+        />
       )}
     </div>
   );

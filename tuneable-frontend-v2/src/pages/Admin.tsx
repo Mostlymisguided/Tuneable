@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
+import ReportsAdmin from '../components/ReportsAdmin';
 import { authAPI, creatorAPI, claimAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
@@ -188,6 +189,7 @@ const Admin: React.FC = () => {
     { id: 'users', name: 'Users', icon: Users },
     { id: 'creators', name: 'Creator Applications', icon: Award },
     { id: 'claims', name: 'Tune Claims', icon: Music },
+    { id: 'reports', name: 'Tune Reports', icon: AlertTriangle },
     { id: 'invites', name: 'Invite Requests', icon: Mail },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -628,6 +630,12 @@ const Admin: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div>
+            <ReportsAdmin />
           </div>
         )}
 

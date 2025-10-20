@@ -27,6 +27,7 @@ const youtubeImportRoutes = require('./routes/youtubeImportRoutes'); // Import Y
 const bidMetricsRoutes = require('./routes/bidMetricsRoutes'); // Import bid metrics routes
 const instagramWebhooks = require('./routes/instagramWebhooks'); // Instagram webhooks
 const creatorRoutes = require('./routes/creatorRoutes'); // Import creator application routes
+const reportRoutes = require('./routes/reportRoutes'); // Report routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -144,6 +145,7 @@ app.use('/api/youtube-import', youtubeImportRoutes); // YouTube bulk import rout
 app.use('/api/bid-metrics', bidMetricsRoutes); // Bid metrics API routes
 app.use('/api/claims', require('./routes/claimRoutes')); // Tune ownership claims
 app.use('/api/creator', creatorRoutes); // Creator application routes
+app.use('/api/reports', reportRoutes); // Report routes
 app.use('/api/webhooks/instagram', instagramWebhooks); // Instagram webhooks
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');

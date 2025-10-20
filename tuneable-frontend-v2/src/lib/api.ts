@@ -363,6 +363,12 @@ export const songAPI = {
     const response = await api.get(`/media/${mediaId}/tag-rankings`);
     return response.data;
   },
+
+  // Report a media item
+  reportMedia: async (mediaId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
+    const response = await api.post(`/reports/${mediaId}/report`, reportData);
+    return response.data;
+  },
 };
 
 // Search API
@@ -485,6 +491,26 @@ export const creatorAPI = {
   // Admin only: Review application
   reviewApplication: async (userId: string, status: 'verified' | 'rejected', reviewNotes?: string) => {
     const response = await api.patch(`/creator/applications/${userId}/review`, { status, reviewNotes });
+    return response.data;
+  },
+};
+
+// Report API (Admin)
+export const reportAPI = {
+  // Get all reports (admin only)
+  getReports: async (status?: string, category?: string, limit?: number, skip?: number) => {
+    const params: any = {};
+    if (status) params.status = status;
+    if (category) params.category = category;
+    if (limit) params.limit = limit;
+    if (skip) params.skip = skip;
+    const response = await api.get('/reports/admin/reports', { params });
+    return response.data;
+  },
+
+  // Update report status (admin only)
+  updateReport: async (reportId: string, updateData: { status?: string; adminNotes?: string }) => {
+    const response = await api.patch(`/reports/admin/reports/${reportId}`, updateData);
     return response.data;
   },
 };
