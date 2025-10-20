@@ -284,6 +284,7 @@ mediaSchema.index({ "label.name": 1 }); // Index for label searches
 mediaSchema.index({ "label.userId": 1 }); // Index for verified labels
 mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
+mediaSchema.index({ tags: 1, globalMediaAggregate: -1 }); // Compound index for tag rankings
 mediaSchema.index({ releaseDate: -1 }); // Index for release date sorting
 mediaSchema.index({ episodeNumber: 1, seasonNumber: 1 }); // Index for episode/season queries
 mediaSchema.index({ podcastSeries: 1 }); // Index for podcast series lookups

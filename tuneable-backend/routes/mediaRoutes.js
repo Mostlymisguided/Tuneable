@@ -832,5 +832,76 @@ router.get('/:mediaId/top-parties', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/:mediaId/tag-rankings
+// @desc    Get tag rankings for a specific media item
+// @access  Public
+router.get('/:mediaId/tag-rankings', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+
+    console.log('🏷️ Tag rankings request for media:', mediaId);
+
+    // Resolve media ID
+    const resolvedMediaId = await resolveId(mediaId, Media);
+    if (!resolvedMediaId) {
+      console.log('❌ Media not found:', mediaId);
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const media = await Media.findById(resolvedMediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!media.tags || media.tags.length === 0) {
+      return res.json(transformResponse({ tagRankings: [] }));
+    }
+
+    console.log('📊 Computing rankings for tags:', media.tags);
+
+    // Calculate ranking for each tag
+    const tagRankings = [];
+    
+    for (const tag of media.tags) {
+      // Find all media with this tag, sorted by globalMediaAggregate
+      const mediaWithTag = await Media.find({ 
+        tags: tag,
+        contentType: { $in: ['music'] } // Only music for now
+      })
+        .sort({ globalMediaAggregate: -1 })
+        .select('uuid title globalMediaAggregate')
+        .lean();
+      
+      // Find this media's rank
+      const rankIndex = mediaWithTag.findIndex(m => m._id.toString() === resolvedMediaId.toString());
+      const rank = rankIndex + 1;
+      const total = mediaWithTag.length;
+      const percentile = total > 0 ? ((total - rank) / total * 100).toFixed(1) : '0';
+      
+      tagRankings.push({
+        tag,
+        rank,
+        total,
+        percentile: parseFloat(percentile),
+        aggregate: media.globalMediaAggregate || 0
+      });
+      
+      console.log(`  Tag "${tag}": Rank #${rank} of ${total} (Top ${percentile}%)`);
+    }
+
+    // Sort by best rank (lowest number)
+    tagRankings.sort((a, b) => a.rank - b.rank);
+
+    console.log('✅ Returning', tagRankings.length, 'tag rankings');
+
+    res.json(transformResponse({
+      tagRankings
+    }));
+  } catch (error) {
+    console.error('Error fetching tag rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch tag rankings' });
+  }
+});
+
 module.exports = router;
 

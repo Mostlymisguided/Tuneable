@@ -103,6 +103,7 @@ const UserProfile: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [songsWithBids, setSongsWithBids] = useState<SongWithBids[]>([]);
+  const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -150,12 +151,27 @@ const UserProfile: React.FC = () => {
       setUser(response.user);
       setStats(response.stats);
       setSongsWithBids(response.songsWithBids);
+      // Also load tag rankings
+      loadTagRankings();
     } catch (err: any) {
       console.error('Error fetching user profile:', err);
       setError(err.response?.data?.error || 'Failed to load user profile');
       toast.error('Failed to load user profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTagRankings = async () => {
+    try {
+      console.log('🏷️ Loading tag rankings for user:', userId);
+      const response = await userAPI.getTagRankings(userId!, 10);
+      console.log('📊 Tag rankings response:', response);
+      setTagRankings(response.tagRankings || []);
+      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
+    } catch (err: any) {
+      console.error('❌ Error loading tag rankings:', err);
+      // Silent fail - not critical
     }
   };
 
@@ -520,6 +536,44 @@ const UserProfile: React.FC = () => {
                 <div className="text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
                 <div className="text-sm text-gray-300">Tunes Bid</div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top Tags */}
+        {tagRankings.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-center text-white mb-4">Top Tags</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tagRankings.slice(0, 6).map((ranking, index) => (
+                <div 
+                  key={ranking.tag} 
+                  className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-6 hover:border-purple-500/60 transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 bg-purple-600/50 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-bold text-sm">#{index + 1}</span>
+                      </div>
+                      <span className="text-white font-medium text-lg">{ranking.tag}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Total Bid</span>
+                      <span className="text-xl font-bold text-white">£{ranking.aggregate.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Rank</span>
+                      <span className="text-lg font-bold text-purple-400">#{ranking.rank}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Percentile</span>
+                      <span className="text-sm text-purple-300">Top {ranking.percentile}%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

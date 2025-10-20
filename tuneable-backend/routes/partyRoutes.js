@@ -800,8 +800,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
     }
 });
 
-// Mark song as playing (called by web player when song starts)
-router.post('/:partyId/songs/:songId/play', authMiddleware, async (req, res) => {
+// Mark media as playing (called by web player when media starts)
+router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
         const userId = req.user._id;
@@ -864,8 +864,8 @@ router.post('/:partyId/songs/:songId/play', authMiddleware, async (req, res) => 
     }
 });
 
-// Reset all songs to queued status (for testing/development)
-router.post('/:partyId/songs/reset', authMiddleware, async (req, res) => {
+// Reset all media to queued status (for testing/development)
+router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
         const userId = req.user._id;
@@ -905,8 +905,8 @@ router.post('/:partyId/songs/reset', authMiddleware, async (req, res) => {
     }
 });
 
-// Mark song as played (called by web player when song finishes)
-router.post('/:partyId/songs/:songId/complete', authMiddleware, async (req, res) => {
+// Mark media as played (called by web player when media finishes)
+router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
         const userId = req.user._id;
@@ -966,8 +966,8 @@ router.post('/:partyId/songs/:songId/complete', authMiddleware, async (req, res)
     }
 });
 
-// Get songs by status
-router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) => {
+// Get media by status
+router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) => {
     try {
         const { partyId, status } = req.params;
         const validStatuses = ['queued', 'playing', 'played', 'vetoed'];
@@ -1010,8 +1010,8 @@ router.get('/:partyId/songs/status/:status', authMiddleware, async (req, res) =>
     }
 });
 
-// Veto a song (host only)
-router.post('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => {
+// Veto a media item (host only)
+router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
         const { reason } = req.body;
@@ -1235,8 +1235,8 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
     }
 });
 
-// Remove a song from a party (veto functionality)
-router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
+// Remove a media item from a party (veto functionality)
+router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
         const userId = req.user._id;
@@ -1292,7 +1292,7 @@ router.delete('/:partyId/songs/:songId', authMiddleware, async (req, res) => {
 });
 
 // Get media sorted by bid values within specific time periods
-router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
+router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
@@ -1428,10 +1428,10 @@ router.get('/:partyId/songs/sorted/:timePeriod', authMiddleware, resolvePartyId(
     }
 });
 
-// @route   PUT /api/parties/:partyId/songs/:songId/veto
-// @desc    Veto a song (host only) - sets status to 'vetoed' and removes from queue
+// @route   PUT /api/parties/:partyId/media/:mediaId/veto
+// @desc    Veto a media item (host only) - sets status to 'vetoed' and removes from queue
 // @access  Private (host only)
-router.put('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => {
+router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
         
@@ -1477,10 +1477,10 @@ router.put('/:partyId/songs/:songId/veto', authMiddleware, async (req, res) => {
     }
 });
 
-// @route   PUT /api/parties/:partyId/songs/:songId/unveto
-// @desc    Un-veto a song (restore to queue) - host only
+// @route   PUT /api/parties/:partyId/media/:mediaId/unveto
+// @desc    Un-veto a media item (restore to queue) - host only
 // @access  Private (host only)
-router.put('/:partyId/songs/:songId/unveto', authMiddleware, async (req, res) => {
+router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) => {
     try {
         const { partyId, songId } = req.params;
         

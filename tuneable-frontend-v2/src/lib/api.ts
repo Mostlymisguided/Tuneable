@@ -192,33 +192,33 @@ export const partyAPI = {
   },
   
   playSong: async (partyId: string, songId: string) => {
-    const response = await api.post(`/parties/${partyId}/songs/${songId}/play`);
+    const response = await api.post(`/parties/${partyId}/media/${songId}/play`);
     return response.data;
   },
   
   // Media playback control
   completeMedia: async (partyId: string, mediaId: string) => {
-    const response = await api.post(`/parties/${partyId}/songs/${mediaId}/complete`);
+    const response = await api.post(`/parties/${partyId}/media/${mediaId}/complete`);
     return response.data;
   },
   
   removeMedia: async (partyId: string, mediaId: string) => {
-    const response = await api.delete(`/parties/${partyId}/songs/${mediaId}`);
+    const response = await api.delete(`/parties/${partyId}/media/${mediaId}`);
     return response.data;
   },
   
   vetoMedia: async (partyId: string, mediaId: string) => {
-    const response = await api.put(`/parties/${partyId}/songs/${mediaId}/veto`);
+    const response = await api.put(`/parties/${partyId}/media/${mediaId}/veto`);
     return response.data;
   },
   
   unvetoMedia: async (partyId: string, mediaId: string) => {
-    const response = await api.put(`/parties/${partyId}/songs/${mediaId}/unveto`);
+    const response = await api.put(`/parties/${partyId}/media/${mediaId}/unveto`);
     return response.data;
   },
   
   resetMedia: async (partyId: string) => {
-    const response = await api.post(`/parties/${partyId}/songs/reset`);
+    const response = await api.post(`/parties/${partyId}/media/reset`);
     return response.data;
   },
   
@@ -259,7 +259,7 @@ export const partyAPI = {
   },
   
   getMediaSortedByTime: async (partyId: string, timePeriod: string) => {
-    const response = await api.get(`/parties/${partyId}/songs/sorted/${timePeriod}`);
+    const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`);
     return response.data;
   },
   
@@ -272,12 +272,12 @@ export const partyAPI = {
 // Song API
 export const songAPI = {
   getSongs: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
-    const response = await api.get('/songs', { params });
+    const response = await api.get('/media', { params });
     return response.data;
   },
   
   getPublicSongs: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
-    const response = await api.get('/songs/public', { params });
+    const response = await api.get('/media/public', { params });
     return response.data;
   },
   
@@ -286,24 +286,24 @@ export const songAPI = {
     formData.append('file', file);
     formData.append('title', metadata.title);
     formData.append('artist', metadata.artist);
-    const response = await api.post('/songs/upload', formData, {
+    const response = await api.post('/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
   getProfile: async (songId: string) => {
-    const response = await api.get(`/songs/${songId}/profile`);
+    const response = await api.get(`/media/${songId}/profile`);
     return response.data;
   },
   
   getComments: async (songId: string, page = 1, limit = 20) => {
-    const response = await api.get(`/songs/${songId}/comments?page=${page}&limit=${limit}`);
+    const response = await api.get(`/media/${songId}/comments?page=${page}&limit=${limit}`);
     return response.data;
   },
   
   createComment: async (songId: string, content: string) => {
-    const response = await api.post(`/songs/${songId}/comments`, { content });
+    const response = await api.post(`/media/${songId}/comments`, { content });
     return response.data;
   },
   
@@ -357,6 +357,12 @@ export const songAPI = {
     const response = await api.get(`/media/${songId}/top-parties`);
     return response.data;
   },
+
+  // Get tag rankings for media
+  getTagRankings: async (mediaId: string) => {
+    const response = await api.get(`/media/${mediaId}/tag-rankings`);
+    return response.data;
+  },
 };
 
 // Search API
@@ -377,7 +383,7 @@ export const searchAPI = {
 // Top Tunes API
 export const topTunesAPI = {
   getTopTunes: async (sortBy: string = 'globalMediaAggregate', limit: number = 10) => {
-    const response = await api.get('/songs/top-tunes', {
+    const response = await api.get('/media/top-tunes', {
       params: { sortBy, limit },
     });
     return response.data;
@@ -406,6 +412,13 @@ export const userAPI = {
   // Admin: Reject invite request
   rejectInviteRequest: async (requestId: string, reason?: string) => {
     const response = await api.patch(`/users/admin/invite-requests/${requestId}/reject`, { reason });
+    return response.data;
+  },
+  
+  // Get user's tag rankings
+  getTagRankings: async (userId: string, limit?: number) => {
+    const params = limit ? { limit } : {};
+    const response = await api.get(`/users/${userId}/tag-rankings`, { params });
     return response.data;
   },
 };

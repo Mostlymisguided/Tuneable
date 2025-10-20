@@ -155,6 +155,7 @@ const TuneProfile: React.FC = () => {
   const [globalBidAmount, setGlobalBidAmount] = useState<number>(0.33);
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [topParties, setTopParties] = useState<any[]>([]);
+  const [tagRankings, setTagRankings] = useState<any[]>([]);
 
   // WebPlayer integration
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
@@ -163,6 +164,7 @@ const TuneProfile: React.FC = () => {
     if (songId) {
       fetchSongProfile();
       loadTopParties();
+      loadTagRankings();
     }
   }, [songId]);
 
@@ -545,6 +547,20 @@ const TuneProfile: React.FC = () => {
       console.error('Error status:', err.response?.status);
       // Temporarily show error to user for debugging
       toast.error(`Top Parties Error: ${err.response?.data?.error || err.message}`);
+    }
+  };
+
+  // Load tag rankings for this tune
+  const loadTagRankings = async () => {
+    try {
+      console.log('🏷️ Loading tag rankings for song:', songId);
+      const response = await songAPI.getTagRankings(songId!);
+      console.log('📊 Tag rankings response:', response);
+      setTagRankings(response.tagRankings || []);
+      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
+    } catch (err: any) {
+      console.error('❌ Error loading tag rankings:', err);
+      // Silent fail - not critical
     }
   };
 
@@ -991,6 +1007,39 @@ const TuneProfile: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Tag Rankings */}
+        {tagRankings.length > 0 && (
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
+              Tag Rankings
+            </h2>
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {tagRankings.map((ranking, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                  >
+                    <div className="flex items-center space-x-2 md:space-x-3">
+                      <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                      <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-base md:text-lg font-bold text-purple-400">
+                        #{ranking.rank}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        of {ranking.total} • Top {ranking.percentile}%
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Song Details */}
         <div className="mb-8 px-2 md:px-0">

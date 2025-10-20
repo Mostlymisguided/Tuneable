@@ -609,4 +609,107 @@ router.patch('/admin/invite-requests/:id/reject', authMiddleware, async (req, re
   }
 });
 
+// @route   GET /api/users/:userId/tag-rankings
+// @desc    Get tag rankings for a specific user (their top tags by bid aggregate)
+// @access  Public
+router.get('/:userId/tag-rankings', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 20 } = req.query;
+
+    console.log('🏷️ User tag rankings request for:', userId);
+
+    // Resolve user ID
+    const User = require('../models/User');
+    const Bid = require('../models/Bid');
+    const Media = require('../models/Media');
+    
+    const resolvedUserId = await resolveId(userId, User);
+    if (!resolvedUserId) {
+      console.log('❌ User not found:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get all active bids by this user
+    const userBids = await Bid.find({ 
+      userId: resolvedUserId,
+      status: 'active'
+    })
+      .populate('mediaId', 'tags')
+      .lean();
+
+    console.log(`📊 Found ${userBids.length} active bids for user`);
+
+    // Aggregate by tag (GlobalUserTagAggregate)
+    const tagAggregates = {};
+    userBids.forEach(bid => {
+      if (bid.mediaId?.tags) {
+        bid.mediaId.tags.forEach(tag => {
+          tagAggregates[tag] = (tagAggregates[tag] || 0) + bid.amount;
+        });
+      }
+    });
+
+    console.log(`📊 User has bid on ${Object.keys(tagAggregates).length} different tags`);
+
+    // Calculate GlobalUserTagAggregateRank for each tag
+    const tagRankings = [];
+    
+    for (const [tag, userAggregate] of Object.entries(tagAggregates)) {
+      // Get all bids on media with this tag
+      const mediaWithTag = await Media.find({ tags: tag }).select('_id').lean();
+      const mediaIds = mediaWithTag.map(m => m._id);
+      
+      // Get all bids on these media items
+      const allBidsForTag = await Bid.find({
+        mediaId: { $in: mediaIds },
+        status: 'active'
+      }).lean();
+      
+      // Aggregate by user
+      const userTagTotals = {};
+      allBidsForTag.forEach(bid => {
+        const uid = bid.userId.toString();
+        userTagTotals[uid] = (userTagTotals[uid] || 0) + bid.amount;
+      });
+      
+      // Sort users by aggregate
+      const sortedUsers = Object.entries(userTagTotals)
+        .sort(([, a], [, b]) => b - a);
+      
+      // Find this user's rank
+      const rankIndex = sortedUsers.findIndex(([uid]) => uid === resolvedUserId.toString());
+      const rank = rankIndex + 1;
+      const totalUsers = sortedUsers.length;
+      const percentile = totalUsers > 0 ? ((totalUsers - rank) / totalUsers * 100).toFixed(1) : '0';
+      
+      tagRankings.push({
+        tag,
+        aggregate: userAggregate,
+        rank,
+        totalUsers,
+        percentile: parseFloat(percentile)
+      });
+      
+      console.log(`  Tag "${tag}": £${userAggregate.toFixed(2)} - Rank #${rank} of ${totalUsers}`);
+    }
+
+    // Sort by aggregate (highest first)
+    tagRankings.sort((a, b) => b.aggregate - a.aggregate);
+
+    // Limit results
+    const limitedRankings = tagRankings.slice(0, parseInt(limit));
+
+    console.log('✅ Returning', limitedRankings.length, 'tag rankings');
+
+    res.json(transformResponse({
+      tagRankings: limitedRankings,
+      totalTags: tagRankings.length
+    }));
+  } catch (error) {
+    console.error('Error fetching user tag rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch tag rankings' });
+  }
+});
+
 module.exports = router;
