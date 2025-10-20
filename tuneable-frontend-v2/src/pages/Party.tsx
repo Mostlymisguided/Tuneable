@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
-import TopBidders from '../components/TopBidders';
+import MediaLeaderboard from '../components/MediaLeaderboard';
 import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, Loader2, Youtube } from 'lucide-react';
 
@@ -1210,11 +1210,6 @@ const Party: React.FC = () => {
                                   </span>
                                 </div>
                               )}
-                              
-                              {/* Top Bidders Display for Currently Playing */}
-                              {mediaData.bids && mediaData.bids.length > 0 && (
-                                <TopBidders bids={mediaData.bids} maxDisplay={5} />
-                              )}
                             </div>
                               
                               {/* Skip buttons for remote parties */}
@@ -1486,16 +1481,16 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex items-center hover:bg-purple-800/20"
+                            className="card flex items-center hover:bg-purple-800/20 relative"
                           >
-                            {/* Number Badge */}
-                            <div className="w-4 h-4 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                            {/* Queue Number Badge - In Left Gutter */}
+                            <div className="absolute -left-8 md:-left-12 top-1/2 -translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
                               <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
                             </div>
                             
-                            {/* Media Thumbnail */}
+                            {/* Media Thumbnail with Overlays */}
                             <div 
-                              className="ml-4 relative w-8 h-8 md:w-32 md:h-32 cursor-pointer group"
+                              className="relative w-8 h-8 md:w-32 md:h-32 cursor-pointer group flex-shrink-0"
                               onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                             >
                               <img
@@ -1505,6 +1500,7 @@ const Party: React.FC = () => {
                                 width="128"
                                 height="128"
                               />
+                              
                               {/* Play Icon Overlay */}
                               <div 
                                 className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -1537,14 +1533,21 @@ const Party: React.FC = () => {
                                   <span className="p-2 text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
                                 </div>
                               </div>
-                              
-                              {/* Top Bidders Display */}
-                              {mediaData.bids && mediaData.bids.length > 0 && (
-                                <TopBidders bids={mediaData.bids} maxDisplay={5} />
-                              )}
-                              
-                              {/* Tags Display */}
-                              {mediaData.tags && mediaData.tags.length > 0 && (
+                            {/* Media Leaderboard - Top Fans & Bids */}
+                            <MediaLeaderboard
+                              globalMediaBidTop={mediaData.globalMediaBidTop}
+                              globalMediaBidTopUser={mediaData.globalMediaBidTopUser}
+                              globalMediaAggregateTop={mediaData.globalMediaAggregateTop}
+                              globalMediaAggregateTopUser={mediaData.globalMediaAggregateTopUser}
+                              partyMediaBidTop={item.partyMediaBidTop}
+                              partyMediaBidTopUser={item.partyMediaBidTopUser}
+                              partyMediaAggregateTop={item.partyMediaAggregateTop}
+                              partyMediaAggregateTopUser={item.partyMediaAggregateTopUser}
+                              bids={mediaData.bids || []}
+                              mediaTitle={mediaData.title}
+                            />
+                                  {/* Tags Display */}
+                                  {mediaData.tags && mediaData.tags.length > 0 && (
                                 <div className="mt-2 flex">
                                   <div className="flex flex-wrap gap-1">
                                     {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
@@ -1558,23 +1561,13 @@ const Party: React.FC = () => {
                                     ))}
                                   </div>
                                 </div>
-                              )}
-                              
-                             {/* Category Display */}
-                              {/* {mediaData.category && mediaData.category !== 'Unknown' && (
-                                <div className="mt-1">
-                                  <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
-                                    {mediaData.category}
-                                  </span>
-                                </div> */}
-                              
+                              )}               
                             </div>
-                            
                             {/* Action Buttons */}
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
                                 {/* Metrics Display */}
-                                <div className="flex flex-col-2 items-end space-y-1 border mx-4 px-3 py-2 rounded-lg">
+                                <div className="flex flex-col-2 items-end space-y-1 border mx-4 px-2 py-2 rounded-lg">
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Tune Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
@@ -1588,37 +1581,6 @@ const Party: React.FC = () => {
                                     </div>
                                   </div>
                                 </div>
-                                
-                                {/* Top Bid Metrics 
-                                <div className="mt-2 p-2 bg-gray-800 rounded-lg">
-                                  <div className="text-xs text-gray-400 mb-1">Top Bids</div>
-                                  <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                      <div className="text-gray-500">Party Top:</div>
-                                      <div className="text-yellow-400 font-medium">
-                                        £{mediaData.partyMediaBidTop?.toFixed(2) || '0.00'}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="text-gray-500">Party Fan:</div>
-                                      <div className="text-green-400 font-medium">
-                                        £{mediaData.partyMediaAggregateTop?.toFixed(2) || '0.00'}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="text-gray-500">Global Top:</div>
-                                      <div className="text-yellow-400 font-medium">
-                                        £{mediaData.globalMediaBidTop?.toFixed(2) || '0.00'}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="text-gray-500">Global Fan:</div>
-                                      <div className="text-green-400 font-medium">
-                                        £{mediaData.globalMediaAggregateTop?.toFixed(2) || '0.00'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div> */}
                                 {/* Inline Bidding */}
                                 <div className="flex items-center space-x-2">
                                   <input

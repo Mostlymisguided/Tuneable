@@ -168,14 +168,36 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 path: 'media.mediaId',
                 model: 'Media',
                 select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser', // ✅ Updated to schema grammar field names
-                populate: {
-                    path: 'bids',
-                    model: 'Bid',
-                    populate: {
-                        path: 'userId',
-                        select: 'username profilePic uuid',  // ✅ Added profilePic and uuid for top bidders display
+                populate: [
+                    {
+                        path: 'bids',
+                        model: 'Bid',
+                        populate: {
+                            path: 'userId',
+                            select: 'username profilePic uuid homeLocation',  // ✅ Added profilePic, uuid, and location for top bidders display
+                        },
                     },
-                },
+                    {
+                        path: 'globalMediaBidTopUser',
+                        model: 'User',
+                        select: 'username profilePic uuid homeLocation'
+                    },
+                    {
+                        path: 'globalMediaAggregateTopUser',
+                        model: 'User',
+                        select: 'username profilePic uuid homeLocation'
+                    }
+                ]
+            })
+            .populate({
+                path: 'media.partyMediaBidTopUser',
+                model: 'User',
+                select: 'username profilePic uuid homeLocation'
+            })
+            .populate({
+                path: 'media.partyMediaAggregateTopUser',
+                model: 'User',
+                select: 'username profilePic uuid homeLocation'
             })
             .populate({
                 path: 'partiers',
