@@ -5,7 +5,7 @@ const Report = require('../models/Report');
 const Media = require('../models/Media');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
-const { adminMiddleware } = require('../middleware/adminMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 const { sendEmail } = require('../utils/emailService');
 
 // Submit a report for a media item
