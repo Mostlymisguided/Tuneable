@@ -726,7 +726,7 @@ const TuneProfile: React.FC = () => {
           </button>
           
           {/* Edit Tune & Report Buttons */}
-          <div className='inline rounded-full items-center absolute right-0 md:right-3 mb-4 flex space-x-2'>
+          <div className='inline rounded-full items-center absolute right-0 top-0 md:right-3 mb-4 flex space-x-2'>
             {/* Report Button - Always visible */}
             <button
               onClick={() => setShowReportModal(true)}
