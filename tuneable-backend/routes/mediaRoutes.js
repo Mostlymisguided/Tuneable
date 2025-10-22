@@ -147,12 +147,7 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
       description: description || '',
       coverArt: finalCoverArt,
       
-      // Track information
-      trackNumber: mappedMetadata.trackNumber || null,
-      discNumber: mappedMetadata.discNumber || null,
-      
-      // Publisher information
-      publisher: mappedMetadata.publisher || null,
+      // Note: trackNumber, discNumber, and publisher fields don't exist in Media model
       encodedBy: mappedMetadata.encodedBy || null,
       comment: mappedMetadata.comment || null,
       
@@ -348,7 +343,7 @@ router.get('/:mediaId/profile', async (req, res) => {
         select: 'username profilePic uuid',
       });
 
-    // Fetch recent comments - check both songId (legacy) and mediaId (new)
+    // Fetch recent comments - check both mediaId (new) and songId (legacy)
     const recentComments = await Comment.find({ 
       $or: [
         { mediaId: media._id },
@@ -415,7 +410,7 @@ router.get('/:mediaId/profile', async (req, res) => {
 });
 
 // @route   PUT /api/media/:id
-// @desc    Update media/song details
+// @desc    Update media details
 // @access  Private (Admin or Verified Creator only)
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
@@ -649,11 +644,11 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Create comment with mediaId (new) instead of songId (legacy)
+    // Create comment with mediaId
     const comment = new Comment({
       content: content.trim(),
       userId,
-      mediaId: media._id, // Use mediaId instead of songId
+      mediaId: media._id,
       parentCommentId: parentCommentId || null,
     });
 
