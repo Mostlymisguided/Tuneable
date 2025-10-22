@@ -1,14 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle } from 'lucide-react';
+import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
 import axios from 'axios';
 
 const CreatorUpload: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { extractMetadata, isExtracting, extractedMetadata, error: metadataError, warnings } = useMetadataExtraction();
   
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -23,7 +25,21 @@ const CreatorUpload: React.FC = () => {
     explicit: false,
     tags: '',
     description: '',
-    coverArt: ''
+    coverArt: '',
+    // Enhanced metadata fields
+    bpm: '',
+    key: '',
+    isrc: '',
+    upc: '',
+    lyrics: '',
+    composer: '',
+    producer: '',
+    publisher: '',
+    label: '',
+    language: '',
+    trackNumber: '',
+    discNumber: '',
+    year: ''
   });
 
   // Check if user is verified creator or admin
@@ -52,7 +68,7 @@ const CreatorUpload: React.FC = () => {
     );
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -76,7 +92,38 @@ const CreatorUpload: React.FC = () => {
       const filename = selectedFile.name.replace('.mp3', '').replace(/_/g, ' ');
       setFormData(prev => ({ ...prev, title: filename }));
     }
+
+    // Extract metadata from the file
+    await extractMetadata(selectedFile);
   };
+
+  // Auto-populate form when metadata is extracted
+  useEffect(() => {
+    if (extractedMetadata) {
+      setFormData(prev => ({
+        ...prev,
+        title: extractedMetadata.title || prev.title,
+        artistName: extractedMetadata.artist || prev.artistName,
+        album: extractedMetadata.album || prev.album,
+        genre: extractedMetadata.genre?.[0] || prev.genre,
+        duration: extractedMetadata.duration?.toString() || prev.duration,
+        explicit: extractedMetadata.explicit || prev.explicit,
+        bpm: extractedMetadata.bpm?.toString() || prev.bpm,
+        key: extractedMetadata.key || prev.key,
+        isrc: extractedMetadata.isrc || prev.isrc,
+        upc: extractedMetadata.upc || prev.upc,
+        lyrics: extractedMetadata.lyrics || prev.lyrics,
+        composer: extractedMetadata.composer || prev.composer,
+        producer: extractedMetadata.producer || prev.producer,
+        publisher: extractedMetadata.publisher || prev.publisher,
+        label: extractedMetadata.label || prev.label,
+        language: extractedMetadata.language || prev.language,
+        trackNumber: extractedMetadata.trackNumber?.toString() || prev.trackNumber,
+        discNumber: extractedMetadata.discNumber?.toString() || prev.discNumber,
+        year: extractedMetadata.year?.toString() || prev.year
+      }));
+    }
+  }, [extractedMetadata]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -115,6 +162,21 @@ const CreatorUpload: React.FC = () => {
       if (formData.tags) uploadData.append('tags', formData.tags);
       if (formData.description) uploadData.append('description', formData.description.trim());
       if (formData.coverArt) uploadData.append('coverArt', formData.coverArt.trim());
+      
+      // Enhanced metadata fields
+      if (formData.bpm) uploadData.append('bpm', formData.bpm);
+      if (formData.key) uploadData.append('key', formData.key);
+      if (formData.isrc) uploadData.append('isrc', formData.isrc);
+      if (formData.upc) uploadData.append('upc', formData.upc);
+      if (formData.lyrics) uploadData.append('lyrics', formData.lyrics);
+      if (formData.composer) uploadData.append('composer', formData.composer);
+      if (formData.producer) uploadData.append('producer', formData.producer);
+      if (formData.publisher) uploadData.append('publisher', formData.publisher);
+      if (formData.label) uploadData.append('label', formData.label);
+      if (formData.language) uploadData.append('language', formData.language);
+      if (formData.trackNumber) uploadData.append('trackNumber', formData.trackNumber);
+      if (formData.discNumber) uploadData.append('discNumber', formData.discNumber);
+      if (formData.year) uploadData.append('year', formData.year);
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const token = localStorage.getItem('token');
@@ -224,6 +286,70 @@ const CreatorUpload: React.FC = () => {
               className="hidden"
             />
           </div>
+
+          {/* Metadata Extraction Status */}
+          {file && (
+            <div className="mb-6">
+              {isExtracting && (
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+                    <span className="text-blue-300 font-medium">Extracting metadata from audio file...</span>
+                  </div>
+                </div>
+              )}
+
+              {extractedMetadata && (
+                <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                    <span className="text-green-300 font-medium">Metadata extracted successfully!</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Title:</span>
+                      <span className="text-white ml-2">{extractedMetadata.title || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Artist:</span>
+                      <span className="text-white ml-2">{extractedMetadata.artist || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Duration:</span>
+                      <span className="text-white ml-2">{extractedMetadata.duration ? `${Math.floor(extractedMetadata.duration / 60)}:${(extractedMetadata.duration % 60).toString().padStart(2, '0')}` : 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">BPM:</span>
+                      <span className="text-white ml-2">{extractedMetadata.bpm || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {metadataError && (
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    <span className="text-red-300 font-medium">Metadata extraction failed: {metadataError}</span>
+                  </div>
+                </div>
+              )}
+
+              {warnings.length > 0 && (
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                    <span className="text-yellow-300 font-medium">Metadata warnings:</span>
+                  </div>
+                  <ul className="text-yellow-200 text-sm space-y-1">
+                    {warnings.map((warning, index) => (
+                      <li key={index}>• {warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Metadata Form */}
           <div className="space-y-6">
@@ -392,6 +518,216 @@ const CreatorUpload: React.FC = () => {
               <label htmlFor="explicit" className="text-white font-medium">
                 Explicit Content (Parental Advisory)
               </label>
+            </div>
+
+            {/* Enhanced Metadata Section */}
+            <div className="border-t border-gray-600 pt-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <Zap className="h-5 w-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">Enhanced Metadata</h3>
+                <span className="text-sm text-gray-400">(Auto-populated from file)</span>
+              </div>
+
+              {/* Technical Metadata */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    BPM
+                  </label>
+                  <input
+                    type="number"
+                    name="bpm"
+                    value={formData.bpm}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="120"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Key
+                  </label>
+                  <input
+                    type="text"
+                    name="key"
+                    value={formData.key}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="C Major"
+                  />
+                </div>
+              </div>
+
+              {/* Track Information */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Track Number
+                  </label>
+                  <input
+                    type="number"
+                    name="trackNumber"
+                    value={formData.trackNumber}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="1"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Disc Number
+                  </label>
+                  <input
+                    type="number"
+                    name="discNumber"
+                    value={formData.discNumber}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="1"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Year
+                  </label>
+                  <input
+                    type="number"
+                    name="year"
+                    value={formData.year}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="2024"
+                  />
+                </div>
+              </div>
+
+              {/* Creator Information */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Composer
+                  </label>
+                  <input
+                    type="text"
+                    name="composer"
+                    value={formData.composer}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="Composer name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Producer
+                  </label>
+                  <input
+                    type="text"
+                    name="producer"
+                    value={formData.producer}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="Producer name"
+                  />
+                </div>
+              </div>
+
+              {/* Business Information */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    ISRC
+                  </label>
+                  <input
+                    type="text"
+                    name="isrc"
+                    value={formData.isrc}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="USRC17607839"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    UPC
+                  </label>
+                  <input
+                    type="text"
+                    name="upc"
+                    value={formData.upc}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="123456789012"
+                  />
+                </div>
+              </div>
+
+              {/* Publisher & Label */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Publisher
+                  </label>
+                  <input
+                    type="text"
+                    name="publisher"
+                    value={formData.publisher}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="Publisher name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Label
+                  </label>
+                  <input
+                    type="text"
+                    name="label"
+                    value={formData.label}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="Record label"
+                  />
+                </div>
+              </div>
+
+              {/* Language & Lyrics */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-white font-medium mb-2">
+                    Language
+                  </label>
+                  <input
+                    type="text"
+                    name="language"
+                    value={formData.language}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder="en"
+                  />
+                </div>
+              </div>
+
+              {/* Lyrics */}
+              <div>
+                <label className="block text-white font-medium mb-2">
+                  Lyrics
+                </label>
+                <textarea
+                  name="lyrics"
+                  value={formData.lyrics}
+                  onChange={handleChange}
+                  rows={6}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  placeholder="Enter song lyrics..."
+                />
+              </div>
             </div>
           </div>
 
