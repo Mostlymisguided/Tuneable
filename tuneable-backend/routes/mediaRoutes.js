@@ -17,22 +17,45 @@ const MetadataExtractor = require('../utils/metadataExtractor');
 const mediaUpload = createMediaUpload();
 const coverArtUpload = createCoverArtUpload();
 
+// Create a custom multer configuration that handles both files
+const mixedUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB max
+    files: 2 // Max 2 files (audio + cover art)
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'audioFile') {
+      // Only MP3 files for audio
+      const allowedTypes = /mp3/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
+      
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        return cb(new Error('Only MP3 files are allowed for audio'));
+      }
+    } else if (file.fieldname === 'coverArtFile') {
+      // Only image files for cover art
+      if (file.mimetype.startsWith('image/')) {
+        return cb(null, true);
+      } else {
+        return cb(new Error('Only image files are allowed for cover art'));
+      }
+    } else {
+      return cb(new Error('Invalid field name'));
+    }
+  }
+});
+
 // @route   POST /api/media/upload
 // @desc    Upload media file (MP3) - Creator/Admin only
 // @access  Private (Verified creators and admins)
-router.post('/upload', authMiddleware, (req, res, next) => {
-  // Handle audio file upload first
-  mediaUpload.single('audioFile')(req, res, (err) => {
-    if (err) return next(err);
-    
-    // Then handle cover art file if present
-    if (req.body.coverArtFile) {
-      coverArtUpload.single('coverArtFile')(req, res, next);
-    } else {
-      next();
-    }
-  });
-}, async (req, res) => {
+router.post('/upload', authMiddleware, mixedUpload.fields([
+  { name: 'audioFile', maxCount: 1 },
+  { name: 'coverArtFile', maxCount: 1 }
+]), async (req, res) => {
   try {
     const userId = req.user._id;
     
@@ -49,12 +72,12 @@ router.post('/upload', authMiddleware, (req, res, next) => {
       return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
     
-    if (!req.file) {
+    if (!req.files || !req.files.audioFile || req.files.audioFile.length === 0) {
       return res.status(400).json({ error: 'No audio file uploaded' });
     }
     
-    const audioFile = req.file;
-    const coverArtFile = req.coverArtFile || null;
+    const audioFile = req.files.audioFile[0];
+    const coverArtFile = req.files.coverArtFile ? req.files.coverArtFile[0] : null;
     
     console.log(`🎵 Processing upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
     if (coverArtFile) {
@@ -93,8 +116,41 @@ router.post('/upload', authMiddleware, (req, res, next) => {
       coverArt
     } = req.body;
     
-    // Get file URL (R2 or local)
-    const fileUrl = audioFile.location || getPublicUrl(audioFile.filename);
+    // Upload audio file to R2 manually
+    let fileUrl;
+    try {
+      console.log('📤 Uploading audio file to R2...');
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const s3Client = new S3Client({
+        region: 'auto',
+        endpoint: process.env.R2_ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        },
+      });
+      
+      const username = user.username || 'unknown';
+      const timestamp = Date.now();
+      const safeFilename = audioFile.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const audioKey = `media-uploads/${username}-${timestamp}-${safeFilename}`;
+      
+      const audioCommand = new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: audioKey,
+        Body: audioFile.buffer,
+        ContentType: 'audio/mpeg',
+        ACL: 'public-read',
+        CacheControl: 'public, max-age=31536000'
+      });
+      
+      await s3Client.send(audioCommand);
+      fileUrl = getPublicUrl(audioKey);
+      console.log(`✅ Audio file uploaded to R2: ${fileUrl}`);
+    } catch (uploadError) {
+      console.error('❌ Error uploading audio file to R2:', uploadError.message);
+      return res.status(500).json({ error: 'Failed to upload audio file' });
+    }
     
     // Parse tags (comma-separated string to array)
     const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
@@ -194,8 +250,32 @@ router.post('/upload', authMiddleware, (req, res, next) => {
       try {
         console.log('🖼️ Processing cover art file...');
         
-        // Get cover art URL (already uploaded by multer)
-        const coverArtUrl = coverArtFile.location || getPublicUrl(`cover-art/${coverArtFile.filename}`);
+        // Upload cover art to R2 manually
+        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint: process.env.R2_ENDPOINT,
+          credentials: {
+            accessKeyId: process.env.R2_ACCESS_KEY_ID,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+          },
+        });
+        
+        const timestamp = Date.now();
+        const safeTitle = finalTitle.replace(/[^a-zA-Z0-9]/g, '_');
+        const coverArtKey = `cover-art/${safeTitle}-${timestamp}.jpg`;
+        
+        const coverArtCommand = new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: coverArtKey,
+          Body: coverArtFile.buffer,
+          ContentType: coverArtFile.mimetype,
+          ACL: 'public-read',
+          CacheControl: 'public, max-age=31536000'
+        });
+        
+        await s3Client.send(coverArtCommand);
+        const coverArtUrl = getPublicUrl(coverArtKey);
         
         // Update media with cover art URL
         media.coverArt = coverArtUrl;
