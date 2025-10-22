@@ -20,6 +20,7 @@ async function testMediaModel() {
     const spokenMedia = await Media.countDocuments({ contentType: 'spoken' });
     const mediaWithBids = await Media.countDocuments({ globalBidValue: { $gt: 0 } });
     const verifiedArtists = await Media.countDocuments({ 'artist.verified': true });
+    const mediaWithOwners = await Media.countDocuments({ 'mediaOwners.0': { $exists: true } });
     
     console.log('\n📊 Media Collection Statistics:');
     console.log(`   Total Media Items: ${totalMedia}`);
@@ -27,6 +28,7 @@ async function testMediaModel() {
     console.log(`   Spoken Content: ${spokenMedia}`);
     console.log(`   With Bids: ${mediaWithBids}`);
     console.log(`   With Verified Artists: ${verifiedArtists}`);
+    console.log(`   With Media Owners: ${mediaWithOwners}`);
     
     // Get top media by bids
     const top3 = await Media.find({ globalBidValue: { $gt: 0 } })
@@ -63,9 +65,18 @@ async function testMediaModel() {
       console.log(`   formattedDuration: ${sampleMedia.formattedDuration}`);
       
       const verifiedCreators = sampleMedia.getVerifiedCreators();
+      const verifiedCreatorsWithOwnership = sampleMedia.getVerifiedCreatorsWithOwnership();
       const pendingCreators = sampleMedia.getPendingCreators();
       console.log(`   Verified Creators: ${verifiedCreators.length}`);
       console.log(`   Pending Creators: ${pendingCreators.length}`);
+      console.log(`   Media Owners: ${sampleMedia.mediaOwners?.length || 0}`);
+      
+      if (verifiedCreatorsWithOwnership.length > 0) {
+        console.log(`   Verified with Ownership:`);
+        verifiedCreatorsWithOwnership.forEach(creator => {
+          console.log(`     - ${creator.name} (${creator.role}): ${creator.ownershipPercentage}% owner`);
+        });
+      }
       
       if (pendingCreators.length > 0) {
         console.log(`   Pending: ${pendingCreators.map(c => `${c.name} (${c.role})`).join(', ')}`);

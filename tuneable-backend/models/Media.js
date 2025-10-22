@@ -125,7 +125,20 @@ const mediaSchema = new mongoose.Schema({
   creatorNames: { type: [String], default: [] },
   
   // Technical metadata (music-specific)
-  rightsHolder: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Rights holder reference
+  // mediaOwners: Array of users with ownership percentages for revenue distribution
+  mediaOwners: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    percentage: { type: Number, min: 0, max: 100, required: true },
+    role: { 
+      type: String, 
+      enum: ['primary', 'secondary', 'label', 'distributor'],
+      default: 'primary'
+    },
+    verified: { type: Boolean, default: false },
+    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who added this ownership claim
+    addedAt: { type: Date, default: Date.now },
+    _id: false
+  }],
   explicit: { type: Boolean, default: false }, // Explicit content flag
   isrc: { type: String, default: null }, // International Standard Recording Code
   upc: { type: String, default: null }, // Universal Product Code
@@ -212,9 +225,6 @@ const mediaSchema = new mongoose.Schema({
   addedBy_uuid: { type: String },
   uploadedAt: { type: Date, default: Date.now }, // Keep for backward compatibility (maps to createdAt)
   playCount: { type: Number, default: 0 },
-  
-  // Verified creators (users who have proven ownership)
-  verifiedCreators: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   popularity: { type: Number, default: 0 },
   
   // Relationships to other media (content graph)
@@ -226,6 +236,18 @@ const mediaSchema = new mongoose.Schema({
     },
     target_uuid: { type: String, required: true }, // UUID of related Media item
     description: { type: String, default: '' }, // Optional notes
+    _id: false
+  }],
+
+  // Edit history tracking for disputes and audit trail
+  editHistory: [{
+    editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    editedAt: { type: Date, default: Date.now },
+    changes: [{
+      field: { type: String, required: true },
+      oldValue: { type: mongoose.Schema.Types.Mixed },
+      newValue: { type: mongoose.Schema.Types.Mixed }
+    }],
     _id: false
   }]
 }, { 
@@ -295,6 +317,10 @@ mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
 mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify lookups
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.target_uuid": 1 }); // Index for finding relationships to specific media
+mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by owner
+mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
+mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user
+mediaSchema.index({ "editHistory.editedAt": -1 }); // Index for recent edits
 mediaSchema.index({ title: 'text', description: 'text' });
 
 // Virtual for formatted duration
@@ -351,6 +377,27 @@ mediaSchema.virtual('summary').get(function() {
   };
 });
 
+// Virtual for mediaOwners with populated usernames
+mediaSchema.virtual('mediaOwnersWithUsernames').get(function() {
+  if (!this.mediaOwners || this.mediaOwners.length === 0) return [];
+  
+  return this.mediaOwners.map(owner => ({
+    ...owner.toObject(),
+    username: owner.userId?.username || 'Unknown User',
+    addedByUsername: owner.addedBy?.username || 'Unknown User'
+  }));
+});
+
+// Virtual for editHistory with populated usernames
+mediaSchema.virtual('editHistoryWithUsernames').get(function() {
+  if (!this.editHistory || this.editHistory.length === 0) return [];
+  
+  return this.editHistory.map(edit => ({
+    ...edit.toObject(),
+    editedByUsername: edit.editedBy?.username || 'Unknown User'
+  }));
+});
+
 // Schema method: Get all verified creators across all roles
 mediaSchema.methods.getVerifiedCreators = function() {
   const verifiedCreators = [];
@@ -378,6 +425,24 @@ mediaSchema.methods.getVerifiedCreators = function() {
   return verifiedCreators;
 };
 
+// Schema method: Get verified creators with ownership information
+mediaSchema.methods.getVerifiedCreatorsWithOwnership = function() {
+  const verifiedCreators = this.getVerifiedCreators();
+  
+  return verifiedCreators.map(creator => {
+    const owner = this.mediaOwners.find(o => 
+      o.userId.toString() === creator.userId.toString()
+    );
+    
+    return {
+      ...creator,
+      ownershipPercentage: owner ? owner.percentage : 0,
+      ownershipRole: owner ? owner.role : null,
+      isMediaOwner: !!owner
+    };
+  });
+};
+
 // Schema method: Get all pending (unverified) creators across all roles
 mediaSchema.methods.getPendingCreators = function() {
   const pendingCreators = [];
@@ -403,6 +468,76 @@ mediaSchema.methods.getPendingCreators = function() {
   });
   
   return pendingCreators;
+};
+
+// Schema method: Add a media owner
+mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'primary', addedBy) {
+  // Check if user is already an owner
+  const existingOwner = this.mediaOwners.find(owner => 
+    owner.userId.toString() === userId.toString()
+  );
+  
+  if (existingOwner) {
+    throw new Error('User is already a media owner');
+  }
+  
+  // Validate percentage doesn't exceed 100% total
+  const currentTotal = this.mediaOwners.reduce((sum, owner) => sum + owner.percentage, 0);
+  if (currentTotal + percentage > 100) {
+    throw new Error('Total ownership percentage cannot exceed 100%');
+  }
+  
+  this.mediaOwners.push({
+    userId,
+    percentage,
+    role,
+    verified: false,
+    addedBy: addedBy || userId,
+    addedAt: new Date()
+  });
+  
+  return this;
+};
+
+// Schema method: Remove a media owner
+mediaSchema.methods.removeMediaOwner = function(userId) {
+  const ownerIndex = this.mediaOwners.findIndex(owner => 
+    owner.userId.toString() === userId.toString()
+  );
+  
+  if (ownerIndex === -1) {
+    throw new Error('User is not a media owner');
+  }
+  
+  this.mediaOwners.splice(ownerIndex, 1);
+  return this;
+};
+
+// Schema method: Update media owner percentage
+mediaSchema.methods.updateOwnerPercentage = function(userId, newPercentage) {
+  const owner = this.mediaOwners.find(owner => 
+    owner.userId.toString() === userId.toString()
+  );
+  
+  if (!owner) {
+    throw new Error('User is not a media owner');
+  }
+  
+  // Validate new total doesn't exceed 100%
+  const currentTotal = this.mediaOwners.reduce((sum, o) => sum + o.percentage, 0);
+  const newTotal = currentTotal - owner.percentage + newPercentage;
+  
+  if (newTotal > 100) {
+    throw new Error('Total ownership percentage cannot exceed 100%');
+  }
+  
+  owner.percentage = newPercentage;
+  return this;
+};
+
+// Schema method: Get total ownership percentage
+mediaSchema.methods.getTotalOwnershipPercentage = function() {
+  return this.mediaOwners.reduce((sum, owner) => sum + owner.percentage, 0);
 };
 
 module.exports = mongoose.models.Media || mongoose.model('Media', mediaSchema);

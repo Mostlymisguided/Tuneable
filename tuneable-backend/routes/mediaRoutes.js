@@ -343,26 +343,37 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
     
-    // Check permissions: must be admin OR verified creator
+    // Check permissions: must be admin OR media owner OR verified creator
     const isAdmin = req.user.role && req.user.role.includes('admin');
-    const isVerifiedCreator = media.verifiedCreators && media.verifiedCreators.some(
-      creatorId => creatorId.toString() === userId.toString()
+    const isMediaOwner = media.mediaOwners && media.mediaOwners.some(
+      owner => owner.userId.toString() === userId.toString()
+    );
+    const isVerifiedCreator = media.getVerifiedCreators().some(
+      creator => creator.userId.toString() === userId.toString()
     );
     
-    if (!isAdmin && !isVerifiedCreator) {
+    if (!isAdmin && !isMediaOwner && !isVerifiedCreator) {
       return res.status(403).json({ error: 'Not authorized to edit this media' });
     }
+    
+    // Track changes for edit history
+    const changes = [];
     
     // Update allowed fields
     const allowedUpdates = [
       'title', 'producer', 'featuring', 'album', 'genre',
       'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'rightsHolder', 'rightsHolderEmail', 'description', 'sources'
+      'lyrics', 'description', 'sources'
     ];
     
     allowedUpdates.forEach(field => {
-      if (req.body[field] !== undefined) {
+      if (req.body[field] !== undefined && media[field] !== req.body[field]) {
+        changes.push({
+          field,
+          oldValue: media[field],
+          newValue: req.body[field]
+        });
         media[field] = req.body[field];
       }
     });
@@ -410,7 +421,24 @@ router.put('/:id', authMiddleware, async (req, res) => {
     
     // Genre field (singular -> genres array)
     if (req.body.genre !== undefined) {
+      const oldGenres = media.genres;
       media.genres = req.body.genre ? [req.body.genre] : [];
+      if (JSON.stringify(oldGenres) !== JSON.stringify(media.genres)) {
+        changes.push({
+          field: 'genres',
+          oldValue: oldGenres,
+          newValue: media.genres
+        });
+      }
+    }
+    
+    // Add to edit history if there are changes
+    if (changes.length > 0) {
+      media.editHistory.push({
+        editedBy: userId,
+        editedAt: new Date(),
+        changes: changes
+      });
     }
     
     await media.save();

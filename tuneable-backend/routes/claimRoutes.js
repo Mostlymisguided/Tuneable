@@ -139,11 +139,34 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 
     await claim.save();
 
-    // If approved, add user to media's verified creators
+    // If approved, add user to media's owners and assign ownership percentage
     if (status === 'approved') {
-      await Media.findByIdAndUpdate(claim.mediaId, {
-        $addToSet: { verifiedCreators: claim.userId }
-      });
+      const media = await Media.findById(claim.mediaId);
+      if (!media) {
+        return res.status(404).json({ error: 'Media not found' });
+      }
+      
+      // Add ownership with default percentage (admin can specify in request)
+      const ownershipPercentage = req.body.ownershipPercentage || 50; // Default 50%
+      try {
+        media.addMediaOwner(claim.userId, ownershipPercentage, 'primary', req.user._id);
+        
+        // Add to edit history
+        media.editHistory.push({
+          editedBy: req.user._id,
+          editedAt: new Date(),
+          changes: [{
+            field: 'mediaOwners',
+            oldValue: 'No owners',
+            newValue: `Added ${claim.userId} as ${ownershipPercentage}% owner via claim approval`
+          }]
+        });
+        
+        await media.save();
+      } catch (error) {
+        console.error('Error adding media owner:', error);
+        return res.status(400).json({ error: 'Failed to assign ownership: ' + error.message });
+      }
     }
 
     res.json({
