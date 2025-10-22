@@ -49,6 +49,15 @@ const userSchema = new mongoose.Schema({
   },
   isActive: { type: Boolean, default: true },
   
+  // Email verification
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String },
+  emailVerificationExpires: { type: Date },
+  
+  // Password reset
+  passwordResetToken: { type: String },
+  passwordResetExpires: { type: Date },
+  
   // Creator profile for verified creators/artists
   creatorProfile: {
     artistName: { type: String },
@@ -120,6 +129,48 @@ userSchema.statics.findByUserId = async function(userId) {
 // Static method to find a user by email
 userSchema.statics.findByEmail = async function(email) {
   return this.findOne({ email }).select('-password');
+};
+
+// Generate email verification token
+userSchema.methods.generateEmailVerificationToken = function() {
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  this.emailVerificationToken = token;
+  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return token;
+};
+
+// Generate password reset token
+userSchema.methods.generatePasswordResetToken = function() {
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = token;
+  this.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+  return token;
+};
+
+// Verify email with token
+userSchema.methods.verifyEmail = function(token) {
+  if (this.emailVerificationToken === token && 
+      this.emailVerificationExpires > Date.now()) {
+    this.emailVerified = true;
+    this.emailVerificationToken = undefined;
+    this.emailVerificationExpires = undefined;
+    return true;
+  }
+  return false;
+};
+
+// Reset password with token
+userSchema.methods.resetPassword = function(token, newPassword) {
+  if (this.passwordResetToken === token && 
+      this.passwordResetExpires > Date.now()) {
+    this.password = newPassword;
+    this.passwordResetToken = undefined;
+    this.passwordResetExpires = undefined;
+    return true;
+  }
+  return false;
 };
 
 // Indexes

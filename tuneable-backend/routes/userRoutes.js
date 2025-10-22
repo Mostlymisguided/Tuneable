@@ -12,7 +12,7 @@ const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
 const authMiddleware = require('../middleware/authMiddleware');
 const { transformResponse } = require('../utils/uuidTransform');
-const { sendUserRegistrationNotification } = require('../utils/emailService');
+const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 
 const router = express.Router();
@@ -154,6 +154,18 @@ router.post(
       } catch (emailError) {
         console.error('Failed to send registration notification email:', emailError);
         // Don't fail the request if email fails
+      }
+
+      // Send email verification if user has email
+      if (user.email) {
+        try {
+          const token = user.generateEmailVerificationToken();
+          await user.save();
+          await sendEmailVerification(user, token);
+        } catch (emailError) {
+          console.error('Failed to send email verification:', emailError);
+          // Don't fail the request if email verification fails
+        }
       }
 
       // Generate JWT token for auto-login using UUID

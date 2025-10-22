@@ -358,11 +358,313 @@ async function sendHighValueBidNotification(bid, media, user, threshold = 10) {
   }
 }
 
+// Send email verification to user
+async function sendEmailVerification(user, verificationToken) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: '🎵 Verify Your Tuneable Account',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">🎵 Welcome to Tuneable!</h2>
+          
+          <p>Hi ${user.username},</p>
+          
+          <p>Thanks for joining Tuneable! To complete your account setup, please verify your email address.</p>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/verify-email?token=${verificationToken}" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Verify Email Address
+            </a>
+          </div>
+          
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #6b7280; font-size: 12px;">
+            ${FRONTEND_URL}/verify-email?token=${verificationToken}
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This verification link will expire in 24 hours. If you didn't create a Tuneable account, you can safely ignore this email.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending verification email:', error);
+      return false;
+    }
+
+    console.log('✅ Email verification sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending verification email:', error.message);
+    return false;
+  }
+}
+
+// Send password reset email
+async function sendPasswordReset(user, resetToken) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: '🔐 Reset Your Tuneable Password',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">🔐 Password Reset Request</h2>
+          
+          <p>Hi ${user.username},</p>
+          
+          <p>We received a request to reset your Tuneable password. Click the button below to create a new password:</p>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/reset-password?token=${resetToken}" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Reset Password
+            </a>
+          </div>
+          
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #6b7280; font-size: 12px;">
+            ${FRONTEND_URL}/reset-password?token=${resetToken}
+          </p>
+          
+          <p><strong>This link will expire in 1 hour for security reasons.</strong></p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending password reset email:', error);
+      return false;
+    }
+
+    console.log('✅ Password reset email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending password reset email:', error.message);
+    return false;
+  }
+}
+
+// Send welcome email to new users
+async function sendWelcomeEmail(user) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: '🎉 Welcome to Tuneable!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">🎉 Welcome to Tuneable!</h2>
+          
+          <p>Hi ${user.username},</p>
+          
+          <p>Welcome to Tuneable! You're now part of the community where music lovers discover, share, and bid on amazing tunes.</p>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Get Started</h3>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>🎵 <strong>Discover Music:</strong> Browse trending tunes and find your next favorite song</li>
+              <li>🎉 <strong>Join Parties:</strong> Create or join music parties with friends</li>
+              <li>💰 <strong>Bid on Tunes:</strong> Place bids on songs you love during parties</li>
+              <li>👤 <strong>Build Your Profile:</strong> Add your music preferences and social links</li>
+            </ul>
+          </div>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/dashboard" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Go to Dashboard
+            </a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            Thanks for joining Tuneable! If you have any questions, feel free to reach out to our support team.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending welcome email:', error);
+      return false;
+    }
+
+    console.log('✅ Welcome email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending welcome email:', error.message);
+    return false;
+  }
+}
+
+// Send ownership notification email
+async function sendOwnershipNotification(user, media, ownershipPercentage, addedBy) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: `🎵 You've been added as ${ownershipPercentage}% owner of "${media.title}"`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">🎵 New Media Ownership</h2>
+          
+          <p>Hi ${user.username},</p>
+          
+          <p>You've been added as a <strong>${ownershipPercentage}% owner</strong> of the following tune:</p>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Tune Details</h3>
+            ${media.coverArt ? `<img src="${media.coverArt}" alt="${media.title}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover; margin-bottom: 10px;">` : ''}
+            <p><strong>Title:</strong> ${media.title}</p>
+            <p><strong>Artist:</strong> ${media.artist?.[0]?.name || media.artist || 'Unknown'}</p>
+            ${media.album ? `<p><strong>Album:</strong> ${media.album}</p>` : ''}
+            <p><strong>Your Ownership:</strong> ${ownershipPercentage}%</p>
+            <p><strong>Added by:</strong> ${addedBy.username}</p>
+          </div>
+          
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #0369a1;">What This Means</h3>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>You can now edit this tune's information</li>
+              <li>You'll receive ${ownershipPercentage}% of any revenue generated</li>
+              <li>You can manage other owners and their percentages</li>
+              <li>You'll be notified of any changes to this tune</li>
+            </ul>
+          </div>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/media/${media._id}" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              View Tune
+            </a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from Tuneable. You can manage your media ownership in your dashboard.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending ownership notification:', error);
+      return false;
+    }
+
+    console.log('✅ Ownership notification sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending ownership notification:', error.message);
+    return false;
+  }
+}
+
+// Send claim approval/rejection notification
+async function sendClaimStatusNotification(user, claim, media, status, adminMessage = '') {
+  try {
+    const isApproved = status === 'approved';
+    const subject = isApproved 
+      ? `✅ Tune Claim Approved: "${media.title}"`
+      : `❌ Tune Claim Rejected: "${media.title}"`;
+    
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: ${isApproved ? '#10b981' : '#ef4444'};">
+            ${isApproved ? '✅' : '❌'} Tune Claim ${isApproved ? 'Approved' : 'Rejected'}
+          </h2>
+          
+          <p>Hi ${user.username},</p>
+          
+          <p>Your claim for the tune <strong>"${media.title}"</strong> has been <strong>${status}</strong>.</p>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Tune Details</h3>
+            ${media.coverArt ? `<img src="${media.coverArt}" alt="${media.title}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover; margin-bottom: 10px;">` : ''}
+            <p><strong>Title:</strong> ${media.title}</p>
+            <p><strong>Artist:</strong> ${media.artist?.[0]?.name || media.artist || 'Unknown'}</p>
+            <p><strong>Claimed:</strong> ${new Date(claim.submittedAt).toLocaleDateString()}</p>
+            <p><strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1)}</p>
+          </div>
+          
+          ${isApproved ? `
+            <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <h3 style="margin-top: 0; color: #059669;">🎉 Congratulations!</h3>
+              <p>You are now a verified owner of this tune and can:</p>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Edit tune information and metadata</li>
+                <li>Manage other owners and their percentages</li>
+                <li>Receive revenue from this tune</li>
+                <li>Control how this tune is used on the platform</li>
+              </ul>
+            </div>
+          ` : `
+            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+              <h3 style="margin-top: 0; color: #dc2626;">Claim Not Approved</h3>
+              <p>Unfortunately, we couldn't verify your ownership of this tune. This could be because:</p>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Insufficient proof of ownership provided</li>
+                <li>Another user already has verified ownership</li>
+                <li>The tune information doesn't match your claim</li>
+              </ul>
+              ${adminMessage ? `<p><strong>Admin Note:</strong> ${adminMessage}</p>` : ''}
+            </div>
+          `}
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/media/${media._id}" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              View Tune
+            </a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from Tuneable. If you have questions about this decision, please contact our support team.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending claim status notification:', error);
+      return false;
+    }
+
+    console.log(`✅ Claim ${status} notification sent:`, data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending claim status notification:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
   sendUserRegistrationNotification,
   sendPartyCreationNotification,
   sendPaymentNotification,
-  sendHighValueBidNotification
+  sendHighValueBidNotification,
+  sendEmailVerification,
+  sendPasswordReset,
+  sendWelcomeEmail,
+  sendOwnershipNotification,
+  sendClaimStatusNotification
 };

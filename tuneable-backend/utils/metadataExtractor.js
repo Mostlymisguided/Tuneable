@@ -18,8 +18,10 @@ class MetadataExtractor {
     try {
       console.log(`🔍 Extracting metadata from: ${filename}`);
       
-      // Parse the audio file
-      const metadata = await parseFile(fileBuffer);
+      // Parse the audio file - parseFile expects a file path, not a buffer
+      // We need to use parseBuffer for buffer input
+      const { parseBuffer } = require('music-metadata');
+      const metadata = await parseBuffer(fileBuffer);
       
       // Extract basic metadata
       const extractedData = {

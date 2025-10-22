@@ -5,7 +5,7 @@ const Media = require('../models/Media');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
-const { sendClaimNotification } = require('../utils/emailService');
+const { sendClaimNotification, sendOwnershipNotification, sendClaimStatusNotification } = require('../utils/emailService');
 const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
 
 // Configure upload using R2 or local fallback
@@ -139,35 +139,58 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 
     await claim.save();
 
-    // If approved, add user to media's owners and assign ownership percentage
-    if (status === 'approved') {
-      const media = await Media.findById(claim.mediaId);
-      if (!media) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      
-      // Add ownership with default percentage (admin can specify in request)
-      const ownershipPercentage = req.body.ownershipPercentage || 50; // Default 50%
-      try {
-        media.addMediaOwner(claim.userId, ownershipPercentage, 'primary', req.user._id);
-        
-        // Add to edit history
-        media.editHistory.push({
-          editedBy: req.user._id,
-          editedAt: new Date(),
-          changes: [{
-            field: 'mediaOwners',
-            oldValue: 'No owners',
-            newValue: `Added ${claim.userId} as ${ownershipPercentage}% owner via claim approval`
-          }]
-        });
-        
-        await media.save();
-      } catch (error) {
-        console.error('Error adding media owner:', error);
-        return res.status(400).json({ error: 'Failed to assign ownership: ' + error.message });
-      }
-    }
+        // If approved, add user to media's owners and assign ownership percentage
+        if (status === 'approved') {
+          const media = await Media.findById(claim.mediaId);
+          if (!media) {
+            return res.status(404).json({ error: 'Media not found' });
+          }
+
+          // Add ownership with default percentage (admin can specify in request)
+          const ownershipPercentage = req.body.ownershipPercentage || 50; // Default 50%
+          try {
+            media.addMediaOwner(claim.userId, ownershipPercentage, 'primary', req.user._id);
+
+            // Add to edit history
+            media.editHistory.push({
+              editedBy: req.user._id,
+              editedAt: new Date(),
+              changes: [{
+                field: 'mediaOwners',
+                oldValue: 'No owners',
+                newValue: `Added ${claim.userId} as ${ownershipPercentage}% owner via claim approval`
+              }]
+            });
+
+            await media.save();
+
+            // Send ownership notification to the user
+            try {
+              const user = await User.findById(claim.userId);
+              const addedBy = await User.findById(req.user._id);
+              if (user && user.email && addedBy) {
+                await sendOwnershipNotification(user, media, ownershipPercentage, addedBy);
+              }
+            } catch (emailError) {
+              console.error('Failed to send ownership notification:', emailError);
+              // Don't fail the request if email fails
+            }
+          } catch (error) {
+            console.error('Error adding media owner:', error);
+            return res.status(400).json({ error: 'Failed to assign ownership: ' + error.message });
+          }
+        }
+
+        // Send claim status notification to user
+        try {
+          const user = await User.findById(claim.userId);
+          if (user && user.email) {
+            await sendClaimStatusNotification(user, claim, media, status, req.body.adminMessage);
+          }
+        } catch (emailError) {
+          console.error('Failed to send claim status notification:', emailError);
+          // Don't fail the request if email fails
+        }
 
     res.json({
       message: `Claim ${status}`,
