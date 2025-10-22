@@ -539,7 +539,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         // Calculate queue context
         const queuedMedia = party.media.filter(m => m.status === 'queued');
         const queueSize = queuedMedia.length;
-        const queuePosition = queueSize + 1; // This new song will be at the end
+        const queuePosition = queueSize + 1; // This new media will be at the end
 
         // Detect platform from user-agent (don't use 'platform' from req.body as it's the media platform like 'youtube')
         const userAgent = req.headers['user-agent'] || '';
@@ -870,14 +870,14 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
         // Broadcast play event via WebSocket
         const { broadcastToParty } = require('../utils/broadcast');
         broadcastToParty(partyId, {
-            type: 'SONG_STARTED',
-            songId: songId,
+            type: 'MEDIA_STARTED',
+            mediaId: songId,
             playedAt: songEntry.playedAt
         });
 
         res.json({
-            message: 'Song started playing',
-            songId: songId,
+            message: 'Media started playing',
+            mediaId: songId,
             playedAt: songEntry.playedAt
         });
     } catch (err) {
@@ -999,18 +999,6 @@ router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) =>
         }
 
         const party = await Party.findById(partyId)
-            .populate({
-                path: 'songs.songId',
-                model: 'Song',
-                populate: {
-                    path: 'bids',
-                    model: 'Bid',
-                    populate: {
-                        path: 'userId',
-                        select: 'username profilePic uuid',  // ✅ Added profilePic and uuid for top bidders display
-                    },
-                },
-            })
             .populate('media.addedBy', 'username');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
@@ -1082,8 +1070,8 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
         });
 
         res.json({
-            message: 'Song vetoed successfully',
-            songId: songId,
+            message: 'Media vetoed successfully',
+            mediaId: songId,
             reason: reason
         });
     } catch (err) {
@@ -1106,7 +1094,7 @@ router.post('/update-statuses', async (req, res) => {
     }
 });
 
-// Skip to next song (remote parties only)
+// Skip to next media (remote parties only)
 router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
@@ -1157,7 +1145,7 @@ router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
     }
 });
 
-// Skip to previous song (remote parties only)
+// Skip to previous media (remote parties only)
 router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
@@ -1265,7 +1253,7 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
 
         // Validate IDs
         if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(songId)) {
-            return res.status(400).json({ error: 'Invalid party or song ID format' });
+            return res.status(400).json({ error: 'Invalid party or media ID format' });
         }
 
         // Find the party
@@ -1513,10 +1501,10 @@ router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) =
         
         // Check if user is the host
         if (party.host.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: 'Only the host can un-veto songs' });
+            return res.status(403).json({ error: 'Only the host can un-veto media' });
         }
         
-        // Find the song in the party
+        // Find the media in the party
         const mediaEntry = party.media.find(m => 
             (m.mediaId && m.mediaId.toString() === songId) || 
             (m.media_uuid === songId)
@@ -1535,7 +1523,7 @@ router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) =
         await party.save();
         
         res.json(transformResponse({
-            message: 'Song restored to queue successfully',
+            message: 'Media restored to queue successfully',
             party: party
         }));
         
