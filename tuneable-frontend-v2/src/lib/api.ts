@@ -292,18 +292,18 @@ export const songAPI = {
     return response.data;
   },
 
-  getProfile: async (songId: string) => {
-    const response = await api.get(`/media/${songId}/profile`);
+  getProfile: async (mediaId: string) => {
+    const response = await api.get(`/media/${mediaId}/profile`);
     return response.data;
   },
   
-  getComments: async (songId: string, page = 1, limit = 20) => {
-    const response = await api.get(`/media/${songId}/comments?page=${page}&limit=${limit}`);
+  getComments: async (mediaId: string, page = 1, limit = 20) => {
+    const response = await api.get(`/media/${mediaId}/comments?page=${page}&limit=${limit}`);
     return response.data;
   },
   
-  createComment: async (songId: string, content: string) => {
-    const response = await api.post(`/media/${songId}/comments`, { content });
+  createComment: async (mediaId: string, content: string) => {
+    const response = await api.post(`/media/${mediaId}/comments`, { content });
     return response.data;
   },
   
@@ -317,7 +317,7 @@ export const songAPI = {
     return response.data;
   },
 
-  updateSong: async (songId: string, updates: {
+  updateSong: async (mediaId: string, updates: {
     title?: string;
     artist?: string;
     producer?: string;
@@ -342,19 +342,19 @@ export const songAPI = {
     description?: string;
     sources?: { [key: string]: string };
   }) => {
-    const response = await api.put(`/media/${songId}`, updates);
+    const response = await api.put(`/media/${mediaId}`, updates);
     return response.data;
   },
 
   // Place global bid (chart support)
-  placeGlobalBid: async (songId: string, amount: number) => {
-    const response = await api.post(`/media/${songId}/global-bid`, { amount });
+  placeGlobalBid: async (mediaId: string, amount: number) => {
+    const response = await api.post(`/media/${mediaId}/global-bid`, { amount });
     return response.data;
   },
 
-  // Get top parties for a song
-  getTopPartiesForSong: async (songId: string) => {
-    const response = await api.get(`/media/${songId}/top-parties`);
+  // Get top parties for media
+  getTopPartiesForMedia: async (mediaId: string) => {
+    const response = await api.get(`/media/${mediaId}/top-parties`);
     return response.data;
   },
 

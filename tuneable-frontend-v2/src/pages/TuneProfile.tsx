@@ -26,14 +26,14 @@ import {
   Loader2,
   Flag
 } from 'lucide-react';
-import { songAPI, claimAPI } from '../lib/api';
+import { songAPI as mediaAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 
-interface Song {
+interface Media {
   _id: string;
   uuid: string;
   title: string;
@@ -108,11 +108,11 @@ interface Comment {
 }
 
 const TuneProfile: React.FC = () => {
-  const { songId } = useParams<{ songId: string }>();
+  const { mediaId: mediaId } = useParams<{ mediaId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [song, setSong] = useState<Song | null>(null);
+  const [media, setMedia] = useState<Media | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -148,7 +148,7 @@ const TuneProfile: React.FC = () => {
     description: '',
     // Enhanced metadata fields
     composer: '',
-    songwriter: '',
+    mediawriter: '',
     label: '',
     language: '',
     bitrate: 0,
@@ -177,31 +177,31 @@ const TuneProfile: React.FC = () => {
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
 
   useEffect(() => {
-    if (songId) {
-      fetchSongProfile();
+    if (mediaId) {
+      fetchMediaProfile();
       loadTopParties();
       loadTagRankings();
     }
-  }, [songId]);
+  }, [mediaId]);
 
-  const fetchSongProfile = async () => {
+  const fetchMediaProfile = async () => {
     try {
       setLoading(true);
-      const response = await songAPI.getProfile(songId!);
-      setSong(response.song);
-      setComments(response.song.comments || []);
+      const response = await mediaAPI.getProfile(mediaId!);
+      setMedia(response.media);
+      setComments(response.media.comments || []);
     } catch (err: any) {
-      console.error('Error fetching song profile:', err);
-      setError(err.response?.data?.error || 'Failed to load song profile');
-      toast.error('Failed to load song profile');
+      console.error('Error fetching media profile:', err);
+      setError(err.response?.data?.error || 'Failed to load media profile');
+      toast.error('Failed to load media profile');
     } finally {
       setLoading(false);
     }
   };
 
   // Calculate GlobalMediaBidAvg (average individual bid amount)
-  const calculateGlobalMediaBidAvg = (songData: Song) => {
-    const bids = songData.bids || [];
+  const calculateGlobalMediaBidAvg = (mediaData: Media) => {
+    const bids = mediaData.bids || [];
     if (bids.length === 0) return 0;
     const total = bids.reduce((sum, bid) => sum + bid.amount, 0);
     return total / bids.length;
@@ -209,7 +209,7 @@ const TuneProfile: React.FC = () => {
 
   // Check if user can edit this tune
   const canEditTune = () => {
-    if (!user || !song) return false;
+    if (!user || !media) return false;
     
     // Check if user is admin
     const isAdmin = user.role && user.role.includes('admin');
@@ -217,7 +217,7 @@ const TuneProfile: React.FC = () => {
     
     // Check if user is a verified creator
     // Note: verifiedCreators is an array of user IDs
-    const isVerifiedCreator = (song as any).verifiedCreators?.some(
+    const isVerifiedCreator = (media as any).verifiedCreators?.some(
       (creatorId: any) => {
         const id = typeof creatorId === 'string' ? creatorId : creatorId._id || creatorId.toString();
         return id === (user as any).id || id === (user as any)._id || id === user.uuid;
@@ -227,73 +227,73 @@ const TuneProfile: React.FC = () => {
     return isVerifiedCreator;
   };
 
-  // Populate edit form when song loads
+  // Populate edit form when media loads
   useEffect(() => {
-    if (song && canEditTune()) {
+    if (media && canEditTune()) {
       // Extract artist name from subdocument array
-      const artistName = (song as any).artist?.[0]?.name || song.artist || '';
+      const artistName = (media as any).artist?.[0]?.name || media.artist || '';
       
       // Extract producer name from subdocument array
-      const producerName = (song as any).producer?.[0]?.name || '';
+      const producerName = (media as any).producer?.[0]?.name || '';
       
       // Extract featuring names from subdocument array
-      const featuringNames = (song as any).featuring?.map((f: any) => f.name || f) || [];
+      const featuringNames = (media as any).featuring?.map((f: any) => f.name || f) || [];
       
       // Extract first genre from genres array
-      const genreValue = (song as any).genres?.[0] || (song as any).genre || '';
+      const genreValue = (media as any).genres?.[0] || (media as any).genre || '';
       
       // Format release date for date input
-      const releaseDateFormatted = song.releaseDate 
-        ? new Date(song.releaseDate).toISOString().split('T')[0] 
+      const releaseDateFormatted = media.releaseDate 
+        ? new Date(media.releaseDate).toISOString().split('T')[0] 
         : '';
       
       setEditForm({
-        title: song.title || '',
+        title: media.title || '',
         artist: artistName,
         producer: producerName,
         featuring: featuringNames,
-        album: song.album || '',
+        album: media.album || '',
         genre: genreValue,
         releaseDate: releaseDateFormatted,
-        duration: song.duration || 0,
-        explicit: song.explicit || false,
-        isrc: song.isrc || '',
-        upc: song.upc || '',
-        bpm: song.bpm || 0,
-        key: song.key || '',
-        tags: song.tags || [],
-        lyrics: song.lyrics || '',
-        description: (song as any).description || '',
+        duration: media.duration || 0,
+        explicit: media.explicit || false,
+        isrc: media.isrc || '',
+        upc: media.upc || '',
+        bpm: media.bpm || 0,
+        key: media.key || '',
+        tags: media.tags || [],
+        lyrics: media.lyrics || '',
+        description: (media as any).description || '',
         // Enhanced metadata fields
-        composer: (song as any).composer?.[0]?.name || (song as any).composer || '',
-        songwriter: (song as any).songwriter?.[0]?.name || (song as any).songwriter || '',
-        label: (song as any).label?.[0]?.name || (song as any).label || '',
-        language: (song as any).language || '',
-        bitrate: song.bitrate || 0,
-        sampleRate: song.sampleRate || 0,
-        pitch: song.pitch || 0,
-        timeSignature: song.timeSignature || '',
-        elements: song.elements || [],
-        coverArt: song.coverArt || ''
+        composer: (media as any).composer?.[0]?.name || (media as any).composer || '',
+        mediawriter: (media as any).mediawriter?.[0]?.name || (media as any).mediawriter || '',
+        label: (media as any).label?.[0]?.name || (media as any).label || '',
+        language: (media as any).language || '',
+        bitrate: media.bitrate || 0,
+        sampleRate: media.sampleRate || 0,
+        pitch: media.pitch || 0,
+        timeSignature: media.timeSignature || '',
+        elements: media.elements || [],
+        coverArt: media.coverArt || ''
       });
       // Set tag input as comma-separated string
-      setTagInput(song.tags?.join(', ') || '');
+      setTagInput(media.tags?.join(', ') || '');
     }
-  }, [song, user]);
+  }, [media, user]);
 
-  // Save tune updates
+  // Save media updates
   const handleSaveTune = async () => {
-    if (!songId) return;
+    if (!mediaId) return;
     
     try {
-      await songAPI.updateSong(songId, editForm);
-      toast.success('Tune updated successfully!');
+      await mediaAPI.updateSong(mediaId, editForm);
+      toast.success('Media updated successfully!');
       setIsEditingTune(false);
-      // Refresh tune data
-      await fetchSongProfile();
+      // Refresh media data
+      await fetchMediaProfile();
     } catch (err: any) {
-      console.error('Error updating tune:', err);
-      toast.error(err.response?.data?.error || 'Failed to update tune');
+      console.error('Error updating media:', err);
+      toast.error(err.response?.data?.error || 'Failed to update media');
     }
   };
 
@@ -337,8 +337,8 @@ const TuneProfile: React.FC = () => {
     }> = [];
     
     // Add links from sources
-    if (song?.sources) {
-      Object.entries(song.sources).forEach(([platform, url]) => {
+    if (media?.sources) {
+      Object.entries(media.sources).forEach(([platform, url]) => {
         const { icon, color, bgColor } = getPlatformIcon(platform);
         links.push({
           platform,
@@ -352,8 +352,8 @@ const TuneProfile: React.FC = () => {
     }
     
     // Auto-populate YouTube link from externalIds if not already in sources
-    if (song?.externalIds?.youtube && !song?.sources?.youtube) {
-      const youtubeId = song.externalIds.youtube;
+    if (media?.externalIds?.youtube && !media?.sources?.youtube) {
+      const youtubeId = media.externalIds.youtube;
       const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
       const { icon, color, bgColor } = getPlatformIcon('youtube');
       links.push({
@@ -367,8 +367,8 @@ const TuneProfile: React.FC = () => {
     }
     
     // Auto-populate Spotify link from externalIds if not already in sources
-    if (song?.externalIds?.spotify && !song?.sources?.spotify) {
-      const spotifyId = song.externalIds.spotify;
+    if (media?.externalIds?.spotify && !media?.sources?.spotify) {
+      const spotifyId = media.externalIds.spotify;
       const spotifyUrl = `https://open.spotify.com/track/${spotifyId}`;
       const { icon, color, bgColor } = getPlatformIcon('spotify');
       links.push({
@@ -388,8 +388,8 @@ const TuneProfile: React.FC = () => {
   const getMissingPlatforms = () => {
     if (!canEditTune()) return [];
     
-    const existingSources = song?.sources || {};
-    const existingExternalIds = song?.externalIds || {};
+    const existingSources = media?.sources || {};
+    const existingExternalIds = media?.externalIds || {};
     const allPlatforms = ['YouTube', 'SoundCloud', 'Spotify'];
     
     return allPlatforms
@@ -417,22 +417,22 @@ const TuneProfile: React.FC = () => {
 
   // Save new link
   const handleSaveLink = async () => {
-    if (!songId || !selectedPlatform || !newLinkUrl.trim()) return;
+    if (!mediaId || !selectedPlatform || !newLinkUrl.trim()) return;
     
     try {
       const updatedSources = {
-        ...(song?.sources || {}),
+        ...(media?.sources || {}),
         [selectedPlatform]: newLinkUrl.trim()
       };
       
-      await songAPI.updateSong(songId, { sources: updatedSources });
+      await mediaAPI.updateSong(mediaId, { sources: updatedSources });
       toast.success(`${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} link added!`);
       setShowAddLinkModal(false);
       setSelectedPlatform('');
       setNewLinkUrl('');
       
-      // Refresh song data
-      await fetchSongProfile();
+      // Refresh media data
+      await fetchMediaProfile();
     } catch (err: any) {
       console.error('Error adding link:', err);
       toast.error(err.response?.data?.error || 'Failed to add link');
@@ -441,11 +441,11 @@ const TuneProfile: React.FC = () => {
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !songId || !user) return;
+    if (!newComment.trim() || !mediaId || !user) return;
 
     try {
       setSubmittingComment(true);
-      const response = await songAPI.createComment(songId, newComment.trim());
+      const response = await mediaAPI.createComment(mediaId, newComment.trim());
       setComments(prev => [response.comment, ...prev]);
       setNewComment('');
       toast.success('Comment added successfully!');
@@ -464,7 +464,7 @@ const TuneProfile: React.FC = () => {
     }
 
     try {
-      const response = await songAPI.likeComment(commentId);
+      const response = await mediaAPI.likeComment(commentId);
       setComments(prev => prev.map(comment => 
         comment._id === commentId 
           ? { ...comment, likeCount: response.hasLiked ? comment.likeCount + 1 : comment.likeCount - 1 }
@@ -480,7 +480,7 @@ const TuneProfile: React.FC = () => {
     if (!user) return;
 
     try {
-      await songAPI.deleteComment(commentId);
+      await mediaAPI.deleteComment(commentId);
       setComments(prev => prev.filter(comment => comment._id !== commentId));
       toast.success('Comment deleted successfully');
     } catch (err: any) {
@@ -540,7 +540,7 @@ const TuneProfile: React.FC = () => {
 
     try {
       const formData = new FormData();
-      formData.append('mediaId', song?._id || '');
+      formData.append('mediaId', media?._id || '');
       formData.append('proofText', claimProofText);
       claimProofFiles.forEach((file) => {
         formData.append('proofFiles', file);
@@ -561,8 +561,8 @@ const TuneProfile: React.FC = () => {
   // Load top parties for this tune
   const loadTopParties = async () => {
     try {
-      console.log('🔍 Loading top parties for song:', songId);
-      const response = await songAPI.getTopPartiesForSong(songId!);
+      console.log('🔍 Loading top parties for media:', mediaId);
+      const response = await mediaAPI.getTopPartiesForMedia(mediaId!);
       console.log('📊 Top parties response:', response);
       console.log('📊 Parties data:', response.parties);
       setTopParties(response.parties || []);
@@ -580,8 +580,8 @@ const TuneProfile: React.FC = () => {
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
     try {
-      console.log('🏷️ Loading tag rankings for song:', songId);
-      const response = await songAPI.getTagRankings(songId!);
+      console.log('🏷️ Loading tag rankings for media:', mediaId);
+      const response = await mediaAPI.getTagRankings(mediaId!);
       console.log('📊 Tag rankings response:', response);
       setTagRankings(response.tagRankings || []);
       console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
@@ -593,17 +593,17 @@ const TuneProfile: React.FC = () => {
 
   // Handle play button click
   const handlePlaySong = () => {
-    if (!song) return;
+    if (!media) return;
 
-    console.log('🎵 Raw song object:', song);
-    console.log('🎵 Raw sources:', song.sources, typeof song.sources);
+    console.log('🎵 Raw media object:', media);
+    console.log('🎵 Raw sources:', media.sources, typeof media.sources);
 
     // Clean and format sources (same logic as Party page)
     let sources = {};
     
-    if (song.sources) {
-      if (Array.isArray(song.sources)) {
-        for (const source of song.sources) {
+    if (media.sources) {
+      if (Array.isArray(media.sources)) {
+        for (const source of media.sources) {
           if (source && source.platform === '$__parent' && source.url && source.url.sources) {
             // Handle Mongoose metadata corruption
             sources = source.url.sources;
@@ -618,36 +618,36 @@ const TuneProfile: React.FC = () => {
             (sources as any).spotify = source.spotify;
           }
         }
-      } else if (typeof song.sources === 'object') {
+      } else if (typeof media.sources === 'object') {
         // Preserve the original sources object
-        sources = song.sources;
+        sources = media.sources;
       }
     }
 
-    // Format song for webplayer
+    // Format media for webplayer
     const formattedSong = {
-      id: song.uuid || song._id,
-      title: song.title,
-      artist: Array.isArray(song.artist) ? song.artist[0]?.name || 'Unknown Artist' : song.artist,
-      duration: song.duration,
-      coverArt: song.coverArt,
+      id: media.uuid || media._id,
+      title: media.title,
+      artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
+      duration: media.duration,
+      coverArt: media.coverArt,
       sources: sources, // Use cleaned sources
-      globalMediaAggregate: song.globalMediaAggregate || 0,
-      bids: song.bids || [],
-      addedBy: song.addedBy?.username || 'Unknown',
-      totalBidValue: song.globalMediaAggregate || 0
+      globalMediaAggregate: media.globalMediaAggregate || 0,
+      bids: media.bids || [],
+      addedBy: media.addedBy?.username || 'Unknown',
+      totalBidValue: media.globalMediaAggregate || 0
     } as any;
 
     console.log('🎵 Playing from TuneProfile:', formattedSong);
     console.log('Sources:', sources);
 
-    // Clear any existing queue and set new song
+    // Clear any existing queue and set new media
     setQueue([formattedSong]);
     setCurrentMedia(formattedSong, 0, true); // true = autoplay
     setGlobalPlayerActive(true);
     setCurrentPartyId(null); // Not in a party context
     
-    toast.success(`Now playing: ${song.title}`);
+    toast.success(`Now playing: ${media.title}`);
   };
 
   // Handle global bid (chart support)
@@ -672,12 +672,12 @@ const TuneProfile: React.FC = () => {
     setIsPlacingGlobalBid(true);
 
     try {
-      await songAPI.placeGlobalBid(songId!, globalBidAmount);
+      await mediaAPI.placeGlobalBid(mediaId!, globalBidAmount);
       
-      toast.success(`Placed £${globalBidAmount.toFixed(2)} bid on "${song?.title}"!`);
+      toast.success(`Placed £${globalBidAmount.toFixed(2)} bid on "${media?.title}"!`);
       
-      // Refresh song data to show updated metrics
-      await fetchSongProfile();
+      // Refresh media data to show updated metrics
+      await fetchMediaProfile();
       await loadTopParties();
       
     } catch (err: any) {
@@ -696,11 +696,11 @@ const TuneProfile: React.FC = () => {
     );
   }
 
-  if (error || !song) {
+  if (error || !media) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-white text-xl mb-4">Error loading song profile</div>
+          <div className="text-white text-xl mb-4">Error loading media profile</div>
           <button
             onClick={() => navigate(-1)}
             className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30"
@@ -712,29 +712,29 @@ const TuneProfile: React.FC = () => {
     );
   }
 
-  const songFields = [
-    { label: 'Title', value: song.title, icon: Music },
-    { label: 'Artist', value: song.artist, icon: Mic },
-    { label: 'Producer', value: song.producer, icon: Volume2 },
-    { label: 'Featuring', value: song.featuring, icon: User },
-    { label: 'Album', value: song.album, icon: Disc },
-    { label: 'Genre', value: song.genre, icon: Tag },
-    { label: 'Release Date', value: song.releaseDate, icon: Calendar },
-    { label: 'Duration', value: song.duration ? formatDuration(song.duration) : null, icon: Clock },
-    { label: 'Explicit', value: song.explicit ? 'Yes' : 'No', icon: Globe },
-    { label: 'ISRC', value: song.isrc, icon: Music },
-    { label: 'UPC', value: song.upc, icon: Disc },
-    { label: 'BPM', value: song.bpm, icon: Headphones },
-    { label: 'Key', value: song.key, icon: Music },
-    { label: 'Time Signature', value: song.timeSignature, icon: Music },
-    { label: 'Bitrate', value: song.bitrate ? `${song.bitrate} kbps` : null, icon: Headphones },
-    { label: 'Sample Rate', value: song.sampleRate ? `${song.sampleRate} Hz` : null, icon: Headphones },
-    { label: 'Elements', value: song.elements, icon: Tag },
-    { label: 'Tags', value: song.tags, icon: Tag },
-    { label: 'Category', value: song.category, icon: Tag },
+  const mediaFields = [
+    { label: 'Title', value: media.title, icon: Music },
+    { label: 'Artist', value: media.artist, icon: Mic },
+    { label: 'Producer', value: media.producer, icon: Volume2 },
+    { label: 'Featuring', value: media.featuring, icon: User },
+    { label: 'Album', value: media.album, icon: Disc },
+    { label: 'Genre', value: media.genre, icon: Tag },
+    { label: 'Release Date', value: media.releaseDate, icon: Calendar },
+    { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
+    { label: 'Explicit', value: media.explicit ? 'Yes' : 'No', icon: Globe },
+    { label: 'ISRC', value: media.isrc, icon: Music },
+    { label: 'UPC', value: media.upc, icon: Disc },
+    { label: 'BPM', value: media.bpm, icon: Headphones },
+    { label: 'Key', value: media.key, icon: Music },
+    { label: 'Time Signature', value: media.timeSignature, icon: Music },
+    { label: 'Bitrate', value: media.bitrate ? `${media.bitrate} kbps` : null, icon: Headphones },
+    { label: 'Sample Rate', value: media.sampleRate ? `${media.sampleRate} Hz` : null, icon: Headphones },
+    { label: 'Elements', value: media.elements, icon: Tag },
+    { label: 'Tags', value: media.tags, icon: Tag },
+    { label: 'Category', value: media.category, icon: Tag },
   ];
 
-  const visibleFields = showAllFields ? songFields : songFields.slice(0, 8);
+  const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -784,8 +784,8 @@ const TuneProfile: React.FC = () => {
             {/* Album Art with Play Button Overlay */}
             <div className="w-full md:w-auto flex justify-center md:justify-start mb-6 md:mb-0 md:mr-6 relative group">
               <img
-                src={song.coverArt || '/android-chrome-192x192.png'}
-                alt={`${song.title} cover`}
+                src={media.coverArt || '/android-chrome-192x192.png'}
+                alt={`${media.title} cover`}
                 className="w-48 h-48 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
               {/* Play Button Overlay */}
@@ -801,8 +801,8 @@ const TuneProfile: React.FC = () => {
             
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
-              <h1 className="text-2xl md:text-4xl font-bold mb-2 text-center md:text-left px-2 md:px-4">{song.title}</h1>
-              <p className="text-lg md:text-3xl text-purple-300 mb-4 text-center md:text-left px-2 md:px-4">{song.artist}</p>
+              <h1 className="text-2xl md:text-4xl font-bold mb-2 text-center md:text-left px-2 md:px-4">{media.title}</h1>
+              <p className="text-lg md:text-3xl text-purple-300 mb-4 text-center md:text-left px-2 md:px-4">{media.artist}</p>
               
               {/* Bid Metrics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 px-2 md:px-0">
@@ -810,7 +810,7 @@ const TuneProfile: React.FC = () => {
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
                   <div className="text-base md:text-2xl font-bold text-green-400">
-                    £{song.globalMediaAggregate?.toFixed(2) || '0.00'}
+                    £{media.globalMediaAggregate?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
@@ -818,7 +818,7 @@ const TuneProfile: React.FC = () => {
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-cyan-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bids</div>
                   <div className="text-base md:text-2xl font-bold text-cyan-400">
-                    {song.bids?.length || 0}
+                    {media.bids?.length || 0}
                   </div>
                 </div>
                 
@@ -826,7 +826,7 @@ const TuneProfile: React.FC = () => {
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-pink-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
                   <div className="text-base md:text-2xl font-bold text-pink-400">
-                    #{song.globalMediaAggregateTopRank || '-'}
+                    #{media.globalMediaAggregateTopRank || '-'}
                   </div>
                 </div>
                 
@@ -834,7 +834,7 @@ const TuneProfile: React.FC = () => {
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-purple-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
                   <div className="text-base md:text-2xl font-bold text-purple-400">
-                    £{song.globalMediaAggregateTop?.toFixed(2) || '0.00'}
+                    £{media.globalMediaAggregateTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
@@ -842,7 +842,7 @@ const TuneProfile: React.FC = () => {
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
                   <div className="text-2xl font-bold text-yellow-400">
-                    £{song.globalMediaBidTop?.toFixed(2) || '0.00'}
+                    £{media.globalMediaBidTop?.toFixed(2) || '0.00'}
                   </div>
                 </div>
                 
@@ -850,7 +850,7 @@ const TuneProfile: React.FC = () => {
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
                   <div className="text-2xl font-bold text-blue-400">
-                    £{calculateGlobalMediaBidAvg(song).toFixed(2)}
+                    £{calculateGlobalMediaBidAvg(media).toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -963,27 +963,27 @@ const TuneProfile: React.FC = () => {
         )}
 
         {/* Top Bids */}
-        {song.bids && song.bids.length > 0 && (
+        {media.bids && media.bids.length > 0 && (
           <div className="mb-8 px-2 md:px-0">
             <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
               <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
               Top Bids
             </h2>
             <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopBidders bids={song.bids} maxDisplay={5} />
+              <TopBidders bids={media.bids} maxDisplay={5} />
             </div>
           </div>
         )}
 
         {/* Top Supporters */}
-        {song.bids && song.bids.length > 0 && (
+        {media.bids && media.bids.length > 0 && (
           <div className="mb-8 px-2 md:px-0">
             <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
               <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400" />
               Top Supporters
             </h2>
             <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopSupporters bids={song.bids} maxDisplay={10} />
+              <TopSupporters bids={media.bids} maxDisplay={10} />
             </div>
           </div>
         )}
@@ -1109,11 +1109,11 @@ const TuneProfile: React.FC = () => {
             </div>
 
             {/* Lyrics Section */}
-            {song.lyrics && (
+            {media.lyrics && (
               <div className="mt-6 pt-6 border-t border-gray-700">
                 <h3 className="text-lg font-semibold text-white mb-3">Lyrics</h3>
                 <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
-                  {song.lyrics}
+                  {media.lyrics}
                 </div>
               </div>
             )}
@@ -1121,12 +1121,12 @@ const TuneProfile: React.FC = () => {
         </div>
 
         {/* Links Section */}
-        {song.sources && Object.keys(song.sources).length > 0 && (
+        {media.sources && Object.keys(media.sources).length > 0 && (
           <div className="mb-8 md:hidden px-2">
             <h2 className="text-xl font-bold text-white mb-3">Links</h2>
             <div className="bg-black/20 rounded-lg p-4">
               <div className="flex flex-wrap gap-3 justify-center">
-                {Object.entries(song.sources).map(([platform, url]) => (
+                {Object.entries(media.sources).map(([platform, url]) => (
                   <a
                     key={platform}
                     href={url}
@@ -1158,7 +1158,7 @@ const TuneProfile: React.FC = () => {
                 <textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Share your thoughts about this song..."
+                  placeholder="Share your thoughts about this media..."
                   className="w-full h-24 bg-black/20 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-purple-500"
                   style={{ color: 'white' }}
                   maxLength={1000}
@@ -1281,7 +1281,7 @@ const TuneProfile: React.FC = () => {
           <div className="card max-w-lg w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-white">
-                Claim "{song?.title}"
+                Claim "{media?.title}"
               </h2>
               <button
                 onClick={() => setShowClaimVerificationModal(false)}
@@ -1302,7 +1302,7 @@ const TuneProfile: React.FC = () => {
               <textarea
                 value={claimProofText}
                 onChange={(e) => setClaimProofText(e.target.value)}
-                placeholder="Describe your role (artist, producer, songwriter, etc.) and provide links to social media, streaming profiles, distribution platforms, or other verification..."
+                placeholder="Describe your role (artist, producer, mediawriter, etc.) and provide links to social media, streaming profiles, distribution platforms, or other verification..."
                 className="input min-h-32"
                 maxLength={2000}
               />
@@ -1595,8 +1595,8 @@ const TuneProfile: React.FC = () => {
                     <label className="block text-white font-medium mb-2">Songwriter</label>
                     <input
                       type="text"
-                      value={editForm.songwriter}
-                      onChange={(e) => setEditForm({ ...editForm, songwriter: e.target.value })}
+                      value={editForm.mediawriter}
+                      onChange={(e) => setEditForm({ ...editForm, mediawriter: e.target.value })}
                       className="input"
                       placeholder="Songwriter name"
                     />
@@ -1773,12 +1773,12 @@ const TuneProfile: React.FC = () => {
       )}
 
       {/* Report Modal */}
-      {song && (
+      {media && (
         <ReportModal
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
-          mediaId={song.uuid}
-          mediaTitle={`${song.title} by ${Array.isArray(song.artist) ? song.artist.map((a: any) => a.name).join(', ') : song.artist}`}
+          mediaId={media.uuid}
+          mediaTitle={`${media.title} by ${Array.isArray(media.artist) ? media.artist.map((a: any) => a.name).join(', ') : media.artist}`}
         />
       )}
     </div>
