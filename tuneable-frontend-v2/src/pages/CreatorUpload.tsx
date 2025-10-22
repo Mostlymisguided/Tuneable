@@ -34,12 +34,8 @@ const CreatorUpload: React.FC = () => {
     lyrics: '',
     composer: '',
     producer: '',
-    publisher: '',
     label: '',
-    language: '',
-    trackNumber: '',
-    discNumber: '',
-    year: ''
+    language: ''
   });
 
   // Check if user is verified creator or admin
@@ -115,12 +111,8 @@ const CreatorUpload: React.FC = () => {
         lyrics: extractedMetadata.lyrics || prev.lyrics,
         composer: extractedMetadata.composer || prev.composer,
         producer: extractedMetadata.producer || prev.producer,
-        publisher: extractedMetadata.publisher || prev.publisher,
         label: extractedMetadata.label || prev.label,
-        language: extractedMetadata.language || prev.language,
-        trackNumber: extractedMetadata.trackNumber?.toString() || prev.trackNumber,
-        discNumber: extractedMetadata.discNumber?.toString() || prev.discNumber,
-        year: extractedMetadata.year?.toString() || prev.year
+        language: extractedMetadata.language || prev.language
       }));
     }
   }, [extractedMetadata]);
@@ -171,12 +163,8 @@ const CreatorUpload: React.FC = () => {
       if (formData.lyrics) uploadData.append('lyrics', formData.lyrics);
       if (formData.composer) uploadData.append('composer', formData.composer);
       if (formData.producer) uploadData.append('producer', formData.producer);
-      if (formData.publisher) uploadData.append('publisher', formData.publisher);
       if (formData.label) uploadData.append('label', formData.label);
       if (formData.language) uploadData.append('language', formData.language);
-      if (formData.trackNumber) uploadData.append('trackNumber', formData.trackNumber);
-      if (formData.discNumber) uploadData.append('discNumber', formData.discNumber);
-      if (formData.year) uploadData.append('year', formData.year);
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const token = localStorage.getItem('token');
@@ -598,50 +586,6 @@ const CreatorUpload: React.FC = () => {
                 </div>
               </div>
 
-              {/* Track Information */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div>
-                  <label className="block text-white font-medium mb-2">
-                    Track Number
-                  </label>
-                  <input
-                    type="number"
-                    name="trackNumber"
-                    value={formData.trackNumber}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder="1"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-white font-medium mb-2">
-                    Disc Number
-                  </label>
-                  <input
-                    type="number"
-                    name="discNumber"
-                    value={formData.discNumber}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder="1"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-white font-medium mb-2">
-                    Year
-                  </label>
-                  <input
-                    type="number"
-                    name="year"
-                    value={formData.year}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder="2024"
-                  />
-                </div>
-              </div>
 
               {/* Creator Information */}
               <div className="grid grid-cols-2 gap-4 mb-6">
@@ -705,22 +649,8 @@ const CreatorUpload: React.FC = () => {
                 </div>
               </div>
 
-              {/* Publisher & Label */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-white font-medium mb-2">
-                    Publisher
-                  </label>
-                  <input
-                    type="text"
-                    name="publisher"
-                    value={formData.publisher}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder="Publisher name"
-                  />
-                </div>
-                
+              {/* Label */}
+              <div className="grid grid-cols-1 gap-4 mb-6">
                 <div>
                   <label className="block text-white font-medium mb-2">
                     Label

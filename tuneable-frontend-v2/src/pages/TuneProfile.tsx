@@ -145,7 +145,18 @@ const TuneProfile: React.FC = () => {
     key: '',
     tags: [] as string[],
     lyrics: '',
-    description: ''
+    description: '',
+    // Enhanced metadata fields
+    composer: '',
+    songwriter: '',
+    label: '',
+    language: '',
+    bitrate: 0,
+    sampleRate: 0,
+    pitch: 0,
+    timeSignature: '',
+    elements: [] as string[],
+    coverArt: ''
   });
 
   // Add Link modal state
@@ -252,7 +263,18 @@ const TuneProfile: React.FC = () => {
         key: song.key || '',
         tags: song.tags || [],
         lyrics: song.lyrics || '',
-        description: (song as any).description || ''
+        description: (song as any).description || '',
+        // Enhanced metadata fields
+        composer: (song as any).composer?.[0]?.name || (song as any).composer || '',
+        songwriter: (song as any).songwriter?.[0]?.name || (song as any).songwriter || '',
+        label: (song as any).label?.[0]?.name || (song as any).label || '',
+        language: (song as any).language || '',
+        bitrate: song.bitrate || 0,
+        sampleRate: song.sampleRate || 0,
+        pitch: song.pitch || 0,
+        timeSignature: song.timeSignature || '',
+        elements: song.elements || [],
+        coverArt: song.coverArt || ''
       });
       // Set tag input as comma-separated string
       setTagInput(song.tags?.join(', ') || '');
@@ -1548,6 +1570,123 @@ const TuneProfile: React.FC = () => {
                   className="input min-h-[200px] font-mono text-sm"
                   placeholder="Enter lyrics..."
                 />
+              </div>
+
+              {/* Enhanced Metadata Section */}
+              <div className="border-t border-gray-600 pt-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <Music className="h-5 w-5 mr-2 text-purple-400" />
+                  Enhanced Metadata
+                </h3>
+
+                {/* Creator Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Composer</label>
+                    <input
+                      type="text"
+                      value={editForm.composer}
+                      onChange={(e) => setEditForm({ ...editForm, composer: e.target.value })}
+                      className="input"
+                      placeholder="Composer name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Songwriter</label>
+                    <input
+                      type="text"
+                      value={editForm.songwriter}
+                      onChange={(e) => setEditForm({ ...editForm, songwriter: e.target.value })}
+                      className="input"
+                      placeholder="Songwriter name"
+                    />
+                  </div>
+                </div>
+
+                {/* Label */}
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Label</label>
+                    <input
+                      type="text"
+                      value={editForm.label}
+                      onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
+                      className="input"
+                      placeholder="Record label"
+                    />
+                  </div>
+                </div>
+
+                {/* Technical Metadata */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Bitrate (kbps)</label>
+                    <input
+                      type="number"
+                      value={editForm.bitrate}
+                      onChange={(e) => setEditForm({ ...editForm, bitrate: parseInt(e.target.value) || 0 })}
+                      className="input"
+                      placeholder="320"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Sample Rate (Hz)</label>
+                    <input
+                      type="number"
+                      value={editForm.sampleRate}
+                      onChange={(e) => setEditForm({ ...editForm, sampleRate: parseInt(e.target.value) || 0 })}
+                      className="input"
+                      placeholder="44100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Pitch</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editForm.pitch}
+                      onChange={(e) => setEditForm({ ...editForm, pitch: parseFloat(e.target.value) || 0 })}
+                      className="input"
+                      placeholder="440.0"
+                    />
+                  </div>
+                </div>
+
+                {/* Time Signature and Language */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Time Signature</label>
+                    <input
+                      type="text"
+                      value={editForm.timeSignature}
+                      onChange={(e) => setEditForm({ ...editForm, timeSignature: e.target.value })}
+                      className="input"
+                      placeholder="4/4"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Language</label>
+                    <input
+                      type="text"
+                      value={editForm.language}
+                      onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
+                      className="input"
+                      placeholder="en"
+                    />
+                  </div>
+                </div>
+
+                {/* Cover Art URL */}
+                <div>
+                  <label className="block text-white font-medium mb-2">Cover Art URL</label>
+                  <input
+                    type="url"
+                    value={editForm.coverArt}
+                    onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
+                    className="input"
+                    placeholder="https://example.com/cover.jpg"
+                  />
+                </div>
               </div>
             </div>
 
