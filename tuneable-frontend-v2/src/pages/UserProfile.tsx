@@ -72,8 +72,8 @@ interface Bid {
   createdAt: string;
 }
 
-interface SongWithBids {
-  song: {
+interface MediaWithBids {
+  media: {
     _id: string;
     title: string;
     artist: string;
@@ -102,7 +102,7 @@ const UserProfile: React.FC = () => {
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [songsWithBids, setSongsWithBids] = useState<SongWithBids[]>([]);
+  const [mediaWithBids, setMediaWithBids] = useState<MediaWithBids[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +150,7 @@ const UserProfile: React.FC = () => {
       const response = await userAPI.getProfile(userId!);
       setUser(response.user);
       setStats(response.stats);
-      setSongsWithBids(response.songsWithBids);
+      setMediaWithBids(response.mediaWithBids);
       // Also load tag rankings
       loadTagRankings();
     } catch (err: any) {
@@ -579,49 +579,49 @@ const UserProfile: React.FC = () => {
         )}
 
         {/* Songs with Bids */}
-        {songsWithBids.length > 0 && (
+        {mediaWithBids.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl text-center font-bold text-white mb-4">Top Tunes</h2>
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
-                {songsWithBids.map((songData, index) => (
-                  <div key={songData.song?.uuid || songData.song?._id || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
+                {mediaWithBids.map((mediaData, index) => (
+                  <div key={mediaData.media?.uuid || mediaData.media?._id || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
                     <div className="flex-shrink-0">
                       <div className="flex items-center justify-center w-12 h-12 bg-purple-600/50 rounded-full">
                         <span className="text-white font-bold text-lg">{index + 1}</span>
                       </div>
                     </div>
                     <img
-                      src={songData.song?.coverArt || '/android-chrome-192x192.png'}
-                      alt={`${songData.song?.title || 'Unknown Song'} cover`}
+                      src={mediaData.media?.coverArt || '/android-chrome-192x192.png'}
+                      alt={`${mediaData.media?.title || 'Unknown Song'} cover`}
                       className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => songData.song?.uuid && navigate(`/tune/${songData.song.uuid}`)}
+                      onClick={() => mediaData.media?.uuid && navigate(`/tune/${mediaData.media.uuid}`)}
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h3 
                           className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
-                          onClick={() => songData.song?.uuid && navigate(`/tune/${songData.song.uuid}`)}
+                          onClick={() => mediaData.media?.uuid && navigate(`/tune/${mediaData.media.uuid}`)}
                         >
-                          {songData.song?.title || 'Unknown Song'}
+                          {mediaData.media?.title || 'Unknown Song'}
                         </h3>
                         <span className="text-gray-400">by</span>
-                        <span className="text-purple-300">{songData.song?.artist || 'Unknown Artist'}</span>
+                        <span className="text-purple-300">{mediaData.media?.artist || 'Unknown Artist'}</span>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-gray-400">
                         <span className="flex items-center">
                           <Clock className="w-4 h-4 mr-1" />
-                          {formatDuration(songData.song?.duration)}
+                          {formatDuration(mediaData.media?.duration)}
                         </span>
                         <span className="flex items-center">
                           <Activity className="w-4 h-4 mr-1" />
-                          {songData.bidCount || 0} bid{(songData.bidCount || 0) !== 1 ? 's' : ''}
+                          {mediaData.bidCount || 0} bid{(mediaData.bidCount || 0) !== 1 ? 's' : ''}
                         </span>
                       </div>
                       {/* Tags Display */}
-                      {songData.song?.tags && songData.song.tags.length > 0 && (
+                      {mediaData.media?.tags && mediaData.media.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {songData.song.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
+                          {mediaData.media.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
                             <span 
                               key={tagIndex}
                               className="px-2 py-1 bg-purple-600/30 text-purple-200 text-xs rounded-full"
@@ -629,16 +629,16 @@ const UserProfile: React.FC = () => {
                               {tag}
                             </span>
                           ))}
-                          {songData.song.tags.length > 5 && (
+                          {mediaData.media.tags.length > 5 && (
                             <span className="px-2 py-1 text-gray-400 text-xs">
-                              +{songData.song.tags.length - 5} more
+                              +{mediaData.media.tags.length - 5} more
                             </span>
                           )}
                         </div>
                       )}
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-green-400">£{(songData.totalAmount || 0).toFixed(2)}</div>
+                      <div className="text-xl font-bold text-green-400">£{(mediaData.totalAmount || 0).toFixed(2)}</div>
                       <div className="text-sm text-gray-400">Total Bid</div>
                     </div>
                   </div>

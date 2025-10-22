@@ -65,7 +65,7 @@ The frontend has ~640 "song/songs" references across 22 files, but **most are fi
 #### Key Files Using "Song" Terminology:
 1. **Party.tsx** - Uses "song" variables (fine - refers to music)
 2. **TuneProfile.tsx** - "Song" interface, "song" state (fine)
-3. **UserProfile.tsx** - "songsWithBids" (fine - user context)
+3. **UserProfile.tsx** - "mediaWithBids" (updated to media terminology)
 4. **TopTunes.tsx** - "songs" array (fine - it's a music chart)
 5. **api.ts** - `songAPI` export (works via backward compatibility)
 
