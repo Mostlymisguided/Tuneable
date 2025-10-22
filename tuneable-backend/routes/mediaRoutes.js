@@ -9,6 +9,7 @@ const { transformResponse } = require('../utils/uuidTransform');
 const { resolveId } = require('../utils/idResolver');
 const { createMediaUpload, getPublicUrl } = require('../utils/r2Upload');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
+const MetadataExtractor = require('../utils/metadataExtractor');
 
 // Configure media upload
 const mediaUpload = createMediaUpload();
@@ -37,7 +38,34 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    // Extract metadata from request
+    console.log(`🎵 Processing upload: ${req.file.originalname} (${req.file.size} bytes)`);
+    
+    // Extract metadata from uploaded file
+    let extractedMetadata = null;
+    let artworkUrl = null;
+    
+    try {
+      console.log('🔍 Extracting metadata from uploaded file...');
+      extractedMetadata = await MetadataExtractor.extractFromBuffer(req.file.buffer, req.file.originalname);
+      
+      // Process artwork if found
+      if (extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
+        console.log('🖼️ Processing extracted artwork...');
+        artworkUrl = await MetadataExtractor.processArtwork(extractedMetadata.artwork, 'temp');
+      }
+      
+      // Validate extracted metadata
+      const validation = MetadataExtractor.validateMetadata(extractedMetadata);
+      if (validation.warnings.length > 0) {
+        console.log('⚠️ Metadata validation warnings:', validation.warnings);
+      }
+      
+    } catch (metadataError) {
+      console.error('❌ Metadata extraction failed:', metadataError.message);
+      // Continue with manual metadata if extraction fails
+    }
+    
+    // Extract metadata from request (user-provided, takes priority over extracted)
     const {
       title,
       artistName,
@@ -51,40 +79,103 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
       coverArt
     } = req.body;
     
-    // Validate required fields
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-    
     // Get file URL (R2 or local)
     const fileUrl = req.file.location || getPublicUrl(`media-uploads/${req.file.filename}`);
     
     // Parse tags (comma-separated string to array)
     const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
     
-    // Determine artist name (priority: provided artistName > creatorProfile > username)
-    const finalArtistName = artistName?.trim() || user.creatorProfile?.artistName || user.username;
+    // Determine final values (user input takes priority over extracted metadata)
+    const finalTitle = title || extractedMetadata?.title || 'Untitled';
+    const finalArtistName = artistName?.trim() || extractedMetadata?.artist || user.creatorProfile?.artistName || user.username;
+    const finalAlbum = album || extractedMetadata?.album || null;
+    const finalGenres = genre ? [genre] : (extractedMetadata?.genres || []);
+    const finalDuration = duration ? parseInt(duration) : (extractedMetadata?.duration || null);
+    const finalExplicit = explicit === 'true' || explicit === true || extractedMetadata?.explicit || false;
+    const finalCoverArt = coverArt || artworkUrl || null;
     
-    // Create Media entry
+    // Validate required fields
+    if (!finalTitle) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    // Map extracted metadata to Media model format
+    const mappedMetadata = extractedMetadata ? 
+      MetadataExtractor.mapToMediaModel(extractedMetadata, userId) : {};
+    
+    // Create Media entry with extracted and manual metadata
     const media = new Media({
-      title,
-      artist: toCreatorSubdocs([{
+      // Basic information (user input takes priority)
+      title: finalTitle,
+      album: finalAlbum,
+      releaseDate: releaseDate || mappedMetadata.releaseDate || undefined,
+      
+      // Creators (use extracted if no user input)
+      artist: artistName ? toCreatorSubdocs([{
         name: finalArtistName,
-        userId: userId
-      }]),
-      album: album || undefined,
-      genres: genre ? [genre] : [],
-      releaseDate: releaseDate || undefined,
-      duration: duration ? parseInt(duration) : undefined,
-      explicit: explicit === 'true' || explicit === true,
+        userId: userId,
+        verified: true
+      }]) : (mappedMetadata.artist || toCreatorSubdocs([{
+        name: finalArtistName,
+        userId: userId,
+        verified: true
+      }])),
+      
+      // Additional creators from metadata
+      producer: mappedMetadata.producer || [],
+      songwriter: mappedMetadata.songwriter || [],
+      composer: mappedMetadata.composer || [],
+      label: mappedMetadata.label || [],
+      
+      // Technical metadata
+      duration: finalDuration,
+      bitrate: mappedMetadata.bitrate || null,
+      sampleRate: mappedMetadata.sampleRate || null,
+      explicit: finalExplicit,
+      
+      // Advanced metadata
+      bpm: mappedMetadata.bpm || null,
+      key: mappedMetadata.key || null,
+      isrc: mappedMetadata.isrc || null,
+      upc: mappedMetadata.upc || null,
+      lyrics: mappedMetadata.lyrics || null,
+      
+      // Content classification
+      genres: finalGenres,
+      language: mappedMetadata.language || 'en',
       tags: parsedTags,
       description: description || '',
-      coverArt: coverArt || undefined,
+      coverArt: finalCoverArt,
+      
+      // Track information
+      trackNumber: mappedMetadata.trackNumber || null,
+      discNumber: mappedMetadata.discNumber || null,
+      
+      // Publisher information
+      publisher: mappedMetadata.publisher || null,
+      encodedBy: mappedMetadata.encodedBy || null,
+      comment: mappedMetadata.comment || null,
+      
+      // File information
       sources: { upload: fileUrl },
       contentType: ['music'],
       contentForm: ['tune'],
+      mediaType: ['mp3'],
+      fileSize: req.file.size,
+      
+      // System fields
       addedBy: userId,
-      uploadedAt: new Date()
+      uploadedAt: new Date(),
+      
+      // Auto-assign ownership to uploader
+      mediaOwners: [{
+        userId: userId,
+        percentage: 100,
+        role: 'primary',
+        verified: true,
+        addedBy: userId,
+        addedAt: new Date()
+      }]
     });
     
     await media.save();
