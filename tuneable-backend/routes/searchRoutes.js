@@ -185,6 +185,7 @@ router.get('/', async (req, res) => {
                     })),
                     source: 'external'
                 };
+            }
         }
 
         // ✅ Cache the result
