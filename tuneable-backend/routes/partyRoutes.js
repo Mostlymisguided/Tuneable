@@ -825,10 +825,10 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 // Mark media as playing (called by web player when media starts)
 router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) => {
     try {
-        const { partyId, mediaId: songId } = req.params;
+        const { partyId, mediaId } = req.params;
         const userId = req.user._id;
 
-        if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
+        if (!isValidObjectId(partyId) || !isValidObjectId(mediaId)) {
             return res.status(400).json({ error: 'Invalid partyId or mediaId format' });
         }
 
@@ -842,7 +842,7 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
             return res.status(403).json({ error: 'Only the host can start songs' });
         }
 
-        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === songId);
+        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in this party' });
         }
@@ -871,13 +871,13 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
         const { broadcastToParty } = require('../utils/broadcast');
         broadcastToParty(partyId, {
             type: 'MEDIA_STARTED',
-            mediaId: songId,
+            mediaId: mediaId,
             playedAt: songEntry.playedAt
         });
 
         res.json({
             message: 'Media started playing',
-            mediaId: songId,
+            mediaId: mediaId,
             playedAt: songEntry.playedAt
         });
     } catch (err) {
@@ -930,10 +930,10 @@ router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
 // Mark media as played (called by web player when media finishes)
 router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res) => {
     try {
-        const { partyId, mediaId: songId } = req.params;
+        const { partyId, mediaId } = req.params;
         const userId = req.user._id;
 
-        if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
+        if (!isValidObjectId(partyId) || !isValidObjectId(mediaId)) {
             return res.status(400).json({ error: 'Invalid partyId or mediaId format' });
         }
 
@@ -947,18 +947,18 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
             return res.status(403).json({ error: 'Only the host can complete songs' });
         }
 
-        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === songId);
+        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in this party' });
         }
 
         const mediaEntry = party.media[mediaIndex];
         
-        console.log(`Attempting to complete media ${songId} with status: ${mediaEntry.status}`);
+        console.log(`Attempting to complete media ${mediaId} with status: ${mediaEntry.status}`);
         
         // Can complete playing media or queued media (for auto-playback)
         if (mediaEntry.status !== 'playing' && mediaEntry.status !== 'queued') {
-            console.log(`Media ${songId} is in status '${mediaEntry.status}', cannot complete`);
+            console.log(`Media ${mediaId} is in status '${mediaEntry.status}', cannot complete`);
             return res.status(400).json({ error: 'Can only complete playing or queued media' });
         }
 
@@ -970,16 +970,16 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
 
         // Broadcast completion event via WebSocket
         const { broadcastToParty } = require('../utils/broadcast');
-        console.log(`Broadcasting MEDIA_COMPLETED for media ${songId} in party ${partyId}`);
+        console.log(`Broadcasting MEDIA_COMPLETED for media ${mediaId} in party ${partyId}`);
         broadcastToParty(partyId, {
             type: 'MEDIA_COMPLETED',
-            mediaId: songId,
+            mediaId: mediaId,
             completedAt: mediaEntry.completedAt
         });
 
         res.json({
             message: 'Media completed',
-            mediaId: songId,
+            mediaId: mediaId,
             completedAt: mediaEntry.completedAt
         });
     } catch (err) {
@@ -1023,11 +1023,11 @@ router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) =>
 // Veto a media item (host only)
 router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => {
     try {
-        const { partyId, mediaId: songId } = req.params;
+        const { partyId, mediaId } = req.params;
         const { reason } = req.body;
         const userId = req.user._id;
 
-        if (!isValidObjectId(partyId) || !isValidObjectId(songId)) {
+        if (!isValidObjectId(partyId) || !isValidObjectId(mediaId)) {
             return res.status(400).json({ error: 'Invalid partyId or mediaId format' });
         }
 
@@ -1041,7 +1041,7 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
             return res.status(403).json({ error: 'Only the host can veto songs' });
         }
 
-        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === songId);
+        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in this party' });
         }
@@ -1063,7 +1063,7 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
         const { broadcastToParty } = require('../utils/broadcast');
         broadcastToParty(partyId, {
             type: 'MEDIA_VETOED',
-            mediaId: songId,
+            mediaId: mediaId,
             vetoedBy: userId,
             reason: reason,
             vetoedAt: mediaEntry.vetoedAt
@@ -1071,7 +1071,7 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
 
         res.json({
             message: 'Media vetoed successfully',
-            mediaId: songId,
+            mediaId: mediaId,
             reason: reason
         });
     } catch (err) {
@@ -1248,11 +1248,11 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
 // Remove a media item from a party (veto functionality)
 router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
     try {
-        const { partyId, mediaId: songId } = req.params;
+        const { partyId, mediaId } = req.params;
         const userId = req.user._id;
 
         // Validate IDs
-        if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(songId)) {
+        if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(mediaId)) {
             return res.status(400).json({ error: 'Invalid party or media ID format' });
         }
 
@@ -1268,7 +1268,7 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         }
 
         // Find the media in the party's queue
-        const mediaIndex = party.media.findIndex(entry => entry.mediaId.toString() === songId);
+        const mediaIndex = party.media.findIndex(entry => entry.mediaId.toString() === mediaId);
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in party queue' });
         }
@@ -1284,14 +1284,14 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         const { broadcastToParty } = require('../utils/broadcast');
         broadcastToParty(partyId, {
             type: 'MEDIA_VETOED',
-            mediaId: songId,
+            mediaId: mediaId,
             vetoedAt: party.media[mediaIndex].vetoedAt,
             vetoedBy: userId
         });
 
         res.json({
             message: 'Media vetoed successfully',
-            mediaId: songId,
+            mediaId: mediaId,
             vetoedAt: party.media[mediaIndex].vetoedAt
         });
 
@@ -1443,7 +1443,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(
 // @access  Private (host only)
 router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => {
     try {
-        const { partyId, mediaId: songId } = req.params;
+        const { partyId, mediaId } = req.params;
         
         const party = await Party.findById(partyId);
         if (!party) {
@@ -1457,8 +1457,8 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
         
         // Find the media in the party
         const mediaEntry = party.media.find(m => 
-            (m.mediaId && m.mediaId.toString() === songId) || 
-            (m.media_uuid === songId)
+            (m.mediaId && m.mediaId.toString() === mediaId) || 
+            (m.media_uuid === mediaId)
         );
         
         if (!mediaEntry) {
@@ -1492,7 +1492,7 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
 // @access  Private (host only)
 router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) => {
     try {
-        const { partyId, mediaId: songId } = req.params;
+        const { partyId, mediaId } = req.params;
         
         const party = await Party.findById(partyId);
         if (!party) {
@@ -1506,8 +1506,8 @@ router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) =
         
         // Find the media in the party
         const mediaEntry = party.media.find(m => 
-            (m.mediaId && m.mediaId.toString() === songId) || 
-            (m.media_uuid === songId)
+            (m.mediaId && m.mediaId.toString() === mediaId) || 
+            (m.media_uuid === mediaId)
         );
         
         if (!mediaEntry) {
