@@ -322,6 +322,21 @@ const CreatorUpload: React.FC = () => {
                       <span className="text-gray-400">BPM:</span>
                       <span className="text-white ml-2">{extractedMetadata.bpm || 'N/A'}</span>
                     </div>
+                    <div>
+                      <span className="text-gray-400">Artwork:</span>
+                      <span className="text-white ml-2">
+                        {extractedMetadata.artwork && extractedMetadata.artwork.length > 0 
+                          ? `${extractedMetadata.artwork.length} image${extractedMetadata.artwork.length > 1 ? 's' : ''} found` 
+                          : 'None'
+                        }
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Bitrate:</span>
+                      <span className="text-white ml-2">
+                        {extractedMetadata.bitrate ? `${Math.round(extractedMetadata.bitrate / 1000)} kbps` : 'N/A'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -478,6 +493,11 @@ const CreatorUpload: React.FC = () => {
               <label className="block text-white font-medium mb-2 flex items-center">
                 <Image className="h-4 w-4 mr-2 text-purple-400" />
                 Cover Art URL
+                {extractedMetadata?.artwork && extractedMetadata.artwork.length > 0 && (
+                  <span className="ml-2 px-2 py-1 bg-green-900/30 text-green-300 text-xs rounded-full border border-green-500/30">
+                    🖼️ Artwork found in file
+                  </span>
+                )}
               </label>
               <input
                 type="url"
@@ -485,8 +505,27 @@ const CreatorUpload: React.FC = () => {
                 value={formData.coverArt}
                 onChange={handleChange}
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                placeholder="https://example.com/cover.jpg"
+                placeholder={
+                  extractedMetadata?.artwork && extractedMetadata.artwork.length > 0
+                    ? "Artwork found in file - enter URL to override or leave blank to use embedded artwork"
+                    : "https://example.com/cover.jpg"
+                }
               />
+              {extractedMetadata?.artwork && extractedMetadata.artwork.length > 0 && (
+                <div className="mt-2 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Image className="h-4 w-4 text-green-400" />
+                    <span className="text-green-300 font-medium text-sm">Embedded Artwork Found</span>
+                  </div>
+                  <p className="text-green-200 text-sm">
+                    This file contains {extractedMetadata.artwork.length} embedded image{extractedMetadata.artwork.length > 1 ? 's' : ''}. 
+                    The artwork will be automatically extracted and used as the cover art.
+                  </p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    You can still provide a custom URL above to override the embedded artwork.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Description */}
