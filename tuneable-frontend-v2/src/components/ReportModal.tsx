@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle } from 'lucide-react';
-import { songAPI as mediaAPI } from '../lib/api';
+import { mediaAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface ReportModalProps {

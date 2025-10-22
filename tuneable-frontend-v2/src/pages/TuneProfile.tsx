@@ -26,7 +26,7 @@ import {
   Loader2,
   Flag
 } from 'lucide-react';
-import { songAPI as mediaAPI, claimAPI } from '../lib/api';
+import { mediaAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
@@ -286,7 +286,7 @@ const TuneProfile: React.FC = () => {
     if (!mediaId) return;
     
     try {
-      await mediaAPI.updateSong(mediaId, editForm);
+      await mediaAPI.updateMedia(mediaId, editForm);
       toast.success('Media updated successfully!');
       setIsEditingTune(false);
       // Refresh media data
@@ -425,7 +425,7 @@ const TuneProfile: React.FC = () => {
         [selectedPlatform]: newLinkUrl.trim()
       };
       
-      await mediaAPI.updateSong(mediaId, { sources: updatedSources });
+      await mediaAPI.updateMedia(mediaId, { sources: updatedSources });
       toast.success(`${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} link added!`);
       setShowAddLinkModal(false);
       setSelectedPlatform('');

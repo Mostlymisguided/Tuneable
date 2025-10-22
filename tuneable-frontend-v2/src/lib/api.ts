@@ -269,19 +269,19 @@ export const partyAPI = {
   },
 };
 
-// Song API
-export const songAPI = {
-  getSongs: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
+// Media API
+export const mediaAPI = {
+  getMedia: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
     const response = await api.get('/media', { params });
     return response.data;
   },
   
-  getPublicSongs: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
+  getPublicMedia: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
     const response = await api.get('/media/public', { params });
     return response.data;
   },
   
-  uploadSong: async (file: File, metadata: { title: string; artist: string }) => {
+  uploadMedia: async (file: File, metadata: { title: string; artist: string }) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', metadata.title);
@@ -317,7 +317,7 @@ export const songAPI = {
     return response.data;
   },
 
-  updateSong: async (mediaId: string, updates: {
+  updateMedia: async (mediaId: string, updates: {
     title?: string;
     artist?: string;
     producer?: string;
