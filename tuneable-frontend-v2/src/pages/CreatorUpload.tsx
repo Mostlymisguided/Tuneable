@@ -155,6 +155,19 @@ const CreatorUpload: React.FC = () => {
       if (formData.description) uploadData.append('description', formData.description.trim());
       if (formData.coverArt) uploadData.append('coverArt', formData.coverArt.trim());
       
+      // Add extracted artwork if available and no custom cover art URL provided
+      if (extractedMetadata?.artwork && extractedMetadata.artwork.length > 0 && !formData.coverArt) {
+        try {
+          const artwork = extractedMetadata.artwork[0]; // Get the first (primary) artwork
+          const blob = new Blob([artwork.data], { type: artwork.format });
+          const artworkFile = new File([blob], 'cover-art.jpg', { type: artwork.format });
+          uploadData.append('coverArtFile', artworkFile);
+          console.log('📷 Added extracted artwork to upload:', artworkFile.name, artworkFile.size, 'bytes');
+        } catch (error) {
+          console.error('❌ Error processing extracted artwork:', error);
+        }
+      }
+      
       // Enhanced metadata fields
       if (formData.bpm) uploadData.append('bpm', formData.bpm);
       if (formData.key) uploadData.append('key', formData.key);

@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
 const router = express.Router();
 const Media = require('../models/Media');
 const Comment = require('../models/Comment');
@@ -7,17 +9,52 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 const { transformResponse } = require('../utils/uuidTransform');
 const { resolveId } = require('../utils/idResolver');
-const { createMediaUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const MetadataExtractor = require('../utils/metadataExtractor');
 
 // Configure media upload
 const mediaUpload = createMediaUpload();
 
+// Create a custom multer configuration for mixed file uploads
+const mixedUpload = multer({
+  storage: multer.memoryStorage(), // Store files in memory for processing
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB max for audio
+    files: 2 // Max 2 files (audio + cover art)
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'audioFile') {
+      // Only MP3 files for audio
+      const allowedTypes = /mp3/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
+      
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        return cb(new Error('Only MP3 files are allowed for audio'));
+      }
+    } else if (file.fieldname === 'coverArtFile') {
+      // Only image files for cover art
+      if (file.mimetype.startsWith('image/')) {
+        return cb(null, true);
+      } else {
+        return cb(new Error('Only image files are allowed for cover art'));
+      }
+    } else {
+      return cb(new Error('Invalid field name'));
+    }
+  }
+});
+
 // @route   POST /api/media/upload
 // @desc    Upload media file (MP3) - Creator/Admin only
 // @access  Private (Verified creators and admins)
-router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (req, res) => {
+router.post('/upload', authMiddleware, mixedUpload.fields([
+  { name: 'audioFile', maxCount: 1 },
+  { name: 'coverArtFile', maxCount: 1 }
+]), async (req, res) => {
   try {
     const userId = req.user._id;
     
@@ -34,18 +71,24 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
       return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
     
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.files || !req.files.audioFile || req.files.audioFile.length === 0) {
+      return res.status(400).json({ error: 'No audio file uploaded' });
     }
     
-    console.log(`🎵 Processing upload: ${req.file.originalname} (${req.file.size} bytes)`);
+    const audioFile = req.files.audioFile[0];
+    const coverArtFile = req.files.coverArtFile ? req.files.coverArtFile[0] : null;
+    
+    console.log(`🎵 Processing upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
+    if (coverArtFile) {
+      console.log(`🖼️ Cover art file: ${coverArtFile.originalname} (${coverArtFile.size} bytes)`);
+    }
     
     // Extract metadata from uploaded file
     let extractedMetadata = null;
     
     try {
       console.log('🔍 Extracting metadata from uploaded file...');
-      extractedMetadata = await MetadataExtractor.extractFromBuffer(req.file.buffer, req.file.originalname);
+      extractedMetadata = await MetadataExtractor.extractFromBuffer(audioFile.buffer, audioFile.originalname);
       
       // Validate extracted metadata
       const validation = MetadataExtractor.validateMetadata(extractedMetadata);
@@ -73,7 +116,7 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     } = req.body;
     
     // Get file URL (R2 or local)
-    const fileUrl = req.file.location || getPublicUrl(`media-uploads/${req.file.filename}`);
+    const fileUrl = audioFile.location || getPublicUrl(`media-uploads/${audioFile.filename}`);
     
     // Parse tags (comma-separated string to array)
     const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
@@ -149,7 +192,7 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
       contentType: ['music'],
       contentForm: ['tune'],
       mediaType: ['mp3'],
-      fileSize: req.file.size,
+      fileSize: audioFile.size,
       
       // System fields
       addedBy: userId,
@@ -168,8 +211,49 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     
     await media.save();
     
-    // Process artwork if found in extracted metadata
-    if (extractedMetadata && extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
+    // Process cover art file if provided
+    if (coverArtFile) {
+      try {
+        console.log('🖼️ Processing cover art file...');
+        
+        // Upload cover art to R2 manually
+        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint: process.env.R2_ENDPOINT,
+          credentials: {
+            accessKeyId: process.env.R2_ACCESS_KEY_ID,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+          },
+        });
+        
+        const timestamp = Date.now();
+        const safeTitle = finalTitle.replace(/[^a-zA-Z0-9]/g, '_');
+        const key = `cover-art/${safeTitle}-${timestamp}.jpg`;
+        
+        const command = new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: key,
+          Body: coverArtFile.buffer,
+          ContentType: coverArtFile.mimetype,
+          ACL: 'public-read',
+          CacheControl: 'public, max-age=31536000'
+        });
+        
+        await s3Client.send(command);
+        const coverArtUrl = getPublicUrl(key);
+        
+        // Update media with cover art URL
+        media.coverArt = coverArtUrl;
+        await media.save();
+        console.log(`✅ Cover art saved: ${coverArtUrl}`);
+      } catch (coverArtError) {
+        console.error('❌ Error processing cover art file:', coverArtError.message);
+        // Continue without cover art - don't fail the upload
+      }
+    }
+    // Process artwork if found in extracted metadata (fallback)
+    else if (extractedMetadata && extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
       try {
         console.log('🖼️ Processing extracted artwork...');
         const artworkUrl = await MetadataExtractor.processArtwork(extractedMetadata.artwork, media._id.toString());

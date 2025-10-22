@@ -39,6 +39,7 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
                     { 'sources.upload': { $exists: true, $ne: null } }  // Include uploaded media
                 ]
             });
+        }
 
         console.log('Search criteria:', JSON.stringify(searchCriteria, null, 2));
 

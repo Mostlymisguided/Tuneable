@@ -283,12 +283,63 @@ const createMediaUpload = () => {
   }
 };
 
+// Create multer upload for cover art files
+const createCoverArtUpload = () => {
+  if (isR2Configured()) {
+    return multer({
+      storage: multerS3({
+        s3: s3Client,
+        bucket: process.env.R2_BUCKET_NAME,
+        acl: 'public-read',
+        contentType: multerS3.AUTO_CONTENT_TYPE,
+        key: function (req, file, cb) {
+          const timestamp = Date.now();
+          const filename = `cover-art/cover-${timestamp}${path.extname(file.originalname)}`;
+          cb(null, filename);
+        }
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new Error('Only image files are allowed for cover art'));
+        }
+        cb(null, true);
+      }
+    });
+  } else {
+    // Fallback to local filesystem
+    const fs = require('fs');
+    const localUploadDir = path.join(__dirname, '../uploads/cover-art');
+    if (!fs.existsSync(localUploadDir)) {
+      fs.mkdirSync(localUploadDir, { recursive: true });
+    }
+    
+    return multer({
+      storage: multer.diskStorage({
+        destination: (req, file, cb) => cb(null, localUploadDir),
+        filename: (req, file, cb) => {
+          const timestamp = Date.now();
+          cb(null, `cover-${timestamp}${path.extname(file.originalname)}`);
+        }
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new Error('Only image files are allowed for cover art'));
+        }
+        cb(null, true);
+      }
+    });
+  }
+};
+
 module.exports = {
   isR2Configured,
   getPublicUrl,
   createCreatorApplicationUpload,
   createClaimUpload,
   createProfilePictureUpload,
-  createMediaUpload
+  createMediaUpload,
+  createCoverArtUpload
 };
 
