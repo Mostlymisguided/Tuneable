@@ -343,7 +343,7 @@ router.get('/:mediaId/profile', async (req, res) => {
         select: 'username profilePic uuid',
       });
 
-    // Fetch recent comments - check both mediaId (new) and songId (legacy)
+    // Fetch recent comments - check both mediaId (current) and songId (legacy)
     const recentComments = await Comment.find({ 
       $or: [
         { mediaId: media._id },
@@ -571,7 +571,7 @@ router.get('/:mediaId/comments', async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch comments (check both mediaId and legacy songId)
+    // Fetch comments (check both mediaId and legacy songId for backward compatibility)
     const comments = await Comment.find({ 
       $or: [
         { mediaId: media._id },

@@ -56,15 +56,15 @@ const bidSchema = new mongoose.Schema({
     isInitialBid: { 
         type: Boolean, 
         default: false 
-    }, // True if this bid added the song to party (vs boosting existing)
-    queuePosition: { type: Number }, // Song position in queue when bid placed (1-indexed)
-    queueSize: { type: Number }, // Total songs in queue at bid time
+    }, // True if this bid added the media to party (vs boosting existing)
+    queuePosition: { type: Number }, // Media position in queue when bid placed (1-indexed)
+    queueSize: { type: Number }, // Total media in queue at bid time
     
     // ========================================
     // MEDIA DETAILS (Phase 2)
     // ========================================
     mediaContentType: { type: [String] }, // ['music'], ['spoken'], etc.
-    mediaContentForm: { type: [String] }, // ['song'], ['podcast'], etc.
+    mediaContentForm: { type: [String] }, // ['music'], ['podcast'], etc.
     mediaDuration: { type: Number }, // Duration in seconds
     
     // ========================================

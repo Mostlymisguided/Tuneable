@@ -7,7 +7,7 @@ const commentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   
   // Support both legacy Song and new Media references
-  songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', required: false }, // DEPRECATED - for legacy comments
+  songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', required: false }, // DEPRECATED - legacy support only
   mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', required: false }, // NEW - preferred
   
   // Optional: Reply functionality
@@ -40,7 +40,7 @@ commentSchema.pre('save', function (next) {
 });
 
 // Indexes for performance
-commentSchema.index({ songId: 1, createdAt: -1 }); // DEPRECATED - For legacy song comments
+commentSchema.index({ songId: 1, createdAt: -1 }); // DEPRECATED - For legacy song comments only
 commentSchema.index({ mediaId: 1, createdAt: -1 }); // NEW - For fetching comments by media
 commentSchema.index({ userId: 1 }); // For user's comment history
 commentSchema.index({ parentCommentId: 1 }); // For reply threads

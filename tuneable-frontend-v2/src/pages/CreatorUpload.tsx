@@ -694,7 +694,7 @@ const CreatorUpload: React.FC = () => {
                   onChange={handleChange}
                   rows={6}
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                  placeholder="Enter song lyrics..."
+                  placeholder="Enter media lyrics..."
                 />
               </div>
             </div>

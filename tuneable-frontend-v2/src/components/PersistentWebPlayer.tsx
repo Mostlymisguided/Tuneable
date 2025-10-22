@@ -255,7 +255,7 @@ const PersistentWebPlayer: React.FC = () => {
   }, [isPlayerReady, isPlaying, playerType, duration, setCurrentTime, setDuration]);
 
 
-  // Initialize player when song changes
+  // Initialize player when media changes
   useEffect(() => {
     console.log('PersistentWebPlayer useEffect - currentMedia:', currentMedia);
     console.log('PersistentWebPlayer useEffect - isPlaying:', isPlaying);
@@ -373,18 +373,18 @@ const PersistentWebPlayer: React.FC = () => {
                 console.log('YouTube player state changed:', event.data);
                 if (event.data === window.YT.PlayerState.ENDED) {
                   if (currentPartyId && currentMedia?.id && isHost) {
-                    console.log('Notifying backend that song completed');
+                    console.log('Notifying backend that media completed');
                     partyAPI.completeMedia(currentPartyId, currentMedia.id)
                       .then(() => {
-                        console.log('Song completion confirmed, advancing to next song');
+                        console.log('Media completion confirmed, advancing to next media');
                         next();
                       })
                       .catch(error => {
-                        console.error('Error notifying song completion:', error);
+                        console.error('Error notifying media completion:', error);
                         next();
                       });
                   } else {
-                    console.log('Not host or no party/song, just advancing to next song');
+                    console.log('Not host or no party/media, just advancing to next media');
                     next();
                   }
                 }
@@ -444,11 +444,11 @@ const PersistentWebPlayer: React.FC = () => {
         if (currentPartyId && currentMedia?.id && isHost) {
           partyAPI.completeMedia(currentPartyId, currentMedia.id)
             .then(() => {
-              console.log('Song completion confirmed, advancing to next song');
+              console.log('Media completion confirmed, advancing to next media');
               next();
             })
             .catch(error => {
-              console.error('Error notifying song completion:', error);
+              console.error('Error notifying media completion:', error);
               next();
             });
     } else {
@@ -533,7 +533,7 @@ const PersistentWebPlayer: React.FC = () => {
       // Prevent default spacebar behavior (page scroll)
       e.preventDefault();
       
-      // Toggle play/pause if there's a current song
+      // Toggle play/pause if there's current media
       if (currentMedia) {
         togglePlayPause();
       }
@@ -672,10 +672,10 @@ const PersistentWebPlayer: React.FC = () => {
             ) : (
               <div className="text-center">
                 <h4 className="text-base font-semibold text-gray-400">
-                  No song playing
+                  No media playing
                 </h4>
                 <p className="text-sm text-gray-500 mt-1">
-                  Select a song to start
+                  Select media to start
                 </p>
               </div>
             )}
@@ -754,7 +754,7 @@ const PersistentWebPlayer: React.FC = () => {
                   onClick={() => togglePlayPause()}
               disabled={!currentMedia}
                   className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={currentMedia ? (isPlaying ? 'Pause' : 'Play') : 'No song playing'}
+              title={currentMedia ? (isPlaying ? 'Pause' : 'Play') : 'No media playing'}
               >
                 {isPlaying ? (
                   <Pause className="h-6 w-6 ml-0.5" />
