@@ -103,25 +103,29 @@ export const useMetadataExtraction = () => {
         // Advanced metadata
         bpm: metadata.common.bpm || null,
         key: metadata.common.key || null,
-        isrc: metadata.common.isrc || null,
-        upc: metadata.common.barcode || null,
+        isrc: Array.isArray(metadata.common.isrc) ? metadata.common.isrc[0] : metadata.common.isrc || null,
+        upc: Array.isArray(metadata.common.barcode) ? metadata.common.barcode[0] : metadata.common.barcode || null,
         lyrics: metadata.common.lyrics?.[0]?.text || null,
-        comment: metadata.common.comment?.[0] || null,
+        comment: metadata.common.comment?.[0]?.text || null,
         
         // Creator information
-        composer: metadata.common.composer || null,
-        songwriter: metadata.common.songwriter || null,
-        producer: metadata.common.producer || null,
-        publisher: metadata.common.publisher || null,
-        label: metadata.common.label || null,
-        encodedBy: metadata.common.encodedBy || null,
+        composer: metadata.common.composer?.[0] || null,
+        songwriter: metadata.common.lyricist?.[0] || null,
+        producer: metadata.common.producer?.[0] || null,
+        publisher: metadata.common.publisher?.[0] || null,
+        label: metadata.common.label?.[0] || null,
+        encodedBy: metadata.common.encodedby || null,
         
         // Content flags
-        explicit: metadata.common.explicit || false,
-        language: metadata.common.language || null,
+        explicit: (metadata.common as any).explicit || false,
+        language: metadata.common.language?.[0] || null,
         
         // Artwork
-        artwork: metadata.common.picture || []
+        artwork: (metadata.common.picture || []).map(pic => ({
+          type: pic.type || 'Cover (front)',
+          format: pic.format || 'image/jpeg',
+          data: pic.data
+        }))
       };
 
       // Validate extracted metadata
