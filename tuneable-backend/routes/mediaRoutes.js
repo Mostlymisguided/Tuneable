@@ -15,11 +15,24 @@ const MetadataExtractor = require('../utils/metadataExtractor');
 
 // Configure media upload
 const mediaUpload = createMediaUpload();
+const coverArtUpload = createCoverArtUpload();
 
 // @route   POST /api/media/upload
 // @desc    Upload media file (MP3) - Creator/Admin only
 // @access  Private (Verified creators and admins)
-router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (req, res) => {
+router.post('/upload', authMiddleware, (req, res, next) => {
+  // Handle audio file upload first
+  mediaUpload.single('audioFile')(req, res, (err) => {
+    if (err) return next(err);
+    
+    // Then handle cover art file if present
+    if (req.body.coverArtFile) {
+      coverArtUpload.single('coverArtFile')(req, res, next);
+    } else {
+      next();
+    }
+  });
+}, async (req, res) => {
   try {
     const userId = req.user._id;
     
@@ -41,8 +54,12 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     }
     
     const audioFile = req.file;
+    const coverArtFile = req.coverArtFile || null;
     
     console.log(`🎵 Processing upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
+    if (coverArtFile) {
+      console.log(`🖼️ Cover art file: ${coverArtFile.originalname} (${coverArtFile.size} bytes)`);
+    }
     
     // Extract metadata from uploaded file
     let extractedMetadata = null;
@@ -172,8 +189,25 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     
     await media.save();
     
-    // Process artwork if found in extracted metadata
-    if (extractedMetadata && extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
+    // Process cover art file if provided
+    if (coverArtFile) {
+      try {
+        console.log('🖼️ Processing cover art file...');
+        
+        // Get cover art URL (already uploaded by multer)
+        const coverArtUrl = coverArtFile.location || getPublicUrl(`cover-art/${coverArtFile.filename}`);
+        
+        // Update media with cover art URL
+        media.coverArt = coverArtUrl;
+        await media.save();
+        console.log(`✅ Cover art saved: ${coverArtUrl}`);
+      } catch (coverArtError) {
+        console.error('❌ Error processing cover art file:', coverArtError.message);
+        // Continue without cover art - don't fail the upload
+      }
+    }
+    // Process artwork if found in extracted metadata (fallback)
+    else if (extractedMetadata && extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
       try {
         console.log('🖼️ Processing extracted artwork...');
         const artworkUrl = await MetadataExtractor.processArtwork(extractedMetadata.artwork, media._id.toString());
