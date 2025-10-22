@@ -186,12 +186,16 @@ const TuneProfile: React.FC = () => {
 
   const fetchMediaProfile = async () => {
     try {
+      console.log('🔍 Fetching media profile for mediaId:', mediaId);
       setLoading(true);
       const response = await mediaAPI.getProfile(mediaId!);
+      console.log('📥 Media profile response:', response);
       setMedia(response.media);
       setComments(response.media.comments || []);
+      console.log('✅ Media profile loaded successfully');
     } catch (err: any) {
-      console.error('Error fetching media profile:', err);
+      console.error('❌ Error fetching media profile:', err);
+      console.error('❌ Error details:', err.response?.data);
       setError(err.response?.data?.error || 'Failed to load media profile');
       toast.error('Failed to load media profile');
     } finally {
