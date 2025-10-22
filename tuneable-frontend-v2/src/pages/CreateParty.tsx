@@ -35,7 +35,7 @@ const CreateParty: React.FC = () => {
     startTime: '',
     privacy: 'public' as 'public' | 'private',
     type: 'remote' as 'remote' | 'live',
-    musicSource: 'youtube' as 'youtube' | 'spotify' | 'direct_upload',
+    musicSource: 'youtube' as 'youtube' | 'direct_upload',
     minimumBid: 0.33,
   });
   const [scheduleType, setScheduleType] = useState<'automatic' | 'custom'>('automatic');
@@ -321,7 +321,6 @@ const CreateParty: React.FC = () => {
                 onChange={handleChange}
               >
                 <option value="youtube">YouTube</option>
-                <option value="spotify" disabled>Spotify (Coming Soon)</option>
                 <option value="direct_upload" disabled>Direct Upload (Coming Soon)</option>
               </select>
             </div>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { searchAPI, partyAPI } from '../lib/api';
-import { spotifyService } from '../services/spotifyService';
 import { toast } from 'react-toastify';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
@@ -39,10 +38,8 @@ const SearchPage: React.FC = () => {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [activeTab] = useState<'songs' | 'podcasts'>('songs');
   const [party, setParty] = useState<any>(null);
-  const [musicSource, setMusicSource] = useState<'youtube' | 'spotify'>('youtube');
+  const [musicSource, setMusicSource] = useState<'youtube'>('youtube');
   const [podcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
-  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
-  const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
   const [hasMoreExternal, setHasMoreExternal] = useState(false);
 
@@ -60,12 +57,6 @@ const SearchPage: React.FC = () => {
         setParty(response.party);
         setMusicSource((response.party as any).musicSource || 'youtube');
         
-        // Check if user has Spotify token stored
-        const storedToken = localStorage.getItem('spotify_access_token');
-        if (storedToken && (response.party as any).musicSource === 'spotify') {
-          setSpotifyToken(storedToken);
-          setIsSpotifyConnected(true);
-        }
       } catch (error) {
         console.error('Error fetching party details:', error);
         toast.error('Failed to load party details');
@@ -98,16 +89,7 @@ const SearchPage: React.FC = () => {
     try {
       let response;
       
-      if (musicSource === 'spotify') {
-        if (!spotifyToken) {
-          toast.error('Please connect your Spotify account first');
-          setIsLoading(false);
-          return;
-        }
-        response = await searchAPI.search(query, 'spotify', undefined, spotifyToken, true);
-      } else {
-        response = await searchAPI.search(query, 'youtube', undefined, undefined, true);
-      }
+      response = await searchAPI.search(query, 'youtube', undefined, undefined, true);
       
       // Track the source of results
       setSearchSource(response.source || 'external');
@@ -117,7 +99,7 @@ const SearchPage: React.FC = () => {
       setNextPageToken(response.nextPageToken || null);
       initializeBidAmounts(response.videos);
       
-      toast.info(`Found ${response.videos.length} additional songs from ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`);
+      toast.info(`Found ${response.videos.length} additional songs from YouTube`);
     } catch (error) {
       console.error('Show more error:', error);
       toast.error('Failed to load more results. Please try again.');
@@ -250,18 +232,8 @@ const SearchPage: React.FC = () => {
         return;
       }
       
-      if (musicSource === 'spotify') {
-        if (!spotifyToken) {
-          toast.error('Please connect your Spotify account first');
-          setIsLoading(false);
-          return;
-        }
-        // Use the unified search API with Spotify access token
-        response = await searchAPI.search(searchQuery, 'spotify', pageToken, spotifyToken);
-      } else {
-        // Use the unified search API for YouTube (which will search local DB first)
-        response = await searchAPI.search(searchQuery, 'youtube', pageToken);
-      }
+      // Use the unified search API for YouTube (which will search local DB first)
+      response = await searchAPI.search(searchQuery, 'youtube', pageToken);
       
       // Track the source of results
       setSearchSource(response.source || 'external');
@@ -276,7 +248,7 @@ const SearchPage: React.FC = () => {
       if (response.source === 'local') {
         toast.info(`Found ${response.videos.length} songs from our database`);
       } else if (response.source === 'external') {
-        toast.info(`Found ${response.videos.length} songs from ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`);
+        toast.info(`Found ${response.videos.length} songs from YouTube`);
       }
     } catch (error) {
       console.error('Search error:', error);
@@ -383,9 +355,6 @@ const SearchPage: React.FC = () => {
         if (song.sources.upload) {
           platform = 'upload';
           url = song.sources.upload;
-        } else if (musicSource === 'spotify' && song.sources.spotify) {
-          platform = 'spotify';
-          url = song.sources.spotify;
         } else if (song.sources.youtube) {
           platform = 'youtube';
           url = song.sources.youtube;
@@ -429,17 +398,6 @@ const SearchPage: React.FC = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleSpotifyConnect = () => {
-    const authUrl = spotifyService.getAuthUrl();
-    window.location.href = authUrl;
-  };
-
-  const handleSpotifyDisconnect = () => {
-    localStorage.removeItem('spotify_access_token');
-    setSpotifyToken(null);
-    setIsSpotifyConnected(false);
-    toast.success('Disconnected from Spotify');
-  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -463,35 +421,11 @@ const SearchPage: React.FC = () => {
                   ? 'bg-red-100 text-red-800' 
                   : 'bg-green-100 text-green-800'
               }`}>
-                {musicSource === 'youtube' ? 'YouTube' : 'Spotify'}
+                YouTube
               </span>
             </div>
           </div>
           
-          {/* Spotify Connection Status - Disabled for now */}
-          {false && musicSource === 'spotify' && (
-            <div className="flex items-center space-x-2">
-              {isSpotifyConnected ? (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-green-600">✓ Connected to Spotify</span>
-                  <button
-                    onClick={handleSpotifyDisconnect}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={handleSpotifyConnect}
-                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span>Connect Spotify</span>
-                </button>
-              )}
-            </div>
-          )}
         </div>
         
         {/* Content Type Tabs - Commented out for MVP (only songs now) */}
@@ -570,7 +504,7 @@ const SearchPage: React.FC = () => {
             <input
               type="text"
               placeholder={activeTab === 'songs' 
-                ? `Search for songs on ${musicSource === 'youtube' ? 'YouTube' : 'Spotify'}...`
+                ? 'Search for songs on YouTube...'
                 : podcastSource === 'local' 
                   ? 'Search for podcast episodes in our database...'
                   : podcastSource === 'taddy'
@@ -619,7 +553,7 @@ const SearchPage: React.FC = () => {
                       : '🍎 From Apple Podcasts'
                   : searchSource === 'local' 
                     ? '📚 From Database' 
-                    : `🌐 From ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`
+                    : '🌐 From YouTube'
                 }
               </div>
             )}
@@ -757,10 +691,10 @@ const SearchPage: React.FC = () => {
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 mx-auto"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span className="px-2">{isLoading ? 'Searching...' : `Show More from ${musicSource === 'spotify' ? 'Spotify' : 'YouTube'}`}</span>
+                <span className="px-2">{isLoading ? 'Searching...' : 'Show More from YouTube'}</span>
               </button>
               <p className="text-sm text-gray-500 mt-2">
-                Didn't find what you're looking for? Search {musicSource === 'spotify' ? 'Spotify' : 'YouTube'} for more results.
+                Didn't find what you're looking for? Search YouTube for more results.
               </p>
             </div>
           )}

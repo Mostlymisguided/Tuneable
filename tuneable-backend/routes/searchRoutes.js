@@ -1,7 +1,6 @@
 const express = require('express');
 const NodeCache = require('node-cache');
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
-const spotifyService = require('../services/spotifyService'); // Spotify API logic
 const Media = require('../models/Media'); // Unified media model
 const { transformResponse } = require('../utils/uuidTransform');
 
@@ -40,14 +39,6 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
                     { 'sources.upload': { $exists: true, $ne: null } }  // Include uploaded media
                 ]
             });
-        } else if (source === 'spotify') {
-            searchCriteria.$and.push({ 
-                $or: [
-                    { 'sources.spotify': { $exists: true, $ne: null } },
-                    { 'sources.upload': { $exists: true, $ne: null } }  // Include uploaded media
-                ]
-            });
-        }
 
         console.log('Search criteria:', JSON.stringify(searchCriteria, null, 2));
 
@@ -169,13 +160,6 @@ router.get('/', async (req, res) => {
             if (source === 'youtube') {
                 console.log('Using YouTube service');
                 result = await youtubeService.searchYouTube(query, pageToken);
-            } else if (source === 'spotify') {
-                console.log('Using Spotify service');
-                const { accessToken } = req.query;
-                if (!accessToken) {
-                    return res.status(400).json({ error: 'Access token required for Spotify search' });
-                }
-                result = await spotifyService.searchTracks(query, 20, 0, accessToken);
             } else {
                 console.error('Invalid source parameter:', source);
                 return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
@@ -200,26 +184,6 @@ router.get('/', async (req, res) => {
                     })),
                     source: 'external'
                 };
-            } else if (source === 'spotify') {
-                console.log(`Spotify service returned ${result?.tracks?.items?.length || 0} items for query: "${query}"`);
-                formattedResults = {
-                    nextPageToken: result.tracks.next ? 'spotify-next' : null,
-                    videos: result.tracks.items.map(track => ({
-                        id: track.id,
-                        title: track.name,
-                        artist: track.artists.map(a => a.name).join(', '),
-                        coverArt: track.album.images[0]?.url || '',
-                        duration: Math.floor(track.duration_ms / 1000),
-                        sources: { 
-                            spotify: track.uri,
-                            spotifyId: track.id,
-                            spotifyUrl: track.external_urls.spotify
-                        },
-                        isLocal: false // Flag to indicate this is from external API
-                    })),
-                    source: 'external'
-                };
-            }
         }
 
         // ✅ Cache the result
