@@ -526,7 +526,7 @@ router.get('/:mediaId/profile', async (req, res) => {
 
     res.json(transformResponse({
       message: 'Media profile fetched successfully',
-      song: transformedMedia, // Keep 'song' key for frontend compatibility
+      media: transformedMedia, // Updated to 'media' key for frontend compatibility
     }));
 
   } catch (error) {
