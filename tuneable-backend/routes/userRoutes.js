@@ -12,6 +12,7 @@ const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
 const authMiddleware = require('../middleware/authMiddleware');
 const { transformResponse } = require('../utils/uuidTransform');
+const { resolveId } = require('../utils/idResolver');
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 
@@ -394,7 +395,7 @@ router.get('/:userId/profile', async (req, res) => {
     });
 
     // Convert to array and sort by total amount bid
-    const mediaWithBids = Object.values(bidsByMedia)
+    const mediaWithBids = Object.values(bidsByMedia)  
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
     res.json(transformResponse({
