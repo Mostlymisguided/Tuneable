@@ -394,7 +394,7 @@ router.get('/:userId/profile', async (req, res) => {
     });
 
     // Convert to array and sort by total amount bid
-    const songsWithBids = Object.values(bidsByMedia)
+    const mediaWithBids = Object.values(bidsByMedia)
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
     res.json(transformResponse({
@@ -420,7 +420,7 @@ router.get('/:userId/profile', async (req, res) => {
         uniqueSongsCount: uniqueMedia.length, // Renamed but keeping field name for frontend compatibility
       },
       topBids,
-      songsWithBids, // Keeping field name for frontend compatibility
+      mediaWithBids, // Updated to use media terminology
     }));
 
   } catch (error) {
