@@ -324,6 +324,139 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
   }
 });
 
+// @route   GET /api/media
+// @desc    Get all media with pagination and filtering
+// @access  Public
+router.get('/', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'globalMediaAggregate',
+      sortOrder = 'desc',
+      genre,
+      creator,
+      search
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build query
+    const query = { contentType: { $in: ['music'] } };
+    
+    if (genre) {
+      query.genres = { $in: [genre] };
+    }
+    
+    if (creator) {
+      query.creatorNames = { $regex: creator, $options: 'i' };
+    }
+    
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { 'artist.name': { $regex: search, $options: 'i' } },
+        { creatorNames: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sortObj.createdAt = -1; // Secondary sort by creation date
+
+    const media = await Media.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('addedBy', 'username profilePic uuid')
+      .lean();
+
+    const total = await Media.countDocuments(query);
+
+    res.json(transformResponse({
+      media,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    }));
+  } catch (error) {
+    console.error('Error fetching media:', error);
+    res.status(500).json({ error: 'Failed to fetch media' });
+  }
+});
+
+// @route   GET /api/media/public
+// @desc    Get public media (same as /api/media but with different access)
+// @access  Public
+router.get('/public', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = 'globalMediaAggregate',
+      sortOrder = 'desc',
+      genre,
+      creator,
+      search
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build query for public media
+    const query = { 
+      contentType: { $in: ['music'] },
+      // Add any public-specific filters here
+    };
+    
+    if (genre) {
+      query.genres = { $in: [genre] };
+    }
+    
+    if (creator) {
+      query.creatorNames = { $regex: creator, $options: 'i' };
+    }
+    
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { 'artist.name': { $regex: search, $options: 'i' } },
+        { creatorNames: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sortObj.createdAt = -1; // Secondary sort by creation date
+
+    const media = await Media.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('addedBy', 'username profilePic uuid')
+      .lean();
+
+    const total = await Media.countDocuments(query);
+
+    res.json(transformResponse({
+      media,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    }));
+  } catch (error) {
+    console.error('Error fetching public media:', error);
+    res.status(500).json({ error: 'Failed to fetch public media' });
+  }
+});
+
 // @route   GET /api/media/top-tunes
 // @desc    Get top media by global bid value for Top Tunes
 // @access  Public
