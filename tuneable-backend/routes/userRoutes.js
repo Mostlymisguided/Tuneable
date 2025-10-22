@@ -377,7 +377,7 @@ router.get('/:userId/profile', async (req, res) => {
             : 'Unknown Artist';
             
           bidsByMedia[mediaId] = {
-            media: {
+            song: {
               ...bid.mediaId.toObject ? bid.mediaId.toObject() : bid.mediaId,
               artist: artistName, // Transform for frontend compatibility
               tags: bid.mediaId.tags || []
