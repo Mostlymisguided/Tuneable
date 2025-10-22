@@ -438,22 +438,29 @@ router.get('/top-tunes', async (req, res) => {
 router.get('/:mediaId/profile', async (req, res) => {
   try {
     const { mediaId } = req.params;
+    console.log('🔍 Media profile request for mediaId:', mediaId);
 
     // Find media by UUID or ObjectId
     let media;
     if (mediaId.includes('-')) {
       // UUID format
+      console.log('🔍 Searching by UUID:', mediaId);
       media = await Media.findOne({ uuid: mediaId });
     } else if (isValidObjectId(mediaId)) {
       // ObjectId format
+      console.log('🔍 Searching by ObjectId:', mediaId);
       media = await Media.findById(mediaId);
     } else {
+      console.log('❌ Invalid media ID format:', mediaId);
       return res.status(400).json({ error: 'Invalid media ID format' });
     }
 
     if (!media) {
+      console.log('❌ Media not found for ID:', mediaId);
       return res.status(404).json({ error: 'Media not found' });
     }
+    
+    console.log('✅ Media found:', media.title);
 
     // Populate media with bids and user data
     const populatedMedia = await Media.findById(media._id)
@@ -524,6 +531,11 @@ router.get('/:mediaId/profile', async (req, res) => {
       globalMediaAggregateTopRank: rank, // Add computed rank
     };
 
+    console.log('📤 Sending media profile response:', {
+      message: 'Media profile fetched successfully',
+      media: transformedMedia
+    });
+    
     res.json(transformResponse({
       message: 'Media profile fetched successfully',
       media: transformedMedia, // Updated to 'media' key for frontend compatibility
