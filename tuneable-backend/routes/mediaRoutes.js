@@ -343,12 +343,9 @@ router.get('/:mediaId/profile', async (req, res) => {
         select: 'username profilePic uuid',
       });
 
-    // Fetch recent comments - check both mediaId (current) and songId (legacy)
+    // Fetch recent comments
     const recentComments = await Comment.find({ 
-      $or: [
-        { mediaId: media._id },
-        { songId: media._id } // Legacy support
-      ],
+      mediaId: media._id,
       parentCommentId: null,
       isDeleted: false 
     })
@@ -571,12 +568,9 @@ router.get('/:mediaId/comments', async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch comments (check both mediaId and legacy songId for backward compatibility)
+    // Fetch comments
     const comments = await Comment.find({ 
-      $or: [
-        { mediaId: media._id },
-        { songId: media._id } // Legacy support
-      ],
+      mediaId: media._id,
       parentCommentId: null,
       isDeleted: false 
     })
@@ -587,10 +581,7 @@ router.get('/:mediaId/comments', async (req, res) => {
 
     // Get total count
     const totalComments = await Comment.countDocuments({ 
-      $or: [
-        { mediaId: media._id },
-        { songId: media._id }
-      ],
+      mediaId: media._id,
       parentCommentId: null,
       isDeleted: false 
     });

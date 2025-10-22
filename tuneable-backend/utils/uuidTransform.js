@@ -43,10 +43,10 @@ function transformDocument(doc, options = {}) {
       transformed.songs = transformed.songs.map(song => {
         const transformedSong = { ...song };
         
-        // Transform songId reference
-        if (song.songId && song.songId.uuid) {
-          transformedSong.song_uuid = song.songId.uuid;
-          transformedSong.songId = song.songId.uuid;
+        // Transform mediaId reference
+        if (song.mediaId && song.mediaId.uuid) {
+          transformedSong.media_uuid = song.mediaId.uuid;
+          transformedSong.mediaId = song.mediaId.uuid;
         }
         
         // Transform addedBy reference
@@ -123,10 +123,10 @@ function transformDocument(doc, options = {}) {
           transformedBid.partyId = bid.partyId.uuid;
         }
         
-        // Transform song reference
-        if (bid.songId && bid.songId.uuid) {
-          transformedBid.song_uuid = bid.songId.uuid;
-          transformedBid.songId = bid.songId.uuid;
+        // Transform media reference
+        if (bid.mediaId && bid.mediaId.uuid) {
+          transformedBid.media_uuid = bid.mediaId.uuid;
+          transformedBid.mediaId = bid.mediaId.uuid;
         }
         
         return transformedBid;

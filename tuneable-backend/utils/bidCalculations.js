@@ -206,24 +206,6 @@ async function updatePartyBidTracking(mediaId, partyId) {
             }
         );
         
-        // Also update legacy songs if they exist
-        await Party.findOneAndUpdate(
-            { 
-                _id: partyId, 
-                $or: [
-                    { 'songs.songId': mediaId },
-                    { 'songs.episodeId': mediaId }
-                ]
-            },
-            {
-                $set: {
-                    'songs.$.topPartyAggregateBidValue': topPartyAggregate.aggregateValue,
-                    'songs.$.topPartyAggregateUser': topPartyAggregate.userId,
-                    'songs.$.topPartyBidValue': topPartyBid.bidValue,
-                    'songs.$.topPartyBidUser': topPartyBid.userId
-                }
-            }
-        );
         
     } catch (error) {
         console.error('Error updating party bid tracking:', error);

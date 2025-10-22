@@ -6,9 +6,8 @@ const commentSchema = new mongoose.Schema({
   content: { type: String, required: true, maxlength: 1000 },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   
-  // Support both legacy Song and new Media references
-  songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', required: false }, // DEPRECATED - legacy support only
-  mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', required: false }, // NEW - preferred
+  // Media reference
+  mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', required: true },
   
   // Optional: Reply functionality
   parentCommentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', default: null },
@@ -25,10 +24,10 @@ const commentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Validation: at least one content reference required
+// Validation: mediaId is required
 commentSchema.pre('validate', function(next) {
-  if (!this.songId && !this.mediaId) {
-    return next(new Error('Either songId or mediaId must be provided'));
+  if (!this.mediaId) {
+    return next(new Error('mediaId is required'));
   }
   next();
 });
@@ -40,8 +39,7 @@ commentSchema.pre('save', function (next) {
 });
 
 // Indexes for performance
-commentSchema.index({ songId: 1, createdAt: -1 }); // DEPRECATED - For legacy song comments only
-commentSchema.index({ mediaId: 1, createdAt: -1 }); // NEW - For fetching comments by media
+commentSchema.index({ mediaId: 1, createdAt: -1 }); // For fetching comments by media
 commentSchema.index({ userId: 1 }); // For user's comment history
 commentSchema.index({ parentCommentId: 1 }); // For reply threads
 commentSchema.index({ isDeleted: 1 }); // For filtering deleted comments
