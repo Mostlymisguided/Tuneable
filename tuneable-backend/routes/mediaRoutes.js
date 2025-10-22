@@ -275,7 +275,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         });
         
         await s3Client.send(coverArtCommand);
-        const coverArtUrl = getPublicUrl(coverArtKey);
+        const coverArtUrl = `${process.env.R2_PUBLIC_URL}/${coverArtKey}`;
         
         // Update media with cover art URL
         media.coverArt = coverArtUrl;

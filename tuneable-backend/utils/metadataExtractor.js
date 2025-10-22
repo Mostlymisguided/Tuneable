@@ -159,7 +159,7 @@ class MetadataExtractor {
         await s3Client.send(command);
         
         // Return public URL
-        return getPublicUrl(key);
+        return `${process.env.R2_PUBLIC_URL}/${key}`;
         
       } else {
         // Fallback to local storage
