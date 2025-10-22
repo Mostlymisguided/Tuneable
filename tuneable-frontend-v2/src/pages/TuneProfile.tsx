@@ -177,10 +177,14 @@ const TuneProfile: React.FC = () => {
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
 
   useEffect(() => {
+    console.log('🔍 TuneProfile useEffect triggered with mediaId:', mediaId);
     if (mediaId) {
+      console.log('✅ mediaId exists, calling fetchMediaProfile');
       fetchMediaProfile();
       loadTopParties();
       loadTagRankings();
+    } else {
+      console.log('❌ No mediaId provided');
     }
   }, [mediaId]);
 

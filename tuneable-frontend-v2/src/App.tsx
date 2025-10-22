@@ -162,7 +162,7 @@ const AppContent = () => {
               } 
             />
             <Route 
-              path="/tune/:songId" 
+              path="/tune/:mediaId" 
               element={<TuneProfile />} 
             />
             <Route 
