@@ -130,35 +130,60 @@ class MetadataExtractor {
    */
   static async saveArtworkToStorage(imageBuffer, filename) {
     try {
-      // Use the same R2 upload service as media files
-      const { uploadToR2 } = require('./r2Upload');
+      const { isR2Configured, getPublicUrl } = require('./r2Upload');
       
-      // Upload to R2
-      const key = `artwork/${filename}`;
-      const url = await uploadToR2(imageBuffer, key, 'image/jpeg');
-      
-      return url;
-      
-    } catch (error) {
-      console.error('❌ Error saving artwork to R2:', error.message);
-      
-      // Fallback to local storage
-      const fs = require('fs');
-      const path = require('path');
-      
-      const localPath = path.join(__dirname, '../uploads/artwork', filename);
-      const publicPath = `/uploads/artwork/${filename}`;
-      
-      // Ensure directory exists
-      const dir = path.dirname(localPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+      if (isR2Configured()) {
+        // Upload to R2 using S3 client
+        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+        
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint: process.env.R2_ENDPOINT,
+          credentials: {
+            accessKeyId: process.env.R2_ACCESS_KEY_ID,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+          },
+        });
+        
+        const key = `cover-art/${filename}`;
+        
+        const command = new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: key,
+          Body: imageBuffer,
+          ContentType: 'image/jpeg',
+          ACL: 'public-read',
+          CacheControl: 'public, max-age=31536000'
+        });
+        
+        await s3Client.send(command);
+        
+        // Return public URL
+        return getPublicUrl(key);
+        
+      } else {
+        // Fallback to local storage
+        const fs = require('fs');
+        const path = require('path');
+        
+        const localPath = path.join(__dirname, '../uploads/cover-art', filename);
+        const publicPath = `/uploads/cover-art/${filename}`;
+        
+        // Ensure directory exists
+        const dir = path.dirname(localPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        
+        // Save file
+        fs.writeFileSync(localPath, imageBuffer);
+        
+        return getPublicUrl(publicPath);
       }
       
-      // Save file
-      fs.writeFileSync(localPath, imageBuffer);
-      
-      return getPublicUrl(publicPath);
+    } catch (error) {
+      console.error('❌ Error saving artwork:', error.message);
+      return null;
     }
   }
   

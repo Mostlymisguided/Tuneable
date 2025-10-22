@@ -42,17 +42,10 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     
     // Extract metadata from uploaded file
     let extractedMetadata = null;
-    let artworkUrl = null;
     
     try {
       console.log('🔍 Extracting metadata from uploaded file...');
       extractedMetadata = await MetadataExtractor.extractFromBuffer(req.file.buffer, req.file.originalname);
-      
-      // Process artwork if found
-      if (extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
-        console.log('🖼️ Processing extracted artwork...');
-        artworkUrl = await MetadataExtractor.processArtwork(extractedMetadata.artwork, 'temp');
-      }
       
       // Validate extracted metadata
       const validation = MetadataExtractor.validateMetadata(extractedMetadata);
@@ -92,7 +85,7 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     const finalGenres = genre ? [genre] : (extractedMetadata?.genres || []);
     const finalDuration = duration ? parseInt(duration) : (extractedMetadata?.duration || null);
     const finalExplicit = explicit === 'true' || explicit === true || extractedMetadata?.explicit || false;
-    const finalCoverArt = coverArt || artworkUrl || null;
+    const finalCoverArt = coverArt || null;
     
     // Validate required fields
     if (!finalTitle) {
@@ -174,6 +167,24 @@ router.post('/upload', authMiddleware, mediaUpload.single('audioFile'), async (r
     });
     
     await media.save();
+    
+    // Process artwork if found in extracted metadata
+    if (extractedMetadata && extractedMetadata.artwork && extractedMetadata.artwork.length > 0) {
+      try {
+        console.log('🖼️ Processing extracted artwork...');
+        const artworkUrl = await MetadataExtractor.processArtwork(extractedMetadata.artwork, media._id.toString());
+        
+        if (artworkUrl) {
+          // Update media with artwork URL
+          media.coverArt = artworkUrl;
+          await media.save();
+          console.log(`✅ Artwork saved: ${artworkUrl}`);
+        }
+      } catch (artworkError) {
+        console.error('❌ Error processing artwork:', artworkError.message);
+        // Continue without artwork - don't fail the upload
+      }
+    }
     
     console.log(`✅ Creator ${user.username} uploaded: ${title} (${media.uuid})`);
     
