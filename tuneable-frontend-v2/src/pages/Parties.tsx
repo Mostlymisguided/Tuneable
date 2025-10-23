@@ -20,7 +20,7 @@ interface PartyType {
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live';
+  type: 'remote' | 'live' | 'global';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   createdAt: string;

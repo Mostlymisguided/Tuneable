@@ -34,7 +34,7 @@ const CreateParty: React.FC = () => {
     location: '',
     startTime: '',
     privacy: 'public' as 'public' | 'private',
-    type: 'remote' as 'remote' | 'live',
+    type: 'remote' as 'remote' | 'live' | 'global',
     musicSource: 'youtube' as 'youtube' | 'direct_upload',
     minimumBid: 0.33,
   });
