@@ -27,16 +27,18 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <h2 className="text-xl font-semibold text-gray-300 mb-4">Quick Actions</h2>
           <div className="space-y-4">
-            <Link
-              to="/create-party"
-              className="flex items-center p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
-            >
-              <Plus className="h-5 w-5 text-primary-600 mr-3" />
-              <div>
-                <p className="font-medium text-gray-900">Create New Party</p>
-                <p className="text-sm text-gray-600">Start a new music party</p>
-              </div>
-            </Link>
+            {user?.role?.includes('admin') && (
+              <Link
+                to="/create-party"
+                className="flex items-center p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+              >
+                <Plus className="h-5 w-5 text-primary-600 mr-3" />
+                <div>
+                  <p className="font-medium text-gray-900">Create New Party</p>
+                  <p className="text-sm text-gray-600">Start a new music party</p>
+                </div>
+              </Link>
+            )}
             
             <Link
               to="/parties"

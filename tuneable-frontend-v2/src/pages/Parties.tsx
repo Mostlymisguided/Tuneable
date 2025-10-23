@@ -161,23 +161,31 @@ const Parties: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">Parties</h1>
           <p className="text-gray-300 mt-2">Discover and join music parties</p>
         </div>
-        <Link
-          to="/create-party"
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Music className="h-4 w-4" />
-          <span className="text-base font-semibold no-underline">Create Party</span>
-        </Link>
+        {user?.role?.includes('admin') && (
+          <Link
+            to="/create-party"
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Music className="h-4 w-4" />
+            <span className="text-base font-semibold no-underline">Create Party</span>
+          </Link>
+        )}
       </div>
 
       {parties.length === 0 ? (
         <div className="text-center py-12">
           <Music className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-300 mb-2">No parties found</h3>
-          <p className="text-gray-600 mb-6">Be the first to create a party!</p>
-          <Link to="/create-party" className="btn-primary">
-            Create Your First Party
-          </Link>
+          <p className="text-gray-600 mb-6">
+            {user?.role?.includes('admin') 
+              ? "Be the first to create a party!" 
+              : "Check back later for new parties!"}
+          </p>
+          {user?.role?.includes('admin') && (
+            <Link to="/create-party" className="btn-primary">
+              Create Your First Party
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

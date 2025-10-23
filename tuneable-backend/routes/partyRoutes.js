@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 const Party = require('../models/Party');
 const Media = require('../models/Media');
 const Bid = require('../models/Bid');
@@ -38,9 +39,9 @@ const deriveCodeFromPartyId = (objectId) => {
 /**
  * Route: POST /
  * Create a new party
- * Access: Protected (requires valid token)
+ * Access: Admin only (requires admin role)
  */
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', adminMiddleware, async (req, res) => {
     try {
       console.log('🔥 Create Party Request Received:', req.body);
       console.log('🔑 Authenticated User:', req.user);

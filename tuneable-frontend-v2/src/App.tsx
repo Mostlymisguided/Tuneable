@@ -45,6 +45,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return user ? <>{children}</> : <Navigate to="/login" />;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (!user.role?.includes('admin')) {
+    return <Navigate to="/dashboard" />;
+  }
+  
+  return <>{children}</>;
+};
+
 // Redirect /profile to /user/:uuid for unified profile experience
 const ProfileRedirect = () => {
   const { user } = useAuth();
@@ -100,9 +118,9 @@ const AppContent = () => {
             <Route 
               path="/create-party" 
               element={
-                <ProtectedRoute>
+                <AdminRoute>
                   <CreateParty />
-                </ProtectedRoute>
+                </AdminRoute>
               } 
             />
             <Route 
