@@ -23,6 +23,8 @@ interface PartyType {
   type: 'remote' | 'live' | 'global';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
+  tags?: string[];
+  description?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +32,8 @@ interface PartyType {
 const Parties: React.FC = () => {
   const [parties, setParties] = useState<PartyType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerms, setSearchTerms] = useState<string[]>([]);
+  const [currentSearchInput, setCurrentSearchInput] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
@@ -53,6 +57,41 @@ const Parties: React.FC = () => {
 
     fetchParties();
   }, []);
+
+  // Filter parties based on search terms
+  const filteredParties = parties.filter(party => {
+    if (searchTerms.length === 0) return true;
+    
+    // Check if any search term matches party name, description, or tags
+    return searchTerms.some(term => {
+      const lowerTerm = term.toLowerCase();
+      return party.name.toLowerCase().includes(lowerTerm) ||
+        (party.description && party.description.toLowerCase().includes(lowerTerm)) ||
+        (party.tags && party.tags.some(tag => tag.toLowerCase().includes(lowerTerm)));
+    });
+  });
+
+  // Handle adding search terms
+  const handleAddSearchTerm = (term: string) => {
+    const trimmedTerm = term.trim().toLowerCase();
+    if (trimmedTerm && !searchTerms.includes(trimmedTerm)) {
+      setSearchTerms([...searchTerms, trimmedTerm]);
+      setCurrentSearchInput('');
+    }
+  };
+
+  // Handle removing search terms
+  const handleRemoveSearchTerm = (termToRemove: string) => {
+    setSearchTerms(searchTerms.filter(term => term !== termToRemove));
+  };
+
+  // Handle search input key press
+  const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && currentSearchInput.trim()) {
+      e.preventDefault();
+      handleAddSearchTerm(currentSearchInput);
+    }
+  };
 
   const handleJoinParty = async (partyId: string, partyName: string, partyPrivacy: string, partyHost: any, partyPartiers: any[]) => {
     try {
@@ -156,10 +195,10 @@ const Parties: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
+      <div className="flex justify-center items-center mb-8">
+        <div className="text-center center-justify">
           <h1 className="text-3xl font-bold text-white">Parties</h1>
-          <p className="text-gray-300 mt-2">Discover and join music parties</p>
+          <p className="text-gray-300 mt-2">Discover and Join Music Parties</p>
         </div>
         {user?.role?.includes('admin') && (
           <Link
@@ -172,7 +211,54 @@ const Parties: React.FC = () => {
         )}
       </div>
 
-      {parties.length === 0 ? (
+      {/* Search Section */}
+      <div className="mb-6">
+        <div className="flex flex-col gap-4">
+          {/* Search Input */}
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Filter Parties by Name, Description or Tags... (Press Enter to Add)"
+              className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              value={currentSearchInput}
+              onChange={(e) => setCurrentSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+            />
+          </div>
+          
+          {/* Search Term Pills */}
+          {searchTerms.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {searchTerms.map((term, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-purple-600 text-white text-sm rounded-full flex items-center gap-2"
+                >
+                  {term}
+                  <button
+                    onClick={() => handleRemoveSearchTerm(term)}
+                    className="text-purple-200 hover:text-white ml-1"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {searchTerms.length > 0 && (
+                <button
+                  onClick={() => setSearchTerms([])}
+                  className="px-3 py-1 bg-gray-600 text-gray-300 text-sm rounded-full hover:bg-gray-500"
+                  type="button"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {filteredParties.length === 0 ? (
         <div className="text-center py-12">
           <Music className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-300 mb-2">No parties found</h3>
@@ -189,7 +275,7 @@ const Parties: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {parties.map((party) => (
+          {filteredParties.map((party) => (
             <div key={party.id} className="card hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-semibold text-white">{party.name}</h3>
@@ -217,6 +303,36 @@ const Parties: React.FC = () => {
                   <Users className="h-4 w-4 mr-2" />
                   <span>{Array.isArray(party.partiers) ? party.partiers.length : 0} partiers</span>
                 </div>
+
+                {/* Tags Display */}
+                {party.tags && party.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {party.tags.slice(0, 3).map((tag: string, index: number) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                    {party.tags.length > 3 && (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                        +{party.tags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Description Display */}
+                {party.description && (
+                  <div className="text-sm text-gray-300 mt-2">
+                    <p className="line-clamp-2">
+                      {party.description.length > 100 
+                        ? `${party.description.substring(0, 100)}...` 
+                        : party.description}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center">

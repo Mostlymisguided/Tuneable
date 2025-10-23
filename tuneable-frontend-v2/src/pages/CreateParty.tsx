@@ -37,6 +37,8 @@ const CreateParty: React.FC = () => {
     type: 'remote' as 'remote' | 'live' | 'global',
     musicSource: 'youtube' as 'youtube' | 'direct_upload',
     minimumBid: 0.33,
+    tags: '',
+    description: '',
   });
   const [scheduleType, setScheduleType] = useState<'automatic' | 'custom'>('automatic');
   const [isLoading, setIsLoading] = useState(false);
@@ -64,9 +66,17 @@ const CreateParty: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Process tags from comma-separated string to array
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim().toLowerCase())
+        .filter(tag => tag.length > 0)
+        .slice(0, 5); // Limit to 5 tags max
+
       // Prepare party data based on schedule type
       const partyData = {
         ...formData,
+        tags: tagsArray,
         // For automatic schedule, don't send startTime (backend will set to now)
         // For custom schedule, send the selected startTime
         ...(scheduleType === 'custom' ? { startTime: formData.startTime } : {})
@@ -380,6 +390,54 @@ const CreateParty: React.FC = () => {
 
               <p className="text-xs text-gray-500 text-center" style={{ paddingTop: '10px' }}>
                 Minimum amount users must bid to add songs to the queue
+              </p>
+            </div>
+          </div>
+
+          {/* Tags and Description Section */}
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center mt-8">
+            <Music className="h-5 w-5 mr-3" />
+            Party Details
+          </h2>
+          
+          <div className="space-y-4">
+            {/* Tags Input */}
+            <div>
+              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
+                Tags (Optional)
+              </label>
+              <input
+                type="text"
+                id="tags"
+                name="tags"
+                value={formData.tags}
+                onChange={handleChange}
+                placeholder="e.g., electronic, chill, 90s, workout (comma-separated)"
+                className="input"
+                maxLength={200}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Add up to 5 tags to help people discover your party. Separate with commas.
+              </p>
+            </div>
+
+            {/* Description Input */}
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                Description (Optional)
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Describe your party theme, music style, or what to expect..."
+                className="input"
+                rows={4}
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.description.length}/500 characters
               </p>
             </div>
           </div>

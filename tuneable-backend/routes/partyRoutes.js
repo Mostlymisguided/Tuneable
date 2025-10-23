@@ -46,7 +46,7 @@ router.post('/', adminMiddleware, async (req, res) => {
       console.log('🔥 Create Party Request Received:', req.body);
       console.log('🔑 Authenticated User:', req.user);
   
-      const { name, location, startTime, privacy, type, musicSource, minimumBid } = req.body;
+      const { name, location, startTime, privacy, type, musicSource, minimumBid, tags, description } = req.body;
   
       if (!name ) {
         console.log('❌ Missing Name');
@@ -81,6 +81,8 @@ router.post('/', adminMiddleware, async (req, res) => {
         status: startTime ? 'scheduled' : 'active', // If no startTime provided, party starts immediately
         musicSource: musicSource || 'youtube',
         minimumBid: minimumBid || 0.33,
+        tags: tags || [],
+        description: description || '',
       });
   
       await party.save();

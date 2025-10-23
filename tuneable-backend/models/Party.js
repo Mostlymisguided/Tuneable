@@ -117,6 +117,17 @@ const PartySchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+    maxlength: [50, 'Tag cannot exceed 50 characters']
+  }],
+  description: {
+    type: String,
+    maxlength: [500, 'Description cannot exceed 500 characters'],
+    trim: true
+  },
 }, {
   timestamps: true
 });
@@ -179,5 +190,6 @@ PartySchema.index({ 'media.partyMediaAggregate': -1 });
 PartySchema.index({ 'media.partyMediaBidTop': -1 });
 PartySchema.index({ 'media.partyMediaAggregateTop': -1 });
 PartySchema.index({ type: 1 }); // Index for Global Party lookup
+PartySchema.index({ tags: 1 }); // Index for tag-based filtering
 
 module.exports = mongoose.model('Party', PartySchema);
