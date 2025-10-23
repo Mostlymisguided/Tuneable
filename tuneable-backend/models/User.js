@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
   cellPhone:{ type: String }, 
   givenName:{ type: String },
   familyName:{ type: String },
-  profilePic: { type: String, default: null }, // Stores URL or file path
+  profilePic: { type: String, default: 'https://uploads.tuneable.stream/profile-pictures/default-profile.png' }, // Stores URL or file path
   personalInviteCode: { type: String, required: true, unique: true },
   parentInviteCode: { type: String, required: false },
   balance: { type: Number, default: 0 }, // New field for wallet balance

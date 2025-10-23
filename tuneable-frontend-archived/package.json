@@ -1,0 +1,50 @@
+{
+  "name": "tuneable-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@react-google-maps/api": "^2.20.6",
+    "@stripe/react-stripe-js": "^3.1.1",
+    "@stripe/stripe-js": "^5.6.0",
+    "axios": "^1.7.9",
+    "cra-template": "1.2.0",
+    "howler": "^2.2.4",
+    "jwt-decode": "^4.0.0",
+    "postcss-value-parser": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-player": "^3.3.1",
+    "react-router-dom": "^7.0.2",
+    "react-scripts": "^5.0.1",
+    "react-toastify": "^11.0.3",
+    "use-places-autocomplete": "^4.0.1",
+    "web-vitals": "^4.2.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
+  }
+}

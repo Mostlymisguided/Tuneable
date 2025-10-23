@@ -1,0 +1,20 @@
+/* Global Styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', sans-serif;
+  background-color: #1e86c2; /* Updated for dark theme */
+  color: #fff;
+}
+
+h1 {
+  font-size: 2rem; /* Adjusted for consistency */
+  margin: 20px 0;
+}
+
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+}

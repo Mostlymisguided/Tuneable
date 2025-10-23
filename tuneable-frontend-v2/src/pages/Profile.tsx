@@ -197,7 +197,7 @@ const Profile: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <img
-                  src={profile.profilePic || '/android-chrome-192x192.png'}
+                  src={profile.profilePic || '/default-profile.png'}
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />

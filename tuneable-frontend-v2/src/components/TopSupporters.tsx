@@ -103,7 +103,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10 }) 
             {/* Profile Picture */}
             <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
               <img
-                src={supporter.user.profilePic || '/android-chrome-192x192.png'}
+                src={supporter.user.profilePic || '/default-profile.png'}
                 alt={supporter.user.username}
                 className="w-full h-full object-cover"
               />
