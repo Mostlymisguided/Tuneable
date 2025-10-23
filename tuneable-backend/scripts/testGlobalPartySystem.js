@@ -9,7 +9,7 @@ const Party = require('../models/Party');
 const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 
-const atlasUri = 'mongodb+srv://admin:superstrongkiwisflytoindiaonpigs@tuneablecluster0.lc0zk.mongodb.net/Tuneable?retryWrites=true&w=majority&appName=TuneableCluster0';
+// Use environment variable for MongoDB connection
 
 async function testGlobalPartySystem() {
   try {
@@ -83,7 +83,7 @@ async function testGlobalPartySystem() {
 }
 
 // Run test
-mongoose.connect(atlasUri)
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/Tuneable')
   .then(async () => {
     console.log('Connected to MongoDB');
     await testGlobalPartySystem();

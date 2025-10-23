@@ -97,8 +97,7 @@ async function migrateGlobalBids() {
 
 // Run migration if called directly
 if (require.main === module) {
-  const atlasUri = 'mongodb+srv://admin:superstrongkiwisflytoindiaonpigs@tuneablecluster0.lc0zk.mongodb.net/Tuneable?retryWrites=true&w=majority&appName=TuneableCluster0';
-  mongoose.connect(process.env.MONGODB_URI || atlasUri)
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/Tuneable')
     .then(async () => {
       console.log('Connected to MongoDB');
       await migrateGlobalBids();

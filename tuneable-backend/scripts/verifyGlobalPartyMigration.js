@@ -7,7 +7,7 @@ const Party = require('../models/Party');
 const Bid = require('../models/Bid');
 const Media = require('../models/Media');
 
-const atlasUri = 'mongodb+srv://admin:superstrongkiwisflytoindiaonpigs@tuneablecluster0.lc0zk.mongodb.net/Tuneable?retryWrites=true&w=majority&appName=TuneableCluster0';
+// Use environment variable for MongoDB connection
 
 async function verifyMigration() {
   try {
@@ -49,7 +49,7 @@ async function verifyMigration() {
 }
 
 // Run verification
-mongoose.connect(atlasUri)
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/Tuneable')
   .then(async () => {
     console.log('Connected to MongoDB');
     await verifyMigration();
