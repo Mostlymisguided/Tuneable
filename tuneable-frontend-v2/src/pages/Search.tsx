@@ -4,6 +4,7 @@ import { searchAPI, partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
+import TagInputModal from '../components/TagInputModal';
 
 // Define types directly to avoid import issues
 interface SearchResult {
@@ -42,6 +43,8 @@ const SearchPage: React.FC = () => {
   const [podcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
   const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
   const [hasMoreExternal, setHasMoreExternal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<SearchResult | null>(null);
 
   useEffect(() => {
     if (!partyId) {
@@ -347,41 +350,60 @@ const SearchPage: React.FC = () => {
         }
       }
       } else {
-        // Handle regular song - detect platform from available sources
-        let platform = 'youtube';
-        let url = song.sources.youtube;
-        
-        // Check for uploaded media first
-        if (song.sources.upload) {
-          platform = 'upload';
-          url = song.sources.upload;
-        } else if (song.sources.youtube) {
-          platform = 'youtube';
-          url = song.sources.youtube;
-        }
-        
-        const response = await partyAPI.addMediaToParty(partyId, {
-          title: song.title,
-          artist: song.artist,
-          url: url,
-          platform: platform,
-          duration: song.duration,
-          coverArt: song.coverArt,
-          bidAmount: songBidAmount,
-          tags: song.tags || [],
-          category: song.category || 'Unknown',
-        });
-        
-        if (response.isDuplicate) {
-          toast.success(`Bid of £${songBidAmount.toFixed(2)} added to existing song in queue!`);
-        } else {
-          toast.success(`Song added to party with £${songBidAmount.toFixed(2)} bid!`);
-        }
-        navigate(`/party/${partyId}`);
+        // Handle regular song - show tag modal first
+        setPendingMedia(song);
+        setShowTagModal(true);
       }
     } catch (error: any) {
       console.error('Bid error:', error);
       toast.error(error.response?.data?.error || 'Failed to add content');
+    }
+  };
+
+  const handleTagSubmit = async (tags: string[]) => {
+    if (!pendingMedia || !partyId) return;
+
+    const song = pendingMedia;
+    const songBidAmount = bidAmounts[song.id] || (party?.minimumBid || 0.01);
+    
+    try {
+      // Handle regular song - detect platform from available sources
+      let platform = 'youtube';
+      let url = song.sources.youtube;
+      
+      // Check for uploaded media first
+      if (song.sources.upload) {
+        platform = 'upload';
+        url = song.sources.upload;
+      } else if (song.sources.youtube) {
+        platform = 'youtube';
+        url = song.sources.youtube;
+      }
+      
+      const response = await partyAPI.addMediaToParty(partyId, {
+        title: song.title,
+        artist: song.artist,
+        url: url,
+        platform: platform,
+        duration: song.duration,
+        coverArt: song.coverArt,
+        bidAmount: songBidAmount,
+        tags: tags, // Use user-generated tags
+        category: song.category || 'Unknown',
+      });
+      
+      if (response.isDuplicate) {
+        toast.success(`Bid of £${songBidAmount.toFixed(2)} added to existing song in queue!`);
+      } else {
+        toast.success(`Song added to party with £${songBidAmount.toFixed(2)} bid!`);
+      }
+      navigate(`/party/${partyId}`);
+    } catch (error: any) {
+      console.error('Error adding media with tags:', error);
+      toast.error(error.response?.data?.error || 'Failed to add content');
+    } finally {
+      setShowTagModal(false);
+      setPendingMedia(null);
     }
   };
 
@@ -735,6 +757,18 @@ const SearchPage: React.FC = () => {
           </p>
         </div>
       )}
+
+      {/* Tag Input Modal */}
+      <TagInputModal
+        isOpen={showTagModal}
+        onClose={() => {
+          setShowTagModal(false);
+          setPendingMedia(null);
+        }}
+        onSubmit={handleTagSubmit}
+        mediaTitle={pendingMedia?.title}
+        mediaArtist={pendingMedia?.artist}
+      />
     </div>
   );
 };

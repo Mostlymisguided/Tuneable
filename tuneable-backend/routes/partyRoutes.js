@@ -585,22 +585,9 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             }
         }
 
-        // Get video tags and category for YouTube
+        // Use provided tags (user-generated) or empty array
         let videoTags = Array.isArray(tags) ? tags : [];
         let videoCategory = category || 'Unknown';
-        
-        if (platform === 'youtube') {
-            try {
-                const videoId = url.split('v=')[1]?.split('&')[0];
-                if (videoId) {
-                    const videoDetails = await getVideoDetails(videoId);
-                    videoTags = videoDetails.tags || [];
-                    videoCategory = videoDetails.category || 'Unknown';
-                }
-            } catch (error) {
-                console.error('Error fetching video details:', error);
-            }
-        }
         
         // Check if media already exists to prevent duplicates
         let existingMedia = null;
