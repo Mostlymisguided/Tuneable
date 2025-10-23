@@ -1056,12 +1056,9 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Use existing Global Party
+    // Get Global Party using new system
     const Party = require('../models/Party');
-    const mongoose = require('mongoose');
-    const GLOBAL_PARTY_ID = '67c6a02895baad05d3a97cf4'; // Your existing Global Party
-    
-    const globalParty = await Party.findById(GLOBAL_PARTY_ID);
+    const globalParty = await Party.getGlobalParty();
     
     if (!globalParty) {
       return res.status(500).json({ error: 'Global Party not found. Please contact support.' });
@@ -1078,9 +1075,10 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       mediaId: media._id,
       amount,
       status: 'active',
+      bidScope: 'global', // Mark as global bid
       username: user.username,
       partyName: globalParty.name, // 'Global Party'
-      partyType: globalParty.type, // 'remote'
+      partyType: globalParty.type, // 'global'
       mediaTitle: media.title,
       mediaArtist: media.artist?.[0]?.name || 'Unknown',
       mediaCoverArt: media.coverArt,
@@ -1117,9 +1115,14 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     
     await globalParty.save();
 
-    // Update media's bid array (BidMetricsEngine will handle aggregates)
+    // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
     media.bids.push(bid._id);
+    
+    // Also add to globalBids array
+    media.globalBids = media.globalBids || [];
+    media.globalBids.push(bid._id);
+    
     await media.save();
 
     // Update user balance

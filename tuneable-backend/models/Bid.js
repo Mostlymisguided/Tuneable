@@ -37,7 +37,7 @@ const bidSchema = new mongoose.Schema({
     // ========================================
     username: { type: String, required: true }, // User who placed bid
     partyName: { type: String, required: true }, // Party name at time of bid
-    mediaTitle: { type: String, required: true }, // Song/media title
+    mediaTitle: { type: String, required: true }, // Media title
     mediaArtist: { type: String }, // Artist name(s)
     mediaCoverArt: { type: String }, // Thumbnail URL
     
@@ -49,6 +49,15 @@ const bidSchema = new mongoose.Schema({
         enum: ['remote', 'live'],
         required: true
     }, // Type of party when bid was placed
+    
+    // ========================================
+    // BID SCOPE (Phase 1)
+    // ========================================
+    bidScope: {
+        type: String,
+        enum: ['party', 'global'],
+        default: 'party'
+    }, // Distinguishes party-specific bids from global bids
     
     // ========================================
     // BID CONTEXT (Phase 1 & 2)

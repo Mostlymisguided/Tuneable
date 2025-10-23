@@ -163,7 +163,62 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
     try {
         const { id } = req.params;
 
-        const party = await Party.findById(id)
+        // Check if this is the Global Party
+        const isGlobalParty = await Party.getGlobalParty();
+        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === id;
+
+        let party;
+        
+        if (isRequestingGlobalParty) {
+            // For Global Party, we need to aggregate ALL media with ANY bids
+            console.log('🌍 Fetching Global Party - aggregating all media with bids...');
+            
+            // Get the Global Party object
+            party = isGlobalParty;
+            
+            // Find ALL media that has ANY bids (party or global)
+            const Media = require('../models/Media');
+            const Bid = require('../models/Bid');
+            
+            const allMediaWithBids = await Media.find({
+                bids: { $exists: true, $ne: [] }
+            })
+            .populate({
+                path: 'bids',
+                model: 'Bid',
+                populate: {
+                    path: 'userId',
+                    select: 'username profilePic uuid homeLocation'
+                }
+            })
+            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation')
+            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation')
+            .populate('addedBy', 'username profilePic uuid homeLocation');
+
+            // Convert to party media format for consistent frontend handling
+            party.media = allMediaWithBids.map(media => ({
+                mediaId: media,
+                media_uuid: media.uuid,
+                addedBy: media.addedBy,
+                addedBy_uuid: media.addedBy?.uuid,
+                partyMediaAggregate: media.globalMediaAggregate || 0,
+                partyBids: media.bids || [],
+                status: 'queued',
+                queuedAt: media.createdAt || new Date(),
+                partyMediaBidTop: media.globalMediaBidTop || 0,
+                partyMediaBidTopUser: media.globalMediaBidTopUser,
+                partyMediaAggregateTop: media.globalMediaAggregateTop || 0,
+                partyMediaAggregateTopUser: media.globalMediaAggregateTopUser
+            }));
+            
+            // Populate partiers and host for Global Party
+            const User = require('../models/User');
+            party.partiers = await User.find({}).select('username uuid');
+            party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid');
+            
+        } else {
+            // Regular party fetching logic
+            party = await Party.findById(id)
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
@@ -209,6 +264,7 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
                 model: 'User',
                 select: 'username uuid',  // ✅ Include uuid for isHost comparison
             });
+        }
 
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
@@ -370,12 +426,36 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
             return res.status(400).json({ error: 'Search query (q) is required' });
         }
 
-        const party = await Party.findById(partyId)
-            .populate({
-                path: 'media.mediaId',
-                model: 'Media',
-                select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm'
-            });
+        // Check if this is the Global Party
+        const isGlobalParty = await Party.getGlobalParty();
+        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
+
+        let party;
+        
+        if (isRequestingGlobalParty) {
+            // For Global Party, search through ALL media with ANY bids
+            console.log('🌍 Searching Global Party - searching all media with bids...');
+            
+            const Media = require('../models/Media');
+            const allMediaWithBids = await Media.find({
+                bids: { $exists: true, $ne: [] }
+            }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm');
+            
+            // Convert to party format for consistent handling
+            party = {
+                media: allMediaWithBids.map(media => ({
+                    mediaId: media
+                }))
+            };
+        } else {
+            // Regular party search logic
+            party = await Party.findById(partyId)
+                .populate({
+                    path: 'media.mediaId',
+                    model: 'Media',
+                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm'
+                });
+        }
 
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
@@ -559,6 +639,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaId: media._id, // Use mediaId instead of songId
             amount: bidAmount,
             status: 'active',
+            bidScope: party.type === 'global' ? 'global' : 'party', // Set bidScope based on party type
             
             // Required denormalized fields
             username: user.username,
@@ -594,6 +675,13 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         // Add bid to media's bids array
         media.bids = media.bids || [];
         media.bids.push(bid._id);
+        
+        // Also add to globalBids array if this is a global bid
+        if (party.type === 'global') {
+            media.globalBids = media.globalBids || [];
+            media.globalBids.push(bid._id);
+        }
+        
         await media.save();
 
         // Add media to party with bid
@@ -745,6 +833,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             mediaId: actualMediaId, // Use mediaId instead of songId
             amount: bidAmount,
             status: 'active',
+            bidScope: party.type === 'global' ? 'global' : 'party', // Set bidScope based on party type
             
             // Required denormalized fields
             username: user.username,
@@ -789,6 +878,13 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             media.globalMediaAggregate = (media.globalMediaAggregate || 0) + bidAmount; // Updated to schema grammar
             media.bids = media.bids || [];
             media.bids.push(bid._id);
+            
+            // Also add to globalBids array if this is a global bid
+            if (party.type === 'global') {
+                media.globalBids = media.globalBids || [];
+                media.globalBids.push(bid._id);
+            }
+            
             await media.save();
         }
 
@@ -839,7 +935,7 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
 
         // Check if user is the host
         if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the host can start songs' });
+            return res.status(403).json({ error: 'Only the host can start media' });
         }
 
         const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
@@ -903,7 +999,7 @@ router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
 
         // Check if user is the host
         if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the host can reset songs' });
+            return res.status(403).json({ error: 'Only the host can reset media' });
         }
 
         // Reset all media to queued status
@@ -944,7 +1040,7 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
 
         // Check if user is the host
         if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the host can complete songs' });
+            return res.status(403).json({ error: 'Only the host can complete media' });
         }
 
         const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
@@ -1038,7 +1134,7 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
 
         // Check if user is the host
         if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the host can veto songs' });
+            return res.status(403).json({ error: 'Only the host can veto' });
         }
 
         const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
@@ -1264,7 +1360,7 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
 
         // Check if user is the host (only host can veto)
         if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the party host can veto songs' });
+            return res.status(403).json({ error: 'Only the party host can veto' });
         }
 
         // Find the media in the party's queue
@@ -1452,7 +1548,7 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
         
         // Check if user is the host
         if (party.host.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: 'Only the host can veto songs' });
+            return res.status(403).json({ error: 'Only the host can veto' });
         }
         
         // Find the media in the party
@@ -1474,14 +1570,14 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
         await party.save();
         
         res.json(transformResponse({
-            message: 'Song vetoed successfully',
+            message: 'Media vetoed successfully',
             party: party
         }));
         
     } catch (err) {
-        console.error('Error vetoing song:', err);
+        console.error('Error vetoing media:', err);
         res.status(500).json({ 
-            error: 'Error vetoing song', 
+            error: 'Error vetoing media', 
             details: err.message 
         });
     }

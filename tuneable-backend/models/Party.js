@@ -105,7 +105,7 @@ const PartySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['remote', 'live'],
+    enum: ['remote', 'live', 'global'],
     default: 'remote',
   },
   status: {
@@ -164,6 +164,11 @@ PartySchema.statics.updateAllStatuses = async function() {
   return updates.length;
 };
 
+// Static method to get Global Party
+PartySchema.statics.getGlobalParty = async function() {
+  return await this.findOne({ type: 'global' });
+};
+
 // Add indexes for performance
 PartySchema.index({ host: 1 });
 PartySchema.index({ partiers: 1 });
@@ -173,5 +178,6 @@ PartySchema.index({ partyUserBidTop: -1 });
 PartySchema.index({ 'media.partyMediaAggregate': -1 });
 PartySchema.index({ 'media.partyMediaBidTop': -1 });
 PartySchema.index({ 'media.partyMediaAggregateTop': -1 });
+PartySchema.index({ type: 1 }); // Index for Global Party lookup
 
 module.exports = mongoose.model('Party', PartySchema);

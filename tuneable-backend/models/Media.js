@@ -142,7 +142,7 @@ const mediaSchema = new mongoose.Schema({
   explicit: { type: Boolean, default: false }, // Explicit content flag
   isrc: { type: String, default: null }, // International Standard Recording Code
   upc: { type: String, default: null }, // Universal Product Code
-  lyrics: { type: String }, // Song lyrics
+  lyrics: { type: String }, // lyrics
   transcript: { type: String }, // Podcast/video transcript
   bpm: { type: Number },
   key: { type: String },
@@ -216,6 +216,9 @@ const mediaSchema = new mongoose.Schema({
   
   // Reference to bids (for populating if needed)
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
+  
+  // Reference to global bids (subset of bids array)
+  globalBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
   // Note: Other metrics (averages, ranks, etc.) are computed on-demand
   // via the BidMetricsEngine using the bidMetricsSchema.js definitions

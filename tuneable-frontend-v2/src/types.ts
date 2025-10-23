@@ -231,7 +231,7 @@ export interface Party {
   musicSource: 'youtube' | 'spotify' | 'direct_upload';
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live';
+  type: 'remote' | 'live' | 'global';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   minimumBid: number;
