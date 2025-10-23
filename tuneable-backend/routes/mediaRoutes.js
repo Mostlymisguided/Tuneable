@@ -1046,7 +1046,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     }
 
     // Get or resolve media
-    const resolvedMediaId = await resolveId(mediaId, 'Media');
+    const resolvedMediaId = await resolveId(mediaId, Media);
     if (!resolvedMediaId) {
       return res.status(404).json({ error: 'Media not found' });
     }

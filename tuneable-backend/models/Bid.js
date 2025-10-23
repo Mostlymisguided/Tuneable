@@ -46,7 +46,7 @@ const bidSchema = new mongoose.Schema({
     // ========================================
     partyType: { 
         type: String, 
-        enum: ['remote', 'live'],
+        enum: ['remote', 'live', 'global'],
         required: true
     }, // Type of party when bid was placed
     

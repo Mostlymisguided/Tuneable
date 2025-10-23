@@ -599,22 +599,52 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             }
         }
         
-        // Create new media item
-        const media = new Media({
-            title,
-            artist: [{ name: artist, userId: null, verified: false }],
-            coverArt: extractedCoverArt,
-            duration: extractedDuration,
-            sources: { [platform]: url },
-            tags: videoTags,
-            category: videoCategory,
-            addedBy: userId,
-            globalMediaAggregate: bidAmount, // Updated to schema grammar
-            contentType: 'music',
-            contentForm: 'tune'
-        });
+        // Check if media already exists to prevent duplicates
+        let existingMedia = null;
 
-        await media.save();
+        // First, try to find by URL (most reliable)
+        if (url) {
+            existingMedia = await Media.findOne({
+                $or: [
+                    { 'sources.youtube': url },
+                    { 'sources.spotify': url },
+                    { 'sources.upload': url }
+                ]
+            });
+        }
+
+        // If not found by URL, try to find by title + artist
+        if (!existingMedia) {
+            existingMedia = await Media.findOne({
+                title: title,
+                'artist.name': artist
+            });
+        }
+
+        let media;
+        if (existingMedia) {
+            // Use existing media
+            media = existingMedia;
+            console.log(`✅ Using existing media: "${media.title}" (${media._id})`);
+        } else {
+            // Create new media item
+            media = new Media({
+                title,
+                artist: [{ name: artist, userId: null, verified: false }],
+                coverArt: extractedCoverArt,
+                duration: extractedDuration,
+                sources: { [platform]: url },
+                tags: videoTags,
+                category: videoCategory,
+                addedBy: userId,
+                globalMediaAggregate: bidAmount, // Updated to schema grammar
+                contentType: 'music',
+                contentForm: 'tune'
+            });
+            
+            await media.save();
+            console.log(`✅ Created new media: "${media.title}" (${media._id})`);
+        }
 
         // Calculate queue context
         const queuedMedia = party.media.filter(m => m.status === 'queued');
@@ -759,21 +789,64 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Find media by either ObjectId or UUID
-        let partyMediaEntry;
-        if (mongoose.isValidObjectId(mediaId)) {
-            partyMediaEntry = party.media.find(entry => 
-                entry.mediaId && entry.mediaId._id.toString() === mediaId
-            );
-        } else {
-            // Try finding by UUID
-            partyMediaEntry = party.media.find(entry => 
-                entry.media_uuid === mediaId || (entry.mediaId && entry.mediaId.uuid === mediaId)
-            );
-        }
+        // Check if this is the Global Party
+        const isGlobalParty = await Party.getGlobalParty();
+        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
 
-        if (!partyMediaEntry) {
-            return res.status(404).json({ error: 'Media not found in party queue' });
+        let partyMediaEntry;
+        let actualMediaId;
+        let populatedMedia;
+
+        if (isRequestingGlobalParty) {
+            // For Global Party, media doesn't exist in party.media array
+            // We need to find the media directly from the Media collection
+            console.log('🌍 Global Party bidding - finding media directly from Media collection');
+            
+            // Resolve media ID (handle both ObjectId and UUID)
+            const Media = require('../models/Media');
+            if (mongoose.isValidObjectId(mediaId)) {
+                actualMediaId = mediaId;
+                populatedMedia = await Media.findById(actualMediaId);
+            } else {
+                // Try finding by UUID
+                populatedMedia = await Media.findOne({ uuid: mediaId });
+                if (populatedMedia) {
+                    actualMediaId = populatedMedia._id;
+                }
+            }
+
+            if (!populatedMedia) {
+                return res.status(404).json({ error: 'Media not found' });
+            }
+
+            // Create a virtual party media entry for Global Party
+            partyMediaEntry = {
+                mediaId: populatedMedia._id,
+                media_uuid: populatedMedia.uuid,
+                partyMediaAggregate: populatedMedia.globalMediaAggregate || 0,
+                partyBids: populatedMedia.bids || [],
+                status: 'queued'
+            };
+
+        } else {
+            // Regular party logic - find media in party.media array
+            if (mongoose.isValidObjectId(mediaId)) {
+                partyMediaEntry = party.media.find(entry => 
+                    entry.mediaId && entry.mediaId._id.toString() === mediaId
+                );
+            } else {
+                // Try finding by UUID
+                partyMediaEntry = party.media.find(entry => 
+                    entry.media_uuid === mediaId || (entry.mediaId && entry.mediaId.uuid === mediaId)
+                );
+            }
+
+            if (!partyMediaEntry) {
+                return res.status(404).json({ error: 'Media not found in party queue' });
+            }
+
+            actualMediaId = partyMediaEntry.mediaId._id || partyMediaEntry.mediaId;
+            populatedMedia = partyMediaEntry.mediaId;
         }
 
         // Check minimum bid
@@ -802,19 +875,25 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             });
         }
 
-        // Get the actual media ObjectId
-        const actualMediaId = partyMediaEntry.mediaId._id || partyMediaEntry.mediaId;
-        
-        // Get full media object for denormalized fields (from populated party)
-        const populatedMedia = partyMediaEntry.mediaId;
+        // actualMediaId and populatedMedia are now set above based on party type
 
         // Calculate queue context
-        const queuedMedia = party.media.filter(m => m.status === 'queued');
-        const queueSize = queuedMedia.length;
-        // Find position of this media in the queue
-        const queuePosition = queuedMedia.findIndex(m => 
-            (m.mediaId._id || m.mediaId).toString() === actualMediaId.toString()
-        ) + 1; // +1 for 1-indexed position
+        let queuedMedia, queueSize, queuePosition;
+        
+        if (isRequestingGlobalParty) {
+            // For Global Party, all media is considered "queued" and we get it from Media collection
+            const Media = require('../models/Media');
+            queuedMedia = await Media.find({ bids: { $exists: true, $ne: [] } });
+            queueSize = queuedMedia.length;
+            queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
+        } else {
+            // Regular party logic
+            queuedMedia = party.media.filter(m => m.status === 'queued' && m.mediaId); // Filter out null mediaId entries
+            queueSize = queuedMedia.length;
+            queuePosition = queuedMedia.findIndex(m => 
+                (m.mediaId._id || m.mediaId).toString() === actualMediaId.toString()
+            ) + 1; // +1 for 1-indexed position
+        }
 
         // Detect platform from user-agent
         const userAgent = req.headers['user-agent'] || '';
@@ -867,10 +946,17 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }
 
         // Update party media entry bid aggregate (schema grammar)
-        partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmount;
-        partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
-        partyMediaEntry.partyBids.push(bid._id);
-        await party.save();
+        if (isRequestingGlobalParty) {
+            // For Global Party, we don't update the party.media array since it's virtual
+            // The media aggregate is updated in the Media model below
+            console.log('🌍 Global Party bidding - skipping party.media update (virtual)');
+        } else {
+            // Regular party logic - update party media entry
+            partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmount;
+            partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
+            partyMediaEntry.partyBids.push(bid._id);
+            await party.save();
+        }
 
         // Update media global bid value
         const media = await Media.findById(actualMediaId);
