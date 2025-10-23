@@ -9,7 +9,6 @@ import Navbar from './components/Navbar';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import Home from './pages/Home';
 import About from './pages/About';
-import TopTunes from './pages/TopTunes';
 import AuthPage from './pages/AuthPage';
 import AuthCallback from './pages/AuthCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -83,7 +82,6 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
-            <Route path="/top-tunes" element={<TopTunes />} />
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage />} />
             <Route path="/request-invite" element={<RequestInvite />} />

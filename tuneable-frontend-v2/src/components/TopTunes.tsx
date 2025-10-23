@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Music, Play, DollarSign } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
-import { ArrowUpDown, Music } from 'lucide-react';
-import TopBidders from './TopBidders';
+import { toast } from 'react-toastify';
 
 interface TopTunesSong {
   id: string;
-  uuid?: string;
   title: string;
   artist: string;
-  duration: number;
   coverArt: string;
   globalMediaAggregate: number;
-  uploadedAt: string;
-  bids?: Array<{
-    userId: {
-      username: string;
-      profilePic?: string;
-      uuid: string;
-    };
-    amount: number;
-  }>;
+  globalMediaBidTop: number;
+  globalMediaBidTopUser?: {
+    username: string;
+    profilePic?: string;
+  };
+  bids?: any[];
+  tags?: string[];
 }
 
 interface TopTunesProps {
@@ -29,206 +24,153 @@ interface TopTunesProps {
 }
 
 const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) => {
-  const navigate = useNavigate();
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState('globalMediaAggregate');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [showAll, setShowAll] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     fetchTopTunes();
-  }, [sortBy, limit, showAll]);
+  }, [sortBy, limit]);
 
   const fetchTopTunes = async () => {
     try {
-      setLoading(true);
-      // Always fetch at least 20 songs initially to enable Show More button
-      const fetchLimit = showAll ? 50 : Math.max(20, limit);
+      setIsLoading(true);
+      const fetchLimit = limit || 10;
       const response = await topTunesAPI.getTopTunes(sortBy, fetchLimit);
-      if (response.success) {
-        setSongs(response.songs);
-      }
+      setSongs(response.songs || []);
     } catch (error) {
-      console.error('Error fetching Top Tunes:', error);
+      console.error('Error fetching top tunes:', error);
+      toast.error('Failed to load top tunes');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortDirection('desc');
-    }
+  const formatCurrency = (amount: number) => {
+    return `£${amount.toFixed(2)}`;
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const handlePlay = (song: TopTunesSong) => {
+    // Handle play functionality - this would integrate with your audio player
+    console.log('Playing:', song.title);
   };
 
-  const formatBidValue = (value: number) => {
-    return `£${value.toFixed(2)}`;
-  };
-
-  const handleShowMore = () => {
-    setShowAll(true);
-    setIsExpanded(true);
-  };
-
-  const handleShowLess = () => {
-    setShowAll(false);
-    setIsExpanded(false);
-  };
-
-  // Determine which songs to display
-  const displaySongs = isExpanded ? songs : songs.slice(0, limit);
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="card">
-        {showHeader && (
-          <h2 className="text-xl font-semibold text-gray-300 mb-4">Top Tunes</h2>
-        )}
-        <div className="text-center py-8">
-          <Music className="h-8 w-8 text-gray-300 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-300">Loading Top Tunes...</p>
+      <div className="space-y-4">
+        {showHeader && <h2 className="text-xl font-semibold text-gray-300">Top Tunes</h2>}
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="card">
+    <div className="space-y-4">
       {showHeader && (
-        <h2 className="text-center text-xl font-semibold text-gray-300 mb-4">Top Tunes</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-300">Top Tunes</h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setSortBy('globalMediaAggregate')}
+              className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                sortBy === 'globalMediaAggregate'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Total
+            </button>
+            <button
+              onClick={() => setSortBy('globalMediaBidTop')}
+              className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                sortBy === 'globalMediaBidTop'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Top Bid
+            </button>
+          </div>
+        </div>
       )}
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                #
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                Song
-              </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                Top Bids
-              </th>
-              <th 
-                className="px-4 py-3 text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('artist')}
-              >
-                <div className="flex justify-center items-center space-x-1">
-                  <span>Artist</span>
-                  <ArrowUpDown className="h-3 w-3" />
-                </div>
-              </th>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('duration')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Duration</span>
-                  <ArrowUpDown className="h-3 w-3" />
-                </div>
-              </th>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('globalMediaAggregate')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Total Bids</span>
-                  <ArrowUpDown className="h-3 w-3" />
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="">
-            {displaySongs.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-300">
-                  <Music className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm">No songs with bids yet</p>
-                </td>
-              </tr>
-            ) : (
-              displaySongs.map((song, index) => (
-                <tr key={song.id} className="hover:bg-gray-500 transition-colors">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-300">
-                    {index + 1}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-3">
-                      <div 
-                        className="flex-shrink-0 h-12 w-12 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => song.uuid && navigate(`/tune/${song.uuid}`)}
+
+      {songs.length === 0 ? (
+        <div className="text-center py-8">
+          <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">No tunes found</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {songs.map((song, index) => (
+            <div
+              key={song.id}
+              className="flex items-center space-x-4 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              {/* Rank */}
+              <div className="flex-shrink-0 w-8 text-center">
+                <span className="text-lg font-bold text-purple-400">#{index + 1}</span>
+              </div>
+
+              {/* Cover Art */}
+              <div className="flex-shrink-0">
+                <img
+                  src={song.coverArt || '/default-cover.jpg'}
+                  alt={song.title}
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+              </div>
+
+              {/* Song Info */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-white font-medium truncate">{song.title}</h3>
+                <p className="text-gray-400 text-sm truncate">{song.artist}</p>
+                
+                {/* Tags */}
+                {song.tags && song.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {song.tags.slice(0, 3).map((tag, tagIndex) => (
+                      <span
+                        key={tagIndex}
+                        className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full"
                       >
-                        {song.coverArt ? (
-                          <img
-                            className="h-12 w-12 rounded-lg object-cover"
-                            src={song.coverArt}
-                            alt={`${song.title} cover`}
-                          />
-                        ) : (
-                          <div className="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                            <Music className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p 
-                          className="text-sm font-medium text-gray-300 truncate cursor-pointer hover:text-purple-600 transition-colors"
-                          onClick={() => song.uuid && navigate(`/tune/${song.uuid}`)}
-                        >
-                          {song.title}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {song.bids && song.bids.length > 0 ? (
-                      <TopBidders bids={song.bids} maxDisplay={3} />
-                    ) : (
-                      <span className="text-sm text-gray-400">No bids</span>
+                        #{tag}
+                      </span>
+                    ))}
+                    {song.tags.length > 3 && (
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                        +{song.tags.length - 3}
+                      </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">
-                    {song.artist}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">
-                    {formatDuration(song.duration)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-semibold text-green-600">
-                    {formatBidValue(song.globalMediaAggregate)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      
-      {/* Show More/Less Button */}
-      {songs.length > limit && (
-        <div className="px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-500">
-          <button
-            onClick={isExpanded ? handleShowLess : handleShowMore}
-            className="w-full text-center text-sm font-medium text-white transition-colors"
-          >
-            {isExpanded ? (
-              `Show Less (${limit} songs)`
-            ) : (
-              `Show More (${songs.length - limit} more songs)`
-            )}
-          </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Stats */}
+              <div className="flex-shrink-0 text-right">
+                <div className="flex items-center space-x-2 text-sm">
+                  <DollarSign className="h-4 w-4 text-green-400" />
+                  <span className="text-green-400 font-medium">
+                    {formatCurrency(song.globalMediaAggregate)}
+                  </span>
+                </div>
+                {song.globalMediaBidTop > 0 && (
+                  <div className="text-xs text-gray-400">
+                    Top: {formatCurrency(song.globalMediaBidTop)}
+                  </div>
+                )}
+              </div>
+
+              {/* Play Button */}
+              <button
+                onClick={() => handlePlay(song)}
+                className="flex-shrink-0 p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Play className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
