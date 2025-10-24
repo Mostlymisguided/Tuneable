@@ -46,12 +46,10 @@ const extractSourceUrl = (media: any, playerType: string): string | null => {
     for (const source of media.sources) {
       if (source?.platform === playerType && source.url) return source.url;
       if (playerType === 'youtube' && source?.youtube) return source.youtube;
-      if (playerType === 'audio' && source?.upload) return source.upload;
       if (playerType === 'spotify' && source?.spotify) return source.spotify;
     }
   } else if (typeof media.sources === 'object') {
     if (playerType === 'youtube' && media.sources.youtube) return media.sources.youtube;
-    if (playerType === 'audio' && media.sources.upload) return media.sources.upload;
     if (playerType === 'spotify' && media.sources.spotify) return media.sources.spotify;
   }
   
@@ -233,13 +231,6 @@ const PersistentWebPlayer: React.FC = () => {
           const dur = youtubePlayerRef.current.getDuration();
           setCurrentTime(current);
           if (dur && dur !== duration) {
-            setDuration(dur);
-          }
-        } else if (playerType === 'audio' && audioRef.current) {
-          const current = audioRef.current.currentTime;
-          const dur = audioRef.current.duration;
-          setCurrentTime(current);
-          if (dur && !isNaN(dur) && dur !== duration) {
             setDuration(dur);
           }
         }
@@ -434,64 +425,6 @@ const PersistentWebPlayer: React.FC = () => {
     }
   };
 
-  const initializeAudioPlayer = (audioUrl: string) => {
-    console.log('Initializing HTML5 audio player with URL:', audioUrl);
-    
-    if (!audioRef.current) {
-      console.error('Audio ref not available');
-      return;
-    }
-
-    try {
-      // Set up audio element
-      audioRef.current.src = audioUrl;
-      audioRef.current.volume = volume / 100;
-      audioRef.current.muted = isMuted;
-
-      // Set up event listeners
-      audioRef.current.onloadedmetadata = () => {
-        console.log('Audio metadata loaded');
-        if (audioRef.current) {
-          const dur = audioRef.current.duration;
-          setDuration(dur);
-          setIsPlayerReady(true);
-          
-          if (isPlaying) {
-            console.log('Auto-playing audio...');
-            audioRef.current.play();
-          }
-        }
-      };
-
-      audioRef.current.onended = () => {
-        console.log('Audio ended');
-        if (currentPartyId && currentMedia?.id && isHost) {
-          partyAPI.completeMedia(currentPartyId, currentMedia.id)
-            .then(() => {
-              console.log('Media completion confirmed, advancing to next media');
-              next();
-            })
-            .catch(error => {
-              console.error('Error notifying media completion:', error);
-              next();
-            });
-    } else {
-          next();
-        }
-      };
-
-      audioRef.current.onerror = (error) => {
-        console.error('Audio playback error:', error);
-      };
-
-      // Load the audio
-      audioRef.current.load();
-      
-      console.log('Audio player initialized successfully');
-        } catch (error) {
-      console.error('Error initializing audio player:', error);
-    }
-  };
 
   // Update player state when isPlaying changes - only for YouTube media
   useEffect(() => {
@@ -591,8 +524,6 @@ const PersistentWebPlayer: React.FC = () => {
     try {
       if (playerType === 'youtube' && youtubePlayerRef.current) {
         youtubePlayerRef.current.seekTo(newTime);
-      } else if (playerType === 'audio' && audioRef.current) {
-        audioRef.current.currentTime = newTime;
       }
     } catch (error) {
       console.error('Error seeking:', error);
@@ -630,9 +561,7 @@ const PersistentWebPlayer: React.FC = () => {
   return (
     <>
       {/* HTML5 Audio Player (always hidden, no visual) */}
-      {playerType === 'audio' && (
-        <audio ref={audioRef} className="hidden" />
-      )}
+      {/* Audio element removed - MP3Player handles audio now */}
 
       {/* Main Player Bar - Fixed to bottom of viewport */}
       <div 

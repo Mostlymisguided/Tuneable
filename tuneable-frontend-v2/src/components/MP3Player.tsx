@@ -43,22 +43,6 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     currentMediaIndex
   } = useWebPlayerStore();
 
-  // Helper function to detect player type (same as PersistentWebPlayer)
-  const detectPlayerType = (media: any): 'youtube' | 'audio' | null => {
-    if (!media?.sources) return null;
-    
-    if (Array.isArray(media.sources)) {
-      for (const source of media.sources) {
-        if (source?.platform === 'youtube' && source.url) return 'youtube';
-        if (source?.platform === 'upload' && source.url) return 'audio';
-      }
-    } else if (typeof media.sources === 'object') {
-      if (media.sources.youtube) return 'youtube';
-      if (media.sources.upload) return 'audio';
-    }
-    
-    return null;
-  };
 
   // Simple approach - MP3Player handles audio, PersistentWebPlayer handles YouTube
 
