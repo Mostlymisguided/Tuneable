@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, ChevronDown, ChevronUp, Globe, Users, Coins, MapPin, User as UserIcon } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, Globe, Users, Coins, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface User {
@@ -130,7 +130,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
             className={`w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 ${user.profilePic ? 'hidden' : 'flex'}`}
             style={{ display: user.profilePic ? 'none' : 'flex' }}
           >
-            <UserIcon className="w-3 h-3 text-white" />
+            <img src="/default-profile.png" alt="Tuneable" className="w-6 h-6" />
           </div>
           
           <div className="flex-1 min-w-0">
@@ -231,7 +231,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                         className={`w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 ${supporter.user.profilePic ? 'hidden' : 'flex'}`}
                         style={{ display: supporter.user.profilePic ? 'none' : 'flex' }}
                       >
-                        <UserIcon className="w-4 h-4 text-white" />
+                        <img src="/default-profile.png" alt="Tuneable" className="w-8 h-8" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <button
@@ -290,7 +290,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                         className={`w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 ${bid.userId?.profilePic ? 'hidden' : 'flex'}`}
                         style={{ display: bid.userId?.profilePic ? 'none' : 'flex' }}
                       >
-                        <UserIcon className="w-4 h-4 text-white" />
+                        <img src="/default-profile.png" alt="Tuneable" className="w-8 h-8 " />
                       </div>
                       <div className="flex-1 min-w-0">
                         <button

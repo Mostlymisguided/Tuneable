@@ -149,7 +149,7 @@ const InviteReferrals: React.FC = () => {
                   {/* Profile Picture */}
                   <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
                     <img
-                      src={referral.profilePic || '/default-profile.png'}
+                      src={referral.profilePic || '/Tuneable-Logo-180x180.svg'}
                       alt={referral.username}
                       className="w-full h-full object-cover"
                     />

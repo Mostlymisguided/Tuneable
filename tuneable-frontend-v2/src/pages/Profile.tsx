@@ -197,7 +197,7 @@ const Profile: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <img
-                  src={profile.profilePic || '/default-profile.png'}
+                  src={profile.profilePic || '/Tuneable-Logo-180x180.svg'}
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />

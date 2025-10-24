@@ -77,7 +77,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
             {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 border-2 border-yellow-500 flex-shrink-0">
               <img
-                src={bid.userId.profilePic || '/default-profile.png'}
+                src={bid.userId.profilePic || '/Tuneable-Logo-180x180.svg'}
                 alt={bid.userId.username}
                 className="w-full h-full object-cover"
               />

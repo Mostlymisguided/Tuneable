@@ -409,7 +409,7 @@ const UserProfile: React.FC = () => {
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative">
               <img
-                src={user.profilePic || '/default-profile.png'}
+                src={user.profilePic || '/Tuneable-Logo-180x180.svg'}
                 alt={`${user.username} profile`}
                 className={`rounded-full shadow-xl object-cover ${isOwnProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                 style={{ width: '200px', height: '200px' }}
