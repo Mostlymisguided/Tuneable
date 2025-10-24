@@ -178,7 +178,10 @@ const mediaSchema = new mongoose.Schema({
   label: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    labelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Label', default: null }, // Reference to Label model
     verified: { type: Boolean, default: false },
+    catalogNumber: { type: String }, // Label's internal catalog number
+    releaseDate: { type: Date }, // Label's release date for this media
     _id: false
   }],
   
@@ -307,6 +310,7 @@ mediaSchema.index({ "producer.verified": 1 }); // Index for verified producer qu
 mediaSchema.index({ "author.verified": 1 }); // Index for verified author queries
 mediaSchema.index({ "label.name": 1 }); // Index for label searches
 mediaSchema.index({ "label.userId": 1 }); // Index for verified labels
+mediaSchema.index({ "label.labelId": 1 }); // Index for Label model references
 mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
 mediaSchema.index({ tags: 1, globalMediaAggregate: -1 }); // Compound index for tag rankings

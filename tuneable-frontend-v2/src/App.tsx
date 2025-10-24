@@ -28,6 +28,7 @@ import Wallet from './pages/Wallet';
 import PodcastDiscovery from './pages/PodcastDiscovery';
 import TuneProfile from './pages/TuneProfile';
 import UserProfile from './pages/UserProfile';
+import LabelProfile from './pages/LabelProfile';
 import Admin from './pages/Admin';
 import CreatorRegister from './pages/CreatorRegister';
 import CreatorUpload from './pages/CreatorUpload';
@@ -222,6 +223,10 @@ const AppContent = () => {
             <Route 
               path="/user/:userId" 
               element={<UserProfile />} 
+            />
+            <Route 
+              path="/label/:slug" 
+              element={<LabelProfile />} 
             />
             <Route 
               path="/admin" 

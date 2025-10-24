@@ -28,6 +28,7 @@ const instagramWebhooks = require('./routes/instagramWebhooks'); // Instagram we
 const creatorRoutes = require('./routes/creatorRoutes'); // Import creator application routes
 const reportRoutes = require('./routes/reportRoutes'); // Report routes
 const emailRoutes = require('./routes/emailRoutes'); // Email routes
+const labelRoutes = require('./routes/labelRoutes'); // Import label routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -146,6 +147,7 @@ app.use('/api/claims', require('./routes/claimRoutes')); // Tune ownership claim
 app.use('/api/creator', creatorRoutes); // Creator application routes
 app.use('/api/reports', reportRoutes); // Report routes
 app.use('/api/email', emailRoutes); // Email routes
+app.use('/api/labels', labelRoutes); // Label routes
 app.use('/api/webhooks/instagram', instagramWebhooks); // Instagram webhooks
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
