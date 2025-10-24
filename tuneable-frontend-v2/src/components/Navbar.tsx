@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Music } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -18,7 +17,11 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between h-12 sm:h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
-              <Music className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
+              <img 
+                src="/Tuneable-Logo-180x180.svg" 
+                alt="Tuneable Logo" 
+                className="h-6 w-6 sm:h-8 sm:w-8"
+              />
               <span className="text-lg sm:text-xl font-bold text-white">Tuneable</span>
             </Link>
           </div>
