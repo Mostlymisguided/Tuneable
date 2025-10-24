@@ -5,8 +5,10 @@ import { loadStripe } from '@stripe/stripe-js';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useWebPlayerStore } from './stores/webPlayerStore';
 import Navbar from './components/Navbar';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
+import MP3Player from './components/MP3Player';
 import Home from './pages/Home';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
@@ -33,6 +35,42 @@ import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+
+// Component to handle simple conditional player rendering
+const PlayerRenderer = () => {
+  const { currentMedia } = useWebPlayerStore();
+  
+  // Helper function to detect media type
+  const detectMediaType = (media: any): 'youtube' | 'audio' | null => {
+    if (!media?.sources) return null;
+    
+    if (Array.isArray(media.sources)) {
+      for (const source of media.sources) {
+        if (source?.platform === 'youtube' && source.url) return 'youtube';
+        if (source?.platform === 'upload' && source.url) return 'audio';
+      }
+    } else if (typeof media.sources === 'object') {
+      if (media.sources.youtube) return 'youtube';
+      if (media.sources.upload) return 'audio';
+    }
+    
+    return null;
+  };
+
+  if (!currentMedia) {
+    return <PersistentWebPlayer />; // Default to YouTube player
+  }
+
+  const mediaType = detectMediaType(currentMedia);
+
+  // Simple conditional rendering - one player at a time
+  if (mediaType === 'audio') {
+    return <MP3Player media={currentMedia} />;
+  }
+
+  // Default to YouTube player for YouTube media or unknown types
+  return <PersistentWebPlayer />;
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -195,7 +233,7 @@ const AppContent = () => {
             />
           </Routes>
         </main>
-        <PersistentWebPlayer />
+        <PlayerRenderer />
         <ToastContainer
           position="top-right"
           autoClose={5000}

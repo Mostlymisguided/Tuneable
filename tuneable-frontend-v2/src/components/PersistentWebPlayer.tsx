@@ -81,7 +81,7 @@ const PersistentWebPlayer: React.FC = () => {
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-  const [playerType, setPlayerType] = useState<'youtube' | 'audio' | null>(null);
+  const [playerType, setPlayerType] = useState<'youtube' | null>(null);
   // Function to open YouTube player in fullscreen
   const openYouTubeFullscreen = () => {
     if (playerType === 'youtube') {
@@ -154,6 +154,8 @@ const PersistentWebPlayer: React.FC = () => {
     setDuration,
     setQueue,
   } = useWebPlayerStore();
+
+  // Simple approach - PersistentWebPlayer only handles YouTube media
 
   // WebSocket connection for real-time updates
   useWebSocket({
@@ -255,7 +257,7 @@ const PersistentWebPlayer: React.FC = () => {
   }, [isPlayerReady, isPlaying, playerType, duration, setCurrentTime, setDuration]);
 
 
-  // Initialize player when media changes
+  // Initialize player when media changes - ONLY for YouTube media
   useEffect(() => {
     console.log('PersistentWebPlayer useEffect - currentMedia:', currentMedia);
     console.log('PersistentWebPlayer useEffect - isPlaying:', isPlaying);
@@ -292,6 +294,16 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
+    // Only handle YouTube media - if it's audio, reset the player
+    if (detectedPlayerType === 'audio') {
+      console.log('Audio media detected - resetting player (MP3Player will handle)');
+      setPlayerType(null);
+      setIsPlayerReady(false);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
+
     const sourceUrl = extractSourceUrl(currentMedia, detectedPlayerType);
     console.log('Source URL:', sourceUrl);
     
@@ -309,8 +321,6 @@ const PersistentWebPlayer: React.FC = () => {
         return;
       }
       initializeYouTubePlayer(videoId);
-    } else if (detectedPlayerType === 'audio') {
-      initializeAudioPlayer(sourceUrl);
     }
   }, [currentMedia, isGlobalPlayerActive]);
 
@@ -329,7 +339,9 @@ const PersistentWebPlayer: React.FC = () => {
     const initializePlayer = () => {
       console.log('Initializing YouTube player...');
       
-      if (window.YT && window.YT.Player && playerRef.current) {
+      // Add a small delay to ensure DOM is stable after transition
+      setTimeout(() => {
+        if (window.YT && window.YT.Player && playerRef.current) {
         try {
           // Clear any existing player
           if (youtubePlayerRef.current) {
@@ -354,6 +366,7 @@ const PersistentWebPlayer: React.FC = () => {
             events: {
               onReady: (event: any) => {
                 console.log('YouTube player ready!');
+                console.log('YouTube player ready - isPlaying:', isPlaying);
                 event.target.setVolume(volume);
                 if (isMuted) {
                   event.target.mute();
@@ -364,10 +377,18 @@ const PersistentWebPlayer: React.FC = () => {
                 
                 // YouTube player is always rendered when active
                 
-                if (isPlaying) {
-                  console.log('Auto-playing video...');
-                  event.target.playVideo();
-                }
+                // Small delay to ensure state is synchronized
+                setTimeout(() => {
+                  if (isPlaying) {
+                    console.log('Auto-playing video...');
+                    event.target.playVideo();
+                  } else {
+                    console.log('YouTube player ready but not playing - isPlaying is false');
+                    // Force play if we're in a transition from MP3
+                    console.log('Forcing play for transition...');
+                    event.target.playVideo();
+                  }
+                }, 100);
               },
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
@@ -398,7 +419,10 @@ const PersistentWebPlayer: React.FC = () => {
         } catch (error) {
           console.error('Error initializing YouTube player:', error);
         }
+      } else {
+        console.log('YouTube API or player ref not available after delay');
       }
+      }, 200); // 200ms delay to ensure DOM stability
     };
 
     if (window.YT && window.YT.Player) {
@@ -469,47 +493,38 @@ const PersistentWebPlayer: React.FC = () => {
     }
   };
 
-  // Update player state when isPlaying changes
+  // Update player state when isPlaying changes - only for YouTube media
   useEffect(() => {
-    if (isPlayerReady) {
-      console.log('Updating player state, isPlaying:', isPlaying, 'playerType:', playerType);
+    if (isPlayerReady && playerType === 'youtube') {
+      console.log('Updating YouTube player state, isPlaying:', isPlaying);
       try {
-        if (playerType === 'youtube' && youtubePlayerRef.current) {
+        if (youtubePlayerRef.current) {
           if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
             youtubePlayerRef.current.playVideo();
           } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
             youtubePlayerRef.current.pauseVideo();
           }
-        } else if (playerType === 'audio' && audioRef.current) {
-          if (isPlaying) {
-            audioRef.current.play();
-          } else {
-            audioRef.current.pause();
-          }
         }
       } catch (error) {
-        console.error('Error controlling player:', error);
+        console.error('Error controlling YouTube player:', error);
       }
     }
   }, [isPlaying, isPlayerReady, playerType]);
 
-  // Update volume when it changes
+  // Update volume when it changes - only for YouTube media
   useEffect(() => {
-    if (isPlayerReady) {
+    if (isPlayerReady && playerType === 'youtube') {
       try {
-        if (playerType === 'youtube' && youtubePlayerRef.current) {
+        if (youtubePlayerRef.current) {
           youtubePlayerRef.current.setVolume(volume);
           if (isMuted) {
             youtubePlayerRef.current.mute();
           } else {
             youtubePlayerRef.current.unMute();
           }
-        } else if (playerType === 'audio' && audioRef.current) {
-          audioRef.current.volume = volume / 100;
-          audioRef.current.muted = isMuted;
         }
       } catch (error) {
-        console.error('Error updating volume:', error);
+        console.error('Error updating YouTube volume:', error);
       }
     }
   }, [volume, isMuted, isPlayerReady, playerType]);
@@ -764,7 +779,7 @@ const PersistentWebPlayer: React.FC = () => {
               </button>
 
               <button
-                  onClick={() => next()}
+                  onClick={next}
                 disabled={currentMediaIndex >= queue.length - 1 || !currentMedia}
                   className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Next Song"
