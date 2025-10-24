@@ -138,10 +138,7 @@ labelSchema.index({ verificationStatus: 1 });
 labelSchema.index({ genres: 1 });
 labelSchema.index({ 'admins.userId': 1 });
 
-// Virtual for follower count
-labelSchema.virtual('followerCount').get(function() {
-  return this.followers ? this.followers.length : 0;
-});
+// Follower count is already a field in the schema, no virtual needed
 
 // Method to add admin
 labelSchema.methods.addAdmin = function(userId, role, addedBy) {
