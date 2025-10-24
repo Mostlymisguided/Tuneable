@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Building2, Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter } from 'lucide-react';
+import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter } from 'lucide-react';
 
 interface Label {
   _id: string;
@@ -66,7 +66,7 @@ const LabelProfile: React.FC = () => {
   const [label, setLabel] = useState<Label | null>(null);
   const [recentReleases, setRecentReleases] = useState<Media[]>([]);
   const [topMedia, setTopMedia] = useState<Media[]>([]);
-  const [artists, setArtists] = useState<Artist[]>([]);
+  const [artists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media'>('overview');
 
@@ -96,18 +96,6 @@ const LabelProfile: React.FC = () => {
     }
   };
 
-  const fetchArtists = async () => {
-    try {
-      const response = await fetch(`/api/labels/${slug}/artists`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        setArtists(data.artists || []);
-      }
-    } catch (error) {
-      console.error('Error fetching artists:', error);
-    }
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -118,13 +106,6 @@ const LabelProfile: React.FC = () => {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
 
   if (loading) {
     return (
