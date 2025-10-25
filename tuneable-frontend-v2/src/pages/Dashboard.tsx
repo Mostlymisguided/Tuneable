@@ -1,7 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Music, Users, DollarSign, Plus } from 'lucide-react';
+import { Music, Users, DollarSign } from 'lucide-react';
 import TopTunes from '../components/TopTunes';
 
 const Dashboard: React.FC = () => {
@@ -23,56 +22,6 @@ const Dashboard: React.FC = () => {
         <TopTunes limit={5} showHeader={true} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-300 mb-4">Quick Actions</h2>
-          <div className="space-y-4">
-            {user?.role?.includes('admin') && (
-              <Link
-                to="/create-party"
-                className="flex items-center p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
-              >
-                <Plus className="h-5 w-5 text-primary-600 mr-3" />
-                <div>
-                  <p className="font-medium text-gray-900">Create New Party</p>
-                  <p className="text-sm text-gray-600">Start a new music party</p>
-                </div>
-              </Link>
-            )}
-            
-            <Link
-              to="/parties"
-              className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <Music className="h-5 w-5 text-gray-600 mr-3" />
-              <div>
-                <p className="font-medium text-gray-900">Browse Parties</p>
-                <p className="text-sm text-gray-600">Find parties to join</p>
-              </div>
-            </Link>
-
-            <Link
-              to="/wallet"
-              className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <DollarSign className="h-5 w-5 text-gray-600 mr-3" />
-              <div>
-                <p className="font-medium text-gray-900">Top Up Balance</p>
-                <p className="text-sm text-gray-600">Add credits to your account</p>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-300 mb-4">Recent Activity</h2>
-          <div className="text-center py-8">
-            <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No recent activity</p>
-            <p className="text-sm text-gray-400">Start by creating or joining a party!</p>
-          </div>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
