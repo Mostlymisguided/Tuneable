@@ -248,7 +248,28 @@ router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ message: 'User profile', user });
+    
+    // Calculate user statistics
+    const Bid = require('../models/Bid');
+    const userBids = await Bid.find({ userId: user._id });
+    
+    const globalUserBids = userBids.length;
+    const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+    const globalUserBidAvg = globalUserBids > 0 ? totalAmountBid / globalUserBids : 0;
+    
+    // Calculate global user aggregate rank (simplified)
+    const allUsers = await User.find({}).select('_id');
+    const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
+    
+    // Add statistics to user object
+    const userWithStats = {
+      ...user.toObject(),
+      globalUserAggregateRank: userAggregateRank,
+      globalUserBidAvg: globalUserBidAvg,
+      globalUserBids: globalUserBids,
+    };
+    
+    res.json({ message: 'User profile', user: userWithStats });
   } catch (error) {
     res.status(500).json({ error: 'Error ing user profile', details: error.message });
   }
@@ -381,6 +402,15 @@ router.get('/:userId/profile', async (req, res) => {
     const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
     const averageBidAmount = totalBids > 0 ? totalAmountBid / totalBids : 0;
     
+    // Calculate global user statistics
+    const globalUserBids = totalBids;
+    const globalUserBidAvg = averageBidAmount;
+    
+    // Calculate global user aggregate rank
+    // This is a simplified calculation - in production, this would be more complex
+    const allUsers = await User.find({}).select('_id');
+    const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
+    
     // Get unique media items bid on
     const uniqueMedia = [...new Set(userBids.map(bid => bid.mediaId?._id?.toString()).filter(Boolean))];
     
@@ -436,6 +466,9 @@ router.get('/:userId/profile', async (req, res) => {
         isActive: user.isActive,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
+        globalUserAggregateRank: userAggregateRank,
+        globalUserBidAvg: globalUserBidAvg,
+        globalUserBids: globalUserBids,
       },
       stats: {
         totalBids,
