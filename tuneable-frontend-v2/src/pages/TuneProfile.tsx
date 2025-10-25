@@ -135,7 +135,9 @@ const TuneProfile: React.FC = () => {
     producer: '',
     featuring: [] as string[],
     album: '',
-    genre: '',
+    EP: '',
+    genres: [] as string[],
+    genre: '', // Keep for backward compatibility
     releaseDate: '',
     duration: 0,
     explicit: false,
@@ -249,8 +251,9 @@ const TuneProfile: React.FC = () => {
       // Extract featuring names from subdocument array
       const featuringNames = (media as any).featuring?.map((f: any) => f.name || f) || [];
       
-      // Extract first genre from genres array
-      const genreValue = (media as any).genres?.[0] || (media as any).genre || '';
+      // Extract genres array and first genre for backward compatibility
+      const genresArray = (media as any).genres || [];
+      const genreValue = genresArray[0] || (media as any).genre || '';
       
       // Format release date for date input
       const releaseDateFormatted = media.releaseDate 
@@ -263,6 +266,8 @@ const TuneProfile: React.FC = () => {
         producer: producerName,
         featuring: featuringNames,
         album: media.album || '',
+        EP: media.EP || '',
+        genres: genresArray,
         genre: genreValue,
         releaseDate: releaseDateFormatted,
         duration: media.duration || 0,
@@ -1446,6 +1451,18 @@ const TuneProfile: React.FC = () => {
                 </div>
               </div>
 
+              {/* EP */}
+              <div>
+                <label className="block text-white font-medium mb-2">EP</label>
+                <input
+                  type="text"
+                  value={editForm.EP}
+                  onChange={(e) => setEditForm({ ...editForm, EP: e.target.value })}
+                  className="input"
+                  placeholder="Extended Play name"
+                />
+              </div>
+
               {/* Featuring Artists */}
               <div>
                 <label className="block text-white font-medium mb-2">Featuring (comma-separated)</label>
@@ -1458,17 +1475,20 @@ const TuneProfile: React.FC = () => {
                 />
               </div>
 
-              {/* Genre and Release Date */}
+              {/* Genres and Release Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-white font-medium mb-2">Genre</label>
+                  <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
                   <input
                     type="text"
-                    value={editForm.genre}
-                    onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
+                    value={editForm.genres.join(', ')}
+                    onChange={(e) => setEditForm({ ...editForm, genres: e.target.value.split(',').map(g => g.trim()).filter(g => g) })}
                     className="input"
-                    placeholder="Genre"
+                    placeholder="pop, indie, rock, electronic"
                   />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enter multiple genres separated by commas
+                  </p>
                 </div>
                 <div>
                   <label className="block text-white font-medium mb-2">Release Date</label>
@@ -1569,6 +1589,21 @@ const TuneProfile: React.FC = () => {
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Type tags separated by commas. Press Enter or click away to save.
+                </p>
+              </div>
+
+              {/* Elements */}
+              <div>
+                <label className="block text-white font-medium mb-2">Elements (comma-separated)</label>
+                <input
+                  type="text"
+                  value={editForm.elements.join(', ')}
+                  onChange={(e) => setEditForm({ ...editForm, elements: e.target.value.split(',').map(e => e.trim()).filter(e => e) })}
+                  className="input"
+                  placeholder="guitar, drums, bass, synthesizer, vocals"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Enter musical elements/instruments separated by commas
                 </p>
               </div>
 
