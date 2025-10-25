@@ -43,7 +43,9 @@ interface Media {
   rightsHolder?: string;
   rightsHolderEmail?: string;
   album?: string;
+  EP?: string;
   genre?: string;
+  genres?: string[];
   releaseDate?: string;
   duration?: number;
   coverArt?: string;
@@ -1262,7 +1264,7 @@ const TuneProfile: React.FC = () => {
 
       {/* Creator Signup Modal */}
       {showCreatorSignupModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
           <div className="card max-w-md w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-white">Become a Creator</h2>
@@ -1304,7 +1306,7 @@ const TuneProfile: React.FC = () => {
 
       {/* Claim Verification Modal */}
       {showClaimVerificationModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
           <div className="card max-w-lg w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-white">
