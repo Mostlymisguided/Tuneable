@@ -322,7 +322,7 @@ const Admin: React.FC = () => {
                   </thead>
                   <tbody className="bg-gray-800 divide-y divide-gray-700">
                     {users.map((user) => (
-                      <tr key={user._id || user.uuid}>
+                      <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-white">{user.username}</div>
                         </td>
@@ -356,7 +356,7 @@ const Admin: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           {!user.role.includes('admin') && (
                             <button
-                              onClick={() => promoteToAdmin(user._id || user.uuid)}
+                              onClick={() => promoteToAdmin(user._id)}
                               className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"
                             >
                               Make Admin
