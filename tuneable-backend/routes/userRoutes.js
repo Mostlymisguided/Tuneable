@@ -517,6 +517,7 @@ router.get('/:userId/profile', async (req, res) => {
         globalUserAggregateRank: userAggregateRank,
         globalUserBidAvg: globalUserBidAvg,
         globalUserBids: globalUserBids,
+        creatorProfile: user.creatorProfile,
       },
       stats: {
         totalBids,
