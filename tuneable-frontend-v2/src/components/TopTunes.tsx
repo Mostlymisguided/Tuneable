@@ -58,6 +58,13 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     return `£${amount.toFixed(2)}`;
   };
 
+  const formatDuration = (seconds: number) => {
+    if (!seconds || seconds === 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handlePlay = (song: TopTunesSong) => {
     const mediaId = song._id || song.id;
     
@@ -182,7 +189,15 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 >
                   {song.title}
                 </h3>
-                <p className="text-gray-400 text-sm truncate">{song.artist}</p>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <p className="truncate">{song.artist}</p>
+                  {song.duration && (
+                    <>
+                      <span>•</span>
+                      <span className="text-gray-500">{formatDuration(song.duration)}</span>
+                    </>
+                  )}
+                </div>
                 
                 {/* Tags */}
                 {song.tags && song.tags.length > 0 && (
