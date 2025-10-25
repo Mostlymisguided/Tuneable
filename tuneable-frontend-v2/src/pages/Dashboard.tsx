@@ -41,11 +41,13 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="bg-green-100 p-3 rounded-lg">
-              <Music className="h-6 w-6 text-green-600" />
+              <Users className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-white">Active Parties</p>
-              <p className="text-2xl font-semibold text-white">0</p>
+              <p className="text-sm font-medium text-white">Global Rank</p>
+              <p className="text-2xl font-semibold text-white">
+                #{user?.globalUserAggregateRank || 'N/A'}
+              </p>
             </div>
           </div>
         </div>
@@ -53,11 +55,13 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="bg-blue-100 p-3 rounded-lg">
-              <Users className="h-6 w-6 text-blue-600" />
+              <DollarSign className="h-6 w-6 text-blue-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-white">Friends</p>
-              <p className="text-2xl font-semibold text-white">0</p>
+              <p className="text-sm font-medium text-white">Avg Bid</p>
+              <p className="text-2xl font-semibold text-white">
+                £{user?.globalUserBidAvg?.toFixed(2) || '0.00'}
+              </p>
             </div>
           </div>
         </div>
@@ -68,8 +72,10 @@ const Dashboard: React.FC = () => {
               <Music className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-white">Songs Added</p>
-              <p className="text-2xl font-semibold text-white">0</p>
+              <p className="text-sm font-medium text-white">Total Bids</p>
+              <p className="text-2xl font-semibold text-white">
+                {user?.globalUserBids || 0}
+              </p>
             </div>
           </div>
         </div>

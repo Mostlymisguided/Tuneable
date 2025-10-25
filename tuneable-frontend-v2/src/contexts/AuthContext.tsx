@@ -26,6 +26,9 @@ interface User {
     joinedAt: string;
     role: 'partier' | 'host' | 'moderator';
   }[];
+  globalUserAggregateRank?: number;
+  globalUserBidAvg?: number;
+  globalUserBids?: number;
 }
 
 interface RegisterData {
