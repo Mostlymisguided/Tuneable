@@ -39,6 +39,37 @@ const Parties: React.FC = () => {
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
   const { currentPartyId } = useWebPlayerStore();
 
+  // Check if user is already part of a party
+  const isUserInParty = (party: PartyType) => {
+    if (!user) return false;
+    
+    // Debug logging
+    console.log('🔍 Checking party membership:', {
+      partyName: party.name,
+      partyType: party.type,
+      userId: user.id,
+      userMongoId: user._id,
+      userUuid: user.uuid,
+      partiers: party.partiers,
+      partiersLength: party.partiers.length
+    });
+    
+    const isInParty = party.partiers.some(partier => {
+      if (typeof partier === 'string') {
+        const match = partier === user._id || partier === user.id || partier === user.uuid;
+        console.log(`  - String partier: ${partier}, matches: ${match}`);
+        return match;
+      } else {
+        const match = partier.id === user._id || partier.id === user.id || partier.uuid === user.uuid;
+        console.log(`  - Object partier: ${JSON.stringify(partier)}, matches: ${match}`);
+        return match;
+      }
+    });
+    
+    console.log(`  - Result: ${isInParty}`);
+    return isInParty;
+  };
+
   useEffect(() => {
     const fetchParties = async () => {
       try {
@@ -69,6 +100,19 @@ const Parties: React.FC = () => {
         (party.description && party.description.toLowerCase().includes(lowerTerm)) ||
         (party.tags && party.tags.some(tag => tag.toLowerCase().includes(lowerTerm)));
     });
+  });
+
+  // Separate parties into joined and available
+  const joinedParties = filteredParties.filter(party => isUserInParty(party));
+  const availableParties = filteredParties.filter(party => !isUserInParty(party));
+  
+  // Debug logging
+  console.log('📊 Party separation results:', {
+    totalParties: filteredParties.length,
+    joinedParties: joinedParties.length,
+    availableParties: availableParties.length,
+    joinedPartyNames: joinedParties.map(p => p.name),
+    availablePartyNames: availableParties.map(p => p.name)
   });
 
   // Handle adding search terms
@@ -183,6 +227,103 @@ const Parties: React.FC = () => {
     }
   };
 
+  // Component for rendering party cards
+  const renderPartyCard = (party: PartyType) => (
+    <div 
+      key={party.id} 
+      className={`card transition-all duration-200 relative overflow-hidden ${
+        isUserInParty(party) || party.type === 'global'
+          ? 'hover:shadow-lg hover:scale-105 hover:bg-gray-800/50 cursor-pointer group'
+          : 'hover:shadow-md'
+      }`}
+      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(`/party/${party.id}`) : undefined}
+    >
+      {/* Purple overlay for clickable cards */}
+      {(isUserInParty(party) || party.type === 'global') && (
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/75 to-purple-800/75 backdrop-blur-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+          <span className="bg-slate-900/50 text-white/70 font-semibold text-base px-4 py-2 rounded-lg shadow-lg hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-500 hover:text-white hover:shadow-lg hover:shadow-pink-500/30 transition-all">
+            Join Party
+          </span>
+        </div>
+      )}
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-lg font-semibold text-white">{party.name}</h3>
+        <span 
+          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(party.status)}`}
+          style={party.status === 'ended' ? { backgroundColor: '#ec4899', color: 'white', fontWeight: 'bold' } : {}}
+        >
+          {party.status}
+        </span>
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <div className="flex items-center text-sm text-white">
+          <MapPin className="h-4 w-4 mr-2" />
+          <span>{party.location}</span>
+        </div>
+        
+
+        <div className="flex items-center text-sm text-white">
+          <Clock className="h-4 w-4 mr-2" />
+          <span>{formatDate(party.startTime)}</span>
+        </div>
+
+        <div className="flex items-center text-sm text-white">
+          <Users className="h-4 w-4 mr-2" />
+          <span>
+            {party.type === 'global' 
+              ? `${Array.isArray(party.partiers) ? party.partiers.length : 0} community members`
+              : `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
+            }
+          </span>
+        </div>
+
+        {/* Tags Display */}
+        {party.tags && party.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {party.tags.slice(0, 3).map((tag: string, index: number) => (
+              <span
+                key={index}
+                className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
+              >
+                #{tag}
+              </span>
+            ))}
+            {party.tags.length > 3 && (
+              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                +{party.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Description Display */}
+        {party.type === 'global' ? (
+          <div className="text-sm text-gray-300 mt-2">
+            <p className="line-clamp-2">
+              The main community space where all users automatically join to discover and share music together.
+            </p>
+          </div>
+        ) : party.description ? (
+          <div className="text-sm text-gray-300 mt-2">
+            <p className="line-clamp-2">
+              {party.description.length > 100 
+                ? `${party.description.substring(0, 100)}...` 
+                : party.description}
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-white">
+          Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
+        </div>
+       
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -258,7 +399,28 @@ const Parties: React.FC = () => {
         </div>
       </div>
 
-      {filteredParties.length === 0 ? (
+      {/* Your Parties Section */}
+      {joinedParties.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">Your Parties</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {joinedParties.map(renderPartyCard)}
+          </div>
+        </div>
+      )}
+
+      {/* Active Parties Section */}
+      {availableParties.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">Active Parties</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableParties.map(renderPartyCard)}
+          </div>
+        </div>
+      )}
+
+      {/* No Parties Found */}
+      {filteredParties.length === 0 && (
         <div className="text-center py-12">
           <Music className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-300 mb-2">No parties found</h3>
@@ -272,82 +434,6 @@ const Parties: React.FC = () => {
               Create Your First Party
             </Link>
           )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredParties.map((party) => (
-            <div key={party.id} className="card hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-white">{party.name}</h3>
-                <span 
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(party.status)}`}
-                  style={party.status === 'ended' ? { backgroundColor: '#ec4899', color: 'white', fontWeight: 'bold' } : {}}
-                >
-                  {party.status}
-                </span>
-              </div>
-
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center text-sm text-white">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  <span>{party.location}</span>
-                </div>
-                
-
-                <div className="flex items-center text-sm text-white">
-                  <Clock className="h-4 w-4 mr-2" />
-                  <span>{formatDate(party.startTime)}</span>
-                </div>
-
-                <div className="flex items-center text-sm text-white">
-                  <Users className="h-4 w-4 mr-2" />
-                  <span>{Array.isArray(party.partiers) ? party.partiers.length : 0} partiers</span>
-                </div>
-
-                {/* Tags Display */}
-                {party.tags && party.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {party.tags.slice(0, 3).map((tag: string, index: number) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                    {party.tags.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        +{party.tags.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Description Display */}
-                {party.description && (
-                  <div className="text-sm text-gray-300 mt-2">
-                    <p className="line-clamp-2">
-                      {party.description.length > 100 
-                        ? `${party.description.substring(0, 100)}...` 
-                        : party.description}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-white">
-                  Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
-                </div>
-                <button
-                  onClick={() => handleJoinParty(party.id, party.name, party.privacy, party.host, party.partiers)}
-                  className="btn-primary text-base"
-                >
-                  Join Party
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 

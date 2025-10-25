@@ -149,6 +149,20 @@ router.post(
       
       console.log('User registered successfully:', user);
 
+      // Auto-join new user to Global Party
+      try {
+        const Party = require('../models/Party');
+        const globalParty = await Party.getGlobalParty();
+        if (globalParty && !globalParty.partiers.includes(user._id)) {
+          globalParty.partiers.push(user._id);
+          await globalParty.save();
+          console.log('✅ Auto-joined new user to Global Party:', user.username);
+        }
+      } catch (globalPartyError) {
+        console.error('Failed to auto-join user to Global Party:', globalPartyError);
+        // Don't fail registration if Global Party join fails
+      }
+
       // Send email notification to admin
       try {
         await sendUserRegistrationNotification(user);
@@ -225,7 +239,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(transformResponse({ message: 'User profile', user }));
+    res.json(transformResponse({ message: 'User profile', user }, { includeId: true }));
   } catch (error) {
     res.status(500).json({ error: 'Error ing user profile', details: error.message });
   }

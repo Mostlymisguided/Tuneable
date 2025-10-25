@@ -176,6 +176,9 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             // For Global Party, we need to aggregate ALL media with ANY bids
             console.log('🌍 Fetching Global Party - aggregating all media with bids...');
             
+            // Performance monitoring for Global Party
+            const startTime = Date.now();
+            
             // Get the Global Party object
             party = isGlobalParty;
             
@@ -216,8 +219,22 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             
             // Populate partiers and host for Global Party
             const User = require('../models/User');
-            party.partiers = await User.find({}).select('username uuid');
+            // Use actual partiers who joined, not all users
+            party.partiers = await User.find({ _id: { $in: party.partiers } }).select('username uuid');
             party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid');
+            
+            // Performance monitoring - log Global Party metrics
+            const endTime = Date.now();
+            const processingTime = endTime - startTime;
+            console.log(`🌍 Global Party Performance Metrics:`);
+            console.log(`   - Processing time: ${processingTime}ms`);
+            console.log(`   - Partiers count: ${party.partiers.length}`);
+            console.log(`   - Media count: ${party.media.length}`);
+            
+            // Log warning if processing takes too long (performance canary)
+            if (processingTime > 5000) {
+                console.warn(`⚠️  Global Party processing took ${processingTime}ms - consider optimization!`);
+            }
             
         } else {
             // Regular party fetching logic

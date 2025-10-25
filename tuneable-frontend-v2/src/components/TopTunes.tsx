@@ -150,7 +150,6 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               {/* Stats */}
               <div className="flex-shrink-0 text-right">
                 <div className="flex items-center space-x-2 text-sm">
-                  <DollarSign className="h-4 w-4 text-green-400" />
                   <span className="text-green-400 font-medium">
                     {formatCurrency(song.globalMediaAggregate)}
                   </span>

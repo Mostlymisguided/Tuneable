@@ -4,6 +4,7 @@ import { authAPI } from '../lib/api';
 // Define types directly to avoid import issues
 interface User {
   id: string;
+  _id?: string; // MongoDB ObjectId for internal matching
   uuid?: string; // UUIDv7 for external API
   username: string;
   email: string;
