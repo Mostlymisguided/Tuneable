@@ -89,9 +89,9 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10 }) 
     <div className="space-y-3">
       {topSupporters.map((supporter: any, index: number) => (
         <div
-          key={supporter.user.uuid || index}
+          key={supporter.user._id || supporter.user.uuid || index}
           className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
-          onClick={() => supporter.user.uuid && navigate(`/user/${supporter.user.uuid}`)}
+          onClick={() => (supporter.user._id || supporter.user.uuid) && navigate(`/user/${supporter.user._id || supporter.user.uuid}`)}
         >
           {/* Left: Rank + Profile + Info */}
           <div className="flex items-center space-x-4 flex-1 min-w-0">

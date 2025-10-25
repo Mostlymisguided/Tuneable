@@ -329,7 +329,7 @@ const Party: React.FC = () => {
       const hostUuid = typeof party.host === 'object' && party.host.uuid 
                        ? party.host.uuid 
                        : party.host;
-      const userUuid = user.id || (user as any).uuid;
+      const userUuid = user._id || user.id || (user as any).uuid;
       const checkIsHost = userUuid === hostUuid;
       setIsHost(checkIsHost);
       console.log('🔍 isHost check:', { userUuid, hostUuid, isHost: checkIsHost, partyHost: party.host });

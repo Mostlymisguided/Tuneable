@@ -106,7 +106,7 @@ const Navbar: React.FC = () => {
                     £{user.balance?.toFixed(2) || '0.00'}
                   </span>
                   <Link
-                    to={`/user/${user.uuid}`}
+                    to={`/user/${user._id || user.uuid}`}
                     className="px-2 sm:px-4 py-1 sm:py-2 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                     style={{ textDecoration: 'none' }}
                     onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}

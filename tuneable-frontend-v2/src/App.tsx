@@ -105,11 +105,11 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const ProfileRedirect = () => {
   const { user } = useAuth();
   
-  if (!user || !user.uuid) {
+  if (!user || (!user._id && !user.uuid)) {
     return <Navigate to="/login" />;
   }
   
-  return <Navigate to={`/user/${user.uuid}`} replace />;
+  return <Navigate to={`/user/${user._id || user.uuid}`} replace />;
 };
 
 const AppContent = () => {

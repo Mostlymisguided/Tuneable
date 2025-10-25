@@ -180,9 +180,11 @@ const TuneProfile: React.FC = () => {
     console.log('🔍 TuneProfile useEffect triggered with mediaId:', mediaId);
     if (mediaId) {
       console.log('✅ mediaId exists, calling fetchMediaProfile');
-      fetchMediaProfile();
-      loadTopParties();
-      loadTagRankings();
+      fetchMediaProfile().then(() => {
+        // Only load top parties and tag rankings after media is loaded
+        loadTopParties();
+        loadTagRankings();
+      });
     } else {
       console.log('❌ No mediaId provided');
     }
@@ -228,7 +230,7 @@ const TuneProfile: React.FC = () => {
     const isVerifiedCreator = (media as any).verifiedCreators?.some(
       (creatorId: any) => {
         const id = typeof creatorId === 'string' ? creatorId : creatorId._id || creatorId.toString();
-        return id === (user as any).id || id === (user as any)._id || id === user.uuid;
+        return id === (user as any)._id || id === (user as any).id || id === user.uuid;
       }
     );
     
@@ -294,7 +296,7 @@ const TuneProfile: React.FC = () => {
     if (!mediaId) return;
     
     try {
-      await mediaAPI.updateMedia(mediaId, editForm);
+      await mediaAPI.updateMedia(media?._id || mediaId, editForm);
       toast.success('Media updated successfully!');
       setIsEditingTune(false);
       // Refresh media data
@@ -433,7 +435,7 @@ const TuneProfile: React.FC = () => {
         [selectedPlatform]: newLinkUrl.trim()
       };
       
-      await mediaAPI.updateMedia(mediaId, { sources: updatedSources });
+      await mediaAPI.updateMedia(media?._id || mediaId, { sources: updatedSources });
       toast.success(`${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} link added!`);
       setShowAddLinkModal(false);
       setSelectedPlatform('');
@@ -453,7 +455,7 @@ const TuneProfile: React.FC = () => {
 
     try {
       setSubmittingComment(true);
-      const response = await mediaAPI.createComment(mediaId, newComment.trim());
+      const response = await mediaAPI.createComment(media?._id || mediaId, newComment.trim());
       setComments(prev => [response.comment, ...prev]);
       setNewComment('');
       toast.success('Comment added successfully!');
@@ -568,9 +570,15 @@ const TuneProfile: React.FC = () => {
 
   // Load top parties for this tune
   const loadTopParties = async () => {
+    if (!media && !mediaId) {
+      console.log('⚠️ No media or mediaId available for top parties');
+      return;
+    }
+    
     try {
       console.log('🔍 Loading top parties for media:', mediaId);
-      const response = await mediaAPI.getTopPartiesForMedia(mediaId!);
+      console.log('🔍 Media object:', media);
+      const response = await mediaAPI.getTopPartiesForMedia(media?._id || mediaId!);
       console.log('📊 Top parties response:', response);
       console.log('📊 Parties data:', response.parties);
       setTopParties(response.parties || []);
@@ -587,9 +595,15 @@ const TuneProfile: React.FC = () => {
 
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
+    if (!media && !mediaId) {
+      console.log('⚠️ No media or mediaId available for tag rankings');
+      return;
+    }
+    
     try {
       console.log('🏷️ Loading tag rankings for media:', mediaId);
-      const response = await mediaAPI.getTagRankings(mediaId!);
+      console.log('🏷️ Media object:', media);
+      const response = await mediaAPI.getTagRankings(media?._id || mediaId!);
       console.log('📊 Tag rankings response:', response);
       setTagRankings(response.tagRankings || []);
       console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
@@ -1222,7 +1236,7 @@ const TuneProfile: React.FC = () => {
                           <span>{comment.likeCount}</span>
                         </button>
                         
-                        {user && comment.userId._id === user.id && (
+                        {user && comment.userId._id === (user._id || user.id) && (
                           <button
                             onClick={() => handleDeleteComment(comment._id)}
                             className="flex items-center space-x-1 text-gray-400 hover:text-red-400 transition-colors"

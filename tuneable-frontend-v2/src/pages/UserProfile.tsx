@@ -25,6 +25,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfile {
   id: string; // UUID as primary ID
+  _id?: string; // ObjectId
   uuid: string;
   username: string;
   profilePic?: string;
@@ -120,7 +121,7 @@ const UserProfile: React.FC = () => {
   });
   
   // Check if viewing own profile
-  const isOwnProfile = currentUser && user && currentUser.uuid === user.uuid;
+  const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
 
   useEffect(() => {
     if (userId) {

@@ -11,8 +11,8 @@ const geoip = require('geoip-lite'); // Added geoip-lite
 const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
 const authMiddleware = require('../middleware/authMiddleware');
-const { transformResponse } = require('../utils/uuidTransform');
-const { resolveId } = require('../utils/idResolver');
+// const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
+// const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 
@@ -203,11 +203,11 @@ router.post(
         { expiresIn: '24h' }
       );
 
-      res.status(201).json(transformResponse({
+      res.status(201).json({
         message: 'User registered successfully',
         token,  // Include token for auto-login
         user: user,
-      }));
+      });
     } catch (error) {
       console.error('Error registering user:', error.message);
       res.status(500).json({ error: 'Error registering user', details: error.message });
@@ -236,7 +236,7 @@ router.post(
         username: user.username 
       }, SECRET_KEY, { expiresIn: '24h' });
 
-      res.json(transformResponse({ message: 'Login successful!', token, user }));
+      res.json({ message: 'Login successful!', token, user });
     } catch (error) {
       res.status(500).json({ error: 'Error logging in', details: error.message });
     }
@@ -248,7 +248,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(transformResponse({ message: 'User profile', user }, { includeId: true }));
+    res.json({ message: 'User profile', user });
   } catch (error) {
     res.status(500).json({ error: 'Error ing user profile', details: error.message });
   }
@@ -267,7 +267,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    res.json(transformResponse({ message: 'Profile updated successfully', user }));
+    res.json({ message: 'Profile updated successfully', user });
   } catch (error) {
     res.status(500).json({ error: 'Error updating profile', details: error.message });
   }
@@ -298,7 +298,7 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
       }
 
       console.log("✅ Profile picture updated:", user.profilePic);
-      res.json(transformResponse({ message: 'Profile picture updated successfully', user }));
+      res.json({ message: 'Profile picture updated successfully', user });
   } catch (error) {
       console.error('Error updating profile picture:', error.message);
       res.status(500).json({ error: 'Error updating profile picture', details: error.message });
@@ -421,7 +421,7 @@ router.get('/:userId/profile', async (req, res) => {
     const mediaWithBids = Object.values(bidsByMedia)  
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
-    res.json(transformResponse({
+    res.json({
       message: 'User profile fetched successfully',
       user: {
         id: user.uuid, // Use UUID as primary ID for external API
@@ -445,7 +445,7 @@ router.get('/:userId/profile', async (req, res) => {
       },
       topBids,
       mediaWithBids, // Updated to use media terminology
-    }));
+    });
 
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -496,14 +496,14 @@ router.post('/request-invite', async (req, res) => {
     
     await inviteRequest.save();
     
-    res.status(201).json(transformResponse({
+    res.status(201).json({
       message: 'Invite request submitted successfully. We will review it and get back to you soon!',
       request: {
         email: inviteRequest.email,
         name: inviteRequest.name,
         status: inviteRequest.status
       }
-    }));
+    });
   } catch (error) {
     console.error('Error submitting invite request:', error);
     res.status(500).json({ error: 'Failed to submit invite request' });
@@ -525,7 +525,7 @@ router.get('/referrals', authMiddleware, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
     
-    res.json(transformResponse({
+    res.json({
       personalInviteCode: user.personalInviteCode,
       referralCount: referrals.length,
       referrals: referrals.map(r => ({
@@ -535,7 +535,7 @@ router.get('/referrals', authMiddleware, async (req, res) => {
         location: r.homeLocation,
         uuid: r.uuid
       }))
-    }));
+    });
   } catch (error) {
     console.error('Error fetching referrals:', error);
     res.status(500).json({ error: 'Failed to fetch referrals' });
@@ -559,10 +559,10 @@ router.get('/admin/invite-requests', authMiddleware, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
     
-    res.json(transformResponse({
+    res.json({
       requests,
       count: requests.length
-    }));
+    });
   } catch (error) {
     console.error('Error fetching invite requests:', error);
     res.status(500).json({ error: 'Failed to fetch invite requests' });
@@ -599,11 +599,11 @@ router.patch('/admin/invite-requests/:id/approve', authMiddleware, async (req, r
 
     // TODO: Send email with invite code
     
-    res.json(transformResponse({
+    res.json({
       message: 'Invite request approved',
       request,
       inviteCode
-    }));
+    });
   } catch (error) {
     console.error('Error approving invite request:', error);
     res.status(500).json({ error: 'Failed to approve invite request' });
@@ -635,10 +635,10 @@ router.patch('/admin/invite-requests/:id/reject', authMiddleware, async (req, re
     request.rejectedReason = reason || null;
     await request.save();
 
-    res.json(transformResponse({
+    res.json({
       message: 'Invite request rejected',
       request
-    }));
+    });
   } catch (error) {
     console.error('Error rejecting invite request:', error);
     res.status(500).json({ error: 'Failed to reject invite request' });
@@ -660,15 +660,14 @@ router.get('/:userId/tag-rankings', async (req, res) => {
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     
-    const resolvedUserId = await resolveId(userId, User);
-    if (!resolvedUserId) {
-      console.log('❌ User not found:', userId);
-      return res.status(404).json({ error: 'User not found' });
+    // Use ObjectId directly (no resolution needed)
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
     // Get all active bids by this user
     const userBids = await Bid.find({ 
-      userId: resolvedUserId,
+      userId: userId,
       status: 'active'
     })
       .populate('mediaId', 'tags')
@@ -738,10 +737,10 @@ router.get('/:userId/tag-rankings', async (req, res) => {
 
     console.log('✅ Returning', limitedRankings.length, 'tag rankings');
 
-    res.json(transformResponse({
+    res.json({
       tagRankings: limitedRankings,
       totalTags: tagRankings.length
-    }));
+    });
   } catch (error) {
     console.error('Error fetching user tag rankings:', error);
     res.status(500).json({ error: 'Failed to fetch tag rankings' });

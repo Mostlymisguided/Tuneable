@@ -1157,12 +1157,18 @@ router.get('/:mediaId/top-parties', async (req, res) => {
 
     console.log('🎪 Top parties request for media:', mediaId);
 
-    // Use ObjectId directly (no resolution needed)
+    // Handle both ObjectIds and UUIDs
+    let actualMediaId = mediaId;
     if (!isValidObjectId(mediaId)) {
-      return res.status(400).json({ error: 'Invalid media ID format' });
+      // If it's not an ObjectId, try to find by UUID
+      const media = await Media.findOne({ uuid: mediaId }).select('_id');
+      if (!media) {
+        return res.status(404).json({ error: 'Media not found' });
+      }
+      actualMediaId = media._id;
     }
 
-    console.log('✅ Resolved media ID:', resolvedMediaId);
+    console.log('✅ Using media ID:', actualMediaId);
 
     // Find all parties that contain this media
     const Party = require('../models/Party');
@@ -1170,7 +1176,7 @@ router.get('/:mediaId/top-parties', async (req, res) => {
     // const GLOBAL_PARTY_ID = '67c6a02895baad05d3a97cf4';
     
     const parties = await Party.find({
-      'media.mediaId': resolvedMediaId,
+      'media.mediaId': actualMediaId,
       status: { $in: ['active', 'scheduled'] }
       // _id: { $ne: GLOBAL_PARTY_ID } // Temporarily include Global Party for visibility
     })
@@ -1217,12 +1223,18 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 
     console.log('🏷️ Tag rankings request for media:', mediaId);
 
-    // Use ObjectId directly (no resolution needed)
+    // Handle both ObjectIds and UUIDs
+    let actualMediaId = mediaId;
     if (!isValidObjectId(mediaId)) {
-      return res.status(400).json({ error: 'Invalid media ID format' });
+      // If it's not an ObjectId, try to find by UUID
+      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
+      if (!mediaByUuid) {
+        return res.status(404).json({ error: 'Media not found' });
+      }
+      actualMediaId = mediaByUuid._id;
     }
 
-    const media = await Media.findById(mediaId);
+    const media = await Media.findById(actualMediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
