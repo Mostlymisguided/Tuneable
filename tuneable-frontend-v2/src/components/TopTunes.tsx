@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 
 interface TopTunesSong {
   id: string;
+  _id?: string;
   title: string;
   artist: string;
   coverArt: string;
@@ -16,6 +19,8 @@ interface TopTunesSong {
   };
   bids?: any[];
   tags?: string[];
+  sources?: any;
+  duration?: number;
 }
 
 interface TopTunesProps {
@@ -24,6 +29,9 @@ interface TopTunesProps {
 }
 
 const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) => {
+  const navigate = useNavigate();
+  const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
+  
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState('globalMediaAggregate');
@@ -51,8 +59,33 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   };
 
   const handlePlay = (song: TopTunesSong) => {
-    // Handle play functionality - this would integrate with your audio player
-    console.log('Playing:', song.title);
+    const mediaId = song._id || song.id;
+    
+    if (!mediaId) {
+      toast.error('Unable to identify media item');
+      return;
+    }
+
+    // Clean and format the media for the webplayer
+    const cleanedMedia = {
+      id: mediaId,
+      _id: song._id,
+      title: song.title,
+      artist: song.artist,
+      duration: song.duration || 0,
+      coverArt: song.coverArt,
+      sources: song.sources || {},
+      globalMediaAggregate: song.globalMediaAggregate,
+      bids: song.bids || [],
+      addedBy: null,
+      totalBidValue: song.globalMediaAggregate,
+    };
+    
+    // Set the media in the webplayer and start playing
+    setCurrentMedia(cleanedMedia, 0, true); // true = autoplay
+    setGlobalPlayerActive(true);
+    
+    toast.success(`Now playing: ${cleanedMedia.title}`);
   };
 
   if (isLoading) {
@@ -113,18 +146,42 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 <span className="text-lg font-bold text-purple-400">#{index + 1}</span>
               </div>
 
-              {/* Cover Art */}
-              <div className="flex-shrink-0">
+              {/* Cover Art with Play Button Overlay */}
+              <div className="flex-shrink-0 relative w-12 h-12">
                 <img
                   src={song.coverArt || '/default-cover.jpg'}
                   alt={song.title}
-                  className="w-12 h-12 rounded-lg object-cover"
+                  className="w-full h-full rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => {
+                    const mediaId = song._id || song.id;
+                    if (mediaId) navigate(`/tune/${mediaId}`);
+                  }}
                 />
+                {/* Play Icon Overlay - Only visible on hover */}
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg cursor-pointer hover:bg-black/60 transition-colors opacity-0 hover:opacity-100 group"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlay(song);
+                  }}
+                >
+                  <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
+                    <Play className="h-3 w-3 text-white" fill="currentColor" />
+                  </div>
+                </div>
               </div>
 
               {/* Song Info */}
               <div className="flex-1 min-w-0">
-                <h3 className="text-white font-medium truncate">{song.title}</h3>
+                <h3 
+                  className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors"
+                  onClick={() => {
+                    const mediaId = song._id || song.id;
+                    if (mediaId) navigate(`/tune/${mediaId}`);
+                  }}
+                >
+                  {song.title}
+                </h3>
                 <p className="text-gray-400 text-sm truncate">{song.artist}</p>
                 
                 {/* Tags */}
@@ -161,13 +218,6 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 )}
               </div>
 
-              {/* Play Button */}
-              <button
-                onClick={() => handlePlay(song)}
-                className="flex-shrink-0 p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Play className="h-4 w-4" />
-              </button>
             </div>
           ))}
         </div>

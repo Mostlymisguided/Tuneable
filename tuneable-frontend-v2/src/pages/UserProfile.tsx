@@ -18,10 +18,12 @@ import {
   Facebook,
   Youtube,
   Instagram,
+  Play,
   Music2
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -100,6 +102,9 @@ const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  
+  // Web player store for playing media
+  const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -203,6 +208,49 @@ const UserProfile: React.FC = () => {
     if (roles.includes('admin')) return 'text-white';
     if (roles.includes('moderator')) return 'text-blue-400';
     return 'text-green-400';
+  };
+
+  // Handle playing media from Top Tunes
+  const handlePlayMedia = (mediaData: any) => {
+    if (!mediaData.media) return;
+    
+    const media = mediaData.media;
+    const mediaId = media._id || media.uuid;
+    
+    if (!mediaId) {
+      toast.error('Unable to identify media item');
+      return;
+    }
+
+    // Clean and format the media for the webplayer
+    let sources = {};
+    
+    if (media.sources) {
+      sources = media.sources;
+    } else {
+      // Fallback to individual source fields
+      if (media.youtubeId) sources = { ...sources, youtube: media.youtubeId };
+      if (media.uploadUrl) sources = { ...sources, upload: media.uploadUrl };
+    }
+    
+    const cleanedMedia = {
+      id: mediaId,
+      title: media.title,
+      artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
+      duration: media.duration,
+      coverArt: media.coverArt,
+      sources: sources,
+      globalMediaAggregate: media.globalMediaAggregate || 0,
+      bids: mediaData.bids || [],
+      addedBy: media.addedBy || null,
+      totalBidValue: mediaData.totalAmountBid || 0,
+    };
+    
+    // Set the media in the webplayer and start playing
+    setCurrentMedia(cleanedMedia, 0, true); // true = autoplay
+    setGlobalPlayerActive(true);
+    
+    toast.success(`Now playing: ${cleanedMedia.title}`);
   };
 
   // Get social media links based on connected accounts
@@ -592,17 +640,38 @@ const UserProfile: React.FC = () => {
                         <span className="text-white font-bold text-lg">{index + 1}</span>
                       </div>
                     </div>
-                    <img
-                      src={mediaData.media?.coverArt || '/android-chrome-192x192.png'}
-                      alt={`${mediaData.media?.title || 'Unknown Song'} cover`}
-                      className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => mediaData.media?._id && navigate(`/tune/${mediaData.media._id}`)}
-                    />
+                    {/* Album Artwork with Play Icon Overlay */}
+                    <div className="relative w-16 h-16 flex-shrink-0">
+                      <img
+                        src={mediaData.media?.coverArt || '/android-chrome-192x192.png'}
+                        alt={`${mediaData.media?.title || 'Unknown Song'} cover`}
+                        className="w-full h-full rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          const mediaId = mediaData.media?._id || mediaData.media?.uuid;
+                          if (mediaId) navigate(`/tune/${mediaId}`);
+                        }}
+                      />
+                      {/* Play Icon Overlay - Only visible on hover */}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg cursor-pointer hover:bg-black/60 transition-colors opacity-0 hover:opacity-100 group"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayMedia(mediaData);
+                        }}
+                      >
+                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
+                          <Play className="h-4 w-4 text-white" fill="currentColor" />
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h3 
                           className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
-                          onClick={() => mediaData.media?._id && navigate(`/tune/${mediaData.media._id}`)}
+                          onClick={() => {
+                            const mediaId = mediaData.media?._id || mediaData.media?.uuid;
+                            if (mediaId) navigate(`/tune/${mediaId}`);
+                          }}
                         >
                           {mediaData.media?.title || 'Unknown Song'}
                         </h3>

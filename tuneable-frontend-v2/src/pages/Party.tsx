@@ -955,7 +955,7 @@ const Party: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen ">
       {/* Party Header */}
       <div className="px-3 sm:px-6 py-4 sm:py-6">
         <div className="card max-w-7xl mx-auto">
