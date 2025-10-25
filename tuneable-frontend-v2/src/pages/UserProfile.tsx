@@ -48,10 +48,6 @@ interface UserProfile {
   createdAt: string;
   updatedAt: string;
   // Social media fields
-  facebookId?: string;
-  googleId?: string;
-  instagramId?: string;
-  soundcloudId?: string;
   creatorProfile?: {
     socialMedia?: {
       facebook?: string;
@@ -112,7 +108,7 @@ interface UserStats {
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const { user: currentUser, refreshUser } = useAuth();
+  const { user: currentUser } = useAuth();
   
   // Web player store for playing media
   const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
@@ -169,11 +165,7 @@ const UserProfile: React.FC = () => {
           isActive: currentUser.isActive,
           createdAt: new Date().toISOString(), // Fallback values
           updatedAt: new Date().toISOString(),
-          // OAuth fields
-          facebookId: (currentUser as any).facebookId,
-          googleId: (currentUser as any).googleId,
-          instagramId: (currentUser as any).instagramId,
-          soundcloudId: (currentUser as any).soundcloudId,
+          // Social media fields
           creatorProfile: (currentUser as any).creatorProfile,
         };
         setUser(userProfile);
@@ -184,30 +176,6 @@ const UserProfile: React.FC = () => {
     }
   }, [userId, currentUser]);
 
-  // Refresh user data when returning from OAuth
-  useEffect(() => {
-    const handleFocus = () => {
-      if (userId && isOwnProfile) {
-        fetchUserProfile();
-      }
-    };
-
-    // Check for OAuth success in URL params
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('oauth_success') === 'true') {
-      // Refresh current user data in AuthContext
-      if (isOwnProfile) {
-        refreshUser();
-      } else {
-        fetchUserProfile();
-      }
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [userId, isOwnProfile]);
 
   // Populate edit form when user data loads
   useEffect(() => {
@@ -328,91 +296,47 @@ const UserProfile: React.FC = () => {
     toast.success(`Now playing: ${cleanedMedia.title}`);
   };
 
-  // Get social media links based on connected accounts and manual URLs
+  // Get social media links based on manual URLs only
   const getSocialMediaLinks = () => {
     const socialLinks = [];
     
-    // Facebook - OAuth or manual URL
-    if (user?.facebookId) {
-      socialLinks.push({
-        name: 'Facebook',
-        icon: Facebook,
-        url: `https://facebook.com/${user.facebookId}`,
-        color: 'hover:bg-blue-600/30 hover:border-blue-500',
-        type: 'oauth'
-      });
-    } else if (user?.creatorProfile?.socialMedia?.facebook) {
+    // Facebook - manual URL only
+    if (user?.creatorProfile?.socialMedia?.facebook) {
       socialLinks.push({
         name: 'Facebook',
         icon: Facebook,
         url: user.creatorProfile.socialMedia.facebook,
-        color: 'hover:bg-blue-600/30 hover:border-blue-500',
-        type: 'manual'
+        color: 'hover:bg-blue-600/30 hover:border-blue-500'
       });
     }
     
-    // YouTube - OAuth or manual URL
-    if (user?.googleId) {
-      socialLinks.push({
-        name: 'YouTube',
-        icon: Youtube,
-        url: '#', // Could link to YouTube channel if available
-        color: 'hover:bg-red-600/30 hover:border-red-500',
-        type: 'oauth'
-      });
-    } else if (user?.creatorProfile?.socialMedia?.youtube) {
+    // YouTube - manual URL only
+    if (user?.creatorProfile?.socialMedia?.youtube) {
       socialLinks.push({
         name: 'YouTube',
         icon: Youtube,
         url: user.creatorProfile.socialMedia.youtube,
-        color: 'hover:bg-red-600/30 hover:border-red-500',
-        type: 'manual'
+        color: 'hover:bg-red-600/30 hover:border-red-500'
       });
     }
     
-    // SoundCloud - OAuth or manual URL
-    if (user?.soundcloudId) {
-      const soundcloudUrl = (user as any).soundcloudUsername 
-        ? `https://soundcloud.com/${(user as any).soundcloudUsername}`
-        : `https://soundcloud.com/user-${user.soundcloudId}`;
-      
-      socialLinks.push({
-        name: 'SoundCloud',
-        icon: Music2,
-        url: soundcloudUrl,
-        color: 'hover:bg-orange-600/30 hover:border-orange-500',
-        type: 'oauth'
-      });
-    } else if (user?.creatorProfile?.socialMedia?.soundcloud) {
+    // SoundCloud - manual URL only
+    if (user?.creatorProfile?.socialMedia?.soundcloud) {
       socialLinks.push({
         name: 'SoundCloud',
         icon: Music2,
         url: user.creatorProfile.socialMedia.soundcloud,
-        color: 'hover:bg-orange-600/30 hover:border-orange-500',
-        type: 'manual'
+        color: 'hover:bg-orange-600/30 hover:border-orange-500'
       });
     }
     
-    // Instagram - OAuth or manual URL
-    if (user?.instagramId) {
-      const instagramUrl = (user as any).instagramUsername 
-        ? `https://instagram.com/${(user as any).instagramUsername}`
-        : `https://instagram.com/user-${user.instagramId}`;
-      
-      socialLinks.push({
-        name: 'Instagram',
-        icon: Instagram,
-        url: instagramUrl,
-        color: 'hover:bg-pink-600/30 hover:border-pink-500',
-        type: 'oauth'
-      });
-    } else if (user?.creatorProfile?.socialMedia?.instagram) {
+    // Instagram - manual URL only
+    if (user?.creatorProfile?.socialMedia?.instagram) {
       socialLinks.push({
         name: 'Instagram',
         icon: Instagram,
         url: user.creatorProfile.socialMedia.instagram,
-        color: 'hover:bg-pink-600/30 hover:border-pink-500',
-        type: 'manual'
+        color: 'hover:bg-pink-600/30 hover:border-pink-500'
       });
     }
     
@@ -425,9 +349,8 @@ const UserProfile: React.FC = () => {
     
     const unconnected = [];
     
-    // Check if Facebook is connected via OAuth or manual URL
-    const hasFacebook = user?.facebookId || user?.creatorProfile?.socialMedia?.facebook;
-    if (!hasFacebook) {
+    // Check if Facebook has manual URL
+    if (!user?.creatorProfile?.socialMedia?.facebook) {
       unconnected.push({
         name: 'Facebook',
         icon: Facebook,
@@ -436,9 +359,8 @@ const UserProfile: React.FC = () => {
       });
     }
     
-    // Check if SoundCloud is connected via OAuth or manual URL
-    const hasSoundCloud = user?.soundcloudId || user?.creatorProfile?.socialMedia?.soundcloud;
-    if (!hasSoundCloud) {
+    // Check if SoundCloud has manual URL
+    if (!user?.creatorProfile?.socialMedia?.soundcloud) {
       unconnected.push({
         name: 'SoundCloud',
         icon: Music2,
@@ -447,9 +369,8 @@ const UserProfile: React.FC = () => {
       });
     }
     
-    // Check if Instagram is connected via OAuth or manual URL
-    const hasInstagram = user?.instagramId || user?.creatorProfile?.socialMedia?.instagram;
-    if (!hasInstagram) {
+    // Check if Instagram has manual URL
+    if (!user?.creatorProfile?.socialMedia?.instagram) {
       unconnected.push({
         name: 'Instagram',
         icon: Instagram,

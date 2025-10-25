@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, Check } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { Facebook, Instagram, Music2 } from 'lucide-react';
 
 interface SocialMediaModalProps {
@@ -79,11 +79,6 @@ export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl
     }
   };
 
-  const handleOAuthConnect = () => {
-    // Redirect to OAuth endpoint
-    const authUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/${platform}`;
-    window.location.href = authUrl;
-  };
 
   if (!isOpen) return null;
 
@@ -109,35 +104,10 @@ export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl
           </button>
         </div>
 
-        {/* OAuth Option */}
-        <div className="mb-6">
-          <button
-            onClick={handleOAuthConnect}
-            className={`w-full flex items-center justify-center space-x-2 px-4 py-3 bg-${config.color}-600 hover:bg-${config.color}-700 text-white rounded-lg transition-colors`}
-          >
-            <config.icon className="w-4 h-4" />
-            <span>Connect with {config.name}</span>
-            <ExternalLink className="w-4 h-4" />
-          </button>
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            Recommended: Secure OAuth connection
-          </p>
-        </div>
-
-        {/* Divider */}
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-700"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-gray-900 text-gray-400">or</span>
-          </div>
-        </div>
-
         {/* Manual URL Entry */}
         <div>
           <label className="block text-sm font-medium text-white mb-2">
-            Add {config.name} URL manually
+            Add {config.name} URL
           </label>
           <div className="space-y-3">
             <input
