@@ -500,7 +500,7 @@ const Party: React.FC = () => {
       const minBid = party?.minimumBid || 0.33;
       const newBidAmounts: Record<string, number> = {};
       [...databaseResults, ...youtubeResults].forEach(media => {
-        newBidAmounts[media.id] = minBid;
+        newBidAmounts[media._id || media.id] = minBid;
       });
       setNewMediaBidAmounts(newBidAmounts);
       
@@ -533,8 +533,8 @@ const Party: React.FC = () => {
         const minBid = party?.minimumBid || 0.33;
         const newBidAmounts: Record<string, number> = { ...newMediaBidAmounts };
         response.videos.forEach((media: any) => {
-          if (!newBidAmounts[media.id]) {
-            newBidAmounts[media.id] = minBid;
+          if (!newBidAmounts[media._id || media.id]) {
+            newBidAmounts[media._id || media.id] = minBid;
           }
         });
         setNewMediaBidAmounts(newBidAmounts);
@@ -552,7 +552,7 @@ const Party: React.FC = () => {
   const handleAddMediaToParty = async (media: any) => {
     if (!partyId) return;
     
-    const bidAmount = newMediaBidAmounts[media.id] || party?.minimumBid || 0.33;
+    const bidAmount = newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33;
     
     try {
       // Get the appropriate URL based on music source
@@ -691,7 +691,7 @@ const Party: React.FC = () => {
 
     try {
       // Veto the media (sets status to 'vetoed')
-      await partyAPI.vetoMedia(partyId!, media.id);
+      await partyAPI.vetoMedia(partyId!, media._id || media.id);
       toast.success('Media vetoed');
       
       // Refresh party data
@@ -710,7 +710,7 @@ const Party: React.FC = () => {
 
     try {
       // Un-veto the media (restore to 'queued' status)
-      await partyAPI.unvetoMedia(partyId!, media.id);
+      await partyAPI.unvetoMedia(partyId!, media._id || media.id);
       toast.success('Media restored to queue');
       
       // Refresh party data
@@ -1351,7 +1351,7 @@ const Party: React.FC = () => {
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                               {addMediaResults.database.map((media: any) => (
-                                <div key={media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                                <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
                                       src={media.coverArt || '/default-cover.jpg'}
@@ -1368,10 +1368,10 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.33}
-                                      value={newMediaBidAmounts[media.id] || party?.minimumBid || 0.33}
+                                      value={newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33}
                                       onChange={(e) => setNewMediaBidAmounts({
                                         ...newMediaBidAmounts,
-                                        [media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                        [media._id || media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
@@ -1379,7 +1379,7 @@ const Party: React.FC = () => {
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
                                     >
-                                      Add £{(newMediaBidAmounts[media.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1397,7 +1397,7 @@ const Party: React.FC = () => {
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                               {addMediaResults.youtube.map((media: any) => (
-                                <div key={media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                                <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
                                       src={media.coverArt || '/default-cover.jpg'}
@@ -1414,10 +1414,10 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.33}
-                                      value={newMediaBidAmounts[media.id] || party?.minimumBid || 0.33}
+                                      value={newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33}
                                       onChange={(e) => setNewMediaBidAmounts({
                                         ...newMediaBidAmounts,
-                                        [media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                        [media._id || media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
@@ -1425,7 +1425,7 @@ const Party: React.FC = () => {
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                                     >
-                                      Add £{(newMediaBidAmounts[media.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>

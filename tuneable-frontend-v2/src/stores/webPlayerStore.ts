@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 // Lightweight Media interface for webplayer (subset of full Media)
 interface PlayerMedia {
   id: string;
+  _id?: string;
   title: string;
   artist: string;
   duration: number;
@@ -251,7 +252,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       
       removeFromQueue: (mediaId) => {
         set((state) => ({
-          queue: state.queue.filter(media => media.id !== mediaId)
+          queue: state.queue.filter(media => (media._id || media.id) !== mediaId)
         }));
       },
       

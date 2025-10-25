@@ -634,7 +634,7 @@ const TuneProfile: React.FC = () => {
 
     // Format media for webplayer
     const formattedSong = {
-      id: media.uuid || media._id,
+      id: media._id || media.uuid,
       title: media.title,
       artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
       duration: media.duration,
@@ -1785,7 +1785,7 @@ const TuneProfile: React.FC = () => {
         <ReportModal
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
-          mediaId={media.uuid}
+          mediaId={media._id}
           mediaTitle={`${media.title} by ${Array.isArray(media.artist) ? media.artist.map((a: any) => a.name).join(', ') : media.artist}`}
         />
       )}

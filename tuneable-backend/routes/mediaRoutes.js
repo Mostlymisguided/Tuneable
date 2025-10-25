@@ -7,8 +7,8 @@ const Comment = require('../models/Comment');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
-const { transformResponse } = require('../utils/uuidTransform');
-const { resolveId } = require('../utils/idResolver');
+// const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
+// const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const MetadataExtractor = require('../utils/metadataExtractor');
@@ -306,7 +306,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     
     console.log(`✅ Creator ${user.username} uploaded: ${title} (${media.uuid})`);
     
-    res.status(201).json(transformResponse({
+    res.status(201).json({
       message: 'Media uploaded successfully',
       media: {
         uuid: media.uuid,
@@ -316,7 +316,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         coverArt: media.coverArt,
         sources: media.sources
       }
-    }));
+    });
     
   } catch (error) {
     console.error('Error uploading media:', error);
@@ -374,7 +374,7 @@ router.get('/', async (req, res) => {
 
     const total = await Media.countDocuments(query);
 
-    res.json(transformResponse({
+    res.json({
       media,
       pagination: {
         page: parseInt(page),
@@ -382,7 +382,7 @@ router.get('/', async (req, res) => {
         total,
         pages: Math.ceil(total / parseInt(limit))
       }
-    }));
+    });
   } catch (error) {
     console.error('Error fetching media:', error);
     res.status(500).json({ error: 'Failed to fetch media' });
@@ -442,7 +442,7 @@ router.get('/public', async (req, res) => {
 
     const total = await Media.countDocuments(query);
 
-    res.json(transformResponse({
+    res.json({
       media,
       pagination: {
         page: parseInt(page),
@@ -450,7 +450,7 @@ router.get('/public', async (req, res) => {
         total,
         pages: Math.ceil(total / parseInt(limit))
       }
-    }));
+    });
   } catch (error) {
     console.error('Error fetching public media:', error);
     res.status(500).json({ error: 'Failed to fetch public media' });
@@ -548,13 +548,13 @@ router.get('/top-tunes', async (req, res) => {
       tags: item.tags || []
     }));
     
-    res.json(transformResponse({
+    res.json({
       success: true,
       songs: transformedSongs, // Keep field name for frontend compatibility
       total: transformedSongs.length,
       sortBy: sortField,
       limit: limitNum
-    }));
+    });
   } catch (err) {
     console.error('Error fetching Top Tunes:', err);
     res.status(500).json({ 
@@ -669,10 +669,10 @@ router.get('/:mediaId/profile', async (req, res) => {
       media: transformedMedia
     });
     
-    res.json(transformResponse({
+    res.json({
       message: 'Media profile fetched successfully',
       media: transformedMedia, // Updated to 'media' key for frontend compatibility
-    }));
+    });
 
   } catch (error) {
     console.error('Error fetching media profile:', error);
@@ -688,14 +688,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
     
-    // Resolve ID (handles both UUID and ObjectId)
-    const resolvedId = await resolveId(id, Media, 'uuid');
-    if (!resolvedId) {
-      return res.status(404).json({ error: 'Media not found' });
+    // Use ObjectId directly (no resolution needed)
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
     }
     
     // Find the media
-    const media = await Media.findById(resolvedId);
+    const media = await Media.findById(id);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -800,12 +799,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
     
     await media.save();
     
-    // Transform response to use UUIDs
-    const transformedMedia = transformResponse(media.toObject());
-    
+    // Return media with ObjectId directly
     res.json({ 
       message: 'Media updated successfully',
-      media: transformedMedia 
+      media: media 
     });
   } catch (error) {
     console.error('Error updating media:', error);
@@ -860,7 +857,7 @@ router.get('/:mediaId/comments', async (req, res) => {
       isDeleted: false 
     });
 
-    res.json(transformResponse({
+    res.json({
       message: 'Comments fetched successfully',
       comments,
       pagination: {
@@ -869,7 +866,7 @@ router.get('/:mediaId/comments', async (req, res) => {
         total: totalComments,
         pages: Math.ceil(totalComments / parseInt(limit)),
       },
-    }));
+    });
 
   } catch (error) {
     console.error('Error fetching comments:', error);
@@ -922,10 +919,10 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
     // Populate user data for response
     await comment.populate('userId', 'username profilePic uuid');
 
-    res.status(201).json(transformResponse({
+    res.status(201).json({
       message: 'Comment created successfully',
       comment,
-    }));
+    });
 
   } catch (error) {
     console.error('Error creating comment:', error);
@@ -964,11 +961,11 @@ router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
     await comment.save();
     await comment.populate('userId', 'username profilePic uuid');
 
-    res.json(transformResponse({
+    res.json({
       message: hasLiked ? 'Comment unliked' : 'Comment liked',
       comment,
       hasLiked: !hasLiked,
-    }));
+    });
 
   } catch (error) {
     console.error('Error toggling comment like:', error);
@@ -1003,9 +1000,9 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
     comment.deletedAt = new Date();
     await comment.save();
 
-    res.json(transformResponse({
+    res.json({
       message: 'Comment deleted successfully',
-    }));
+    });
 
   } catch (error) {
     console.error('Error deleting comment:', error);
@@ -1045,13 +1042,12 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       });
     }
 
-    // Get or resolve media
-    const resolvedMediaId = await resolveId(mediaId, Media);
-    if (!resolvedMediaId) {
-      return res.status(404).json({ error: 'Media not found' });
+    // Use ObjectId directly (no resolution needed)
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
     }
 
-    const media = await Media.findById(resolvedMediaId);
+    const media = await Media.findById(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -1139,12 +1135,12 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       }
     }
 
-    res.json(transformResponse({
+    res.json({
       message: 'Global bid placed successfully',
       bid,
       updatedBalance: user.balance,
       globalPartyId: globalParty._id
-    }));
+    });
   } catch (error) {
     console.error('Error placing global bid:', error);
     res.status(500).json({ error: 'Failed to place global bid', details: error.message });
@@ -1161,11 +1157,9 @@ router.get('/:mediaId/top-parties', async (req, res) => {
 
     console.log('🎪 Top parties request for media:', mediaId);
 
-    // Resolve media ID
-    const resolvedMediaId = await resolveId(mediaId, Media);
-    if (!resolvedMediaId) {
-      console.log('❌ Media not found:', mediaId);
-      return res.status(404).json({ error: 'Media not found' });
+    // Use ObjectId directly (no resolution needed)
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
     }
 
     console.log('✅ Resolved media ID:', resolvedMediaId);
@@ -1205,9 +1199,9 @@ router.get('/:mediaId/top-parties', async (req, res) => {
 
     console.log('✅ Returning', partyStats.length, 'parties with bids');
 
-    res.json(transformResponse({
+    res.json({
       parties: partyStats
-    }));
+    });
   } catch (error) {
     console.error('Error fetching top parties:', error);
     res.status(500).json({ error: 'Failed to fetch top parties' });
@@ -1223,20 +1217,18 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 
     console.log('🏷️ Tag rankings request for media:', mediaId);
 
-    // Resolve media ID
-    const resolvedMediaId = await resolveId(mediaId, Media);
-    if (!resolvedMediaId) {
-      console.log('❌ Media not found:', mediaId);
-      return res.status(404).json({ error: 'Media not found' });
+    // Use ObjectId directly (no resolution needed)
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
     }
 
-    const media = await Media.findById(resolvedMediaId);
+    const media = await Media.findById(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
 
     if (!media.tags || media.tags.length === 0) {
-      return res.json(transformResponse({ tagRankings: [] }));
+      return res.json({ tagRankings: [] });
     }
 
     console.log('📊 Computing rankings for tags:', media.tags);
@@ -1276,9 +1268,9 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 
     console.log('✅ Returning', tagRankings.length, 'tag rankings');
 
-    res.json(transformResponse({
+    res.json({
       tagRankings
-    }));
+    });
   } catch (error) {
     console.error('Error fetching tag rankings:', error);
     res.status(500).json({ error: 'Failed to fetch tag rankings' });

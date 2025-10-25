@@ -5,6 +5,7 @@ import { partyAPI } from '../lib/api';
 
 interface PlayerMedia {
   id: string;
+  _id?: string;
   title: string;
   artist: string;
   duration: number;
@@ -124,8 +125,8 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         audioRef.current.onended = () => {
           console.log('MP3Player: Audio ended');
           
-          if (currentPartyId && media?.id && isHost) {
-            partyAPI.completeMedia(currentPartyId, media.id)
+          if (currentPartyId && media?._id && isHost) {
+            partyAPI.completeMedia(currentPartyId, media._id)
               .then(() => {
                 console.log('MP3Player: Media completion confirmed');
                 next(); // Simple next - let App.tsx handle which player to show

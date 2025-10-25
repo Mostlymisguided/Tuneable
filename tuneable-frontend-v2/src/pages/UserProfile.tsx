@@ -595,13 +595,13 @@ const UserProfile: React.FC = () => {
                       src={mediaData.media?.coverArt || '/android-chrome-192x192.png'}
                       alt={`${mediaData.media?.title || 'Unknown Song'} cover`}
                       className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => mediaData.media?.uuid && navigate(`/tune/${mediaData.media.uuid}`)}
+                      onClick={() => mediaData.media?._id && navigate(`/tune/${mediaData.media._id}`)}
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h3 
                           className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
-                          onClick={() => mediaData.media?.uuid && navigate(`/tune/${mediaData.media.uuid}`)}
+                          onClick={() => mediaData.media?._id && navigate(`/tune/${mediaData.media._id}`)}
                         >
                           {mediaData.media?.title || 'Unknown Song'}
                         </h3>

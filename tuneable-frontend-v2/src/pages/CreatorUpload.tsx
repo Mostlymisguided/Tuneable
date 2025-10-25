@@ -198,8 +198,8 @@ const CreatorUpload: React.FC = () => {
       toast.success('Upload successful!');
       
       // Redirect to the new tune's profile
-      if (response.data.media?.uuid) {
-        navigate(`/tune/${response.data.media.uuid}`);
+      if (response.data.media?._id) {
+        navigate(`/tune/${response.data.media._id}`);
       } else {
         navigate('/dashboard');
       }
