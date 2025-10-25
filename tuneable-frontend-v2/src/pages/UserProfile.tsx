@@ -24,6 +24,7 @@ import {
 import { userAPI, authAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import SocialMediaModal from '../components/SocialMediaModal';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -51,6 +52,16 @@ interface UserProfile {
   googleId?: string;
   instagramId?: string;
   soundcloudId?: string;
+  creatorProfile?: {
+    socialMedia?: {
+      facebook?: string;
+      instagram?: string;
+      soundcloud?: string;
+      spotify?: string;
+      youtube?: string;
+      twitter?: string;
+    };
+  };
 }
 
 interface Bid {
@@ -125,6 +136,17 @@ const UserProfile: React.FC = () => {
     homeLocation: { city: '', country: '' }
   });
   
+  // Social media modal state
+  const [socialModal, setSocialModal] = useState<{
+    isOpen: boolean;
+    platform: 'facebook' | 'instagram' | 'soundcloud' | null;
+    currentUrl?: string;
+  }>({
+    isOpen: false,
+    platform: null,
+    currentUrl: undefined
+  });
+
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
 
@@ -253,29 +275,49 @@ const UserProfile: React.FC = () => {
     toast.success(`Now playing: ${cleanedMedia.title}`);
   };
 
-  // Get social media links based on connected accounts
+  // Get social media links based on connected accounts and manual URLs
   const getSocialMediaLinks = () => {
     const socialLinks = [];
     
+    // Facebook - OAuth or manual URL
     if (user?.facebookId) {
       socialLinks.push({
         name: 'Facebook',
         icon: Facebook,
         url: `https://facebook.com/${user.facebookId}`,
-        color: 'hover:bg-blue-600/30 hover:border-blue-500'
+        color: 'hover:bg-blue-600/30 hover:border-blue-500',
+        type: 'oauth'
+      });
+    } else if (user?.creatorProfile?.socialMedia?.facebook) {
+      socialLinks.push({
+        name: 'Facebook',
+        icon: Facebook,
+        url: user.creatorProfile.socialMedia.facebook,
+        color: 'hover:bg-blue-600/30 hover:border-blue-500',
+        type: 'manual'
       });
     }
     
+    // YouTube - OAuth or manual URL
     if (user?.googleId) {
-      // YouTube is connected via Google OAuth
       socialLinks.push({
         name: 'YouTube',
         icon: Youtube,
         url: '#', // Could link to YouTube channel if available
-        color: 'hover:bg-red-600/30 hover:border-red-500'
+        color: 'hover:bg-red-600/30 hover:border-red-500',
+        type: 'oauth'
+      });
+    } else if (user?.creatorProfile?.socialMedia?.youtube) {
+      socialLinks.push({
+        name: 'YouTube',
+        icon: Youtube,
+        url: user.creatorProfile.socialMedia.youtube,
+        color: 'hover:bg-red-600/30 hover:border-red-500',
+        type: 'manual'
       });
     }
     
+    // SoundCloud - OAuth or manual URL
     if (user?.soundcloudId) {
       const soundcloudUrl = (user as any).soundcloudUsername 
         ? `https://soundcloud.com/${(user as any).soundcloudUsername}`
@@ -285,10 +327,20 @@ const UserProfile: React.FC = () => {
         name: 'SoundCloud',
         icon: Music2,
         url: soundcloudUrl,
-        color: 'hover:bg-orange-600/30 hover:border-orange-500'
+        color: 'hover:bg-orange-600/30 hover:border-orange-500',
+        type: 'oauth'
+      });
+    } else if (user?.creatorProfile?.socialMedia?.soundcloud) {
+      socialLinks.push({
+        name: 'SoundCloud',
+        icon: Music2,
+        url: user.creatorProfile.socialMedia.soundcloud,
+        color: 'hover:bg-orange-600/30 hover:border-orange-500',
+        type: 'manual'
       });
     }
     
+    // Instagram - OAuth or manual URL
     if (user?.instagramId) {
       const instagramUrl = (user as any).instagramUsername 
         ? `https://instagram.com/${(user as any).instagramUsername}`
@@ -298,7 +350,16 @@ const UserProfile: React.FC = () => {
         name: 'Instagram',
         icon: Instagram,
         url: instagramUrl,
-        color: 'hover:bg-pink-600/30 hover:border-pink-500'
+        color: 'hover:bg-pink-600/30 hover:border-pink-500',
+        type: 'oauth'
+      });
+    } else if (user?.creatorProfile?.socialMedia?.instagram) {
+      socialLinks.push({
+        name: 'Instagram',
+        icon: Instagram,
+        url: user.creatorProfile.socialMedia.instagram,
+        color: 'hover:bg-pink-600/30 hover:border-pink-500',
+        type: 'manual'
       });
     }
     
@@ -311,29 +372,35 @@ const UserProfile: React.FC = () => {
     
     const unconnected = [];
     
-    if (!user?.facebookId) {
+    // Check if Facebook is connected via OAuth or manual URL
+    const hasFacebook = user?.facebookId || user?.creatorProfile?.socialMedia?.facebook;
+    if (!hasFacebook) {
       unconnected.push({
         name: 'Facebook',
         icon: Facebook,
-        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/facebook`,
+        platform: 'facebook' as const,
         color: 'border-blue-500 text-blue-300 hover:bg-blue-600/20'
       });
     }
     
-    if (!user?.soundcloudId) {
+    // Check if SoundCloud is connected via OAuth or manual URL
+    const hasSoundCloud = user?.soundcloudId || user?.creatorProfile?.socialMedia?.soundcloud;
+    if (!hasSoundCloud) {
       unconnected.push({
         name: 'SoundCloud',
         icon: Music2,
-        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/soundcloud`,
+        platform: 'soundcloud' as const,
         color: 'border-orange-500 text-orange-300 hover:bg-orange-600/20'
       });
     }
     
-    if (!user?.instagramId) {
+    // Check if Instagram is connected via OAuth or manual URL
+    const hasInstagram = user?.instagramId || user?.creatorProfile?.socialMedia?.instagram;
+    if (!hasInstagram) {
       unconnected.push({
         name: 'Instagram',
         icon: Instagram,
-        authUrl: `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/instagram`,
+        platform: 'instagram' as const,
         color: 'border-pink-500 text-pink-300 hover:bg-pink-600/20'
       });
     }
@@ -346,6 +413,42 @@ const UserProfile: React.FC = () => {
     if (user?.personalInviteCode) {
       navigator.clipboard.writeText(user.personalInviteCode);
       toast.success('Invite code copied to clipboard!');
+    }
+  };
+
+  // Social media modal handlers
+  const openSocialModal = (platform: 'facebook' | 'instagram' | 'soundcloud') => {
+    const currentUrl = user?.creatorProfile?.socialMedia?.[platform];
+    setSocialModal({
+      isOpen: true,
+      platform,
+      currentUrl
+    });
+  };
+
+  const closeSocialModal = () => {
+    setSocialModal({
+      isOpen: false,
+      platform: null,
+      currentUrl: undefined
+    });
+  };
+
+  const handleSaveSocialMedia = async (url: string) => {
+    if (!socialModal.platform) return;
+    
+    try {
+      await userAPI.updateSocialMedia(socialModal.platform, url);
+      toast.success(`${socialModal.platform} URL updated successfully!`);
+      
+      // Refresh user data
+      if (userId) {
+        await fetchUserProfile();
+      }
+    } catch (error: any) {
+      console.error('Error updating social media:', error);
+      toast.error(error.response?.data?.error || 'Failed to update social media URL');
+      throw error;
     }
   };
 
@@ -525,14 +628,14 @@ const UserProfile: React.FC = () => {
                   <div className="text-xs text-gray-400 mb-2">Connect accounts:</div>
                   <div className="flex flex-wrap gap-2">
                     {getUnconnectedSocialAccounts().map((social) => (
-                      <a
+                      <button
                         key={social.name}
-                        href={social.authUrl}
+                        onClick={() => openSocialModal(social.platform)}
                         className={`flex items-center space-x-2 px-3 py-1.5 bg-black/10 border rounded-lg text-xs font-medium transition-all ${social.color}`}
                       >
                         <social.icon className="w-3.5 h-3.5" />
                         <span>Add {social.name}</span>
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -840,6 +943,17 @@ const UserProfile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Social Media Modal */}
+      {socialModal.platform && (
+        <SocialMediaModal
+          isOpen={socialModal.isOpen}
+          onClose={closeSocialModal}
+          platform={socialModal.platform}
+          currentUrl={socialModal.currentUrl}
+          onSave={handleSaveSocialMedia}
+        />
       )}
     </div>
   );

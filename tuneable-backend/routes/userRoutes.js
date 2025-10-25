@@ -294,6 +294,54 @@ router.put('/profile', authMiddleware, async (req, res) => {
   }
 });
 
+// Update social media URL
+router.put('/profile/social-media', authMiddleware, async (req, res) => {
+  try {
+    const { platform, url } = req.body;
+    
+    if (!platform || !url) {
+      return res.status(400).json({ error: 'Platform and URL are required' });
+    }
+
+    const validPlatforms = ['facebook', 'instagram', 'soundcloud', 'spotify', 'youtube', 'twitter'];
+    if (!validPlatforms.includes(platform)) {
+      return res.status(400).json({ error: 'Invalid platform' });
+    }
+
+    // Validate URL format
+    const urlPatterns = {
+      facebook: /^https?:\/\/(www\.)?facebook\.com\/[a-zA-Z0-9.]+/,
+      instagram: /^https?:\/\/(www\.)?instagram\.com\/[a-zA-Z0-9._]+/,
+      soundcloud: /^https?:\/\/(www\.)?soundcloud\.com\/[a-zA-Z0-9._-]+/,
+      spotify: /^https?:\/\/(open\.)?spotify\.com\/[a-zA-Z0-9/]+/,
+      youtube: /^https?:\/\/(www\.)?youtube\.com\/[a-zA-Z0-9/]+/,
+      twitter: /^https?:\/\/(www\.)?twitter\.com\/[a-zA-Z0-9_]+/
+    };
+
+    if (!urlPatterns[platform].test(url)) {
+      return res.status(400).json({ error: `Invalid ${platform} URL format` });
+    }
+
+    // Update the social media URL in creatorProfile
+    const updateField = `creatorProfile.socialMedia.${platform}`;
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { [updateField]: url },
+      { new: true }
+    ).select('-password');
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({ 
+      message: `${platform} URL updated successfully`, 
+      user,
+      socialMedia: user.creatorProfile?.socialMedia 
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating social media URL', details: error.message });
+  }
+});
+
 // Profile Picture Upload Route
 router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (req, res) => {
   try {

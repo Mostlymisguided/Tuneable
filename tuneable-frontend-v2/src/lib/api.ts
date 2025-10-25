@@ -409,6 +409,12 @@ export const userAPI = {
     const response = await api.get(`/users/${userId}/profile`);
     return response.data;
   },
+
+  // Update social media URL
+  updateSocialMedia: async (platform: string, url: string) => {
+    const response = await api.put('/users/profile/social-media', { platform, url });
+    return response.data;
+  },
   
   // Admin: Get invite requests
   getInviteRequests: async (status?: string) => {

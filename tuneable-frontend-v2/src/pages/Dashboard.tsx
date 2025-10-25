@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Music, Users, DollarSign } from 'lucide-react';
+import { AudioLines, Globe, Coins } from 'lucide-react';
 import TopTunes from '../components/TopTunes';
 
 const Dashboard: React.FC = () => {
@@ -27,7 +27,7 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="bg-primary-100 p-3 rounded-lg">
-              <DollarSign className="h-6 w-6 text-primary-600" />
+              <Coins className="h-6 w-6 text-primary-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Balance</p>
@@ -41,7 +41,7 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="bg-green-100 p-3 rounded-lg">
-              <Users className="h-6 w-6 text-green-600" />
+              <Globe className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Global Rank</p>
@@ -55,7 +55,7 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="bg-blue-100 p-3 rounded-lg">
-              <DollarSign className="h-6 w-6 text-blue-600" />
+              <Coins className="h-6 w-6 text-blue-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Avg Bid</p>
@@ -69,7 +69,7 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="bg-purple-100 p-3 rounded-lg">
-              <Music className="h-6 w-6 text-purple-600" />
+              <AudioLines className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Total Bids</p>
