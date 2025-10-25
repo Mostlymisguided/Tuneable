@@ -59,7 +59,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
     
     bids.forEach(bid => {
       if (bid.userId) {
-        const userId = bid.userId.uuid || bid.userId._id;
+        const userId = bid.userId._id || bid.userId.uuid;
         if (userId) {
           if (!userAggregates[userId]) {
             userAggregates[userId] = {

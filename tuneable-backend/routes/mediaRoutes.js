@@ -530,7 +530,7 @@ router.get('/top-tunes', async (req, res) => {
     
     // Transform Media items to match expected frontend format
     const transformedSongs = media.map(item => ({
-      id: item.uuid || item._id,
+      id: item._id || item.uuid,
       uuid: item.uuid,
       title: item.title,
       artist: item.artist && item.artist.length > 0 ? item.artist[0].name : 'Unknown Artist', // Primary artist name

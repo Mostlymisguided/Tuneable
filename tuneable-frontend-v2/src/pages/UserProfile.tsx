@@ -586,7 +586,7 @@ const UserProfile: React.FC = () => {
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
                 {mediaWithBids.map((mediaData, index) => (
-                  <div key={mediaData.media?.uuid || mediaData.media?._id || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
+                  <div key={mediaData.media?._id || mediaData.media?.uuid || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
                     <div className="flex-shrink-0">
                       <div className="flex items-center justify-center w-12 h-12 bg-purple-600/50 rounded-full">
                         <span className="text-white font-bold text-lg">{index + 1}</span>

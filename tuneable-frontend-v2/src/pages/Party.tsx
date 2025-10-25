@@ -295,7 +295,7 @@ const Party: React.FC = () => {
           }
           
           return {
-            id: actualMedia.id || actualMedia.uuid || actualMedia._id, // Prefer UUID for external API
+            id: actualMedia._id || actualMedia.id || actualMedia.uuid, // Prefer ObjectId first
             title: actualMedia.title,
             artist: Array.isArray(actualMedia.artist) ? actualMedia.artist[0]?.name || 'Unknown Artist' : actualMedia.artist,
             duration: actualMedia.duration,
@@ -362,7 +362,7 @@ const Party: React.FC = () => {
         }
         
         return {
-          id: item.id || item.uuid || item._id, // Prefer UUID for external API
+          id: item._id || item.id || item.uuid, // Prefer ObjectId first
           title: item.title,
           artist: Array.isArray(item.artist) ? item.artist[0]?.name || 'Unknown Artist' : item.artist,
           duration: item.duration,
@@ -746,7 +746,7 @@ const Party: React.FC = () => {
     setIsBidding(true);
     try {
       // Get the media ID - try various ID fields
-      const mediaId = selectedMedia.uuid || selectedMedia.id || selectedMedia._id;
+      const mediaId = selectedMedia._id || selectedMedia.id || selectedMedia.uuid;
       if (!mediaId) {
         toast.error('Unable to identify media item');
         setIsBidding(false);
@@ -882,7 +882,7 @@ const Party: React.FC = () => {
     }
     
     const cleanedMedia = {
-      id: mediaData.id || mediaData.uuid || mediaData._id,
+      id: mediaData._id || mediaData.id || mediaData.uuid,
       title: mediaData.title,
       artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
       duration: mediaData.duration,

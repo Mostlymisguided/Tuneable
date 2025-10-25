@@ -333,8 +333,8 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
             return {
                 _id: entry.mediaId._id,
-                id: entry.mediaId.uuid || entry.mediaId._id, // Use UUID for external API, fallback to _id
-                uuid: entry.mediaId.uuid || entry.mediaId._id, // Also include uuid field for consistency
+                id: entry.mediaId._id || entry.mediaId.uuid, // Use ObjectId first, fallback to UUID
+                uuid: entry.mediaId._id || entry.mediaId.uuid, // Also include uuid field for consistency
                 title: entry.mediaId.title,
                 artist: entry.mediaId.artist,
                 duration: entry.mediaId.duration || '666',
@@ -1653,8 +1653,8 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
 
                     return {
                         _id: media._id,
-                        id: media.uuid || media._id, // Use UUID for external API, fallback to _id
-                        uuid: media.uuid || media._id, // Also include uuid field for consistency
+                        id: media._id || media.uuid, // Use ObjectId first, fallback to UUID
+                        uuid: media._id || media.uuid, // Also include uuid field for consistency
                         title: media.title,
                         artist: artistName, // Transform for frontend compatibility
                         duration: media.duration,
@@ -1697,8 +1697,8 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
 
                     return {
                         _id: entry.mediaId._id,
-                        id: entry.mediaId.uuid || entry.mediaId._id, // Use UUID for external API, fallback to _id
-                        uuid: entry.mediaId.uuid || entry.mediaId._id, // Also include uuid field for consistency
+                        id: entry.mediaId._id || entry.mediaId.uuid, // Use ObjectId first, fallback to UUID
+                        uuid: entry.mediaId._id || entry.mediaId.uuid, // Also include uuid field for consistency
                         title: entry.mediaId.title,
                         artist: artistName, // Transform for frontend compatibility
                         duration: entry.mediaId.duration,
