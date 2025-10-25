@@ -38,7 +38,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         // Redirect to frontend with ONLY the token (security improvement)
         // Frontend will fetch user data using the token
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
         
       } catch (error) {
         console.error('Facebook callback error:', error);
@@ -92,7 +92,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         // Redirect to frontend with ONLY the token (security improvement)
         // Frontend will fetch user data using the token
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
         
       } catch (error) {
         console.error('Google callback error:', error);
@@ -148,7 +148,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         // Frontend will fetch user data using the token
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         console.log('✅ Redirecting to:', `${frontendUrl}/auth/callback?token=${token.substring(0, 20)}...`);
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
         
       } catch (error) {
         console.error('❌ SoundCloud callback error:', error);
@@ -198,7 +198,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         // Redirect to frontend with ONLY the token (security improvement)
         // Frontend will fetch user data using the token
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
         
       } catch (error) {
         console.error('Instagram callback error:', error);

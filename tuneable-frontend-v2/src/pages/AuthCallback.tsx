@@ -24,7 +24,15 @@ const AuthCallback: React.FC = () => {
           // handleOAuthCallback now fetches user data automatically
           await handleOAuthCallback(token);
           toast.success('Login successful!');
-          navigate('/dashboard');
+          
+          // Check if this was a social media OAuth connection
+          const oauthSuccess = searchParams.get('oauth_success');
+          if (oauthSuccess === 'true') {
+            // Redirect to user profile with success parameter
+            navigate('/user/profile?oauth_success=true');
+          } else {
+            navigate('/dashboard');
+          }
         } catch (error) {
           console.error('Error during OAuth callback:', error);
           toast.error('Authentication failed. Please try again.');

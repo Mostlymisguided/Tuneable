@@ -112,7 +112,7 @@ interface UserStats {
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshUser } = useAuth();
   
   // Web player store for playing media
   const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
@@ -152,9 +152,62 @@ const UserProfile: React.FC = () => {
 
   useEffect(() => {
     if (userId) {
-      fetchUserProfile();
+      // If viewing own profile, use current user data from AuthContext
+      if (currentUser && (currentUser._id === userId || currentUser.uuid === userId)) {
+        // Convert AuthContext User to UserProfile format
+        const userProfile: UserProfile = {
+          id: currentUser.id,
+          _id: currentUser._id,
+          uuid: currentUser.uuid || currentUser.id,
+          username: currentUser.username,
+          email: currentUser.email,
+          profilePic: currentUser.profilePic,
+          balance: currentUser.balance,
+          personalInviteCode: currentUser.personalInviteCode,
+          homeLocation: currentUser.homeLocation,
+          role: currentUser.role,
+          isActive: currentUser.isActive,
+          createdAt: new Date().toISOString(), // Fallback values
+          updatedAt: new Date().toISOString(),
+          // OAuth fields
+          facebookId: (currentUser as any).facebookId,
+          googleId: (currentUser as any).googleId,
+          instagramId: (currentUser as any).instagramId,
+          soundcloudId: (currentUser as any).soundcloudId,
+          creatorProfile: (currentUser as any).creatorProfile,
+        };
+        setUser(userProfile);
+        setLoading(false);
+      } else {
+        fetchUserProfile();
+      }
     }
-  }, [userId]);
+  }, [userId, currentUser]);
+
+  // Refresh user data when returning from OAuth
+  useEffect(() => {
+    const handleFocus = () => {
+      if (userId && isOwnProfile) {
+        fetchUserProfile();
+      }
+    };
+
+    // Check for OAuth success in URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('oauth_success') === 'true') {
+      // Refresh current user data in AuthContext
+      if (isOwnProfile) {
+        refreshUser();
+      } else {
+        fetchUserProfile();
+      }
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [userId, isOwnProfile]);
 
   // Populate edit form when user data loads
   useEffect(() => {
