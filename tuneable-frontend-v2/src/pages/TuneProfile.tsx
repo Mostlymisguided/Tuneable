@@ -1450,19 +1450,6 @@ const TuneProfile: React.FC = () => {
                   />
                 </div>
               </div>
-
-              {/* EP */}
-              <div>
-                <label className="block text-white font-medium mb-2">EP</label>
-                <input
-                  type="text"
-                  value={editForm.EP}
-                  onChange={(e) => setEditForm({ ...editForm, EP: e.target.value })}
-                  className="input"
-                  placeholder="Extended Play name"
-                />
-              </div>
-
               {/* Featuring Artists */}
               <div>
                 <label className="block text-white font-medium mb-2">Featuring (comma-separated)</label>
@@ -1473,6 +1460,36 @@ const TuneProfile: React.FC = () => {
                   className="input"
                   placeholder="Artist 1, Artist 2, Artist 3"
                 />
+              </div>
+   {/* Tags */}
+   <div>
+                <label className="block text-white font-medium mb-2">Tags (comma-separated)</label>
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onBlur={handleTagInputBlur}
+                  onKeyDown={handleTagInputKeyDown}
+                  className="input"
+                  placeholder="pop, indie, summer, upbeat"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Type tags separated by commas. Press Enter or click away to save.
+                </p>
+              </div>
+              {/* Elements */}
+              <div>
+                <label className="block text-white font-medium mb-2">Elements (comma-separated)</label>
+                <input
+                  type="text"
+                  value={editForm.elements.join(', ')}
+                  onChange={(e) => setEditForm({ ...editForm, elements: e.target.value.split(',').map(e => e.trim()).filter(e => e) })}
+                  className="input"
+                  placeholder="guitar, drums, bass, synthesizer, vocals"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Enter musical elements/instruments separated by commas
+                </p>
               </div>
 
               {/* Genres and Release Date */}
@@ -1527,86 +1544,7 @@ const TuneProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* ISRC and UPC */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">ISRC</label>
-                  <input
-                    type="text"
-                    value={editForm.isrc}
-                    onChange={(e) => setEditForm({ ...editForm, isrc: e.target.value })}
-                    className="input"
-                    placeholder="ISRC code"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">UPC</label>
-                  <input
-                    type="text"
-                    value={editForm.upc}
-                    onChange={(e) => setEditForm({ ...editForm, upc: e.target.value })}
-                    className="input"
-                    placeholder="UPC code"
-                  />
-                </div>
-              </div>
-
-              {/* BPM and Key */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">BPM</label>
-                  <input
-                    type="number"
-                    value={editForm.bpm}
-                    onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
-                    className="input"
-                    placeholder="Beats per minute"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Key</label>
-                  <input
-                    type="text"
-                    value={editForm.key}
-                    onChange={(e) => setEditForm({ ...editForm, key: e.target.value })}
-                    className="input"
-                    placeholder="Musical key (e.g., C Major)"
-                  />
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="block text-white font-medium mb-2">Tags (comma-separated)</label>
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onBlur={handleTagInputBlur}
-                  onKeyDown={handleTagInputKeyDown}
-                  className="input"
-                  placeholder="pop, indie, summer, upbeat"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Type tags separated by commas. Press Enter or click away to save.
-                </p>
-              </div>
-
-              {/* Elements */}
-              <div>
-                <label className="block text-white font-medium mb-2">Elements (comma-separated)</label>
-                <input
-                  type="text"
-                  value={editForm.elements.join(', ')}
-                  onChange={(e) => setEditForm({ ...editForm, elements: e.target.value.split(',').map(e => e.trim()).filter(e => e) })}
-                  className="input"
-                  placeholder="guitar, drums, bass, synthesizer, vocals"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Enter musical elements/instruments separated by commas
-                </p>
-              </div>
-
+            
               {/* Description */}
               <div>
                 <label className="block text-white font-medium mb-2">Description</label>
@@ -1658,7 +1596,18 @@ const TuneProfile: React.FC = () => {
                       placeholder="Songwriter name"
                     />
                   </div>
-                </div>
+                
+    {/* EP */}
+               <div>
+                <label className="block text-white font-medium mb-2">EP</label>
+                <input
+                  type="text"
+                  value={editForm.EP}
+                  onChange={(e) => setEditForm({ ...editForm, EP: e.target.value })}
+                  className="input"
+                  placeholder="Extended Play name"
+                />
+              </div>
 
                 {/* Label */}
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
@@ -1672,6 +1621,7 @@ const TuneProfile: React.FC = () => {
                       placeholder="Record label"
                     />
                   </div>
+                </div>
                 </div>
 
                 {/* Technical Metadata */}
@@ -1709,6 +1659,31 @@ const TuneProfile: React.FC = () => {
                   </div>
                 </div>
 
+
+              {/* BPM and Key */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">BPM</label>
+                  <input
+                    type="number"
+                    value={editForm.bpm}
+                    onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
+                    className="input"
+                    placeholder="Beats per minute"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Key</label>
+                  <input
+                    type="text"
+                    value={editForm.key}
+                    onChange={(e) => setEditForm({ ...editForm, key: e.target.value })}
+                    className="input"
+                    placeholder="Musical key (e.g., C Major)"
+                  />
+                </div>
+              </div>
+
                 {/* Time Signature and Language */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
@@ -1732,6 +1707,29 @@ const TuneProfile: React.FC = () => {
                     />
                   </div>
                 </div>
+                 {/* ISRC and UPC */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">ISRC</label>
+                  <input
+                    type="text"
+                    value={editForm.isrc}
+                    onChange={(e) => setEditForm({ ...editForm, isrc: e.target.value })}
+                    className="input"
+                    placeholder="ISRC code"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">UPC</label>
+                  <input
+                    type="text"
+                    value={editForm.upc}
+                    onChange={(e) => setEditForm({ ...editForm, upc: e.target.value })}
+                    className="input"
+                    placeholder="UPC code"
+                  />
+                </div>
+              </div>
 
                 {/* Cover Art URL */}
                 <div>

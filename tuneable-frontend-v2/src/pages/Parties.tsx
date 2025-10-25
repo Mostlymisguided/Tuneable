@@ -297,7 +297,7 @@ const Parties: React.FC = () => {
           <Users className="h-4 w-4 mr-2" />
           <span>
             {party.type === 'global' 
-              ? `${Array.isArray(party.partiers) ? party.partiers.length : 0} community members`
+              ? `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
               : `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
             }
           </span>
@@ -326,7 +326,7 @@ const Parties: React.FC = () => {
         {party.type === 'global' ? (
           <div className="text-sm text-gray-300 mt-2">
             <p className="line-clamp-2">
-              The main community space where all users automatically join to discover and share music together.
+              The global community party where all users discover and share music together
             </p>
           </div>
         ) : party.description ? (
@@ -384,7 +384,9 @@ const Parties: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">Parties</h1>
           <p className="text-gray-300 mt-2">Discover and Join Music Parties</p>
         </div>
+       
         {user?.role?.includes('admin') && (
+
           <Link
             to="/create-party"
             className="btn-primary flex items-center space-x-2"
@@ -392,9 +394,10 @@ const Parties: React.FC = () => {
             <Music className="h-4 w-4" />
             <span className="text-base font-semibold no-underline">Create Party</span>
           </Link>
+          
         )}
-      </div>
-
+        </div>
+     
       {/* Search Section */}
       <div className="mb-6">
         <div className="flex flex-col gap-4">

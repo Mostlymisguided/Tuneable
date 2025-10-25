@@ -1187,7 +1187,7 @@ router.get('/:mediaId/top-parties', async (req, res) => {
 
     // Extract party info and bid totals for this media
     const partyStats = parties.map(party => {
-      const mediaEntry = party.media.find(m => m.mediaId.toString() === resolvedMediaId.toString());
+      const mediaEntry = party.media.find(m => m.mediaId.toString() === actualMediaId.toString());
       console.log(`  Party "${party.name}": aggregate=${mediaEntry?.partyMediaAggregate || 0}, bids=${mediaEntry?.partyBids?.length || 0}`);
       return {
         _id: party._id,
@@ -1259,7 +1259,7 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
         .lean();
       
       // Find this media's rank
-      const rankIndex = mediaWithTag.findIndex(m => m._id.toString() === resolvedMediaId.toString());
+      const rankIndex = mediaWithTag.findIndex(m => m._id.toString() === actualMediaId.toString());
       const rank = rankIndex + 1;
       const total = mediaWithTag.length;
       const percentile = total > 0 ? ((total - rank) / total * 100).toFixed(1) : '0';
