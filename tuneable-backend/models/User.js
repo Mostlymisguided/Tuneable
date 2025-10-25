@@ -102,6 +102,13 @@ const userSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending', 'active', 'inactive'], default: 'pending' },
     joinedAt: { type: Date, default: Date.now },
     invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }],
+  
+  // Party affiliations - track which parties user has joined
+  joinedParties: [{
+    partyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
+    joinedAt: { type: Date, default: Date.now },
+    role: { type: String, enum: ['partier', 'host', 'moderator'], default: 'partier' }
   }]
 }, { 
   timestamps: true,

@@ -21,6 +21,11 @@ interface User {
   };
   role: string[];
   isActive: boolean;
+  joinedParties?: {
+    partyId: string;
+    joinedAt: string;
+    role: 'partier' | 'host' | 'moderator';
+  }[];
 }
 
 interface RegisterData {

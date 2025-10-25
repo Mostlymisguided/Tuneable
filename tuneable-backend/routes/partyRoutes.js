@@ -12,8 +12,8 @@ const User = require('../models/User');
 const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcast } = require('../utils/broadcast');
-const { transformResponse } = require('../utils/uuidTransform');
-const { resolvePartyId } = require('../utils/idResolver');
+// const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
+// const { resolvePartyId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
@@ -98,7 +98,7 @@ router.post('/', adminMiddleware, async (req, res) => {
       }
   
       broadcast(party._id, { message: 'New party created', party });
-      res.status(201).json(transformResponse({ message: 'Party created successfully', party }));
+      res.status(201).json({ message: 'Party created successfully', party });
   
     } catch (err) {
       console.error('🔥 Error creating party:', err);
@@ -107,7 +107,7 @@ router.post('/', adminMiddleware, async (req, res) => {
   });
 
 
-router.post("/join/:partyId", authMiddleware, resolvePartyId(), async (req, res) => {
+router.post("/join/:partyId", authMiddleware, async (req, res) => {
     const { partyId } = req.params;
     const { inviteCode, location } = req.body;
     const userId = req.user._id;
@@ -132,11 +132,28 @@ router.post("/join/:partyId", authMiddleware, resolvePartyId(), async (req, res)
         // }
 
         if (!party.partiers.includes(userId)) {
+            // Add user to party's partiers array
             party.partiers.push(userId);
             await party.save();
+            
+            // Add party to user's joinedParties array
+            const User = require('../models/User');
+            const user = await User.findById(userId);
+            if (user) {
+                // Check if user is already in this party
+                const alreadyJoined = user.joinedParties.some(jp => jp.partyId.toString() === partyId);
+                if (!alreadyJoined) {
+                    user.joinedParties.push({
+                        partyId: partyId, // partyId is now ObjectId (no conversion needed)
+                        role: isHost ? 'host' : 'partier'
+                    });
+                    await user.save();
+                    console.log(`✅ Added party ${partyId} to user ${userId} joinedParties`);
+                }
+            }
         }
 
-        res.json(transformResponse({ message: "Joined successfully", party }));
+        res.json({ message: "Joined successfully", party });
 
     } catch (error) {
         res.status(500).json({ message: "Server error", error });
@@ -155,14 +172,14 @@ router.get('/', authMiddleware, async (req, res) => {
             .select('-media') // Exclude media for better performance
             .populate('host', 'username uuid'); // ✅ Include uuid for consistent host identification
 
-        res.status(200).json(transformResponse({ message: 'Parties fetched successfully', parties }));
+        res.status(200).json({ message: 'Parties fetched successfully', parties });
     } catch (err) {
         handleError(res, err, 'Failed to fetch parties');
     }
 });
 
 // FETCH PARTY DETAILS
-router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) => {
+router.get('/:id/details', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -384,10 +401,10 @@ router.get('/:id/details', authMiddleware, resolvePartyId(), async (req, res) =>
             media: processedMedia, // ✅ Return flattened, sorted media
         };
 
-        res.status(200).json(transformResponse({
+        res.status(200).json({
             message: 'Party details fetched successfully',
             party: responseParty,
-        }));
+        });
     } catch (err) {
         console.error('Error fetching party details:', err.message);
         res.status(500).json({ error: 'Failed to fetch party details', details: err.message });
@@ -437,7 +454,7 @@ router.post('/geocode-address', async (req, res) => {
  * Search within party queue media
  * Access: Protected
  */
-router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res) => {
+router.get('/:partyId/search', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
         const { q } = req.query;
@@ -526,12 +543,12 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
             }
         });
 
-        res.json(transformResponse({
+        res.json({
             success: true,
             results: matchingMedia,
             count: matchingMedia.length,
             query: q
-        }));
+        });
 
     } catch (err) {
         handleError(res, err, 'Failed to search party queue');
@@ -539,7 +556,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
 });
 
 // Route 1: Add new media to party with initial bid
-router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req, res) => {
+router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
         const { url, title, artist, bidAmount, platform, duration, tags, category } = req.body;
@@ -762,12 +779,12 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
                 }
             });
 
-        res.status(201).json(transformResponse({
+        res.status(201).json({
             message: 'Media added to party successfully',
             media: populatedMedia,
             bid: bid,
             updatedBalance: user.balance
-        }));
+        });
 
     } catch (err) {
         console.error('Error adding media to party:', err);
@@ -776,7 +793,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 });
 
 // Route 2: Place bid on existing media in party
-router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), async (req, res) => {
+router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         const { bidAmount } = req.body;
@@ -998,12 +1015,12 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
                 }
             });
 
-        res.status(201).json(transformResponse({
+        res.status(201).json({
             message: 'Bid placed successfully',
             media: updatedMedia,
             bid: bid,
             updatedBalance: user.balance
-        }));
+        });
 
     } catch (err) {
         console.error('Error placing bid:', err);
@@ -1198,11 +1215,11 @@ router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) =>
         // Sort by party media aggregate (highest first) for all statuses - schema grammar
         mediaWithStatus.sort((a, b) => (b.partyMediaAggregate || 0) - (a.partyMediaAggregate || 0));
 
-        res.json(transformResponse({
+        res.json({
             status: status,
             media: mediaWithStatus,
             count: mediaWithStatus.length
-        }));
+        });
     } catch (err) {
         console.error('Error fetching media by status:', err);
         res.status(500).json({ error: 'Error fetching media by status', details: err.message });
@@ -1491,7 +1508,7 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
 });
 
 // Get media sorted by bid values within specific time periods
-router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
+router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
@@ -1708,13 +1725,13 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(
                 .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
         }
 
-        res.json(transformResponse({
+        res.json({
             timePeriod: timePeriod,
             media: processedMedia,
             count: processedMedia.length,
             periodStartDate: startDate,
             periodEndDate: now
-        }));
+        });
 
     } catch (err) {
         console.error('Error fetching media sorted by time period:', err);
@@ -1760,10 +1777,10 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
         
         await party.save();
         
-        res.json(transformResponse({
+        res.json({
             message: 'Media vetoed successfully',
             party: party
-        }));
+        });
         
     } catch (err) {
         console.error('Error vetoing media:', err);
@@ -1809,10 +1826,10 @@ router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) =
         
         await party.save();
         
-        res.json(transformResponse({
+        res.json({
             message: 'Media restored to queue successfully',
             party: party
-        }));
+        });
         
     } catch (err) {
         console.error('Error un-vetoing media:', err);

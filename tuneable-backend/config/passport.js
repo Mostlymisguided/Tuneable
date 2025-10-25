@@ -149,8 +149,17 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         const Party = require('../models/Party');
         const globalParty = await Party.getGlobalParty();
         if (globalParty && !globalParty.partiers.includes(newUser._id)) {
+          // Add user to Global Party's partiers array
           globalParty.partiers.push(newUser._id);
           await globalParty.save();
+          
+          // Add Global Party to user's joinedParties array
+          newUser.joinedParties.push({
+            partyId: globalParty._id, // Using ObjectId directly
+            role: 'partier'
+          });
+          await newUser.save();
+          
           console.log('✅ Auto-joined new OAuth user to Global Party:', newUser.username);
         }
       } catch (globalPartyError) {
@@ -292,8 +301,17 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           const Party = require('../models/Party');
           const globalParty = await Party.getGlobalParty();
           if (globalParty && !globalParty.partiers.includes(newUser._id)) {
+            // Add user to Global Party's partiers array
             globalParty.partiers.push(newUser._id);
             await globalParty.save();
+            
+            // Add Global Party to user's joinedParties array
+            newUser.joinedParties.push({
+              partyId: globalParty._id, // Using ObjectId directly
+              role: 'partier'
+            });
+            await newUser.save();
+            
             console.log('✅ Auto-joined new Google OAuth user to Global Party:', newUser.username);
           }
         } catch (globalPartyError) {
@@ -430,8 +448,17 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           const Party = require('../models/Party');
           const globalParty = await Party.getGlobalParty();
           if (globalParty && !globalParty.partiers.includes(newUser._id)) {
+            // Add user to Global Party's partiers array
             globalParty.partiers.push(newUser._id);
             await globalParty.save();
+            
+            // Add Global Party to user's joinedParties array
+            newUser.joinedParties.push({
+              partyId: globalParty._id, // Using ObjectId directly
+              role: 'partier'
+            });
+            await newUser.save();
+            
             console.log('✅ Auto-joined new SoundCloud OAuth user to Global Party:', newUser.username);
           }
         } catch (globalPartyError) {
@@ -568,8 +595,17 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           const Party = require('../models/Party');
           const globalParty = await Party.getGlobalParty();
           if (globalParty && !globalParty.partiers.includes(newUser._id)) {
+            // Add user to Global Party's partiers array
             globalParty.partiers.push(newUser._id);
             await globalParty.save();
+            
+            // Add Global Party to user's joinedParties array
+            newUser.joinedParties.push({
+              partyId: globalParty._id, // Using ObjectId directly
+              role: 'partier'
+            });
+            await newUser.save();
+            
             console.log('✅ Auto-joined new Instagram OAuth user to Global Party:', newUser.username);
           }
         } catch (globalPartyError) {

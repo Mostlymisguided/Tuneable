@@ -84,7 +84,7 @@ const CreateParty: React.FC = () => {
 
       const response = await partyAPI.createParty(partyData);
       toast.success('Party created successfully!');
-      navigate(`/party/${response.party.id}`);
+      navigate(`/party/${response.party._id || response.party.id}`);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create party');
     } finally {
@@ -121,24 +121,25 @@ const CreateParty: React.FC = () => {
   return (
     <>
       <style>{sliderStyles}</style>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Create New Party</h1>
-        <p className="text-gray-600 mt-2">
-          Set up your music party and invite friends to join
-        </p>
-      </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-white mb-2">Create New Party</h1>
+            <p className="text-gray-300 text-lg">
+              Set up your music party and invite friends to join
+            </p>
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <Music className="h-5 w-5 mr-3" />
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+          <h2 className="text-2xl font-semibold text-white mb-6 flex items-center">
+            <Music className="h-6 w-6 mr-3 text-purple-400" />
             Party Details
           </h2>
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-200 mb-2">
                 Party Name *
               </label>
               <input
@@ -146,7 +147,7 @@ const CreateParty: React.FC = () => {
                 id="name"
                 name="name"
                 required
-                className="input mt-1"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                 placeholder="Enter Party Name"
                 value={formData.name}
                 onChange={handleChange}
@@ -154,7 +155,7 @@ const CreateParty: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="location" className="block text-sm font-medium text-gray-200 mb-2">
                 Location / Venue *
               </label>
               <input
@@ -162,7 +163,7 @@ const CreateParty: React.FC = () => {
                 id="location"
                 name="location"
                 required
-                className="input mt-1"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                 placeholder="Enter Location Address / Venue Name"
                 value={formData.location}
                 onChange={handleChange}
@@ -170,65 +171,56 @@ const CreateParty: React.FC = () => {
             </div>
           </div>
 
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center mt-8">
-            <Calendar className="h-5 w-5 mr-3" />
+        </div>
+
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+          <h2 className="text-2xl font-semibold text-white mb-6 flex items-center">
+            <Calendar className="h-6 w-6 mr-3 text-purple-400" />
             Party Schedule
           </h2>
           
           <div className="space-y-6">
             {/* Schedule Type Toggle */}
-            <div className="bg-gradient-to-r from-gray-50 to-slate-50 p-4 rounded-lg border border-gray-200">
+            <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-600/50">
               <div className="flex space-x-4">
                 <button
                   type="button"
                   onClick={() => setScheduleType('automatic')}
-                  className={`flex-1 rounded-lg font-semibold transition-colors ${
+                  className={`flex-1 rounded-lg font-semibold transition-all duration-200 py-3 px-4 ${
                     scheduleType === 'automatic'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
+                      : 'bg-gray-600/50 text-gray-300 border border-gray-500 hover:bg-gray-600 hover:text-white'
                   }`}
-                  style={{ 
-                    paddingTop: '0.5rem',
-                    paddingRight: '1rem',
-                    paddingBottom: '0.5rem',
-                    paddingLeft: '1rem'
-                  }}
                 >
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-2 h-2 rounded-full bg-current"></div>
-                    <span className="text-white">Automatic</span>
+                    <span>Automatic</span>
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setScheduleType('custom')}
-                  className={`flex-1 rounded-lg font-semibold transition-colors ${
+                  className={`flex-1 rounded-lg font-semibold transition-all duration-200 py-3 px-4 ${
                     scheduleType === 'custom'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
+                      : 'bg-gray-600/50 text-gray-300 border border-gray-500 hover:bg-gray-600 hover:text-white'
                   }`}
-                  style={{ 
-                    paddingTop: '0.5rem',
-                    paddingRight: '1rem',
-                    paddingBottom: '0.5rem',
-                    paddingLeft: '1rem'
-                  }}
                 >
                   <div className="flex items-center justify-center">
-                    <span className="text-white">Custom</span>
+                    <span>Custom</span>
                   </div>
                 </button>
               </div>
               {scheduleType === 'automatic' && (
-                <div className="text-center" style={{ paddingTop: '20px' }}>
-                  <p className="text-sm text-gray-600">
+                <div className="text-center mt-4">
+                  <p className="text-sm text-gray-300">
                     Start Now - End When You Choose
                   </p>
                 </div>
               )}
               {scheduleType === 'custom' && formData.startTime && (
-                <div className="text-center" style={{ paddingTop: '20px' }}>
-                  <p className="text-sm text-white">
+                <div className="text-center mt-4">
+                  <p className="text-sm text-purple-300 font-medium">
                     {new Date(formData.startTime).toLocaleString('en-GB', {
                       weekday: 'long',
                       year: 'numeric',
@@ -244,13 +236,13 @@ const CreateParty: React.FC = () => {
 
             {/* Custom Start Time - Only show when custom is selected */}
             {scheduleType === 'custom' && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-100" style={{ marginTop: '0' }}>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="bg-gray-700/30 p-6 rounded-xl border border-gray-600/50">
+                <label className="block text-sm font-medium text-gray-200 mb-4">
                   Start Time *
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">Date</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-2">Date</label>
                     <input
                       type="date"
                       value={formData.startTime.split('T')[0]}
@@ -258,12 +250,12 @@ const CreateParty: React.FC = () => {
                         const time = formData.startTime.split('T')[1] || '19:00';
                         setFormData({ ...formData, startTime: `${e.target.value}T${time}` });
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-gray-600/50 border border-gray-500 rounded-md text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">Time</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-2">Time</label>
                     <input
                       type="time"
                       value={formData.startTime.split('T')[1] || '19:00'}
@@ -271,7 +263,7 @@ const CreateParty: React.FC = () => {
                         const date = formData.startTime.split('T')[0];
                         setFormData({ ...formData, startTime: `${date}T${e.target.value}` });
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-gray-600/50 border border-gray-500 rounded-md text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>
                 </div>
@@ -281,8 +273,11 @@ const CreateParty: React.FC = () => {
 
           </div>
 
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center mt-8">
-            <Shield className="h-5 w-5 mr-3" />
+        </div>
+
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+          <h2 className="text-2xl font-semibold text-white mb-6 flex items-center">
+            <Shield className="h-6 w-6 mr-3 text-purple-400" />
             Party Settings
           </h2>
           
@@ -304,13 +299,13 @@ const CreateParty: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-gray-700" style={{ paddingBottom: '5px' }}>
+              <label htmlFor="type" className="block text-sm font-medium text-gray-200 mb-2">
                 Party Type
               </label>
               <select
                 id="type"
                 name="type"
-                className="input mt-1"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                 value={formData.type}
                 onChange={handleChange}
               >
@@ -320,13 +315,13 @@ const CreateParty: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="musicSource" className="block text-sm font-medium text-gray-700" style={{ paddingBottom: '5px' }}>
+              <label htmlFor="musicSource" className="block text-sm font-medium text-gray-200 mb-2">
                 Music Source
               </label>
               <select
                 id="musicSource"
                 name="musicSource"
-                className="input mt-1"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                 value={formData.musicSource}
                 onChange={handleChange}
               >
@@ -336,13 +331,13 @@ const CreateParty: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-gray-200 mb-4">
                 Minimum Bid
               </label>
               
               {/* Value Display */}
-              <div className="text-center mb-4">
-                <div className="text-3xl font-bold text-white">
+              <div className="text-center mb-6">
+                <div className="text-4xl font-bold text-purple-400">
                   £{formData.minimumBid.toFixed(2)}
                 </div>
               </div>
@@ -363,7 +358,7 @@ const CreateParty: React.FC = () => {
                 />
                 
                 {/* Slider Labels */}
-                <div className="flex justify-between text-xs text-gray-500 mt-2">
+                <div className="flex justify-between text-xs text-gray-400 mt-2">
                   <span>£0.01</span>
                   <span>£5.55</span>
                   <span>£11.11</span>
@@ -379,8 +374,8 @@ const CreateParty: React.FC = () => {
                     onClick={() => setFormData({ ...formData, minimumBid: value })}
                     className={`px-3 py-1 text-sm rounded-full border transition-colors ${
                       Math.abs(formData.minimumBid - value) < 0.01
-                        ? 'bg-blue-100 border-blue-300 text-blue-700'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        ? 'bg-purple-600 border-purple-500 text-white'
+                        : 'bg-gray-600/50 border-gray-500 text-gray-300 hover:bg-gray-600 hover:text-white'
                     }`}
                   >
                     £{value.toFixed(2)}
@@ -394,16 +389,19 @@ const CreateParty: React.FC = () => {
             </div>
           </div>
 
-          {/* Tags and Description Section */}
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center mt-8">
-            <Music className="h-5 w-5 mr-3" />
+        </div>
+
+        {/* Tags and Description Section */}
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+          <h2 className="text-2xl font-semibold text-white mb-6 flex items-center">
+            <Music className="h-6 w-6 mr-3 text-purple-400" />
             Party Details
           </h2>
           
           <div className="space-y-4">
             {/* Tags Input */}
             <div>
-              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="tags" className="block text-sm font-medium text-gray-200 mb-2">
                 Tags (Optional)
               </label>
               <input
@@ -413,17 +411,17 @@ const CreateParty: React.FC = () => {
                 value={formData.tags}
                 onChange={handleChange}
                 placeholder="e.g., electronic, chill, 90s, workout (comma-separated)"
-                className="input"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-400 mt-2">
                 Add up to 5 tags to help people discover your party. Separate with commas.
               </p>
             </div>
 
             {/* Description Input */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-200 mb-2">
                 Description (Optional)
               </label>
               <textarea
@@ -432,22 +430,22 @@ const CreateParty: React.FC = () => {
                 value={formData.description}
                 onChange={handleChange}
                 placeholder="Describe your party theme, music style, or what to expect..."
-                className="input"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors resize-none"
                 rows={4}
                 maxLength={500}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-400 mt-2">
                 {formData.description.length}/500 characters
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-center space-x-4">
+        <div className="flex justify-center space-x-6 mt-8">
           <button
             type="button"
             onClick={() => navigate('/parties')}
-            className="btn-secondary flex items-center space-x-2"
+            className="px-8 py-3 bg-gray-600/50 text-gray-300 border border-gray-500 rounded-lg hover:bg-gray-600 hover:text-white transition-all duration-200 flex items-center space-x-2"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
@@ -455,13 +453,14 @@ const CreateParty: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="btn-primary disabled:opacity-50 font-semibold"
+            className="px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             {isLoading ? 'Creating...' : 'Create Party'}
           </button>
         </div>
       </form>
-    </div>
+        </div>
+      </div>
     </>
   );
 };

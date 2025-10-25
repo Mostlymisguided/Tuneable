@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Music, Play, DollarSign } from 'lucide-react';
+import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 

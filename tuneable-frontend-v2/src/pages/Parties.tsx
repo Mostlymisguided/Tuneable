@@ -10,6 +10,8 @@ import { Music, Users, MapPin, Clock } from 'lucide-react';
 // Define types directly to avoid import issues
 interface PartyType {
   id: string;
+  _id?: string; // MongoDB ObjectId
+  uuid?: string; // UUID for external API
   name: string;
   location: string;
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };
@@ -43,30 +45,40 @@ const Parties: React.FC = () => {
   const isUserInParty = (party: PartyType) => {
     if (!user) return false;
     
-    // Debug logging
-    console.log('🔍 Checking party membership:', {
-      partyName: party.name,
-      partyType: party.type,
-      userId: user.id,
-      userMongoId: user._id,
-      userUuid: user.uuid,
-      partiers: party.partiers,
-      partiersLength: party.partiers.length
-    });
+    // Global Party is always considered joined for all users
+    if (party.type === 'global') {
+      console.log('🌍 Global Party - always joined');
+      return true;
+    }
     
+    // Use the new joinedParties field for reliable checking
+    if (user.joinedParties && user.joinedParties.length > 0) {
+      console.log(`🔍 Checking party membership for: ${party.name}`);
+      console.log(`  - Party _id: ${party._id}`);
+      console.log(`  - User joinedParties:`, user.joinedParties.map(jp => jp.partyId));
+      
+      const isJoined = user.joinedParties.some((jp: { partyId: string; joinedAt: string; role: string }) => {
+        // Now using ObjectIds directly - much simpler!
+        const match = jp.partyId === party._id;
+        console.log(`  - Checking joinedParty: ${jp.partyId} vs party._id: ${party._id}, match: ${match}`);
+        return match;
+      });
+      
+      console.log(`🔍 Party membership check for ${party.name}: ${isJoined}`);
+      return isJoined;
+    }
+    
+    // Fallback to old logic if joinedParties is not available
+    console.log('⚠️  Using fallback logic - joinedParties not available');
     const isInParty = party.partiers.some(partier => {
       if (typeof partier === 'string') {
-        const match = partier === user._id || partier === user.id || partier === user.uuid;
-        console.log(`  - String partier: ${partier}, matches: ${match}`);
-        return match;
+        return partier === user._id || partier === user.id || partier === user.uuid;
       } else {
-        const match = partier.id === user._id || partier.id === user.id || partier.uuid === user.uuid;
-        console.log(`  - Object partier: ${JSON.stringify(partier)}, matches: ${match}`);
-        return match;
+        return partier.id === user._id || partier.id === user.id || partier.uuid === user.uuid;
       }
     });
     
-    console.log(`  - Result: ${isInParty}`);
+    console.log(`  - Fallback result: ${isInParty}`);
     return isInParty;
   };
 
@@ -112,7 +124,20 @@ const Parties: React.FC = () => {
     joinedParties: joinedParties.length,
     availableParties: availableParties.length,
     joinedPartyNames: joinedParties.map(p => p.name),
-    availablePartyNames: availableParties.map(p => p.name)
+    availablePartyNames: availableParties.map(p => p.name),
+    user: user ? { 
+      id: user.id, 
+      _id: user._id, 
+      uuid: user.uuid,
+      joinedParties: user.joinedParties || []
+    } : null,
+    allParties: filteredParties.map(p => ({
+      name: p.name,
+      id: p.id,
+      _id: p._id,
+      uuid: p.uuid,
+      type: p.type
+    }))
   });
 
   // Handle adding search terms
@@ -236,13 +261,13 @@ const Parties: React.FC = () => {
           ? 'hover:shadow-lg hover:scale-105 hover:bg-gray-800/50 cursor-pointer group'
           : 'hover:shadow-md'
       }`}
-      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(`/party/${party.id}`) : undefined}
+      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(`/party/${party._id || party.id}`) : undefined}
     >
       {/* Purple overlay for clickable cards */}
       {(isUserInParty(party) || party.type === 'global') && (
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/75 to-purple-800/75 backdrop-blur-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
           <span className="bg-slate-900/50 text-white/70 font-semibold text-base px-4 py-2 rounded-lg shadow-lg hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-500 hover:text-white hover:shadow-lg hover:shadow-pink-500/30 transition-all">
-            Join Party
+            Go To Party
           </span>
         </div>
       )}
@@ -319,7 +344,25 @@ const Parties: React.FC = () => {
         <div className="text-sm text-white">
           Host: {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
         </div>
-       
+        {party.type === 'global' ? (
+          <div className="text-sm text-green-400 font-medium">
+            Auto-joined
+          </div>
+        ) : isUserInParty(party) ? (
+          <div className="text-sm text-purple-400 font-medium">
+            Joined
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent card click
+              handleJoinParty(party._id || party.id, party.name, party.privacy, party.host, party.partiers);
+            }}
+            className="btn-primary text-base"
+          >
+            Join Party
+          </button>
+        )}
       </div>
     </div>
   );
