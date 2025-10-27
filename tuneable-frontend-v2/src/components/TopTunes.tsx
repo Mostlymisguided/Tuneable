@@ -49,7 +49,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       
       // Separate search terms and tags
       const searchQueries = searchTerms.filter(term => !term.startsWith('#'));
-      const tagQueries = searchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1).toLowerCase()); // Make tags lowercase for case-insensitive matching
+      const tagQueries = searchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1)); // Remove # prefix, keep original case
       
       console.log('🔍 TopTunes search:', { searchQueries, tagQueries, searchTerms });
       
