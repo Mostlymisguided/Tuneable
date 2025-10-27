@@ -49,7 +49,9 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       
       // Separate search terms and tags
       const searchQueries = searchTerms.filter(term => !term.startsWith('#'));
-      const tagQueries = searchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
+      const tagQueries = searchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1).toLowerCase()); // Make tags lowercase for case-insensitive matching
+      
+      console.log('🔍 TopTunes search:', { searchQueries, tagQueries, searchTerms });
       
       const response = await topTunesAPI.getTopTunes(
         'globalMediaAggregate', 
