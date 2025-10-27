@@ -614,23 +614,36 @@ const Party: React.FC = () => {
       media = media.filter((item: any) => {
         const mediaItem = item.mediaId || item;
         
-        // Check if ANY search term matches title, artist, tags, or category
-        return queueSearchTerms.some(term => {
+        // Separate regular search terms and tag search terms
+        const regularTerms = queueSearchTerms.filter(term => !term.startsWith('#'));
+        const tagTerms = queueSearchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
+        
+        // Check if ANY regular search term matches title, artist, or category
+        const matchesRegularSearch = regularTerms.length === 0 || regularTerms.some(term => {
           const lowerTerm = term.toLowerCase();
           const title = (mediaItem.title || '').toLowerCase();
           const artist = Array.isArray(mediaItem.artist) 
             ? mediaItem.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
             : (mediaItem.artist || '').toLowerCase();
-          const tags = Array.isArray(mediaItem.tags) 
-            ? mediaItem.tags.join(' ').toLowerCase() 
-            : '';
           const category = (mediaItem.category || '').toLowerCase();
           
           return title.includes(lowerTerm) || 
                  artist.includes(lowerTerm) || 
-                 tags.includes(lowerTerm) ||
                  category.includes(lowerTerm);
         });
+        
+        // Check if ANY tag search term matches tags (case-insensitive)
+        const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
+          const lowerTagTerm = tagTerm.toLowerCase();
+          const tags = Array.isArray(mediaItem.tags) 
+            ? mediaItem.tags.map((tag: any) => tag.toLowerCase())
+            : [];
+          
+          return tags.some((tag: string) => tag === lowerTagTerm);
+        });
+        
+        // Both regular search and tag search must match (if they exist)
+        return matchesRegularSearch && matchesTagSearch;
       });
       
       console.log(`🔍 Filtered queue: ${media.length} media items match search terms:`, queueSearchTerms);
