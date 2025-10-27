@@ -230,6 +230,12 @@ const mediaSchema = new mongoose.Schema({
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   addedBy_uuid: { type: String },
   uploadedAt: { type: Date, default: Date.now }, // Keep for backward compatibility (maps to createdAt)
+  
+  // Rights confirmation fields
+  rightsCleared: { type: Boolean, default: false },
+  rightsConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  rightsConfirmedAt: { type: Date },
+  
   playCount: { type: Number, default: 0 },
   popularity: { type: Number, default: 0 },
   

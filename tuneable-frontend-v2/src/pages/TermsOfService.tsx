@@ -128,6 +128,21 @@ const TermsOfService: React.FC = () => {
                   <li>By submitting content, you grant Tuneable a non-exclusive license to use, display, and distribute your content on the platform</li>
                   <li>You represent that you have the necessary rights to share any content you submit</li>
                 </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">6.3.1 Upload License Agreement</h3>
+                <p className="mb-2">
+                  <strong>By uploading original music or media content to Tuneable, you represent and warrant that:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>You are the owner or authorized representative of all rights (composition and master) in the uploaded work</li>
+                  <li>You grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, distribute, and monetise your content within the Tuneable platform</li>
+                  <li>You indemnify Tuneable CIC against any third-party claims arising from your uploaded content</li>
+                  <li>You may revoke this license at any time by written notice or account deletion, after which Tuneable will remove your content within 30 days</li>
+                </ul>
+                <p className="text-sm text-gray-600">
+                  If you do not have the necessary rights to upload content, or if a third party claims infringement, Tuneable reserves the right to immediately remove such content without notice. 
+                  You bear sole responsibility for ensuring you have all necessary permissions before uploading.
+                </p>
               </div>
             </section>
 

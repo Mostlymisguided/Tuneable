@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,7 @@ const CreatorUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     artistName: '', // For admins or to override creatorProfile name
@@ -135,6 +136,11 @@ const CreatorUpload: React.FC = () => {
 
     if (!formData.title.trim()) {
       toast.error('Title is required');
+      return;
+    }
+
+    if (!rightsConfirmed) {
+      toast.error('Please confirm your rights to the uploaded content');
       return;
     }
 
@@ -729,6 +735,28 @@ const CreatorUpload: React.FC = () => {
             </div>
           )}
 
+          {/* Rights Confirmation */}
+          <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-lg p-6">
+            <div className="flex items-start space-x-3">
+              <input
+                type="checkbox"
+                id="rights-confirmation"
+                checked={rightsConfirmed}
+                onChange={(e) => setRightsConfirmed(e.target.checked)}
+                className="mt-1 h-5 w-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                required
+              />
+              <label htmlFor="rights-confirmation" className="text-sm text-gray-300">
+                <strong className="text-white">Rights Confirmation:</strong> I confirm that I own or have authorization 
+                to distribute the rights (composition and master) in this uploaded work, and I grant Tuneable CIC a 
+                non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content. 
+                <Link to="/terms-of-service" className="text-purple-400 underline ml-1 hover:text-purple-300">
+                  View Terms
+                </Link>
+              </label>
+            </div>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex space-x-4 mt-8">
             <button
@@ -740,7 +768,7 @@ const CreatorUpload: React.FC = () => {
             </button>
             <button
               onClick={handleUpload}
-              disabled={isUploading || !file || !formData.title.trim()}
+              disabled={isUploading || !file || !formData.title.trim() || !rightsConfirmed}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2"
             >
               {isUploading ? (
