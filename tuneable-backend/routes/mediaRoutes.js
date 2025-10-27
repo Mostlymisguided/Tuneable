@@ -537,9 +537,21 @@ router.get('/top-tunes', async (req, res) => {
     
     // Add tag filtering (case-insensitive)
     if (tags && Array.isArray(tags) && tags.length > 0) {
-      // Create case-insensitive regex patterns for each tag
-      const tagRegexes = tags.map(tag => new RegExp(`^${tag.trim()}$`, 'i'));
-      query.tags = { $in: tagRegexes };
+      // Use $or with $regex for proper case-insensitive tag matching
+      const tagConditions = tags.map(tag => ({
+        tags: { $regex: `^${tag.trim()}$`, $options: 'i' }
+      }));
+      
+      if (query.$or) {
+        // If there's already a $or condition (from search), combine them
+        query.$and = [
+          { $or: query.$or },
+          { $or: tagConditions }
+        ];
+        delete query.$or;
+      } else {
+        query.$or = tagConditions;
+      }
     }
     
     // Use new Media model, filtering for music content

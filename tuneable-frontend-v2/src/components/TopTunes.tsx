@@ -193,12 +193,16 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 {searchTerms.map((term, index) => (
                   <div
                     key={index}
-                    className="inline-flex items-center bg-slate-700 text-slate-100 px-3 py-1.5 rounded-full text-sm font-medium"
+                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                      term.startsWith('#') 
+                        ? 'bg-blue-700 text-blue-100' 
+                        : 'bg-slate-700 text-slate-100'
+                    }`}
                   >
                     <span>{term}</span>
                     <button
                       onClick={() => removeSearchTerm(term)}
-                      className="ml-2 rounded-xl items-center hover:bg-slate-600 transition-colors"
+                      className="ml-2 rounded-xl items-center hover:bg-black/20 transition-colors"
                     >
                       <X className="w-3 h-3" />
                     </button>
