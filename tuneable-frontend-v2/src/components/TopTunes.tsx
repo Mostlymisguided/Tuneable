@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Music, Play, Search, X } from 'lucide-react';
+import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -35,30 +35,28 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timePeriod, setTimePeriod] = useState('all-time');
-  const [searchInput, setSearchInput] = useState('');
-  const [searchTerms, setSearchTerms] = useState<string[]>([]);
+  // const [searchInput, setSearchInput] = useState('');
+  // const [searchTerms, setSearchTerms] = useState<string[]>([]);
 
   useEffect(() => {
     fetchTopTunes();
-  }, [limit, timePeriod, searchTerms]);
+  }, [limit, timePeriod]); // Removed searchTerms dependency
 
   const fetchTopTunes = async () => {
     try {
       setIsLoading(true);
       const fetchLimit = limit || 10;
       
-      // Separate search terms and tags
-      const searchQueries = searchTerms.filter(term => !term.startsWith('#'));
-      const tagQueries = searchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1)); // Remove # prefix, keep original case
-      
-      console.log('🔍 TopTunes search:', { searchQueries, tagQueries, searchTerms });
+      // Commented out search functionality
+      // const searchQueries = searchTerms.filter(term => !term.startsWith('#'));
+      // const tagQueries = searchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
       
       const response = await topTunesAPI.getTopTunes(
         'globalMediaAggregate', 
         fetchLimit, 
-        timePeriod, 
-        searchQueries.length > 0 ? searchQueries.join(' ') : undefined,
-        tagQueries.length > 0 ? tagQueries : undefined
+        timePeriod
+        // searchQueries.length > 0 ? searchQueries.join(' ') : undefined,
+        // tagQueries.length > 0 ? tagQueries : undefined
       );
       setSongs(response.songs || []);
     } catch (error) {
@@ -73,24 +71,25 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     return `£${amount.toFixed(2)}`;
   };
 
-  const addSearchTerm = (term: string) => {
-    const trimmedTerm = term.trim();
-    if (trimmedTerm && !searchTerms.includes(trimmedTerm)) {
-      setSearchTerms([...searchTerms, trimmedTerm]);
-      setSearchInput('');
-    }
-  };
+  // Commented out search functionality
+  // const addSearchTerm = (term: string) => {
+  //   const trimmedTerm = term.trim();
+  //   if (trimmedTerm && !searchTerms.includes(trimmedTerm)) {
+  //     setSearchTerms([...searchTerms, trimmedTerm]);
+  //     setSearchInput('');
+  //   }
+  // };
 
-  const removeSearchTerm = (term: string) => {
-    setSearchTerms(searchTerms.filter(t => t !== term));
-  };
+  // const removeSearchTerm = (term: string) => {
+  //   setSearchTerms(searchTerms.filter(t => t !== term));
+  // };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addSearchTerm(searchInput);
-    }
-  };
+  // const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  //   if (e.key === 'Enter') {
+  //     e.preventDefault();
+  //     addSearchTerm(searchInput);
+  //   }
+  // };
 
   const formatDuration = (seconds: number) => {
     if (!seconds || seconds === 0) return '0:00';
@@ -173,8 +172,8 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
             ))}
           </div>
           
-          {/* Search Input */}
-          <div className="relative">
+          {/* Search Input - Commented out */}
+          {/* <div className="relative">
             <div className="flex items-center bg-gray-800 rounded-lg border border-gray-700 focus-within:border-purple-500 transition-colors">
               <Search className="ml-3 h-5 w-5 text-gray-400" />
               <input
@@ -187,30 +186,27 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               />
             </div>
             
-            {/* Search Term Pills */}
-            {searchTerms.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {searchTerms.map((term, index) => (
-                  <div
-                    key={index}
-                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
-                      term.startsWith('#') 
-                        ? 'bg-blue-700 text-blue-100' 
-                        : 'bg-slate-700 text-slate-100'
-                    }`}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {searchTerms.map((term, index) => (
+                <div
+                  key={index}
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                    term.startsWith('#') 
+                      ? 'bg-blue-700 text-blue-100' 
+                      : 'bg-slate-700 text-slate-100'
+                  }`}
+                >
+                  <span>{term}</span>
+                  <button
+                    onClick={() => removeSearchTerm(term)}
+                    className="ml-2 rounded-xl items-center hover:bg-black/20 transition-colors"
                   >
-                    <span>{term}</span>
-                    <button
-                      onClick={() => removeSearchTerm(term)}
-                      className="ml-2 rounded-xl items-center hover:bg-black/20 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div> */}
         </div>
       )}
 
