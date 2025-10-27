@@ -29,7 +29,9 @@ const AuthPage: React.FC = () => {
     parentInviteCode: '',
     homeLocation: {
       city: '',
+      region: '',
       country: '',
+      countryCode: '',
     },
   });
 
@@ -113,7 +115,7 @@ const AuthPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
-    if (name === 'city' || name === 'country') {
+    if (name === 'city' || name === 'region' || name === 'country' || name === 'countryCode') {
       setFormData({
         ...formData,
         homeLocation: {
