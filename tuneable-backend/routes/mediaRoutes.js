@@ -502,8 +502,6 @@ router.get('/top-tunes', async (req, res) => {
     const Bid = require('../models/Bid');
     const User = require('../models/User');
     
-    let media; // Declare media variable
-    
     // Add time period filtering
     if (timePeriod !== 'all-time') {
       const now = new Date();
