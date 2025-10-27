@@ -539,23 +539,12 @@ router.get('/top-tunes', async (req, res) => {
     if (tags && Array.isArray(tags) && tags.length > 0) {
       console.log('🔍 Tag filtering - tags received:', tags);
       
-      // Use $or with $regex for proper case-insensitive tag matching
-      const tagConditions = tags.map(tag => ({
-        tags: { $regex: `^${tag.trim()}$`, $options: 'i' }
-      }));
+      // For array fields, we need to use $in with case-insensitive regex
+      // Create a single condition that matches any of the tags
+      const tagRegex = tags.map(tag => new RegExp(`^${tag.trim()}$`, 'i'));
+      query.tags = { $in: tagRegex };
       
-      console.log('🔍 Tag conditions:', tagConditions);
-      
-      if (query.$or) {
-        // If there's already a $or condition (from search), combine them
-        query.$and = [
-          { $or: query.$or },
-          { $or: tagConditions }
-        ];
-        delete query.$or;
-      } else {
-        query.$or = tagConditions;
-      }
+      console.log('🔍 Tag regex patterns:', tagRegex);
       
       console.log('🔍 Final query for tags:', JSON.stringify(query, null, 2));
     }
