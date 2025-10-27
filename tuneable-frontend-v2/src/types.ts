@@ -8,12 +8,29 @@ export interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
-  homeLocation: {
-    city: string;
-    country: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
+  locations: {
+    primary: {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      coordinates?: {
+        lat: number;
+        lng: number;
+      };
+      type?: string;
+      detectedFromIP?: boolean;
+    };
+    secondary?: {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      coordinates?: {
+        lat: number;
+        lng: number;
+      };
+      type?: string;
     };
   };
   role: string[];
@@ -37,8 +54,10 @@ export interface RegisterData {
   givenName?: string;
   familyName?: string;
   homeLocation?: {
-    city: string;
-    country: string;
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
   };
 }
 

@@ -89,30 +89,49 @@ router.post(
         return res.status(400).json({ error: 'Invalid invite code' });
       }
       
-      // Extract IP address using x-forwarded-for if available, otherwise fallback to connection IP
+      // Extract IP address for geolocation (not stored for privacy)
       const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-      // Lookup geolocation based on IP address
       const geo = geoip.lookup(ip);
       console.log(`Registration IP: ${ip}, Geo: ${JSON.stringify(geo)}`);
       
-      // Determine homeLocation with fallback logic:
-      const defaultLocation = { city: 'Antarctica', country: 'Antarctica' };
-      let locationInfo;
-      // Check if a homeLocation object was provided and has keys
+      // Determine primary location with fallback logic
+      const defaultLocation = { 
+        city: 'Unknown', 
+        region: null, 
+        country: 'Unknown', 
+        countryCode: null 
+      };
+      
+      let primaryLocation;
+      
+      // Check if a homeLocation object was provided and has values
       if (homeLocation && Object.keys(homeLocation).length > 0) {
-        // If both city and country are empty strings, use the default Antarctica location
-        if (
-          (!homeLocation.city || homeLocation.city.trim() === '') &&
-          (!homeLocation.country || homeLocation.country.trim() === '')
-        ) {
-          locationInfo = defaultLocation;
-        } else {
-          locationInfo = homeLocation;
-        }
+        primaryLocation = {
+          city: homeLocation.city || null,
+          region: homeLocation.region || null,
+          country: homeLocation.country || null,
+          countryCode: homeLocation.countryCode || null,
+          coordinates: homeLocation.coordinates || null,
+          detectedFromIP: false
+        };
       } else if (geo) {
-        locationInfo = geo;
+        // Use IP geolocation data
+        primaryLocation = {
+          city: geo.city || null,
+          region: geo.region || null, // State/province
+          country: geo.country || null,
+          countryCode: geo.country || null, // geoip-lite returns country code in 'country' field
+          coordinates: (geo.ll && geo.ll[0] && geo.ll[1]) ? {
+            lat: geo.ll[0],
+            lng: geo.ll[1]
+          } : null,
+          detectedFromIP: true
+        };
       } else {
-        locationInfo = defaultLocation;
+        primaryLocation = {
+          ...defaultLocation,
+          detectedFromIP: false
+        };
       }
       
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -136,7 +155,9 @@ router.post(
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
-        homeLocation: locationInfo,
+        locations: {
+          primary: primaryLocation
+        }
       });
       await user.save();
       

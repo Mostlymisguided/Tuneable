@@ -26,14 +26,30 @@ const userSchema = new mongoose.Schema({
   personalInviteCode: { type: String, required: true, unique: true },
   parentInviteCode: { type: String, required: false },
   balance: { type: Number, default: 0 }, // New field for wallet balance
-  homeLocation: {
-    city: { type: String, default: null },
-    country: { type: String, default: null },
-    //Add what3words
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
+  locations: {
+    primary: {
+      city: { type: String },
+      region: { type: String }, // State, province, or region
+      country: { type: String },
+      countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
+      coordinates: {
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+      type: { type: String, enum: ['home', 'base', 'studio'], default: 'home' },
+      detectedFromIP: { type: Boolean, default: false } // Track if auto-detected from IP
     },
+    secondary: {
+      city: { type: String },
+      region: { type: String },
+      country: { type: String },
+      countryCode: { type: String },
+      coordinates: {
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+      type: { type: String, enum: ['secondary', 'travel', 'work'], default: 'secondary' }
+    }
   },
   preferences: {
     theme: { type: String, default: 'light' },
