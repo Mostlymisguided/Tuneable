@@ -535,9 +535,11 @@ router.get('/top-tunes', async (req, res) => {
       ];
     }
     
-    // Add tag filtering
+    // Add tag filtering (case-insensitive)
     if (tags && Array.isArray(tags) && tags.length > 0) {
-      query.tags = { $in: tags };
+      // Create case-insensitive regex patterns for each tag
+      const tagRegexes = tags.map(tag => new RegExp(`^${tag.trim()}$`, 'i'));
+      query.tags = { $in: tagRegexes };
     }
     
     // Use new Media model, filtering for music content
