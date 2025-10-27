@@ -537,10 +537,14 @@ router.get('/top-tunes', async (req, res) => {
     
     // Add tag filtering (case-insensitive)
     if (tags && Array.isArray(tags) && tags.length > 0) {
+      console.log('🔍 Tag filtering - tags received:', tags);
+      
       // Use $or with $regex for proper case-insensitive tag matching
       const tagConditions = tags.map(tag => ({
         tags: { $regex: `^${tag.trim()}$`, $options: 'i' }
       }));
+      
+      console.log('🔍 Tag conditions:', tagConditions);
       
       if (query.$or) {
         // If there's already a $or condition (from search), combine them
@@ -552,6 +556,8 @@ router.get('/top-tunes', async (req, res) => {
       } else {
         query.$or = tagConditions;
       }
+      
+      console.log('🔍 Final query for tags:', JSON.stringify(query, null, 2));
     }
     
     // Use new Media model, filtering for music content
@@ -568,6 +574,11 @@ router.get('/top-tunes', async (req, res) => {
         },
       })
       .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags'); // Updated to schema grammar
+
+    console.log('🔍 Media found:', media.length, 'items');
+    if (tags && tags.length > 0) {
+      console.log('🔍 Sample media tags:', media.slice(0, 3).map(m => ({ title: m.title, tags: m.tags })));
+    }
 
     // Ensure proper population by manually checking and populating if needed
     const Bid = require('../models/Bid');
