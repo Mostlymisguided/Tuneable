@@ -160,7 +160,55 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Prohibited Activities</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Revenue Sharing and Payments</h2>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">8.1 Bid Revenue Distribution</h3>
+                <p className="mb-2">
+                  Revenue from bids placed on media content is distributed as follows:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Artists/Creators:</strong> 50% of bid revenue</li>
+                  <li><strong>Tuneable Platform:</strong> 33% of bid revenue (operating costs and platform maintenance)</li>
+                  <li><strong>Platform Development Fund:</strong> 17% of bid revenue (reserved for future features, artist tools, and platform enhancements)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">8.2 Payment Processing</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>All revenue shares are calculated after standard payment processing fees</li>
+                  <li>Payments are processed securely through Stripe</li>
+                  <li>Revenue share percentages may be adjusted with 30 days notice to accommodate platform scaling and sustainability</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">8.3 Revenue Share Commitment</h3>
+                <p className="mb-2">
+                  Tuneable CIC commits to increasing artist revenue share to 60% as the platform scales and operational costs decrease. 
+                  We will provide transparent reporting on revenue distribution upon request.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">8.4 Future Features</h3>
+                <p className="mb-2">
+                  When live party hosting features are implemented, party hosts/venues will receive a portion of revenue from parties 
+                  they host, with the specific percentage to be determined and disclosed at launch.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">8.5 Payment Schedule</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Payouts to artists will be processed monthly, with a minimum threshold of £10 GBP before payment is issued</li>
+                  <li>You will receive detailed statements showing your revenue breakdown</li>
+                  <li>Payment methods will be determined at the time of first payout</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">8.6 Disputes and Chargebacks</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>If a bid is disputed or charged back, the affected revenue share will be withheld pending resolution</li>
+                  <li>Artists will be notified of any payment disputes affecting their content</li>
+                  <li>Chargebacks may result in temporary suspension of payout processing</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">9. Prohibited Activities</h2>
               <p className="text-gray-700 mb-4">You agree not to:</p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>Use the Service for any illegal purpose</li>
@@ -175,7 +223,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">9. Creator and Verified Status</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Creator and Verified Status</h2>
               <div className="space-y-4 text-gray-700">
                 <p>
                   Users who add original content to the platform may be designated as "creators" and may apply for verified status. 
@@ -190,15 +238,15 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Disclaimers and Limitations of Liability</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Disclaimers and Limitations of Liability</h2>
               <div className="space-y-4 text-gray-700">
-                <h3 className="text-xl font-medium text-gray-900">10.1 Service Disclaimer</h3>
+                <h3 className="text-xl font-medium text-gray-900">11.1 Service Disclaimer</h3>
                 <p className="mb-2">
                   THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. 
                   WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
                 </p>
 
-                <h3 className="text-xl font-medium text-gray-900">10.2 Limitation of Liability</h3>
+                <h3 className="text-xl font-medium text-gray-900">11.2 Limitation of Liability</h3>
                 <p className="mb-2">
                   TO THE MAXIMUM EXTENT PERMITTED BY LAW, TUNEABLE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, 
                   CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
@@ -207,7 +255,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Third-Party Services</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Third-Party Services</h2>
               <p className="text-gray-700 mb-4">
                 The Service integrates with third-party platforms including:
               </p>
@@ -225,7 +273,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Termination</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">13. Termination</h2>
               <div className="space-y-4 text-gray-700">
                 <p>
                   We reserve the right to suspend or terminate your account at any time for:
@@ -245,7 +293,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">13. Privacy</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">14. Privacy</h2>
               <p className="text-gray-700">
                 Your use of the Service is also governed by our{' '}
                 <Link to="/privacy-policy" className="text-primary-600 hover:text-primary-500 font-medium">
@@ -256,7 +304,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">14. Changes to Terms</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">15. Changes to Terms</h2>
               <p className="text-gray-700 mb-4">
                 We reserve the right to modify these Terms at any time. We will notify users of material changes by:
               </p>
@@ -271,7 +319,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">15. Governing Law</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">16. Governing Law</h2>
               <p className="text-gray-700">
                 These Terms shall be governed by and construed in accordance with the laws of England and Wales, 
                 without regard to its conflict of law provisions. Any disputes arising from these Terms or the Service 
@@ -280,7 +328,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">16. Contact Information</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">17. Contact Information</h2>
               <p className="text-gray-700 mb-4">
                 If you have any questions about these Terms of Service, please contact us:
               </p>
@@ -293,7 +341,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">17. Severability</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">18. Severability</h2>
               <p className="text-gray-700">
                 If any provision of these Terms is found to be unenforceable or invalid, that provision will be limited or 
                 eliminated to the minimum extent necessary, and the remaining provisions will remain in full force and effect.
@@ -301,7 +349,7 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">18. Entire Agreement</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">19. Entire Agreement</h2>
               <p className="text-gray-700">
                 These Terms, together with our Privacy Policy, constitute the entire agreement between you and Tuneable 
                 regarding the use of the Service and supersede any prior agreements.
