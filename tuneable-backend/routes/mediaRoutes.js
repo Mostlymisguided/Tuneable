@@ -539,35 +539,17 @@ router.get('/top-tunes', async (req, res) => {
     if (tags && Array.isArray(tags) && tags.length > 0) {
       console.log('🔍 Tag filtering - tags received:', tags);
       
-      // Create fuzzy matching function to normalize tags
-      const normalizeTag = (tag) => {
-        return tag.toLowerCase()
-          .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
-          .replace(/[^\w]/g, ''); // Remove any other non-word characters
-      };
-      
-      // Create regex patterns for fuzzy matching
+      // Create fuzzy matching regex patterns
+      // This allows "hiphop", "hip-hop", "hip hop", "Hip Hop" to all match
+      // We replace spaces and hyphens with a regex pattern that matches optionally
       const tagRegex = tags.map(tag => {
-        const normalizedSearchTag = normalizeTag(tag.trim());
-        // Match tags that normalize to the same string
-        return new RegExp(`^${normalizedSearchTag}$`, 'i');
+        const escapedTag = tag.trim().replace(/[-\s]/g, '[-\\s]*');
+        return new RegExp(escapedTag, 'i');
       });
       
-      // Use $where to apply fuzzy matching logic
-      query.$and = query.$and || [];
-      query.$and.push({
-        $where: function() {
-          if (!this.tags || !Array.isArray(this.tags)) return false;
-          
-          return this.tags.some(storedTag => {
-            const normalizedStoredTag = normalizeTag(storedTag);
-            return tagRegex.some(regex => regex.test(normalizedStoredTag));
-          });
-        }
-      });
+      query.tags = { $in: tagRegex };
       
-      console.log('🔍 Fuzzy tag matching - normalized search terms:', tags.map(tag => normalizeTag(tag.trim())));
-      console.log('🔍 Final query for tags:', JSON.stringify(query, null, 2));
+      console.log('🔍 Fuzzy tag matching - regex patterns:', tagRegex);
     }
     
     // Use new Media model, filtering for music content
