@@ -541,7 +541,22 @@ router.get('/top-tunes', async (req, res) => {
       ];
     }
     
-    // Add tag filtering (case-insensitive with fuzzy matching)
+    // Use new Media model, filtering for music content
+    let media = await Media.find(query)
+      .sort(sortObj)
+      .limit(limitNum * 2) // Get more results for filtering
+      .populate({
+        path: 'bids',
+        model: 'Bid',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'username profilePic uuid',
+        },
+      })
+      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags'); // Updated to schema grammar
+
+    // Apply fuzzy tag matching on results if tags are specified
     if (tags && Array.isArray(tags) && tags.length > 0) {
       console.log('🔍 Tag filtering - tags received:', tags);
       
@@ -556,102 +571,22 @@ router.get('/top-tunes', async (req, res) => {
       const normalizedSearchTags = tags.map(tag => normalizeTag(tag.trim()));
       console.log('🔍 Normalized search tags:', normalizedSearchTags);
       
-      // Use aggregation pipeline for fuzzy matching (Atlas compatible)
-      const pipeline = [
-        { $match: query },
-        {
-          $addFields: {
-            normalizedTags: {
-              $map: {
-                input: "$tags",
-                as: "tag",
-                in: {
-                  $replaceAll: {
-                    input: {
-                      $replaceAll: {
-                        input: {
-                          $replaceAll: {
-                            input: {
-                              $replaceAll: {
-                                input: { $toLower: "$$tag" },
-                                find: " ",
-                                replacement: ""
-                              }
-                            },
-                            find: "-",
-                            replacement: ""
-                          }
-                        },
-                        find: "_",
-                        replacement: ""
-                      }
-                    },
-                    find: ".",
-                    replacement: ""
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          $match: {
-            $expr: {
-              $gt: [
-                {
-                  $size: {
-                    $filter: {
-                      input: "$normalizedTags",
-                      cond: {
-                        $in: ["$$this", normalizedSearchTags]
-                      }
-                    }
-                  }
-                },
-                0
-              ]
-            }
-          }
-        },
-        { $project: { normalizedTags: 0 } } // Remove the temporary field
-      ];
+      // Filter media items that have matching tags
+      media = media.filter(item => {
+        if (!item.tags || !Array.isArray(item.tags)) return false;
+        
+        return item.tags.some(storedTag => {
+          const normalizedStoredTag = normalizeTag(storedTag);
+          return normalizedSearchTags.includes(normalizedStoredTag);
+        });
+      }).slice(0, limitNum); // Limit to requested count
       
-      // Use aggregation instead of find
-      let media = await Media.aggregate(pipeline)
-        .limit(limitNum);
-      
-      console.log('🔍 Media found via aggregation:', media.length, 'items');
-      if (tags && tags.length > 0) {
-        console.log('🔍 Sample media tags:', media.slice(0, 3).map(m => ({ title: m.title, tags: m.tags })));
-      }
-      
-      // Manually populate bids after aggregation
-      for (let mediaItem of media) {
-        if (mediaItem.bids && mediaItem.bids.length > 0) {
-          const populatedBids = await Bid.find({ _id: { $in: mediaItem.bids } })
-            .populate('userId', 'username profilePic uuid');
-          mediaItem.bids = populatedBids;
-        }
-      }
-    } else {
-      // Use regular find for non-tag queries
-      media = await Media.find(query)
-        .sort(sortObj)
-        .limit(limitNum)
-        .populate({
-          path: 'bids',
-          model: 'Bid',
-          populate: {
-            path: 'userId',
-            model: 'User',
-            select: 'username profilePic uuid',
-          },
-        })
-        .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags');
-
-      console.log('🔍 Media found:', media.length, 'items');
+      console.log('🔍 Media found after tag filtering:', media.length, 'items');
     }
 
+    console.log('🔍 Media found:', media.length, 'items');
+    
+    // Ensure proper population by manually checking and populating if needed
     for (let mediaItem of media) {
       if (mediaItem.bids && mediaItem.bids.length > 0) {
         for (let bid of mediaItem.bids) {
