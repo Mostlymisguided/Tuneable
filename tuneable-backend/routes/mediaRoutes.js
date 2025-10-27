@@ -232,6 +232,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       addedBy: userId,
       uploadedAt: new Date(),
       
+      // Rights confirmation (assumed true when uploaded via checkbox)
+      rightsCleared: true,
+      rightsConfirmedBy: userId,
+      rightsConfirmedAt: new Date(),
+      
       // Auto-assign ownership to uploader
       mediaOwners: [{
         userId: userId,
