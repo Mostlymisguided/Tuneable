@@ -635,7 +635,7 @@ const Party: React.FC = () => {
         // Check if ANY tag search term matches tags (case-insensitive with fuzzy matching)
         const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
           // Normalize search term
-          const normalizeTag = (tag) => {
+          const normalizeTag = (tag: string) => {
             return tag.toLowerCase()
               .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
               .replace(/[^\w]/g, ''); // Remove any other non-word characters
