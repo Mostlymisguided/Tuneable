@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Music, Play } from 'lucide-react';
+import { Music, Play, Search } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -34,17 +34,27 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('globalMediaAggregate');
+  const [timePeriod, setTimePeriod] = useState('all-time');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchTopTunes();
-  }, [sortBy, limit]);
+  }, [limit, timePeriod, debouncedSearch]);
 
   const fetchTopTunes = async () => {
     try {
       setIsLoading(true);
       const fetchLimit = limit || 10;
-      const response = await topTunesAPI.getTopTunes(sortBy, fetchLimit);
+      const response = await topTunesAPI.getTopTunes('globalMediaAggregate', fetchLimit, timePeriod, debouncedSearch || undefined);
       setSongs(response.songs || []);
     } catch (error) {
       console.error('Error fetching top tunes:', error);
@@ -109,29 +119,46 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   return (
     <div className="space-y-4">
       {showHeader && (
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-300">Top Tunes</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setSortBy('globalMediaAggregate')}
-              className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                sortBy === 'globalMediaAggregate'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              Total
-            </button>
-            <button
-              onClick={() => setSortBy('globalMediaBidTop')}
-              className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                sortBy === 'globalMediaBidTop'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              Top Bid
-            </button>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-300">
+              Top Tunes {timePeriod !== 'all-time' && `- ${timePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
+            </h2>
+          </div>
+          
+          {/* Time Period Selection */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all-time', label: 'All Time' },
+              { key: 'today', label: 'Today' },
+              { key: 'week', label: 'This Week' },
+              { key: 'month', label: 'This Month' },
+              { key: 'year', label: 'This Year' }
+            ].map((period) => (
+              <button
+                key={period.key}
+                onClick={() => setTimePeriod(period.key)}
+                className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                  timePeriod === period.key
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {period.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search tunes, artists..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
           </div>
         </div>
       )}

@@ -462,7 +462,7 @@ router.get('/public', async (req, res) => {
 // @access  Public
 router.get('/top-tunes', async (req, res) => {
   try {
-    const { sortBy = 'globalMediaAggregate', limit = 10 } = req.query;
+    const { sortBy = 'globalMediaAggregate', limit = 10, timePeriod = 'all-time', search, tags } = req.query;
     
     // Validate sortBy parameter - map to Media model fields
     const validSortFields = ['globalMediaAggregate', 'title', 'creators', 'duration', 'uploadedAt'];
@@ -492,11 +492,56 @@ router.get('/top-tunes', async (req, res) => {
       sortObj[mediaSortField] = -1; // Descending for duration and date
     }
     
-    // Use new Media model, filtering for music content
-    let media = await Media.find({ 
+    // Build query object
+    let query = { 
       globalMediaAggregate: { $gt: 0 }, // Updated to schema grammar
       contentType: { $in: ['music'] } // Only music content for now
-    })
+    };
+    
+    // Add time period filtering
+    if (timePeriod !== 'all-time') {
+      const now = new Date();
+      let startDate;
+      
+      switch (timePeriod) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          startDate = null;
+      }
+      
+      if (startDate) {
+        query.uploadedAt = { $gte: startDate };
+      }
+    }
+    
+    // Add search filtering
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { title: searchRegex },
+        { 'artist.name': searchRegex },
+        { creatorNames: searchRegex }
+      ];
+    }
+    
+    // Add tag filtering
+    if (tags && Array.isArray(tags) && tags.length > 0) {
+      query.tags = { $in: tags };
+    }
+    
+    // Use new Media model, filtering for music content
+    let media = await Media.find(query)
       .sort(sortObj)
       .limit(limitNum)
       .populate({

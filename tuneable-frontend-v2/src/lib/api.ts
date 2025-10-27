@@ -396,10 +396,12 @@ export const searchAPI = {
 
 // Top Tunes API
 export const topTunesAPI = {
-  getTopTunes: async (sortBy: string = 'globalMediaAggregate', limit: number = 10) => {
-    const response = await api.get('/media/top-tunes', {
-      params: { sortBy, limit },
-    });
+  getTopTunes: async (sortBy: string = 'globalMediaAggregate', limit: number = 10, timePeriod: string = 'all-time', search?: string, tags?: string[]) => {
+    const params: any = { sortBy, limit, timePeriod };
+    if (search) params.search = search;
+    if (tags && tags.length > 0) params.tags = tags;
+    
+    const response = await api.get('/media/top-tunes', { params });
     return response.data;
   },
 };
