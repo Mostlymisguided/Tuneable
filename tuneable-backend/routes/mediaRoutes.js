@@ -498,6 +498,12 @@ router.get('/top-tunes', async (req, res) => {
       contentType: { $in: ['music'] } // Only music content for now
     };
     
+    // Ensure proper population by manually checking and populating if needed
+    const Bid = require('../models/Bid');
+    const User = require('../models/User');
+    
+    let media; // Declare media variable
+    
     // Add time period filtering
     if (timePeriod !== 'all-time') {
       const now = new Date();
@@ -546,54 +552,106 @@ router.get('/top-tunes', async (req, res) => {
           .replace(/[^\w]/g, ''); // Remove any other non-word characters
       };
       
-      // Create regex patterns for fuzzy matching
-      const tagRegex = tags.map(tag => {
-        const normalizedSearchTag = normalizeTag(tag.trim());
-        // Match tags that normalize to the same string
-        return new RegExp(`^${normalizedSearchTag}$`, 'i');
-      });
+      // Normalize search tags
+      const normalizedSearchTags = tags.map(tag => normalizeTag(tag.trim()));
+      console.log('🔍 Normalized search tags:', normalizedSearchTags);
       
-      // Use $where to apply fuzzy matching logic
-      query.$and = query.$and || [];
-      query.$and.push({
-        $where: function() {
-          if (!this.tags || !Array.isArray(this.tags)) return false;
-          
-          return this.tags.some(storedTag => {
-            const normalizedStoredTag = normalizeTag(storedTag);
-            return tagRegex.some(regex => regex.test(normalizedStoredTag));
-          });
-        }
-      });
-      
-      console.log('🔍 Fuzzy tag matching - normalized search terms:', tags.map(tag => normalizeTag(tag.trim())));
-      console.log('🔍 Final query for tags:', JSON.stringify(query, null, 2));
-    }
-    
-    // Use new Media model, filtering for music content
-    let media = await Media.find(query)
-      .sort(sortObj)
-      .limit(limitNum)
-      .populate({
-        path: 'bids',
-        model: 'Bid',
-        populate: {
-          path: 'userId',
-          model: 'User',
-          select: 'username profilePic uuid',
+      // Use aggregation pipeline for fuzzy matching (Atlas compatible)
+      const pipeline = [
+        { $match: query },
+        {
+          $addFields: {
+            normalizedTags: {
+              $map: {
+                input: "$tags",
+                as: "tag",
+                in: {
+                  $replaceAll: {
+                    input: {
+                      $replaceAll: {
+                        input: {
+                          $replaceAll: {
+                            input: {
+                              $replaceAll: {
+                                input: { $toLower: "$$tag" },
+                                find: " ",
+                                replacement: ""
+                              }
+                            },
+                            find: "-",
+                            replacement: ""
+                          }
+                        },
+                        find: "_",
+                        replacement: ""
+                      }
+                    },
+                    find: ".",
+                    replacement: ""
+                  }
+                }
+              }
+            }
+          }
         },
-      })
-      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags'); // Updated to schema grammar
+        {
+          $match: {
+            $expr: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: "$normalizedTags",
+                      cond: {
+                        $in: ["$$this", normalizedSearchTags]
+                      }
+                    }
+                  }
+                },
+                0
+              ]
+            }
+          }
+        },
+        { $project: { normalizedTags: 0 } } // Remove the temporary field
+      ];
+      
+      // Use aggregation instead of find
+      let media = await Media.aggregate(pipeline)
+        .limit(limitNum);
+      
+      console.log('🔍 Media found via aggregation:', media.length, 'items');
+      if (tags && tags.length > 0) {
+        console.log('🔍 Sample media tags:', media.slice(0, 3).map(m => ({ title: m.title, tags: m.tags })));
+      }
+      
+      // Manually populate bids after aggregation
+      for (let mediaItem of media) {
+        if (mediaItem.bids && mediaItem.bids.length > 0) {
+          const populatedBids = await Bid.find({ _id: { $in: mediaItem.bids } })
+            .populate('userId', 'username profilePic uuid');
+          mediaItem.bids = populatedBids;
+        }
+      }
+    } else {
+      // Use regular find for non-tag queries
+      media = await Media.find(query)
+        .sort(sortObj)
+        .limit(limitNum)
+        .populate({
+          path: 'bids',
+          model: 'Bid',
+          populate: {
+            path: 'userId',
+            model: 'User',
+            select: 'username profilePic uuid',
+          },
+        })
+        .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags');
 
-    console.log('🔍 Media found:', media.length, 'items');
-    if (tags && tags.length > 0) {
-      console.log('🔍 Sample media tags:', media.slice(0, 3).map(m => ({ title: m.title, tags: m.tags })));
+      console.log('🔍 Media found:', media.length, 'items');
     }
 
-    // Ensure proper population by manually checking and populating if needed
-    const Bid = require('../models/Bid');
-    const User = require('../models/User');
-    
     for (let mediaItem of media) {
       if (mediaItem.bids && mediaItem.bids.length > 0) {
         for (let bid of mediaItem.bids) {
