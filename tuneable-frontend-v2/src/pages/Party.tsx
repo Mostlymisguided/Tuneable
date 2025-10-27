@@ -632,14 +632,21 @@ const Party: React.FC = () => {
                  category.includes(lowerTerm);
         });
         
-        // Check if ANY tag search term matches tags (case-insensitive)
+        // Check if ANY tag search term matches tags (case-insensitive with fuzzy matching)
         const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
-          const lowerTagTerm = tagTerm.toLowerCase();
+          // Normalize search term
+          const normalizeTag = (tag) => {
+            return tag.toLowerCase()
+              .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
+              .replace(/[^\w]/g, ''); // Remove any other non-word characters
+          };
+          
+          const normalizedSearchTag = normalizeTag(tagTerm);
           const tags = Array.isArray(mediaItem.tags) 
-            ? mediaItem.tags.map((tag: any) => tag.toLowerCase())
+            ? mediaItem.tags.map((tag: any) => normalizeTag(tag))
             : [];
           
-          return tags.some((tag: string) => tag === lowerTagTerm);
+          return tags.some((tag: string) => tag === normalizedSearchTag);
         });
         
         // Both regular search and tag search must match (if they exist)

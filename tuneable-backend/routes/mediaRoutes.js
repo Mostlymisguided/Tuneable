@@ -535,17 +535,38 @@ router.get('/top-tunes', async (req, res) => {
       ];
     }
     
-    // Add tag filtering (case-insensitive)
+    // Add tag filtering (case-insensitive with fuzzy matching)
     if (tags && Array.isArray(tags) && tags.length > 0) {
       console.log('🔍 Tag filtering - tags received:', tags);
       
-      // For array fields, we need to use $in with case-insensitive regex
-      // Create a single condition that matches any of the tags
-      const tagRegex = tags.map(tag => new RegExp(`^${tag.trim()}$`, 'i'));
-      query.tags = { $in: tagRegex };
+      // Create fuzzy matching function to normalize tags
+      const normalizeTag = (tag) => {
+        return tag.toLowerCase()
+          .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
+          .replace(/[^\w]/g, ''); // Remove any other non-word characters
+      };
       
-      console.log('🔍 Tag regex patterns:', tagRegex);
+      // Create regex patterns for fuzzy matching
+      const tagRegex = tags.map(tag => {
+        const normalizedSearchTag = normalizeTag(tag.trim());
+        // Match tags that normalize to the same string
+        return new RegExp(`^${normalizedSearchTag}$`, 'i');
+      });
       
+      // Use $where to apply fuzzy matching logic
+      query.$and = query.$and || [];
+      query.$and.push({
+        $where: function() {
+          if (!this.tags || !Array.isArray(this.tags)) return false;
+          
+          return this.tags.some(storedTag => {
+            const normalizedStoredTag = normalizeTag(storedTag);
+            return tagRegex.some(regex => regex.test(normalizedStoredTag));
+          });
+        }
+      });
+      
+      console.log('🔍 Fuzzy tag matching - normalized search terms:', tags.map(tag => normalizeTag(tag.trim())));
       console.log('🔍 Final query for tags:', JSON.stringify(query, null, 2));
     }
     
