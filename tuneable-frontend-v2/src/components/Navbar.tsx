@@ -84,15 +84,6 @@ const Navbar: React.FC = () => {
                   Podcasts
                 </Link> */}
                 <Link
-                  to="/wallet"
-                  className="hidden lg:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  Wallet
-                </Link>
-                <Link
                   to="/about"
                   className="hidden lg:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
@@ -102,8 +93,16 @@ const Navbar: React.FC = () => {
                   About
                 </Link>
                 <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-4">
-                  <span className="hidden sm:block text-sm text-gray-300">
+                  <Link
+                    to="/wallet"
+                    className="hidden sm:block text-sm text-gray-300 hover:text-white transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-700/50"
+                    style={{ textDecoration: 'none' }}
+                    title="Wallet"
+                  >
                     £{user.balance?.toFixed(2) || '0.00'}
+                  </Link>
+                  <span className="hidden sm:block text-sm text-purple-300">
+                    {(user as any)?.tuneBytes?.toFixed(0) || '0'} TuneBytes
                   </span>
                   <Link
                     to={`/user/${user._id || user.uuid}`}
