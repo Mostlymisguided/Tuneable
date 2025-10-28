@@ -111,7 +111,7 @@ const AuthPage: React.FC = () => {
     navigate('/');
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
     if (name === 'city' || name === 'region' || name === 'country') {
@@ -429,7 +429,7 @@ const AuthPage: React.FC = () => {
 
         {/* Location Fields */}
         <div className="flex flex-col flex items-center justify-center">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Location (Optional)</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Home Location (Optional)</h3>
           <div className="grid grid-cols-2 gap-2 w-full">
             <input
               id="city"
