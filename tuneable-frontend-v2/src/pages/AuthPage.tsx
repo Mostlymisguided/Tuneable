@@ -7,7 +7,9 @@ import {
   EyeOff,
   Gift,
   CheckCircle,
-  XCircle
+  XCircle,
+  X,
+  ArrowLeft
 } from 'lucide-react';
 import axios from 'axios';
 import { userAPI } from '../lib/api';
@@ -581,28 +583,48 @@ const AuthPage: React.FC = () => {
   );
 
   return (
-    <div className="bg-black/50 overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 h-full items-center justify-center flex" style={{ zIndex: 10000 }}>
-      <div className="relative p-4 w-2/3 max-w-xl h-full md:h-auto">
-        <div className="relative bg-white p-4 rounded-lg shadow">
-          {/* Close Button */}
+    <div 
+      className="bg-black/50 fixed inset-0 flex items-center justify-center p-4" 
+      style={{ zIndex: 10000 }}
+      onClick={handleClose}
+    >
+      <div 
+        className="relative bg-white rounded-lg shadow-lg max-h-[90vh] w-full max-w-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Fixed Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center z-10">
           <button
             type="button"
             onClick={handleClose}
-            className="lucide-x py-2 px-4 w-auto max-w-md flex justify-center items-center hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-black transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
+            className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
           >
+            <ArrowLeft className="h-5 w-5 mr-2" />
             <span>Back</span>
           </button>
-
+          <h2 className="text-xl font-semibold text-gray-900">
+            {isRegisterPage ? 'Create Account' : 'Sign In'}
+          </h2>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-80px)] p-4">
           {/* Error/Success Messages */}
           {isFromOAuth && (
-            <div className="m-5 mb-0 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-600">
                 There was an issue with your authentication. Please try again.
               </p>
             </div>
           )}
-
-
+          
           {/* Main Content */}
           {isRegisterPage ? renderRegisterForm() : renderLoginForm()}
         </div>
