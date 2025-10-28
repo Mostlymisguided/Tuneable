@@ -117,7 +117,7 @@ const RequestInvite: React.FC = () => {
               Request an Invite
             </h1>
             <p className="text-gray-300 text-lg">
-              Join the waitlist for early access to Tuneable
+              Early access to Tuneable
             </p>
           </div>
 
@@ -125,7 +125,7 @@ const RequestInvite: React.FC = () => {
           <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6">
             <h3 className="text-white font-semibold mb-2">Why invite-only?</h3>
             <p className="text-gray-300 text-sm">
-              We're building Tuneable with a carefully curated community of music lovers and creators. 
+              Tuneable is currently in Beta Testing with a carefully curated community of music lovers & creators.
               Tell us why you'd be a great fit, and we'll review your request!
             </p>
           </div>
@@ -187,7 +187,7 @@ const RequestInvite: React.FC = () => {
                   value={formData.reason}
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                  placeholder="Tell us about yourself, your music taste, or what you're looking forward to on Tuneable..."
+                  placeholder="Do you see yourself using Tuneable as a User or Creator? If as a Creator please include some links to your music or social media..."
                 />
               </div>
               <p className="text-xs text-gray-400 mt-1">

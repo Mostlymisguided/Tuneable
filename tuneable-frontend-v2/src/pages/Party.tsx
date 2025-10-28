@@ -1433,7 +1433,13 @@ const Party: React.FC = () => {
                                       className="h-12 w-12 rounded object-cover flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-white font-medium truncate">{media.title}</p>
+                                      <p 
+                                        className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                        onClick={() => navigate(`/tune/${media._id || media.id}`)}
+                                        title="View tune profile"
+                                      >
+                                        {media.title}
+                                      </p>
                                       <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                                     </div>
                                   </div>

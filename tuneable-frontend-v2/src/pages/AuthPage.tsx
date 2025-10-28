@@ -443,7 +443,7 @@ const AuthPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className=" right-3 mt-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="right-3 mt-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -609,7 +609,7 @@ const AuthPage: React.FC = () => {
 
       <div className="mt-6 text-center text-sm text-slate-600">
         Already have an account?{' '}
-        <Link to="/login" className="font-medium text-[#4285f4]">
+        <Link to="/login" className="font-medium">
           Sign in
         </Link>
       </div>
