@@ -111,43 +111,12 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  // Helper function to detect YouTube URLs
-  const isYouTubeUrl = (query: string) => {
-    const youtubePatterns = [
-      /youtube\.com\/watch\?v=/,
-      /youtu\.be\//,
-      /youtube\.com\/embed\//
-    ];
-    return youtubePatterns.some(pattern => pattern.test(query));
-  };
-
   const handleSearch = async (searchQuery: string, pageToken?: string) => {
     if (!searchQuery.trim()) return;
     
     setIsLoading(true);
     try {
       let response;
-      
-      // Check if it's a YouTube URL
-      if (isYouTubeUrl(searchQuery)) {
-        console.log('🎥 Detected YouTube URL, processing...');
-        response = await searchAPI.searchByYouTubeUrl(searchQuery);
-        console.log('🎥 YouTube URL response:', response);
-        
-        // Handle YouTube URL response
-        setSearchSource(response.source || 'external');
-        setHasMoreExternal(false);
-        setResults(response.videos || []);
-        setNextPageToken(null);
-        initializeBidAmounts(response.videos || []);
-        
-        // Show user feedback
-        if (response.source === 'local') {
-          toast.success(`Found "${response.videos[0]?.title}" in our database`);
-        } else if (response.source === 'external') {
-          toast.success(`Found "${response.videos[0]?.title}" from YouTube`);
-        }
-      } else {
       
       if (activeTab === 'podcasts') {
         if (podcastSource === 'local') {
@@ -283,7 +252,6 @@ const SearchPage: React.FC = () => {
         toast.info(`Found ${response.videos.length} songs from our database`);
       } else if (response.source === 'external') {
         toast.info(`Found ${response.videos.length} songs from YouTube`);
-      }
       }
     } catch (error) {
       console.error('Search error:', error);
@@ -558,7 +526,7 @@ const SearchPage: React.FC = () => {
             <input
               type="text"
               placeholder={activeTab === 'songs' 
-                ? 'Search for songs on YouTube or paste a YouTube URL...'
+                ? 'Search for songs on YouTube...'
                 : podcastSource === 'local' 
                   ? 'Search for podcast episodes in our database...'
                   : podcastSource === 'taddy'

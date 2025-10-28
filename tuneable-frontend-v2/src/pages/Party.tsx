@@ -457,17 +457,70 @@ const Party: React.FC = () => {
     fetchSortedMedia(timePeriod);
   };
 
+  // Helper function to detect YouTube URLs
+  const isYouTubeUrl = (query: string) => {
+    const youtubePatterns = [
+      /youtube\.com\/watch\?v=/,
+      /youtu\.be\//,
+      /youtube\.com\/embed\//
+    ];
+    return youtubePatterns.some(pattern => pattern.test(query));
+  };
+
   // Inline add media search functions
   const handleAddMediaSearch = async () => {
     if (!addMediaSearchQuery.trim()) return;
     
     setIsSearchingNewMedia(true);
     try {
-      const musicSource = party?.musicSource || 'youtube';
+      let response;
       
-      // Search local database first
-      console.log('🔍 Searching for new media:', addMediaSearchQuery);
-      const response = await searchAPI.search(addMediaSearchQuery, musicSource);
+      // Check if it's a YouTube URL
+      if (isYouTubeUrl(addMediaSearchQuery)) {
+        console.log('🎥 Detected YouTube URL, processing...');
+        response = await searchAPI.searchByYouTubeUrl(addMediaSearchQuery);
+        console.log('🎥 YouTube URL response:', response);
+        
+        // Handle YouTube URL response
+        let databaseResults = [];
+        let youtubeResults = [];
+        
+        if (response.source === 'local' && response.videos) {
+          databaseResults = response.videos;
+          console.log(`📚 Found existing media in database: ${response.videos[0]?.title}`);
+        } else if (response.source === 'external' && response.videos) {
+          youtubeResults = response.videos;
+          console.log(`🎥 Found new media from YouTube: ${response.videos[0]?.title}`);
+        }
+        
+        setAddMediaResults({
+          database: databaseResults,
+          youtube: youtubeResults
+        });
+        
+        // Initialize bid amounts for results
+        const minBid = party?.minimumBid || 0.33;
+        const newBidAmounts: Record<string, number> = {};
+        [...databaseResults, ...youtubeResults].forEach(media => {
+          newBidAmounts[media._id || media.id] = minBid;
+        });
+        setNewMediaBidAmounts(newBidAmounts);
+        
+        // Show user feedback
+        if (response.videos && response.videos.length > 0) {
+          if (response.source === 'local') {
+            toast.success(`Found "${response.videos[0]?.title}" in our database`);
+          } else if (response.source === 'external') {
+            toast.success(`Found "${response.videos[0]?.title}" from YouTube`);
+          }
+        }
+      } else {
+        // Regular search logic
+        const musicSource = party?.musicSource || 'youtube';
+        
+        // Search local database first
+        console.log('🔍 Searching for new media:', addMediaSearchQuery);
+        response = await searchAPI.search(addMediaSearchQuery, musicSource);
       
       let databaseResults = [];
       let youtubeResults = [];
@@ -503,6 +556,7 @@ const Party: React.FC = () => {
         newBidAmounts[media._id || media.id] = minBid;
       });
       setNewMediaBidAmounts(newBidAmounts);
+      }
       
     } catch (error) {
       console.error('Search error:', error);
@@ -1343,7 +1397,7 @@ const Party: React.FC = () => {
                                 handleAddMediaSearch();
                               }
                             }}
-                            placeholder="Search for Tunes in our library or on Youtube..."
+                            placeholder="Search for Tunes in our library or on YouTube, or paste a YouTube URL..."
                             className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                           />
                          
