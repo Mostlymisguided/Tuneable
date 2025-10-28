@@ -52,6 +52,22 @@ export interface User {
   globalUserAggregateRank?: number;
   globalUserBidAvg?: number;
   globalUserBids?: number;
+  creatorProfile?: {
+    artistName?: string;
+    bio?: string;
+    genres?: string[];
+    roles?: string[];
+    website?: string;
+    socialMedia?: {
+      instagram?: string;
+      facebook?: string;
+      soundcloud?: string;
+      spotify?: string;
+      youtube?: string;
+      twitter?: string;
+    };
+    label?: string;
+  };
 }
 
 export interface RegisterData {

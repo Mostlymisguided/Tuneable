@@ -24,7 +24,10 @@ import {
   Music2,
   Coins,
   Loader2,
-  Flag
+  Flag,
+  Edit3,
+  Facebook,
+  Instagram
 } from 'lucide-react';
 import { mediaAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';

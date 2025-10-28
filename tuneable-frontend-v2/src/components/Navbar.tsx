@@ -92,9 +92,14 @@ const Navbar: React.FC = () => {
                   >
                     £{user.balance?.toFixed(2) || '0.00'}
                   </Link>
-                  <span className="hidden sm:block text-sm text-purple-300">
+                  <Link
+                    to={`/user/${user._id || user.uuid}`}
+                    className="hidden sm:block text-sm text-purple-300 hover:text-purple-100 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-purple-700/50"
+                    style={{ textDecoration: 'none' }}
+                    title="Profile"
+                  >
                     {(user as any)?.tuneBytes?.toFixed(0) || '0'} TuneBytes
-                  </span>
+                  </Link>
                   <Link
                     to={`/user/${user._id || user.uuid}`}
                     className="px-2 sm:px-4 py-1 sm:py-2 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
