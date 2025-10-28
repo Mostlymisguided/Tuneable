@@ -57,7 +57,6 @@ export interface RegisterData {
     city?: string;
     region?: string;
     country?: string;
-    countryCode?: string;
   };
 }
 

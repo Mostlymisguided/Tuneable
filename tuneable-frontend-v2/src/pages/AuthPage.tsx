@@ -31,7 +31,6 @@ const AuthPage: React.FC = () => {
       city: '',
       region: '',
       country: '',
-      countryCode: '',
     },
   });
 
@@ -115,7 +114,7 @@ const AuthPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
-    if (name === 'city' || name === 'region' || name === 'country' || name === 'countryCode') {
+    if (name === 'city' || name === 'region' || name === 'country') {
       setFormData({
         ...formData,
         homeLocation: {
@@ -446,29 +445,76 @@ const AuthPage: React.FC = () => {
               name="region"
               type="text"
               className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="State/Region"
+              placeholder="State/Region/County"
               value={formData.homeLocation.region}
               onChange={handleChange}
             />
-            <input
+            <select
               id="country"
               name="country"
-              type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="Country"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none focus:ring-2 focus:ring-black focus:ring-offset-1"
               value={formData.homeLocation.country}
               onChange={handleChange}
-            />
-            <input
-              id="countryCode"
-              name="countryCode"
-              type="text"
-              maxLength={2}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="Country Code (e.g., US)"
-              value={formData.homeLocation.countryCode}
-              onChange={handleChange}
-            />
+            >
+              <option value="">Select Country</option>
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Canada">Canada</option>
+              <option value="Australia">Australia</option>
+              <option value="Germany">Germany</option>
+              <option value="France">France</option>
+              <option value="Spain">Spain</option>
+              <option value="Italy">Italy</option>
+              <option value="Netherlands">Netherlands</option>
+              <option value="Sweden">Sweden</option>
+              <option value="Norway">Norway</option>
+              <option value="Denmark">Denmark</option>
+              <option value="Finland">Finland</option>
+              <option value="Ireland">Ireland</option>
+              <option value="Belgium">Belgium</option>
+              <option value="Switzerland">Switzerland</option>
+              <option value="Austria">Austria</option>
+              <option value="Portugal">Portugal</option>
+              <option value="Poland">Poland</option>
+              <option value="Czech Republic">Czech Republic</option>
+              <option value="Hungary">Hungary</option>
+              <option value="Romania">Romania</option>
+              <option value="Bulgaria">Bulgaria</option>
+              <option value="Croatia">Croatia</option>
+              <option value="Slovenia">Slovenia</option>
+              <option value="Slovakia">Slovakia</option>
+              <option value="Estonia">Estonia</option>
+              <option value="Latvia">Latvia</option>
+              <option value="Lithuania">Lithuania</option>
+              <option value="Japan">Japan</option>
+              <option value="South Korea">South Korea</option>
+              <option value="China">China</option>
+              <option value="India">India</option>
+              <option value="Brazil">Brazil</option>
+              <option value="Mexico">Mexico</option>
+              <option value="Argentina">Argentina</option>
+              <option value="Chile">Chile</option>
+              <option value="Colombia">Colombia</option>
+              <option value="Peru">Peru</option>
+              <option value="South Africa">South Africa</option>
+              <option value="Nigeria">Nigeria</option>
+              <option value="Kenya">Kenya</option>
+              <option value="Egypt">Egypt</option>
+              <option value="Morocco">Morocco</option>
+              <option value="Turkey">Turkey</option>
+              <option value="Israel">Israel</option>
+              <option value="United Arab Emirates">United Arab Emirates</option>
+              <option value="Saudi Arabia">Saudi Arabia</option>
+              <option value="New Zealand">New Zealand</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Malaysia">Malaysia</option>
+              <option value="Thailand">Thailand</option>
+              <option value="Indonesia">Indonesia</option>
+              <option value="Philippines">Philippines</option>
+              <option value="Vietnam">Vietnam</option>
+              <option value="Taiwan">Taiwan</option>
+              <option value="Hong Kong">Hong Kong</option>
+            </select>
           </div>
           <p className="text-xs text-gray-500 mt-1 text-center">
             Leave blank to auto-detect from your IP address

@@ -7,7 +7,68 @@ const { check, validationResult } = require('express-validator');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios'); // Added geoip-lite
+const axios = require('axios');
+
+// Country name to country code mapping
+const countryCodeMap = {
+  'United States': 'US',
+  'United Kingdom': 'GB',
+  'Canada': 'CA',
+  'Australia': 'AU',
+  'Germany': 'DE',
+  'France': 'FR',
+  'Spain': 'ES',
+  'Italy': 'IT',
+  'Netherlands': 'NL',
+  'Sweden': 'SE',
+  'Norway': 'NO',
+  'Denmark': 'DK',
+  'Finland': 'FI',
+  'Ireland': 'IE',
+  'Belgium': 'BE',
+  'Switzerland': 'CH',
+  'Austria': 'AT',
+  'Portugal': 'PT',
+  'Poland': 'PL',
+  'Czech Republic': 'CZ',
+  'Hungary': 'HU',
+  'Romania': 'RO',
+  'Bulgaria': 'BG',
+  'Croatia': 'HR',
+  'Slovenia': 'SI',
+  'Slovakia': 'SK',
+  'Estonia': 'EE',
+  'Latvia': 'LV',
+  'Lithuania': 'LT',
+  'Japan': 'JP',
+  'South Korea': 'KR',
+  'China': 'CN',
+  'India': 'IN',
+  'Brazil': 'BR',
+  'Mexico': 'MX',
+  'Argentina': 'AR',
+  'Chile': 'CL',
+  'Colombia': 'CO',
+  'Peru': 'PE',
+  'South Africa': 'ZA',
+  'Nigeria': 'NG',
+  'Kenya': 'KE',
+  'Egypt': 'EG',
+  'Morocco': 'MA',
+  'Turkey': 'TR',
+  'Israel': 'IL',
+  'United Arab Emirates': 'AE',
+  'Saudi Arabia': 'SA',
+  'New Zealand': 'NZ',
+  'Singapore': 'SG',
+  'Malaysia': 'MY',
+  'Thailand': 'TH',
+  'Indonesia': 'ID',
+  'Philippines': 'PH',
+  'Vietnam': 'VN',
+  'Taiwan': 'TW',
+  'Hong Kong': 'HK'
+}; // Added geoip-lite
 const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -124,7 +185,7 @@ router.post(
           city: homeLocation.city || null,
           region: homeLocation.region || null,
           country: homeLocation.country || null,
-          countryCode: homeLocation.countryCode || null,
+          countryCode: homeLocation.country ? countryCodeMap[homeLocation.country] || null : null,
           coordinates: homeLocation.coordinates || null,
           detectedFromIP: false
         };
