@@ -107,7 +107,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
     if (!user || amount === 0) return null;
 
     return (
-      <div className={`flex items-center justify-between p-2 rounded-lg bg-gradient-to-r ${color} border border-opacity-30 w-fit`}>
+      <div className={`flex items-center justify-between p-2 rounded-lg bg-gradient-to-r ${color}  border-opacity-30 w-fit`}>
         <div className="flex items-center space-x-2">
           {/* Profile Picture replacing icon */}
           {user.profilePic ? (

@@ -1561,7 +1561,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex items-center hover:bg-purple-800/20 relative"
+                            className="card flex items-center hover:border-white relative"
                           >
                             {/* Queue Number Badge - In Left Gutter */}
                             <div className="absolute -left-8 md:-left-12 top-1/2 -translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
@@ -1645,7 +1645,7 @@ const Party: React.FC = () => {
                             <div className="flex flex-col space-y-2">
                               <div className="flex items-center space-x-2">
                                 {/* Metrics Display */}
-                                <div className="flex flex-col-2 items-end space-y-1 border mx-4 px-2 py-2 rounded-lg">
+                                <div className="flex flex-col-2 items-end space-y-1 bg-slate-900/20 mx-4 px-2 py-2 rounded-lg">
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
@@ -1670,7 +1670,7 @@ const Party: React.FC = () => {
                                       ...queueBidAmounts,
                                       [mediaData._id || mediaData.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
                                     })}
-                                    className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                    className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-2 text-gray text-sm"
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                   <button
