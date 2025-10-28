@@ -265,7 +265,7 @@ const Parties: React.FC = () => {
     >
       {/* Purple overlay for clickable cards */}
       {(isUserInParty(party) || party.type === 'global') && (
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/75 to-purple-800/75 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/85 to-slate-900/85 backdrop-blur-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
           <span className="bg-slate-900/50 text-white/70 font-semibold text-base px-4 py-2 rounded-lg shadow-lg hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-500 hover:text-white hover:shadow-lg hover:shadow-pink-500/30 transition-all">
             Go To Party
           </span>

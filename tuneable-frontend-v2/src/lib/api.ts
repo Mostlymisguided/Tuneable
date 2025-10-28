@@ -419,6 +419,12 @@ export const userAPI = {
     return response.data;
   },
 
+  // Detect user location from IP address
+  detectLocation: async () => {
+    const response = await api.get('/users/detect-location');
+    return response.data;
+  },
+
   // Update social media URL
   updateSocialMedia: async (platform: string, url: string) => {
     const response = await api.put('/users/profile/social-media', { platform, url });

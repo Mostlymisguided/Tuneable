@@ -10,6 +10,7 @@ import {
   XCircle
 } from 'lucide-react';
 import axios from 'axios';
+import { userAPI } from '../lib/api';
 
 const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -54,6 +55,37 @@ const AuthPage: React.FC = () => {
       validateInviteCode(inviteParam.toUpperCase());
     }
   }, [location.search, isRegisterPage]);
+
+  // Auto-detect location for registration form
+  useEffect(() => {
+    const detectUserLocation = async () => {
+      try {
+        const response = await userAPI.detectLocation();
+        if (response.success && response.location) {
+          setFormData(prev => ({
+            ...prev,
+            homeLocation: {
+              ...prev.homeLocation,
+              country: response.location.country,
+              // Keep existing city/region if user already started typing
+              city: prev.homeLocation.city || response.location.city,
+              region: prev.homeLocation.region || response.location.region,
+            }
+          }));
+          
+          toast.info(`Auto-detected location: ${response.location.country}`);
+        }
+      } catch (error) {
+        console.log('Location detection failed:', error);
+        // Silently fail - don't show error to user
+      }
+    };
+
+    // Only detect location for registration page
+    if (isRegisterPage) {
+      detectUserLocation();
+    }
+  }, [isRegisterPage]);
 
   // Validate invite code against backend
   const validateInviteCode = async (code: string) => {
@@ -429,7 +461,14 @@ const AuthPage: React.FC = () => {
 
         {/* Location Fields */}
         <div className="flex flex-col flex items-center justify-center">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Home Location (Optional)</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-2">
+            Home Location (Optional)
+            {formData.homeLocation.country && (
+              <span className="ml-2 text-xs text-green-600">
+                ✓ Auto-detected
+              </span>
+            )}
+          </h3>
           <div className="grid grid-cols-2 gap-2 w-full">
             <input
               id="city"
@@ -517,7 +556,7 @@ const AuthPage: React.FC = () => {
             </select>
           </div>
           <p className="text-xs text-gray-500 mt-1 text-center">
-            Leave blank to auto-detect from your IP address
+            Location auto-detected from your IP address. You can edit or remove it.
           </p>
         </div>
 
