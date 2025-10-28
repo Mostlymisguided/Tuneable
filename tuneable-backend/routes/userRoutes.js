@@ -7,7 +7,7 @@ const { check, validationResult } = require('express-validator');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const geoip = require('geoip-lite'); // Added geoip-lite
+const axios = require('axios'); // Added geoip-lite
 const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -91,9 +91,21 @@ router.post(
       
       // Extract IP address for geolocation (not stored for privacy)
       const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
-      const geo = geoip.lookup(ip);
-      console.log(`Registration IP: ${ip}, Geo: ${JSON.stringify(geo)}`);
-      console.log(`Frontend homeLocation: ${JSON.stringify(homeLocation)}`);
+      console.log(`Registration IP: ${ip}`);
+      
+      // Get geolocation data from IPinfo Lite (free, unlimited)
+      let geoData = null;
+      try {
+        // IPinfo Lite provides country-level data for free
+        const response = await axios.get(`https://api.ipinfo.io/lite/${ip}`, {
+          timeout: 5000 // 5 second timeout
+        });
+        geoData = response.data;
+        console.log(`IPinfo Lite response: ${JSON.stringify(geoData)}`);
+      } catch (error) {
+        console.log(`IPinfo Lite error: ${error.message}`);
+        // Fallback to default location if API fails
+      }
       
       // Determine primary location with fallback logic
       const defaultLocation = { 
@@ -117,26 +129,34 @@ router.post(
           detectedFromIP: false
         };
         console.log('Using frontend-provided location:', primaryLocation);
-      } else if (geo && geo.city) {
-        // Use IP geolocation data
+      } else if (geoData && geoData.country) {
+        // Use IPinfo Lite geolocation data (country-level)
         primaryLocation = {
-          city: geo.city || null,
-          region: geo.region || null, // State/province
-          country: geo.country || null,
-          countryCode: geo.country || null, // geoip-lite returns country code in 'country' field
-          coordinates: (geo.ll && geo.ll[0] && geo.ll[1]) ? {
-            lat: geo.ll[0],
-            lng: geo.ll[1]
-          } : null,
+          city: null, // IPinfo Lite doesn't provide city data
+          region: null, // IPinfo Lite doesn't provide region data
+          country: geoData.country || null,
+          countryCode: geoData.country_code || null,
+          coordinates: null, // IPinfo Lite doesn't provide coordinates
           detectedFromIP: true
         };
-        console.log('Using IP geolocation:', primaryLocation);
+        console.log('Using IPinfo Lite geolocation:', primaryLocation);
       } else {
-        primaryLocation = {
-          ...defaultLocation,
-          detectedFromIP: false
-        };
-        console.log('Using default location:', primaryLocation);
+        // Fallback for private IPs or API failures
+        if (ip && (ip.includes('192.168.') || ip.includes('10.') || ip.includes('172.') || ip === '127.0.0.1' || ip === '::1')) {
+          // Local/private IP - use default
+          primaryLocation = {
+            ...defaultLocation,
+            detectedFromIP: false
+          };
+          console.log('Using default location for private IP:', primaryLocation);
+        } else {
+          // Public IP but no geo data - use default
+          primaryLocation = {
+            ...defaultLocation,
+            detectedFromIP: false
+          };
+          console.log('Using default location for public IP without geo data:', primaryLocation);
+        }
       }
       
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });
