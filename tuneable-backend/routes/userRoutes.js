@@ -90,9 +90,10 @@ router.post(
       }
       
       // Extract IP address for geolocation (not stored for privacy)
-      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
       const geo = geoip.lookup(ip);
       console.log(`Registration IP: ${ip}, Geo: ${JSON.stringify(geo)}`);
+      console.log(`Frontend homeLocation: ${JSON.stringify(homeLocation)}`);
       
       // Determine primary location with fallback logic
       const defaultLocation = { 
@@ -105,7 +106,8 @@ router.post(
       let primaryLocation;
       
       // Check if a homeLocation object was provided and has values
-      if (homeLocation && Object.keys(homeLocation).length > 0) {
+      if (homeLocation && Object.keys(homeLocation).length > 0 && 
+          (homeLocation.city || homeLocation.country)) {
         primaryLocation = {
           city: homeLocation.city || null,
           region: homeLocation.region || null,
@@ -114,7 +116,8 @@ router.post(
           coordinates: homeLocation.coordinates || null,
           detectedFromIP: false
         };
-      } else if (geo) {
+        console.log('Using frontend-provided location:', primaryLocation);
+      } else if (geo && geo.city) {
         // Use IP geolocation data
         primaryLocation = {
           city: geo.city || null,
@@ -127,11 +130,13 @@ router.post(
           } : null,
           detectedFromIP: true
         };
+        console.log('Using IP geolocation:', primaryLocation);
       } else {
         primaryLocation = {
           ...defaultLocation,
           detectedFromIP: false
         };
+        console.log('Using default location:', primaryLocation);
       }
       
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });

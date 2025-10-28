@@ -427,6 +427,54 @@ const AuthPage: React.FC = () => {
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
         </div>
+
+        {/* Location Fields */}
+        <div className="flex flex-col flex items-center justify-center">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Location (Optional)</h3>
+          <div className="grid grid-cols-2 gap-2 w-full">
+            <input
+              id="city"
+              name="city"
+              type="text"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              placeholder="City"
+              value={formData.homeLocation.city}
+              onChange={handleChange}
+            />
+            <input
+              id="region"
+              name="region"
+              type="text"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              placeholder="State/Region"
+              value={formData.homeLocation.region}
+              onChange={handleChange}
+            />
+            <input
+              id="country"
+              name="country"
+              type="text"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              placeholder="Country"
+              value={formData.homeLocation.country}
+              onChange={handleChange}
+            />
+            <input
+              id="countryCode"
+              name="countryCode"
+              type="text"
+              maxLength={2}
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              placeholder="Country Code (e.g., US)"
+              value={formData.homeLocation.countryCode}
+              onChange={handleChange}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            Leave blank to auto-detect from your IP address
+          </p>
+        </div>
+
         <div className="flex flex-col p-4 flex items-center justify-center">
         <button
           type="submit"
