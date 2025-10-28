@@ -392,6 +392,13 @@ export const searchAPI = {
     const response = await api.get('/search', { params });
     return response.data;
   },
+  
+  searchByYouTubeUrl: async (url: string) => {
+    const response = await api.get('/search/youtube-url', {
+      params: { url }
+    });
+    return response.data;
+  },
 };
 
 // Top Tunes API

@@ -235,4 +235,128 @@ router.post('/clear-cache', (req, res) => {
     }
 });
 
+// Helper function to extract YouTube video ID from URL
+const extractVideoId = (url) => {
+    if (!url) return null;
+    
+    // Handle various YouTube URL formats
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+        /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) {
+            return match[1];
+        }
+    }
+    
+    return null;
+};
+
+// Helper function to transform Media document to search result format
+const transformMediaToSearchResult = (media) => {
+    const sources = {};
+    if (media.sources) {
+        if (media.sources instanceof Map) {
+            media.sources.forEach((value, key) => {
+                sources[key] = value;
+            });
+        } else {
+            Object.assign(sources, media.sources);
+        }
+    }
+
+    const artistName = Array.isArray(media.artist) && media.artist.length > 0 
+        ? media.artist[0].name 
+        : 'Unknown Artist';
+
+    return {
+        id: media._id || media.uuid, // Include both _id and uuid for frontend
+        uuid: media.uuid, // Include UUID for frontend
+        title: media.title,
+        artist: artistName,
+        coverArt: media.coverArt || (sources.youtube ? `https://img.youtube.com/vi/${extractVideoId(sources.youtube)}/hqdefault.jpg` : ''),
+        duration: media.duration || 0,
+        sources: sources,
+        globalMediaAggregate: media.globalMediaAggregate || 0,
+        tags: media.tags || [],
+        category: media.category || 'Unknown',
+        isLocal: true // Flag to indicate this is from our database
+    };
+};
+
+// YouTube URL processing endpoint
+router.get('/youtube-url', async (req, res) => {
+    const { url } = req.query;
+    
+    if (!url) {
+        return res.status(400).json({ error: 'YouTube URL is required' });
+    }
+    
+    try {
+        console.log(`Processing YouTube URL: ${url}`);
+        
+        // Extract video ID from URL
+        const videoId = extractVideoId(url);
+        if (!videoId) {
+            return res.status(400).json({ error: 'Invalid YouTube URL format' });
+        }
+        
+        console.log(`Extracted video ID: ${videoId}`);
+        
+        // Check if video already exists in database
+        const existingMedia = await Media.findOne({
+            $or: [
+                { 'sources.youtube': videoId },
+                { 'externalIds.youtube': videoId },
+                { 'sources.youtube': url },
+                { 'sources.youtube': `https://www.youtube.com/watch?v=${videoId}` }
+            ]
+        });
+        
+        if (existingMedia) {
+            console.log(`Found existing media in database: ${existingMedia.title}`);
+            return res.json({
+                source: 'local',
+                videos: [transformMediaToSearchResult(existingMedia)]
+            });
+        }
+        
+        // Fetch video details from YouTube API
+        console.log(`Fetching video details from YouTube API for: ${videoId}`);
+        const { getVideoDetails } = youtubeService;
+        const videoDetails = await getVideoDetails(videoId);
+        
+        if (!videoDetails) {
+            return res.status(404).json({ error: 'Video not found or not accessible' });
+        }
+        
+        // Return single video result in the same format as regular search
+        const videoResult = {
+            id: videoId,
+            title: videoDetails.title || 'Unknown Title',
+            artist: videoDetails.channelTitle || 'Unknown Artist',
+            coverArt: videoDetails.thumbnail || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            duration: videoDetails.duration || 0,
+            sources: { youtube: url },
+            tags: videoDetails.tags || [],
+            category: videoDetails.category || 'Unknown',
+            isLocal: false // Flag to indicate this is from external API
+        };
+        
+        console.log(`Successfully processed YouTube URL: ${videoResult.title}`);
+        
+        res.json({
+            source: 'external',
+            videos: [videoResult]
+        });
+        
+    } catch (error) {
+        console.error('Error processing YouTube URL:', error);
+        res.status(500).json({ error: 'Failed to process YouTube URL: ' + error.message });
+    }
+});
+
 module.exports = router;
