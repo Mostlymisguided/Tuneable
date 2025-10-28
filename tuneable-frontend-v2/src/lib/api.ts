@@ -9,6 +9,7 @@ interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
+  tuneBytes?: number;
   homeLocation: {
     city: string;
     country: string;
@@ -540,6 +541,31 @@ export const reportAPI = {
   // Update report status (admin only)
   updateReport: async (reportId: string, updateData: { status?: string; adminNotes?: string }) => {
     const response = await api.patch(`/reports/admin/reports/${reportId}`, updateData);
+    return response.data;
+  },
+};
+
+// TuneBytes API functions
+export const tuneBytesAPI = {
+  // Get user's TuneBytes statistics
+  getStats: async (userId: string) => {
+    const response = await api.get(`/users/${userId}/tunebytes`);
+    return response.data;
+  },
+
+  // Get user's TuneBytes transaction history
+  getHistory: async (userId: string, limit = 50, offset = 0) => {
+    const response = await api.get(`/users/${userId}/tunebytes/history`, {
+      params: { limit, offset }
+    });
+    return response.data;
+  },
+
+  // Recalculate TuneBytes for a media item (admin only)
+  recalculate: async (userId: string, mediaId: string) => {
+    const response = await api.post(`/users/${userId}/tunebytes/recalculate`, {
+      mediaId
+    });
     return response.data;
   },
 };

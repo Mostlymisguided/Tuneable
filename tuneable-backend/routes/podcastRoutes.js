@@ -187,6 +187,16 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     
     await bid.save();
     
+    // Calculate and award TuneBytes for this bid (async, don't block response)
+    try {
+      const tuneBytesService = require('../services/tuneBytesService');
+      tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
+        console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
+      });
+    } catch (error) {
+      console.error('Error setting up TuneBytes calculation:', error);
+    }
+    
     // Update episode
     episode.globalMediaAggregate += amount;
     episode.bids = episode.bids || [];
@@ -270,6 +280,16 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     });
     
     await bid.save();
+    
+    // Calculate and award TuneBytes for this bid (async, don't block response)
+    try {
+      const tuneBytesService = require('../services/tuneBytesService');
+      tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
+        console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
+      });
+    } catch (error) {
+      console.error('Error setting up TuneBytes calculation:', error);
+    }
     
     // Update party episode entry
     partyEpisodeEntry.partyBidValue += amount;

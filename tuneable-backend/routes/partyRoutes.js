@@ -718,6 +718,16 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
 
         await bid.save();
 
+        // Calculate and award TuneBytes for this bid (async, don't block response)
+        try {
+          const tuneBytesService = require('../services/tuneBytesService');
+          tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
+            console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
+          });
+        } catch (error) {
+          console.error('Error setting up TuneBytes calculation:', error);
+        }
+
         // Send email notification for high-value bids
         try {
           await sendHighValueBidNotification(bid, media, user, 10);
@@ -960,6 +970,16 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         });
 
         await bid.save();
+
+        // Calculate and award TuneBytes for this bid (async, don't block response)
+        try {
+          const tuneBytesService = require('../services/tuneBytesService');
+          tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
+            console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
+          });
+        } catch (error) {
+          console.error('Error setting up TuneBytes calculation:', error);
+        }
 
         // Send email notification for high-value bids
         try {

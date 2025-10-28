@@ -939,4 +939,117 @@ router.get('/:userId/tag-rankings', async (req, res) => {
   }
 });
 
+// ========================================
+// TUNEBYTES ROUTES
+// ========================================
+
+// @route   GET /api/users/:userId/tunebytes
+// @desc    Get user's TuneBytes statistics and history
+// @access  Private
+router.get('/:userId/tunebytes', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user._id;
+
+    // Users can only view their own TuneBytes data
+    if (userId !== requestingUserId.toString()) {
+      return res.status(403).json({ error: 'You can only view your own TuneBytes data' });
+    }
+
+    const tuneBytesService = require('../services/tuneBytesService');
+    const stats = await tuneBytesService.getUserTuneBytesStats(userId);
+
+    res.json({
+      success: true,
+      stats
+    });
+
+  } catch (error) {
+    console.error('Error fetching user TuneBytes stats:', error);
+    res.status(500).json({ error: 'Failed to fetch TuneBytes statistics' });
+  }
+});
+
+// @route   GET /api/users/:userId/tunebytes/history
+// @desc    Get user's TuneBytes transaction history
+// @access  Private
+router.get('/:userId/tunebytes/history', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user._id;
+    const { limit = 50, offset = 0 } = req.query;
+
+    // Users can only view their own TuneBytes data
+    if (userId !== requestingUserId.toString()) {
+      return res.status(403).json({ error: 'You can only view your own TuneBytes data' });
+    }
+
+    const TuneBytesTransaction = require('../models/TuneBytesTransaction');
+    const transactions = await TuneBytesTransaction.find({ 
+      userId: new mongoose.Types.ObjectId(userId),
+      status: 'confirmed'
+    })
+    .populate('mediaId', 'title artist coverArt')
+    .populate('bidId', 'amount createdAt')
+    .sort({ createdAt: -1 })
+    .skip(parseInt(offset))
+    .limit(parseInt(limit));
+
+    const totalCount = await TuneBytesTransaction.countDocuments({ 
+      userId: new mongoose.Types.ObjectId(userId),
+      status: 'confirmed'
+    });
+
+    res.json({
+      success: true,
+      transactions,
+      pagination: {
+        total: totalCount,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: (parseInt(offset) + parseInt(limit)) < totalCount
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching TuneBytes history:', error);
+    res.status(500).json({ error: 'Failed to fetch TuneBytes history' });
+  }
+});
+
+// @route   POST /api/users/:userId/tunebytes/recalculate
+// @desc    Recalculate TuneBytes for a specific media item
+// @access  Private (Admin only)
+router.post('/:userId/tunebytes/recalculate', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { mediaId } = req.body;
+    const requestingUserId = req.user._id;
+
+    // Check if user is admin
+    const User = require('../models/User');
+    const requestingUser = await User.findById(requestingUserId);
+    if (!requestingUser.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (!mediaId) {
+      return res.status(400).json({ error: 'mediaId is required' });
+    }
+
+    const tuneBytesService = require('../services/tuneBytesService');
+    const result = await tuneBytesService.recalculateTuneBytesForMedia(mediaId);
+
+    res.json({
+      success: true,
+      message: 'TuneBytes recalculated successfully',
+      result
+    });
+
+  } catch (error) {
+    console.error('Error recalculating TuneBytes:', error);
+    res.status(500).json({ error: 'Failed to recalculate TuneBytes' });
+  }
+});
+
 module.exports = router;

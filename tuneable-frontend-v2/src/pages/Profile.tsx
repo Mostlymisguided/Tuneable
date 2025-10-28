@@ -261,6 +261,25 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
+          {/* TuneBytes Card */}
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+            <div className="flex items-center space-x-3">
+              <Gift className="w-6 h-6" />
+              <div>
+                <p className="text-purple-100 text-sm">TuneBytes Earned</p>
+                <p className="text-2xl font-bold">{(profile as any).tuneBytes?.toFixed(2) || '0.00'}</p>
+                <p className="text-purple-100 text-xs mt-1">
+                  Earned by discovering popular music
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-purple-400">
+              <p className="text-purple-100 text-xs">
+                💡 TuneBytes can be redeemed for artist merchandise, concert tickets, and exclusive perks in the future!
+              </p>
+            </div>
+          </div>
+
           {/* Profile Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Personal Information */}

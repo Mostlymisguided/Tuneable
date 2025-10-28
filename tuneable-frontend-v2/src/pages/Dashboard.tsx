@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift } from 'lucide-react';
 import TopTunes from '../components/TopTunes';
 
 const Dashboard: React.FC = () => {
@@ -47,6 +47,20 @@ const Dashboard: React.FC = () => {
               <p className="text-sm font-medium text-white">Global Rank</p>
               <p className="text-2xl font-semibold text-white">
                 #{user?.globalUserAggregateRank || 'N/A'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <Gift className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">TuneBytes</p>
+              <p className="text-2xl font-semibold text-white">
+                {(user as any)?.tuneBytes?.toFixed(0) || '0'}
               </p>
             </div>
           </div>

@@ -8,6 +8,15 @@ export interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
+  tuneBytes?: number;
+  tuneBytesHistory?: {
+    mediaId: string;
+    earnedAmount: number;
+    earnedAt: string;
+    bidId: string;
+    discoveryRank: number;
+    reason: 'discovery' | 'popularity_growth';
+  }[];
   locations: {
     primary: {
       city?: string;
@@ -281,4 +290,51 @@ export interface AuthContextType {
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+}
+
+// TuneBytes related interfaces
+export interface TuneBytesTransaction {
+  _id: string;
+  uuid: string;
+  userId: string;
+  mediaId: string;
+  bidId: string;
+  username: string;
+  mediaTitle: string;
+  mediaArtist: string;
+  mediaCoverArt?: string;
+  tuneBytesEarned: number;
+  calculationSnapshot: {
+    currentTotalValue: number;
+    bidTimeTotalValue: number;
+    userBidAmount: number;
+    userBidPence: number;
+    discoveryRank: number;
+    discoveryBonus: number;
+    timeElapsed: number;
+    formula: string;
+  };
+  status: 'pending' | 'confirmed' | 'redeemed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TuneBytesStats {
+  totalTuneBytes: number;
+  totalTransactions: number;
+  totalMediaDiscovered: number;
+  averageTuneBytesPerTransaction: number;
+  topDiscoveryRank: number;
+  recentTransactions: TuneBytesTransaction[];
+}
+
+export interface TuneBytesHistoryResponse {
+  success: boolean;
+  transactions: TuneBytesTransaction[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
 }

@@ -26,6 +26,18 @@ const userSchema = new mongoose.Schema({
   personalInviteCode: { type: String, required: true, unique: true },
   parentInviteCode: { type: String, required: false },
   balance: { type: Number, default: 0 }, // New field for wallet balance
+  tuneBytes: { 
+    type: Number, 
+    default: 0 
+  },
+  tuneBytesHistory: [{
+    mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media' },
+    earnedAmount: Number,
+    earnedAt: { type: Date, default: Date.now },
+    bidId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bid' },
+    discoveryRank: Number, // 1st, 2nd, 3rd bidder, etc.
+    reason: { type: String, enum: ['discovery', 'popularity_growth'] }
+  }],
   locations: {
     primary: {
       city: { type: String },
