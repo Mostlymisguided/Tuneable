@@ -83,15 +83,6 @@ const Navbar: React.FC = () => {
                 >
                   Podcasts
                 </Link> */}
-                <Link
-                  to="/about"
-                  className="hidden lg:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  About
-                </Link>
                 <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-4">
                   <Link
                     to="/wallet"

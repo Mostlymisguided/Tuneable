@@ -167,9 +167,9 @@ const TermsOfService: React.FC = () => {
                   Revenue from bids placed on media content is distributed as follows:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>Artists/Creators:</strong> 50% of bid revenue</li>
-                  <li><strong>Tuneable Platform:</strong> 33% of bid revenue (operating costs and platform maintenance)</li>
-                  <li><strong>Platform Development Fund:</strong> 17% of bid revenue (reserved for future features, artist tools, and platform enhancements)</li>
+                  <li><strong>Artists/Creators:</strong> 60% of bid revenue</li>
+                  <li><strong>Tuneable Platform:</strong> 30% of bid revenue (operating costs and platform maintenance)</li>
+                  <li><strong>Platform Development Fund:</strong> 10% of bid revenue (reserved for future features, artist tools, and platform enhancements)</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">8.2 Payment Processing</h3>
@@ -181,8 +181,8 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">8.3 Revenue Share Commitment</h3>
                 <p className="mb-2">
-                  Tuneable CIC commits to increasing artist revenue share to 60% as the platform scales and operational costs decrease. 
-                  We will provide transparent reporting on revenue distribution upon request.
+                  Tuneable CIC is committed to maintaining this artist-friendly revenue split, with artists receiving the majority 
+                  of bid revenue. We will provide transparent reporting on revenue distribution upon request.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.4 Future Features</h3>
@@ -334,7 +334,7 @@ const TermsOfService: React.FC = () => {
               </p>
               <div className="mt-4 p-4 bg-gray-100 rounded-lg">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> mostlymisguided@icloud.com<br />
+                  <strong>Email:</strong> hi@tuneable.stream<br />
                   <strong>Response Time:</strong> We will respond to all inquiries within 7 business days
                 </p>
               </div>
