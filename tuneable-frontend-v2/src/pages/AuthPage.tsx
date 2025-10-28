@@ -21,6 +21,10 @@ const AuthPage: React.FC = () => {
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
   const [inviterUsername, setInviterUsername] = useState<string>('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
+  
+  // Location detection state
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationDetectionStatus, setLocationDetectionStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -58,37 +62,6 @@ const AuthPage: React.FC = () => {
     }
   }, [location.search, isRegisterPage]);
 
-  // Auto-detect location for registration form
-  useEffect(() => {
-    const detectUserLocation = async () => {
-      try {
-        const response = await userAPI.detectLocation();
-        if (response.success && response.location) {
-          setFormData(prev => ({
-            ...prev,
-            homeLocation: {
-              ...prev.homeLocation,
-              country: response.location.country,
-              // Keep existing city/region if user already started typing
-              city: prev.homeLocation.city || response.location.city,
-              region: prev.homeLocation.region || response.location.region,
-            }
-          }));
-          
-          toast.info(`Auto-detected location: ${response.location.country}`);
-        }
-      } catch (error) {
-        console.log('Location detection failed:', error);
-        // Silently fail - don't show error to user
-      }
-    };
-
-    // Only detect location for registration page
-    if (isRegisterPage) {
-      detectUserLocation();
-    }
-  }, [isRegisterPage]);
-
   // Validate invite code against backend
   const validateInviteCode = async (code: string) => {
     if (!code || code.length !== 5) {
@@ -105,6 +78,9 @@ const AuthPage: React.FC = () => {
       if (response.data.valid) {
         setInviteCodeValid(true);
         setInviterUsername(response.data.inviterUsername || '');
+        
+        // Trigger location detection after successful invite code validation
+        detectUserLocation();
       } else {
         setInviteCodeValid(false);
         setInviterUsername('');
@@ -114,6 +90,37 @@ const AuthPage: React.FC = () => {
       setInviterUsername('');
     } finally {
       setIsValidatingCode(false);
+    }
+  };
+
+  // Separate location detection function
+  const detectUserLocation = async () => {
+    setIsDetectingLocation(true);
+    setLocationDetectionStatus('idle');
+    
+    try {
+      const response = await userAPI.detectLocation();
+      if (response.success && response.location) {
+        setFormData(prev => ({
+          ...prev,
+          homeLocation: {
+            ...prev.homeLocation,
+            country: response.location.country,
+            city: prev.homeLocation.city || response.location.city,
+            region: prev.homeLocation.region || response.location.region,
+          }
+        }));
+        
+        setLocationDetectionStatus('success');
+        toast.success(`Auto-detected location: ${response.location.country}`);
+      } else {
+        setLocationDetectionStatus('failed');
+      }
+    } catch (error) {
+      console.log('Location detection failed:', error);
+      setLocationDetectionStatus('failed');
+    } finally {
+      setIsDetectingLocation(false);
     }
   };
 
@@ -465,12 +472,34 @@ const AuthPage: React.FC = () => {
         <div className="flex flex-col flex items-center justify-center">
           <h3 className="text-sm font-medium text-gray-700 mb-2">
             Home Location (Optional)
-            {formData.homeLocation.country && (
+            {locationDetectionStatus === 'success' && (
               <span className="ml-2 text-xs text-green-600">
                 ✓ Auto-detected
               </span>
             )}
           </h3>
+          
+          {/* Location detection status */}
+          {isDetectingLocation && (
+            <div className="flex items-center mb-2 text-xs text-blue-600">
+              <div className="animate-spin h-4 w-4 border-2 border-blue-300 border-t-blue-600 rounded-full mr-2"></div>
+              <span>Detecting your location...</span>
+            </div>
+          )}
+          
+          {locationDetectionStatus === 'failed' && (
+            <div className="flex items-center mb-2 text-xs text-orange-600">
+              <XCircle className="h-4 w-4 mr-1" />
+              <span>Could not auto-detect location</span>
+            </div>
+          )}
+          
+          {locationDetectionStatus === 'success' && (
+            <div className="flex items-center mb-2 text-xs text-green-600">
+              <CheckCircle className="h-4 w-4 mr-1" />
+              <span>Location auto-detected successfully</span>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 w-full">
             <input
               id="city"
@@ -558,7 +587,12 @@ const AuthPage: React.FC = () => {
             </select>
           </div>
           <p className="text-xs text-gray-500 mt-1 text-center">
-            Location auto-detected from your IP address. You can edit or remove it.
+            {locationDetectionStatus === 'success' 
+              ? 'Location auto-detected from your IP address. You can edit or remove it.'
+              : locationDetectionStatus === 'failed'
+              ? 'Location detection failed. Please enter your location manually.'
+              : 'Location will be auto-detected after entering a valid invite code.'
+            }
           </p>
         </div>
 
