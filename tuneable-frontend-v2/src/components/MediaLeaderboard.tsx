@@ -107,8 +107,8 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
     if (!user || amount === 0) return null;
 
     return (
-      <div className={`flex items-center justify-between p-2 rounded-lg bg-gradient-to-r ${color} border border-opacity-30`}>
-        <div className="flex items-center space-x-2 flex-1 min-w-0">
+      <div className={`flex items-center justify-between p-2 rounded-lg bg-gradient-to-r ${color} border border-opacity-30 w-fit`}>
+        <div className="flex items-center space-x-2">
           {/* Profile Picture replacing icon */}
           {user.profilePic ? (
             <img
@@ -129,7 +129,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
             <img src="/default-profile.png" alt="Tuneable" className="w-6 h-6" />
           </div>
           
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0">
             <div className="text-xs text-gray-300 mb-0.5">{label}</div>
             <button
               onClick={() => navigate(`/user/${user._id || user.uuid}`)}
@@ -145,7 +145,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
             )}
           </div>
         </div>
-        <div className="text-sm font-bold text-white  ">
+        <div className="text-sm font-bold text-white ml-2">
           £{amount.toFixed(2)}
         </div>
       </div>
@@ -153,36 +153,39 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
   };
 
   return (
-    <div className="mt-3 space-y-2">
-      {/* Top 1 Badges - Always Visible */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <UserBadge
-          user={globalMediaAggregateTopUser}
-          amount={globalMediaAggregateTop || 0}
-          icon={<Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />}
-          label="Top Global Fan"
-          color="from-blue-900/20 to-blue-800/10"
-        />
-        <UserBadge
-          user={partyMediaBidTopUser}
-          amount={partyMediaBidTop || 0}
-          icon={<Coins className="w-4 h-4 text-yellow-400 flex-shrink-0" />}
-          label="Top Party Bid"
-          color="from-yellow-900/20 to-yellow-800/10"
-        />
-      </div>
+    <div className="mt-3">
+      {/* Top 1 Badges and Leaderboard Button - Constrained Width */}
+      <div className="flex flex-col gap-2 w-fit">
+        {/* Top 1 Badges - Always Visible */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <UserBadge
+            user={globalMediaAggregateTopUser}
+            amount={globalMediaAggregateTop || 0}
+            icon={<Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />}
+            label="Top Global Fan"
+            color="from-blue-900/20 to-blue-800/10"
+          />
+          <UserBadge
+            user={partyMediaBidTopUser}
+            amount={partyMediaBidTop || 0}
+            icon={<Coins className="w-4 h-4 text-yellow-400 flex-shrink-0" />}
+            label="Top Party Bid"
+            color="from-yellow-900/20 to-yellow-800/10"
+          />
+        </div>
 
-      {/* Expand/Collapse Button */}
-      {bids.length > 0 && (
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-center space-x-2 p-2 bg-purple-900/30 hover:bg-purple-900/50 rounded-lg transition-colors text-sm text-purple-300"
-        >
-          <Trophy className="w-4 h-4" />
-          <span>{isExpanded ? 'Hide' : 'Show'} Full Leaderboard</span>
-          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-      )}
+        {/* Expand/Collapse Button - Same Width as Badges */}
+        {bids.length > 0 && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full flex items-center justify-center space-x-2 p-2 bg-purple-900/30 hover:bg-purple-900/50 rounded-lg transition-colors text-sm text-purple-300"
+          >
+            <Trophy className="w-4 h-4" />
+            <span>{isExpanded ? 'Hide' : 'Show'} Full Leaderboard</span>
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        )}
+      </div>
 
       {/* Expanded Leaderboards */}
       {isExpanded && (

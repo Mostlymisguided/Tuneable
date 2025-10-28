@@ -1570,15 +1570,15 @@ const Party: React.FC = () => {
                             
                             {/* Media Thumbnail with Overlays */}
                             <div 
-                              className="relative w-8 h-8 md:w-32 md:h-32 cursor-pointer group flex-shrink-0"
+                              className="relative w-8 h-8 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
                               onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                             >
                               <img
                                 src={mediaData.coverArt || '/default-cover.jpg'}
                                 alt={mediaData.title || 'Unknown Media'}
                                 className="w-full h-full rounded object-cover"
-                                width="128"
-                                height="128"
+                                width="192"
+                                height="192"
                               />
                               
                               {/* Play Icon Overlay */}
@@ -1621,8 +1621,6 @@ const Party: React.FC = () => {
                               globalMediaAggregateTopUser={mediaData.globalMediaAggregateTopUser}
                               partyMediaBidTop={item.partyMediaBidTop}
                               partyMediaBidTopUser={item.partyMediaBidTopUser}
-                              partyMediaAggregateTop={item.partyMediaAggregateTop}
-                              partyMediaAggregateTopUser={item.partyMediaAggregateTopUser}
                               bids={mediaData.bids || []}
                               mediaTitle={mediaData.title}
                             />
@@ -1649,7 +1647,7 @@ const Party: React.FC = () => {
                                 {/* Metrics Display */}
                                 <div className="flex flex-col-2 items-end space-y-1 border mx-4 px-2 py-2 rounded-lg">
                                   <div className="text-center p-2">
-                                    <div className="text-xs text-gray-300 tracking-wide">Tune Total</div>
+                                    <div className="text-xs text-gray-300 tracking-wide">Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
                                       £{(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate.toFixed(2) : '0.00')}
                                     </div>
