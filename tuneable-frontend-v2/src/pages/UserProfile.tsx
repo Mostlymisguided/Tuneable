@@ -261,7 +261,7 @@ const UserProfile: React.FC = () => {
   const getRoleColor = (roles: string[]) => {
     if (roles.includes('admin')) return 'text-white';
     if (roles.includes('moderator')) return 'text-blue-400';
-    if (roles.includes('creator')) return 'text-purple-400';
+    if (roles.includes('creator')) return 'text-white';
     return 'text-green-400';
   };
 

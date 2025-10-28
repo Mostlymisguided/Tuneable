@@ -28,8 +28,6 @@ interface MediaLeaderboardProps {
   globalMediaAggregateTopUser?: User;
   partyMediaBidTop?: number;
   partyMediaBidTopUser?: User;
-  partyMediaAggregateTop?: number;
-  partyMediaAggregateTopUser?: User;
   
   // All bids for calculating Top 5
   bids?: Bid[];
@@ -45,8 +43,6 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
   globalMediaAggregateTopUser,
   partyMediaBidTop,
   partyMediaBidTopUser,
-  partyMediaAggregateTop,
-  partyMediaAggregateTopUser,
   bids = [],
   mediaTitle = 'this media'
 }) => {
@@ -159,20 +155,13 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
   return (
     <div className="mt-3 space-y-2">
       {/* Top 1 Badges - Always Visible */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <UserBadge
           user={globalMediaAggregateTopUser}
           amount={globalMediaAggregateTop || 0}
           icon={<Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />}
           label="Top Global Fan"
           color="from-blue-900/20 to-blue-800/10"
-        />
-        <UserBadge
-          user={partyMediaAggregateTopUser}
-          amount={partyMediaAggregateTop || 0}
-          icon={<Users className="w-4 h-4 text-purple-400 flex-shrink-0" />}
-          label="Top Party Fan"
-          color="from-purple-900/20 to-purple-800/10"
         />
         <UserBadge
           user={partyMediaBidTopUser}
