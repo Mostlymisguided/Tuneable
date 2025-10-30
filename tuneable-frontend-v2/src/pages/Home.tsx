@@ -31,7 +31,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Shield className="h-8 w-8 text-indigo-400" />,
-      title: "Support sound healing initiatives + mobile and floating wellness venues",
+      title: "Support sound healing initiatives + wellness venues",
       description: "Integrating music therapy and healing practices into our platform and community."
     }
   ];
