@@ -45,9 +45,9 @@ const Parties: React.FC = () => {
   const isUserInParty = (party: PartyType) => {
     if (!user) return false;
     
-    // Global Party is always considered joined for all users
+    // Global Tunes is always considered joined for all users
     if (party.type === 'global') {
-      console.log('🌍 Global Party - always joined');
+      console.log('🌍 Global Tunes - always joined');
       return true;
     }
     
@@ -381,8 +381,8 @@ const Parties: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-center items-center mb-8">
         <div className="text-center center-justify">
-          <h1 className="text-3xl font-bold text-white">Parties</h1>
-          <p className="text-gray-300 mt-2">Discover and Join Music Parties</p>
+          <h1 className="text-3xl font-bold text-white">Tunes</h1>
+          <p className="text-gray-300 mt-2">Discover Tunes and Join Parties</p>
         </div>
        
         {user?.role?.includes('admin') && (

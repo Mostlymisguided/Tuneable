@@ -35,7 +35,6 @@ const CreateParty: React.FC = () => {
     startTime: '',
     privacy: 'public' as 'public' | 'private',
     type: 'remote' as 'remote' | 'live' | 'global',
-    musicSource: 'youtube' as 'youtube' | 'direct_upload',
     minimumBid: 0.33,
     tags: '',
     description: '',
@@ -76,6 +75,7 @@ const CreateParty: React.FC = () => {
       // Prepare party data based on schedule type
       const partyData = {
         ...formData,
+        musicSource: 'youtube', // Default to YouTube for backward compatibility
         tags: tagsArray,
         // For automatic schedule, don't send startTime (backend will set to now)
         // For custom schedule, send the selected startTime
@@ -310,25 +310,10 @@ const CreateParty: React.FC = () => {
                 onChange={handleChange}
               >
                 <option value="remote">Remote - Collaborative Playlist</option>
-                <option value="live">Live - Real-time Venue</option>
+                <option value="live">Live - Real-time Venue (Coming Soon)</option>
               </select>
             </div>
 
-            <div>
-              <label htmlFor="musicSource" className="block text-sm font-medium text-gray-200 mb-2">
-                Music Source
-              </label>
-              <select
-                id="musicSource"
-                name="musicSource"
-                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                value={formData.musicSource}
-                onChange={handleChange}
-              >
-                <option value="youtube">YouTube</option>
-                <option value="direct_upload" disabled>Direct Upload (Coming Soon)</option>
-              </select>
-            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-200 mb-4">

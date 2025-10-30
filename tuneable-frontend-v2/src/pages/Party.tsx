@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -11,7 +11,8 @@ import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import MediaLeaderboard from '../components/MediaLeaderboard';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Plus, Copy, Share2, Coins, SkipForward, SkipBack, Loader2, Youtube } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Plus, Coins, SkipForward, SkipBack, Loader2, Youtube, Tag } from 'lucide-react';
+import TopSupporters from '../components/TopSupporters';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -89,19 +90,12 @@ const Party: React.FC = () => {
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, number>>({});
   
-  const [showVetoed, setShowVetoed] = useState(false);
+  const [showVetoed] = useState(false);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
 
-  // Function to scroll to webplayer
-  const scrollToWebPlayer = () => {
-    // Scroll to the bottom of the page where the webplayer is located
-    window.scrollTo({ 
-      top: document.documentElement.scrollHeight, 
-      behavior: 'smooth' 
-    });
-  };
+  // Scroll helper removed (no longer used)
 
   // Use global WebPlayer store
   const {
@@ -417,24 +411,7 @@ const Party: React.FC = () => {
   // Alias for consistency
   // const fetchParty = fetchPartyDetails; // OLD - no longer used
 
-  const copyPartyCode = () => {
-    if (party?.partyCode) {
-      navigator.clipboard.writeText(party.partyCode);
-      toast.success('Party code copied to clipboard!');
-    }
-  };
-
-  const shareParty = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: party?.name,
-        text: `Join my party: ${party?.name}`,
-        url: window.location.href,
-      });
-    } else {
-      copyPartyCode();
-    }
-  };
+  // Share and copy party code features removed
 
   // Sorting functions
   const fetchSortedMedia = async (timePeriod: string) => {
@@ -649,8 +626,62 @@ const Party: React.FC = () => {
 
   // Helper to get media items
   const getPartyMedia = () => {
-    return party.media || [];
+    return (party && party.media) ? party.media : [];
   };
+
+  // Top Tags cloud (proxy for GlobalTagAggregate using party/global aggregates)
+  const topTags = useMemo(() => {
+    if (!party) return [] as Array<{ tag: string; total: number; count: number }>;
+    const counts: Record<string, { total: number; count: number }> = {};
+    const media = getPartyMedia().filter((it: any) => it.status === 'queued');
+
+    for (const item of media) {
+      const m = item.mediaId || item;
+      const tags: string[] = Array.isArray(m.tags) ? m.tags : [];
+      const value =
+        (typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0) ||
+        (typeof m.globalMediaAggregate === 'number' ? m.globalMediaAggregate : 0);
+
+      for (const raw of tags) {
+        const t = (raw || '').trim().toLowerCase();
+        if (!t) continue;
+        if (!counts[t]) counts[t] = { total: 0, count: 0 };
+        counts[t].total += value;
+        counts[t].count += 1;
+      }
+    }
+
+    return Object.entries(counts)
+      .map(([tag, v]) => ({ tag, total: v.total, count: v.count }))
+      .sort((a, b) => b.total - a.total || b.count - a.count)
+      .slice(0, 15);
+  }, [party]);
+
+  // Selected tag filters derived from queueSearchTerms
+  const selectedTagFilters = useMemo(() => {
+    return queueSearchTerms
+      .filter((t) => t.startsWith('#'))
+      .map((t) => t.slice(1).toLowerCase());
+  }, [queueSearchTerms]);
+
+  // Aggregate bids across queued media filtered by selected tags
+  const topSupporterBids = useMemo(() => {
+    if (!party) return [] as any[];
+    const out: any[] = [];
+    const media = getPartyMedia().filter((it: any) => it.status === 'queued');
+    for (const item of media) {
+      const m = item.mediaId || item;
+      const tags: string[] = Array.isArray(m.tags) ? m.tags.map((t: string) => (t || '').toLowerCase()) : [];
+      if (selectedTagFilters.length > 0) {
+        const ok = selectedTagFilters.every((t) => tags.includes(t));
+        if (!ok) continue;
+      }
+      (m.bids || []).forEach((b: any) => out.push(b));
+    }
+    return out;
+  }, [party, selectedTagFilters]);
+
+  // Removed TuneBytes/user profile fetch for simplicity and performance
 
   // Get media to display based on selected time period and search terms
   const getDisplayMedia = () => {
@@ -1031,53 +1062,10 @@ const Party: React.FC = () => {
   return (
     <div className="min-h-screen ">
       {/* Party Header */}
-      <div className="px-3 sm:px-6 py-4 sm:py-6">
-        <div className="card max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-              <div className="space-y-3">
+      <div className=" justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
+       
                 <h1 className="mb-2 text-xl sm:text-3xl font-bold text-white">{party.name}</h1>
-                <div className="flex items-center mt-1">
-                <span className="text-white text-sm font-semibold md:text-lg">
-                    Location
-                  </span>
-                  <span className="ml-2 text-white text-sm font-semibold md:text-lg bg-purple-600 rounded-full px-2 py-1">
-                    {party.location}
-                  </span>
-                </div>
-                <div className="">
-                  <span className="text-white text-sm font-semibold md:text-lg">
-                    Host 
-                  </span>
-                  <span className="ml-2 text-white text-sm font-semibold md:text-lg bg-purple-600 rounded-full px-2 py-1">
-                    {typeof party.host === 'object' ? party.host?.username || 'Unknown' : party.host}
-                  </span>
-                </div>
-                <div className="flex mt-4">
-                  <span className="px-2 py-1 text-white text-xs md:text-base font-medium rounded-full bg-green-600/90">
-                    {party.status}
-                  </span>
-                  </div>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-              <button
-                onClick={copyPartyCode}
-                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
-              >
-                <Copy className="h-4 w-4" />
-                <span className="text-sm sm:text-base">{party.partyCode}</span>
-              </button>
-              <button
-                onClick={shareParty}
-                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition-colors"
-              >
-                <Share2 className="h-4 w-4" />
-                <span className="text-sm sm:text-base">Share</span>
-              </button>
-            </div>
-          </div>
-        </div>
+         
       </div>
 
       {/* Metrics Cards */}
@@ -1093,17 +1081,6 @@ const Party: React.FC = () => {
                 <div className="text-xs sm:text-sm text-gray-300">
                   {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
                 </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-purple-800/50 border border-gray-600 p-3 sm:p-4 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-3 sm:space-x-4">
-              <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">
-                  {getPartyMedia().filter((item: any) => item.status === 'played').length}
-                </div>
-                <div className="text-xs sm:text-sm text-gray-300">Played</div>
               </div>
             </div>
           </div>
@@ -1127,76 +1104,74 @@ const Party: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="justify-center flex space-x-1 mb-6">
-          <button 
-            onClick={scrollToWebPlayer}
-            className="px-4 py-2 shadow-sm bg-black/20 border-white/20 border border-gray-500 text-white rounded-lg font-medium hover:bg-gray-700/30 transition-colors" 
-            style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-          >
-            Now Playing
-          </button>
-          <button 
-            onClick={() => setShowVetoed(false)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${!showVetoed ? 'bg-purple-600 text-white' : 'bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30'}`}
-            style={!showVetoed ? {backgroundColor: '#9333EA'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-          >
-            {selectedTimePeriod === 'all-time' 
-              ? `Queue (${getPartyMedia().filter((item: any) => item.status === 'queued').length})`
-              : `Queue - ${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} (${getDisplayMedia().length})`
-            }
-          </button>
-          <button 
-            onClick={() => setShowVetoed(true)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${showVetoed ? 'bg-red-600 text-white' : 'bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30'}`}
-            style={showVetoed ? {backgroundColor: '#DC2626'} : {backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-          >
-            Vetoed ({getPartyMedia().filter((item: any) => item.status === 'vetoed').length})
-          </button>
-          
-          {/* Manual refresh button for remote parties */}
-          {/*{party.type === 'remote' && (
-            <button 
-              onClick={handleManualRefresh}
-              className="px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 flex items-center space-x-2"
-              style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-              title="Refresh queue"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh</span>
-            </button>
-          )}*/}
-          {party.type === 'live' && (
-            <button 
-              onClick={() => {
-                const element = document.getElementById('previously-played');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-4 py-2 shadow-sm bg-gray-700 border border-gray-500 text-white rounded-lg font-medium" 
-              style={{backgroundColor: 'rgba(55, 65, 81, 0.2)'}}
-            >
-              Previously Played
-            </button>
-          )}
-        </div>
+        {/* Top Tags + Top Supporters (two columns on desktop) */}
+        <div className="max-w-7xl mx-auto mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Top Tags Cloud */}
+          {topTags.length > 0 && (
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Tag className="h-4 w-4 mr-2 text-purple-400" />
+                  Top Tags
+                </h3>
+                {queueSearchTerms.some((t) => t.startsWith('#')) && (
+                  <button
+                    onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => !t.startsWith('#')))}
+                    className="text-sm text-purple-300 hover:text-white"
+                  >
+                    Clear tags
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {topTags.map(({ tag, total }) => {
+                  const hash = `#${tag}`;
+                  const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
+                  const weight = Math.max(0.75, Math.min(1.25, total / 50));
+                  const sizeClass = weight > 1.1 ? 'text-base' : weight > 0.95 ? 'text-sm' : 'text-xs';
 
-        {/* Wallet Balance */}
-        <div className=" mt-4 rounded-lg mb-6">
-          <div className="relative items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-white font-medium">Wallet Balance: £{user?.balance?.toFixed(2) || '0.00'}</span>
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() =>
+                        setQueueSearchTerms((prev) =>
+                          selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
+                        )
+                      }
+                      className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
+                        selected
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                      }`}
+                      title={`£${total.toFixed(2)} total across queued tunes`}
+                    >
+                      #{tag}
+                      <span className="ml-2 text-[10px] opacity-70">£{total.toFixed(2)}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="mt-2 block">
-            <button 
-              onClick={() => navigate('/wallet')}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Top Up</span>
-            </button>
+          )}
+
+          {/* Top Supporters */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+              {selectedTagFilters.length > 0 ? (
+                <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
+              ) : (
+                <span className="text-xs text-gray-400">Showing global support</span>
+              )}
+            </div>
+            <div className="max-h-64 overflow-y-auto pr-1">
+              <TopSupporters bids={topSupporterBids} maxDisplay={10} />
             </div>
           </div>
         </div>
+
+
+        {/* Wallet Balance removed per product update */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Media Queue */}

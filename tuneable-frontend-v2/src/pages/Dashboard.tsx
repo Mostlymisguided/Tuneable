@@ -1,10 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift } from 'lucide-react';
-import TopTunes from '../components/TopTunes';
+import { AudioLines, Globe, Coins, Gift, Play, ArrowRight } from 'lucide-react';
+import { partyAPI } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
+  const [globalParty, setGlobalParty] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await partyAPI.getParties();
+        const g = (res.parties || []).find((p: any) => p.type === 'global');
+        setGlobalParty(g || null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const playFirst = () => {
+    if (!globalParty?.media?.length) return;
+    const first = globalParty.media[0];
+    setQueue(globalParty.media);
+    setCurrentMedia(first, 0, true);
+    setGlobalPlayerActive(true);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -17,9 +44,43 @@ const Dashboard: React.FC = () => {
         </p>
       </div>
 
-      {/* Top Tunes Section */}
-      <div className="mb-8">
-        <TopTunes limit={5} showHeader={true} />
+      {/* Global Tunes Hero */}
+      <div className="card mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Global Tunes</h2>
+            <p className="text-gray-400">What everyone is playing and bidding on right now</p>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={() => navigate(`/parties`)}>Browse Tunes</button>
+            {globalParty && (
+              <button className="btn-primary inline-flex items-center gap-2" onClick={playFirst} disabled={isLoading || !globalParty?.media?.length}>
+                <Play className="h-4 w-4" /> Play
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mini queue preview */}
+        <div className="mt-4 space-y-2">
+          {(globalParty?.media || []).slice(0, 5).map((m: any) => (
+            <div key={m._id || m.id} className="flex items-center justify-between bg-black/20 rounded px-3 py-2">
+              <div className="flex items-center gap-3">
+                {m.coverArt && <img src={m.coverArt} alt="" className="h-10 w-10 rounded object-cover" />}
+                <div>
+                  <div className="text-white">{m.title}</div>
+                  <div className="text-gray-400 text-sm">{m.artist}</div>
+                </div>
+              </div>
+              <div className="text-gray-300 text-sm">£{(m.globalMediaAggregate || 0).toFixed(2)}</div>
+            </div>
+          ))}
+          {globalParty && (
+            <button className="mt-2 text-purple-400 inline-flex items-center" onClick={() => navigate(`/party/${globalParty._id || globalParty.id}`)}>
+              Open Global Tunes <ArrowRight className="h-4 w-4 ml-1" />
+            </button>
+          )}
+        </div>
       </div>
 
 

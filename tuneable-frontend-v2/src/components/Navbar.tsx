@@ -66,13 +66,13 @@ const Navbar: React.FC = () => {
                   </Link>
                 )}
                 <Link
-                  to="/parties"
+                  to="/party/67c6a02895baad05d3a97cf4"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  Parties
+                  Tunes
                 </Link>
                 {/* <Link
                   to="/podcasts"

@@ -34,6 +34,7 @@ import CreatorRegister from './pages/CreatorRegister';
 import CreatorUpload from './pages/CreatorUpload';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
+import GlobalTunes from './pages/GlobalTunes';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -173,6 +174,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <PodcastDiscovery />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/global" 
+              element={
+                <ProtectedRoute>
+                  <GlobalTunes />
                 </ProtectedRoute>
               } 
             />

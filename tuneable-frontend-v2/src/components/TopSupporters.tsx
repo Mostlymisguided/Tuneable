@@ -17,9 +17,10 @@ interface Bid {
 interface TopSupportersProps {
   bids: Bid[];
   maxDisplay?: number;
+  userStatsMap?: Record<string, { tuneBytes?: number; globalUserAggregate?: number }>;
 }
 
-const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10 }) => {
+const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, userStatsMap }) => {
   const navigate = useNavigate();
 
   if (!bids || bids.length === 0) {
@@ -133,7 +134,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10 }) 
             </div>
           </div>
           
-          {/* Right: Total Amount */}
+          {/* Right: Totals */}
           <div className="text-right flex-shrink-0 ml-4">
             <div className="text-2xl font-bold text-green-400">
               £{supporter.totalAmount.toFixed(2)}
@@ -141,6 +142,11 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10 }) 
             <div className="text-xs text-gray-400">
               avg £{(supporter.totalAmount / supporter.bidCount).toFixed(2)}
             </div>
+            {userStatsMap && (supporter.user.uuid || supporter.user._id) && (
+              <div className="text-xs text-purple-300 mt-1">
+                TuneBytes: {userStatsMap[supporter.user.uuid || supporter.user._id]?.tuneBytes ?? '—'}
+              </div>
+            )}
           </div>
         </div>
       ))}
