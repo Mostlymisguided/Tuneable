@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authAPI } from '../lib/api';
 import { toast } from 'react-toastify';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 import { 
   User, 
   MapPin, 
@@ -197,7 +198,7 @@ const Profile: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <img
-                  src={profile.profilePic || '/Tuneable-Logo-180x180.svg'}
+                  src={profile.profilePic || DEFAULT_PROFILE_PIC}
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />

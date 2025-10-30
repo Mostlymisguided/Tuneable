@@ -9,7 +9,8 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
-import MediaLeaderboard from '../components/MediaLeaderboard';
+// MediaLeaderboard kept in codebase for potential future use
+import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Coins, SkipForward, SkipBack, Loader2, Youtube, Tag } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
@@ -1588,17 +1589,8 @@ const Party: React.FC = () => {
                                   <span className="p-2 text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
                                 </div>
                               </div>
-                            {/* Media Leaderboard - Top Fans & Bids */}
-                            <MediaLeaderboard
-                              globalMediaBidTop={mediaData.globalMediaBidTop}
-                              globalMediaBidTopUser={mediaData.globalMediaBidTopUser}
-                              globalMediaAggregateTop={mediaData.globalMediaAggregateTop}
-                              globalMediaAggregateTopUser={mediaData.globalMediaAggregateTopUser}
-                              partyMediaBidTop={item.partyMediaBidTop}
-                              partyMediaBidTopUser={item.partyMediaBidTopUser}
-                              bids={mediaData.bids || []}
-                              mediaTitle={mediaData.title}
-                            />
+                            {/* Mini Supporters Bar - shows top supporters for this media */}
+                            <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
                                   {/* Tags Display */}
                                   {mediaData.tags && mediaData.tags.length > 0 && (
                                 <div className="mt-2 flex">

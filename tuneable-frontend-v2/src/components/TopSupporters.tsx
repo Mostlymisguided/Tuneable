@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, TrendingUp } from 'lucide-react';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface Bid {
   userId: {
@@ -104,7 +105,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
             {/* Profile Picture */}
             <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
               <img
-                src={supporter.user.profilePic || '/Tuneable-Logo-180x180.svg'}
+                src={supporter.user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={supporter.user.username}
                 className="w-full h-full object-cover"
               />

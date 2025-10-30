@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Users, Copy, CheckCircle, Gift, MapPin, Calendar } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { authAPI } from '../lib/api';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface Referral {
   username: string;
@@ -149,7 +150,7 @@ const InviteReferrals: React.FC = () => {
                   {/* Profile Picture */}
                   <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
                     <img
-                      src={referral.profilePic || '/Tuneable-Logo-180x180.svg'}
+                      src={referral.profilePic || DEFAULT_PROFILE_PIC}
                       alt={referral.username}
                       className="w-full h-full object-cover"
                     />

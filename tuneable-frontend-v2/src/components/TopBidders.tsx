@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface Bid {
   userId: {
@@ -77,7 +78,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
             {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 border-2 border-yellow-500 flex-shrink-0">
               <img
-                src={bid.userId.profilePic || '/Tuneable-Logo-180x180.svg'}
+                src={bid.userId.profilePic || DEFAULT_PROFILE_PIC}
                 alt={bid.userId.username}
                 className="w-full h-full object-cover"
               />

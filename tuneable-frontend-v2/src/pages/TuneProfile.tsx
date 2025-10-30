@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 import { 
   Music, 
   User, 
@@ -1217,7 +1218,7 @@ const TuneProfile: React.FC = () => {
                 <div key={comment._id} className="bg-black/20 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <img
-                      src={comment.userId.profilePic || '/Tuneable-Logo-180x180.svg'}
+                      src={comment.userId.profilePic || DEFAULT_PROFILE_PIC}
                       alt={comment.userId.username}
                       className="w-10 h-10 rounded-full object-cover"
                     />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 import { 
   MapPin, 
   Coins, 
@@ -556,7 +557,7 @@ const UserProfile: React.FC = () => {
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative">
               <img
-                src={user.profilePic || '/Tuneable-Logo-180x180.svg'}
+                src={user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={`${user.username} profile`}
                 className={`rounded-full shadow-xl object-cover ${isOwnProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                 style={{ width: '200px', height: '200px' }}
