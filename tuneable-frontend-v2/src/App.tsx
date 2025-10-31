@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, cssTransition } from 'react-toastify';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import 'react-toastify/dist/ReactToastify.css';
@@ -37,6 +37,13 @@ import LoadingSpinner from './components/LoadingSpinner';
 import GlobalTunes from './pages/GlobalTunes';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+
+// Define fade transition for toast notifications
+const Fade = cssTransition({
+  enter: 'fadeIn',
+  exit: 'fadeOut',
+  duration: [300, 200] // [enter, exit] in milliseconds
+});
 
 // Component to handle simple conditional player rendering
 const PlayerRenderer = () => {
@@ -251,13 +258,14 @@ const AppContent = () => {
         <ToastContainer
           position="top-right"
           autoClose={5000}
-          hideProgressBar={false}
+          hideProgressBar={true}
           newestOnTop={false}
           closeOnClick
           rtl={false}
           pauseOnFocusLoss
           draggable
           pauseOnHover
+          transition={Fade}
         />
       </div>
     </Router>
