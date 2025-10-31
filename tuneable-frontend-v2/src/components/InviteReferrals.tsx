@@ -153,6 +153,9 @@ const InviteReferrals: React.FC = () => {
                       src={referral.profilePic || DEFAULT_PROFILE_PIC}
                       alt={referral.username}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                      }}
                     />
                   </div>
                   

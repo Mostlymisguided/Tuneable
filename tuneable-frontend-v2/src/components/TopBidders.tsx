@@ -81,6 +81,9 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
                 src={bid.userId.profilePic || DEFAULT_PROFILE_PIC}
                 alt={bid.userId.username}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                }}
               />
             </div>
             

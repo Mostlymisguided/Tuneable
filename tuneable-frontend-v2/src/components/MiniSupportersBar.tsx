@@ -65,6 +65,9 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
                 src={s.user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={s.user.username}
                 className="h-6 w-6 rounded-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                }}
               />
               <span className="text-sm text-white truncate max-w-[10rem]">{s.user.username}</span>
               <span className="text-xs text-green-300">£{s.total.toFixed(2)}</span>

@@ -670,11 +670,27 @@ const Party: React.FC = () => {
     if (!party) return [] as any[];
     const out: any[] = [];
     const media = getPartyMedia().filter((it: any) => it.status === 'queued');
+    
+    // Normalize tag function (matching queue filtering logic)
+    const normalizeTag = (tag: string) => {
+      return tag.toLowerCase()
+        .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
+        .replace(/[^\w]/g, ''); // Remove any other non-word characters
+    };
+    
     for (const item of media) {
       const m = item.mediaId || item;
-      const tags: string[] = Array.isArray(m.tags) ? m.tags.map((t: string) => (t || '').toLowerCase()) : [];
+      const tags: string[] = Array.isArray(m.tags) 
+        ? m.tags.map((t: string) => normalizeTag(t || ''))
+        : [];
+      
       if (selectedTagFilters.length > 0) {
-        const ok = selectedTagFilters.every((t) => tags.includes(t));
+        // Use OR logic (.some()) to match queue filtering behavior
+        // Media should be included if it has ANY of the selected tags
+        const normalizedSelectedTags = selectedTagFilters.map(t => normalizeTag(t));
+        const ok = normalizedSelectedTags.some((selectedTag) => 
+          tags.some((tag) => tag === selectedTag)
+        );
         if (!ok) continue;
       }
       (m.bids || []).forEach((b: any) => out.push(b));
@@ -1373,7 +1389,7 @@ const Party: React.FC = () => {
                                 handleAddMediaSearch();
                               }
                             }}
-                            placeholder="Search for Tunes in our library or on YouTube, or paste a YouTube URL..."
+                            placeholder="Search for Tunes in our library or paste a YouTube URL..."
                             className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                           />
                          

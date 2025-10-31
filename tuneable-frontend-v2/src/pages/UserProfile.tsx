@@ -563,6 +563,9 @@ const UserProfile: React.FC = () => {
                 style={{ width: '200px', height: '200px' }}
                 onClick={handleProfilePicClick}
                 title={isOwnProfile ? 'Click to change profile picture' : ''}
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                }}
               />
               {isUploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">

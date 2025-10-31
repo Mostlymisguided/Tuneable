@@ -201,6 +201,9 @@ const Profile: React.FC = () => {
                   src={profile.profilePic || DEFAULT_PROFILE_PIC}
                   alt="Profile"
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                  }}
                 />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center rounded-full">

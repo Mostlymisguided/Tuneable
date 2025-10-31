@@ -108,6 +108,9 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
                 src={supporter.user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={supporter.user.username}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                }}
               />
             </div>
             

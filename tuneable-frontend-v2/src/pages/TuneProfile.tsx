@@ -1221,6 +1221,9 @@ const TuneProfile: React.FC = () => {
                       src={comment.userId.profilePic || DEFAULT_PROFILE_PIC}
                       alt={comment.userId.username}
                       className="w-10 h-10 rounded-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                      }}
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
