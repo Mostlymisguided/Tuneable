@@ -280,7 +280,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         });
         
         await s3Client.send(coverArtCommand);
-        const coverArtUrl = `${process.env.R2_PUBLIC_URL || 'https://uploads.tuneable.stream'}/${coverArtKey}`;
+        const coverArtUrl = getPublicUrl(coverArtKey);
         
         // Update media with cover art URL
         media.coverArt = coverArtUrl;

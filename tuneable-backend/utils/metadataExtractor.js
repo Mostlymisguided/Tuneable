@@ -158,8 +158,8 @@ class MetadataExtractor {
         
         await s3Client.send(command);
         
-        // Return public URL
-        return `${process.env.R2_PUBLIC_URL || 'https://uploads.tuneable.stream'}/${key}`;
+        // Return public URL using getPublicUrl for custom domain
+        return getPublicUrl(key);
         
       } else {
         // Fallback to local storage

@@ -68,6 +68,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Don't set Content-Type for FormData - let browser handle it automatically with boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+  
   return config;
 });
 
@@ -109,9 +115,9 @@ export const authAPI = {
   uploadProfilePic: async (file: File) => {
     const formData = new FormData();
     formData.append('profilePic', file);
-    const response = await api.put('/users/profile-pic', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Don't set Content-Type manually - let axios/browser handle it automatically
+    // This ensures the boundary parameter is included correctly
+    const response = await api.put('/users/profile-pic', formData);
     return response.data;
   },
   

@@ -115,11 +115,17 @@ const Profile: React.FC = () => {
       }
       
       toast.success('Profile picture updated successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading profile picture:', error);
-      toast.error('Failed to upload profile picture');
+      // Show actual error message from server if available
+      const errorMessage = error.response?.data?.error || error.response?.data?.details || 'Failed to upload profile picture';
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
+      // Reset file input to allow re-uploading the same file
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 

@@ -396,9 +396,10 @@ router.post(
       });
       await user.save();
       
-      // Set profile picture URL (R2 location or local path)
+      // Set profile picture URL using custom domain (R2_PUBLIC_URL)
+      // req.file.key contains the S3 key, use it with getPublicUrl for custom domain
       const profilePic = req.file 
-        ? (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`))
+        ? (req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`)))
         : null;
       user.profilePic = profilePic;
       await user.save();
@@ -606,8 +607,10 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
           return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      // Get profile picture URL (works for both R2 and local)
-      const profilePicPath = req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`);
+      // Use custom domain URL via getPublicUrl (uses R2_PUBLIC_URL env var)
+      // req.file.key contains the S3 key (e.g., "profile-pictures/userId-timestamp.jpg")
+      // req.file.location is the default R2 URL, but we want the custom domain
+      const profilePicPath = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`));
 
       console.log(`📸 Saving profile pic: ${profilePicPath} for user ${req.user.userId}`);
 

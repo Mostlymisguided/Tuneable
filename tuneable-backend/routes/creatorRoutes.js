@@ -47,10 +47,11 @@ router.post('/apply', authMiddleware, upload.array('proofFiles', 5), async (req,
     const parsedRoles = typeof roles === 'string' ? JSON.parse(roles) : roles;
     const parsedSocialMedia = typeof socialMedia === 'string' ? JSON.parse(socialMedia) : socialMedia;
 
-    // Process uploaded proof files (works for both R2 and local)
+    // Process uploaded proof files - use custom domain URL (R2_PUBLIC_URL)
+    // req.file.key contains the S3 key, use it with getPublicUrl for custom domain
     const proofFiles = req.files ? req.files.map(file => ({
       filename: file.key || file.filename, // R2 uses key, local uses filename
-      url: file.location || getPublicUrl(`creator-applications/${file.filename}`), // R2 has location, local needs construction
+      url: file.key ? getPublicUrl(file.key) : (file.location || getPublicUrl(`creator-applications/${file.filename}`)), // Use custom domain
       uploadedAt: new Date()
     })) : [];
 

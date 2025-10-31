@@ -487,9 +487,13 @@ const UserProfile: React.FC = () => {
       await fetchUserProfile();
     } catch (err: any) {
       console.error('Error uploading profile pic:', err);
-      toast.error(err.response?.data?.error || 'Failed to upload profile picture');
+      toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to upload profile picture');
     } finally {
       setIsUploading(false);
+      // Reset file input to allow re-uploading the same file
+      if (e.target) {
+        e.target.value = '';
+      }
     }
   };
 
