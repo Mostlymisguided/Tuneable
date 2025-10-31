@@ -39,10 +39,10 @@ import GlobalTunes from './pages/GlobalTunes';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 // Define fade transition for toast notifications
+// Duration is controlled by CSS animations (0.3s for fadeIn, 0.2s for fadeOut)
 const Fade = cssTransition({
   enter: 'fadeIn',
-  exit: 'fadeOut',
-  duration: [300, 200] // [enter, exit] in milliseconds
+  exit: 'fadeOut'
 });
 
 // Component to handle simple conditional player rendering
