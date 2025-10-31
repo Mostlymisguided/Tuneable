@@ -58,19 +58,19 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
             <button
               key={id}
               onClick={() => navigate(`/user/${id}`)}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/25 border border-white/10 hover:border-purple-400 transition-colors"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/25 border border-white/10 hover:border-purple-400 transition-colors flex-shrink-0"
               title={`£${s.total.toFixed(2)} (${s.count} bids)`}
             >
               <img
                 src={s.user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={s.user.username}
-                className="h-6 w-6 rounded-full object-cover"
+                className="h-6 w-6 rounded-full object-cover flex-shrink-0"
                 onError={(e) => {
                   e.currentTarget.src = DEFAULT_PROFILE_PIC;
                 }}
               />
-              <span className="text-sm text-white truncate max-w-[10rem]">{s.user.username}</span>
-              <span className="text-xs text-green-300">£{s.total.toFixed(2)}</span>
+              <span className="text-sm text-white whitespace-nowrap">{s.user.username}</span>
+              <span className="text-xs text-green-300 flex-shrink-0">£{s.total.toFixed(2)}</span>
             </button>
           );
         })}
