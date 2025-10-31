@@ -276,7 +276,7 @@ const AuthPage: React.FC = () => {
           type="email"
           autoComplete="email"
           required
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+          className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
           placeholder="Email Address"
           value={formData.email}
           onChange={handleChange}
@@ -287,7 +287,7 @@ const AuthPage: React.FC = () => {
           type="password"
           autoComplete="current-password"
           required
-          className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+          className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
           placeholder="Password"
           value={formData.password}
           onChange={handleChange}
@@ -362,7 +362,7 @@ const AuthPage: React.FC = () => {
               type="text"
               required
               maxLength={5}
-              className={`block w-full rounded-lg border px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-offset-1 ${
+              className={`block w-full rounded-lg border px-3 py-2 pr-10 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-offset-1 ${
                 inviteCodeValid === true
                   ? 'border-green-500 focus:ring-green-500'
                   : inviteCodeValid === false
@@ -406,7 +406,7 @@ const AuthPage: React.FC = () => {
             name="username"
             type="text"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
             placeholder="Choose a username"
             value={formData.username}
             onChange={handleChange}
@@ -422,7 +422,7 @@ const AuthPage: React.FC = () => {
             type="email"
             autoComplete="email"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
             placeholder="Email Address"
             value={formData.email}
             onChange={handleChange}
@@ -435,7 +435,7 @@ const AuthPage: React.FC = () => {
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
               required
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
@@ -454,7 +454,7 @@ const AuthPage: React.FC = () => {
               type={showConfirmPassword ? 'text' : 'password'}
               autoComplete="new-password"
               required
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="Confirm Password"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -505,7 +505,7 @@ const AuthPage: React.FC = () => {
               id="city"
               name="city"
               type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="City"
               value={formData.homeLocation.city}
               onChange={handleChange}
@@ -514,7 +514,7 @@ const AuthPage: React.FC = () => {
               id="region"
               name="region"
               type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
               placeholder="State/Region/County"
               value={formData.homeLocation.region}
               onChange={handleChange}
@@ -522,7 +522,7 @@ const AuthPage: React.FC = () => {
             <select
               id="country"
               name="country"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none focus:ring-2 focus:ring-black focus:ring-offset-1"
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 focus:ring-2 focus:ring-black focus:ring-offset-1"
               value={formData.homeLocation.country}
               onChange={handleChange}
             >
