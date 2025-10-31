@@ -701,10 +701,34 @@ router.get('/:mediaId/profile', async (req, res) => {
     // Add comments to the response
     populatedMedia.comments = recentComments;
 
-    // Compute GlobalMediaAggregateRank (rank by total bid value)
+    // Calculate accurate globalMediaAggregate from all active/played bids
+    // This ensures the displayed total matches the sum of all bids, even if stored value is stale
+    const Bid = require('../models/Bid');
+    const allBids = await Bid.find({
+      mediaId: media._id,
+      status: { $in: ['active', 'played'] }
+    });
+    
+    const calculatedGlobalMediaAggregate = allBids.reduce((sum, bid) => sum + bid.amount, 0);
+    
+    console.log(`📊 Calculated globalMediaAggregate: ${calculatedGlobalMediaAggregate} (from ${allBids.length} bids) vs stored: ${populatedMedia.globalMediaAggregate || 0}`);
+
+    // Update stored value if it's incorrect (self-healing mechanism)
+    const storedValue = populatedMedia.globalMediaAggregate || 0;
+    const tolerance = 0.01; // Allow small floating point differences
+    if (Math.abs(calculatedGlobalMediaAggregate - storedValue) > tolerance) {
+      console.log(`⚠️  Stored globalMediaAggregate is incorrect, updating from ${storedValue} to ${calculatedGlobalMediaAggregate}`);
+      await Media.findByIdAndUpdate(media._id, { 
+        globalMediaAggregate: calculatedGlobalMediaAggregate 
+      });
+      // Update the populatedMedia object so we use the corrected value below
+      populatedMedia.globalMediaAggregate = calculatedGlobalMediaAggregate;
+    }
+
+    // Compute GlobalMediaAggregateRank (rank by total bid value) - use calculated value
     // Count how many media have a higher globalMediaAggregate value
     const rank = await Media.countDocuments({
-      globalMediaAggregate: { $gt: populatedMedia.globalMediaAggregate || 0 }
+      globalMediaAggregate: { $gt: calculatedGlobalMediaAggregate }
     }) + 1; // +1 because rank is 1-indexed
 
     // Convert sources Map to plain object BEFORE toObject()
@@ -738,6 +762,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       artists: populatedMedia.artist || [], // Full artist subdocuments
       creators: populatedMedia.creatorNames || [], // All creator names
       globalMediaAggregateTopRank: rank, // Add computed rank
+      globalMediaAggregate: calculatedGlobalMediaAggregate, // Override with calculated value from all bids
     };
 
     console.log('📤 Sending media profile response:', {
