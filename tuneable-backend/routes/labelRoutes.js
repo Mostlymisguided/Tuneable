@@ -5,6 +5,10 @@ const User = require('../models/User');
 const Media = require('../models/Media');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const { createLabelLogoUpload, getPublicUrl } = require('../utils/r2Upload');
+
+// Configure upload for label logos
+const logoUpload = createLabelLogoUpload();
 
 // ========================================
 // PUBLIC ROUTES
@@ -314,6 +318,43 @@ router.put('/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error updating label:', error);
     res.status(500).json({ error: 'Failed to update label' });
+  }
+});
+
+// Upload label logo (authenticated, label admin/owner only)
+router.put('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const label = await Label.findById(req.params.id);
+    
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    // Check if user can edit this label (admin or label admin/owner)
+    const isPlatformAdmin = req.user.role && req.user.role.includes('admin');
+    const canEdit = isPlatformAdmin || label.isAdmin(req.user.id);
+    
+    if (!canEdit) {
+      return res.status(403).json({ error: 'Not authorized to update this label' });
+    }
+
+    // Use custom domain URL via getPublicUrl
+    const logoPath = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`label-logos/${req.file.filename}`));
+
+    console.log(`📸 Saving label logo: ${logoPath} for label ${label.name}`);
+
+    label.logo = logoPath;
+    await label.save();
+
+    console.log('✅ Label logo updated:', label.logo);
+    res.json({ message: 'Label logo updated successfully', label });
+  } catch (error) {
+    console.error('Error updating label logo:', error.message);
+    res.status(500).json({ error: 'Error updating label logo', details: error.message });
   }
 });
 

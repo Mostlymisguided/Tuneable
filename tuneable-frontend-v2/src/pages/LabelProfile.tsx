@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save } from 'lucide-react';
+import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -81,6 +81,10 @@ const LabelProfile: React.FC = () => {
   // Edit and Report state
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  
+  // Logo upload state
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
@@ -169,6 +173,43 @@ const LabelProfile: React.FC = () => {
       // Handle error (label not found, etc.)
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle logo click
+  const handleLogoClick = () => {
+    if (canEditLabel() && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Handle logo upload
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !label) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    try {
+      setIsUploadingLogo(true);
+      await labelAPI.uploadLogo(label._id, file);
+      toast.success('Label logo updated!');
+      
+      // Refresh label data
+      await fetchLabelData();
+    } catch (err: any) {
+      console.error('Error uploading logo:', err);
+      toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+      // Reset file input to allow re-uploading the same file
+      if (e.target) {
+        e.target.value = '';
+      }
     }
   };
 
@@ -309,20 +350,36 @@ const LabelProfile: React.FC = () => {
                 <img
                   src={label.logo}
                   alt={`${label.name} logo`}
-                  className="rounded-lg shadow-xl object-cover border-2 border-purple-500/30"
+                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                   style={{ width: '200px', height: '200px' }}
+                  onClick={handleLogoClick}
+                  title={canEditLabel() ? 'Click to change logo' : ''}
                   onError={(e) => {
                     e.currentTarget.src = '/android-chrome-192x192.png';
                   }}
                 />
               ) : (
                 <div 
-                  className="rounded-lg shadow-xl object-cover border-2 border-purple-500/30 bg-purple-900/50 flex items-center justify-center text-white text-4xl font-bold"
+                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 bg-purple-900/50 flex items-center justify-center text-white text-4xl font-bold ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                   style={{ width: '200px', height: '200px' }}
+                  onClick={handleLogoClick}
+                  title={canEditLabel() ? 'Click to upload logo' : ''}
                 >
                   {label.name.charAt(0).toUpperCase()}
                 </div>
               )}
+              {isUploadingLogo && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+                  <Loader2 className="h-8 w-8 text-white animate-spin" />
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
             </div>
             
             {/* Label Info */}

@@ -333,6 +333,35 @@ const createCoverArtUpload = () => {
   }
 };
 
+// Create multer upload for label logos
+const createLabelLogoUpload = () => {
+  if (!isR2Configured()) {
+    throw new Error('R2 storage is required for label logo uploads');
+  }
+
+  return multer({
+    storage: multerS3({
+      s3: s3Client,
+      bucket: process.env.R2_BUCKET_NAME,
+      acl: 'public-read',
+      contentType: multerS3.AUTO_CONTENT_TYPE,
+      key: function (req, file, cb) {
+        const labelId = req.params?.id || req.params?.labelId || req.body?.labelId || 'label';
+        const timestamp = Date.now();
+        const filename = `label-logos/${labelId}-${timestamp}${path.extname(file.originalname)}`;
+        cb(null, filename);
+      }
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.startsWith('image/')) {
+        return cb(new Error('Only image files are allowed'));
+      }
+      cb(null, true);
+    }
+  });
+};
+
 module.exports = {
   isR2Configured,
   getPublicUrl,
@@ -340,6 +369,7 @@ module.exports = {
   createClaimUpload,
   createProfilePictureUpload,
   createMediaUpload,
-  createCoverArtUpload
+  createCoverArtUpload,
+  createLabelLogoUpload
 };
 

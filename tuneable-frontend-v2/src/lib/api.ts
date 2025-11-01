@@ -607,6 +607,14 @@ export const labelAPI = {
     const response = await api.post('/labels/admin/recalculate-stats', { labelId });
     return response.data;
   },
+
+  // Upload label logo (authenticated, label admin/owner only)
+  uploadLogo: async (labelId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    const response = await api.put(`/labels/${labelId}/logo`, formData);
+    return response.data;
+  },
 };
 
 export const claimAPI = {
