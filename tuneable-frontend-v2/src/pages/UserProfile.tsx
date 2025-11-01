@@ -260,8 +260,7 @@ const UserProfile: React.FC = () => {
           region: user.secondaryLocation.region || '',
           country: user.secondaryLocation.country || ''
         } : null,
-        
-        Media: {
+        socialMedia: {
           soundcloud: user.socialMedia?.soundcloud || '',
           facebook: user.socialMedia?.facebook || '',
           instagram: user.socialMedia?.instagram || ''
