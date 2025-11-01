@@ -135,8 +135,24 @@ router.get('/:slug', async (req, res) => {
       }
     }));
 
+    // Ensure socialMedia and stats have default values if undefined
+    const labelResponse = labelToReturn.toObject ? labelToReturn.toObject() : labelToReturn;
+    if (!labelResponse.socialMedia) {
+      labelResponse.socialMedia = {};
+    }
+    if (!labelResponse.stats) {
+      labelResponse.stats = {
+        artistCount: 0,
+        releaseCount: 0,
+        totalBidAmount: 0,
+        averageBidAmount: 0,
+        topBidAmount: 0,
+        totalBidCount: 0
+      };
+    }
+
     res.json({
-      label: labelToReturn,
+      label: labelResponse,
       recentReleases: formattedRecentReleases,
       topMedia: formattedTopMedia
     });

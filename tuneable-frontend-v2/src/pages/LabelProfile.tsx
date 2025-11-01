@@ -16,24 +16,24 @@ interface Label {
     city: string;
     country: string;
   };
-  socialMedia: {
-    instagram: string;
-    facebook: string;
-    soundcloud: string;
-    spotify: string;
-    youtube: string;
-    twitter: string;
-    tiktok: string;
+  socialMedia?: {
+    instagram?: string;
+    facebook?: string;
+    soundcloud?: string;
+    spotify?: string;
+    youtube?: string;
+    twitter?: string;
+    tiktok?: string;
   };
   foundedYear: number;
   genres: string[];
-  stats: {
-    artistCount: number;
-    releaseCount: number;
-    totalBidAmount: number;
-    averageBidAmount: number;
-    topBidAmount: number;
-    totalBidCount: number;
+  stats?: {
+    artistCount?: number;
+    releaseCount?: number;
+    totalBidAmount?: number;
+    averageBidAmount?: number;
+    topBidAmount?: number;
+    totalBidCount?: number;
   };
   verificationStatus: string;
   createdAt: string;
@@ -162,20 +162,28 @@ const LabelProfile: React.FC = () => {
               )}
               
               {/* Stats */}
-              <div className="flex flex-wrap gap-6 text-sm">
-                <div className="flex items-center space-x-1">
-                  <Users className="w-4 h-4" />
-                  <span>{label.stats.artistCount} artists</span>
+              {label.stats && (
+                <div className="flex flex-wrap gap-6 text-sm">
+                  {label.stats.artistCount !== undefined && (
+                    <div className="flex items-center space-x-1">
+                      <Users className="w-4 h-4" />
+                      <span>{label.stats.artistCount || 0} artists</span>
+                    </div>
+                  )}
+                  {label.stats.releaseCount !== undefined && (
+                    <div className="flex items-center space-x-1">
+                      <Music className="w-4 h-4" />
+                      <span>{label.stats.releaseCount || 0} releases</span>
+                    </div>
+                  )}
+                  {label.stats.totalBidAmount !== undefined && (
+                    <div className="flex items-center space-x-1">
+                      <TrendingUp className="w-4 h-4" />
+                      <span>{formatCurrency(label.stats.totalBidAmount || 0)} total bids</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Music className="w-4 h-4" />
-                  <span>{label.stats.releaseCount} releases</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>{formatCurrency(label.stats.totalBidAmount)} total bids</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -255,32 +263,41 @@ const LabelProfile: React.FC = () => {
               <div className="bg-gray-800 rounded-lg p-6">
                 <h3 className="text-xl font-semibold text-white mb-4">Social Media</h3>
                 <div className="space-y-3">
-                  {label.socialMedia.instagram && (
+                  {label.socialMedia?.instagram && (
                     <a href={label.socialMedia.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-gray-300 hover:text-white">
                       <Instagram className="w-4 h-4" />
                       <span>Instagram</span>
                     </a>
                   )}
                   
-                  {label.socialMedia.facebook && (
+                  {label.socialMedia?.facebook && (
                     <a href={label.socialMedia.facebook} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-gray-300 hover:text-white">
                       <Facebook className="w-4 h-4" />
                       <span>Facebook</span>
                     </a>
                   )}
                   
-                  {label.socialMedia.youtube && (
+                  {label.socialMedia?.youtube && (
                     <a href={label.socialMedia.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-gray-300 hover:text-white">
                       <Youtube className="w-4 h-4" />
                       <span>YouTube</span>
                     </a>
                   )}
                   
-                  {label.socialMedia.twitter && (
+                  {label.socialMedia?.twitter && (
                     <a href={label.socialMedia.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-gray-300 hover:text-white">
                       <Twitter className="w-4 h-4" />
                       <span>Twitter</span>
                     </a>
+                  )}
+                  
+                  {(!label.socialMedia || (
+                    !label.socialMedia.instagram &&
+                    !label.socialMedia.facebook &&
+                    !label.socialMedia.youtube &&
+                    !label.socialMedia.twitter
+                  )) && (
+                    <p className="text-gray-400 text-sm">No social media links available</p>
                   )}
                 </div>
               </div>
