@@ -201,7 +201,8 @@ labelSchema.statics.getByGenre = function(genre, limit = 20) {
 
 // Pre-save middleware to generate slug
 labelSchema.pre('save', function(next) {
-  if (this.isModified('name') && !this.slug) {
+  // Generate slug if name is modified and slug is missing, or if it's a new document without a slug
+  if ((this.isModified('name') || this.isNew) && !this.slug && this.name) {
     this.slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')

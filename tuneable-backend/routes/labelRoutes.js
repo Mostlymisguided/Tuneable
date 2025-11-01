@@ -222,6 +222,11 @@ router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, description, email, website, genres, foundedYear } = req.body;
 
+    // Validate required fields
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Label name and email are required' });
+    }
+
     // Check if label name already exists
     const existingLabel = await Label.findOne({ name });
     if (existingLabel) {
@@ -234,8 +239,21 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'User already has a label' });
     }
 
+    // Generate slug from name (before creating label)
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    // Check if slug already exists
+    const existingSlug = await Label.findOne({ slug });
+    if (existingSlug) {
+      return res.status(400).json({ error: 'A label with a similar name already exists' });
+    }
+
     const label = new Label({
       name,
+      slug, // Explicitly set slug
       description,
       email,
       website,
