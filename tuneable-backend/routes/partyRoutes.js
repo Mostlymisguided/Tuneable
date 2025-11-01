@@ -1361,28 +1361,34 @@ router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) =>
     }
 });
 
-// Veto a media item (host only)
+// Veto a media item (host or admin) - DEPRECATED: Use PUT route instead
+// This route is kept for backward compatibility but delegates to the PUT route logic
 router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         const { reason } = req.body;
-        const userId = req.user._id;
-
-        if (!isValidObjectId(partyId) || !isValidObjectId(mediaId)) {
-            return res.status(400).json({ error: 'Invalid partyId or mediaId format' });
-        }
-
+        const Bid = require('../models/Bid');
+        const User = require('../models/User');
+        const Media = require('../models/Media');
+        const mongoose = require('mongoose');
+        
         const party = await Party.findById(partyId);
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
-
-        // Check if user is the host
-        if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the host can veto' });
+        
+        // Check if user is the host OR admin
+        const isHost = party.host.toString() === req.user._id.toString();
+        const isAdmin = req.user.role && req.user.role.includes('admin');
+        
+        if (!isHost && !isAdmin) {
+            return res.status(403).json({ error: 'Only the host or admin can veto' });
         }
 
-        const mediaIndex = party.media.findIndex(media => media.mediaId.toString() === mediaId);
+        const mediaIndex = party.media.findIndex(media => 
+            (media.mediaId && media.mediaId.toString() === mediaId) || 
+            (media.media_uuid === mediaId)
+        );
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in this party' });
         }
@@ -1394,9 +1400,76 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
             return res.status(400).json({ error: 'Can only veto queued media' });
         }
 
+        // Resolve actual mediaId (handle both ObjectId and UUID)
+        let actualMediaId = mediaId;
+        if (!mongoose.isValidObjectId(mediaId)) {
+            const mediaDoc = await Media.findOne({ uuid: mediaId });
+            if (!mediaDoc) {
+                return res.status(404).json({ error: 'Media not found' });
+            }
+            actualMediaId = mediaDoc._id.toString();
+        }
+        
+        // Find all active/played bids for this media in this party
+        const bidsToRefund = await Bid.find({
+            mediaId: actualMediaId,
+            partyId: partyId,
+            status: { $in: ['active', 'played'] }
+        }).populate('userId', 'balance uuid username');
+        
+        console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);
+        
+        // Group bids by userId for efficient refunds
+        const refundsByUser = new Map();
+        
+        for (const bid of bidsToRefund) {
+            const userId = bid.userId._id.toString();
+            
+            if (!refundsByUser.has(userId)) {
+                refundsByUser.set(userId, {
+                    user: bid.userId,
+                    totalAmount: 0,
+                    bidIds: []
+                });
+            }
+            
+            const refund = refundsByUser.get(userId);
+            refund.totalAmount += bid.amount;
+            refund.bidIds.push(bid._id);
+        }
+        
+        // Refund all users and update bid statuses
+        const refundPromises = [];
+        
+        for (const [userId, refund] of refundsByUser) {
+            // Refund user balance (add back the amount)
+            refundPromises.push(
+                User.findByIdAndUpdate(userId, {
+                    $inc: { balance: refund.totalAmount }
+                })
+            );
+            
+            console.log(`💰 Refunding £${refund.totalAmount.toFixed(2)} to user ${refund.user.username}`);
+            
+            // Update all bids for this user to 'vetoed' status
+            refundPromises.push(
+                Bid.updateMany(
+                    { _id: { $in: refund.bidIds } },
+                    { 
+                        $set: { 
+                            status: 'vetoed'
+                        } 
+                    }
+                )
+            );
+        }
+        
+        await Promise.all(refundPromises);
+
         mediaEntry.status = 'vetoed';
         mediaEntry.vetoedAt = new Date();
-        mediaEntry.vetoedBy = userId;
+        mediaEntry.vetoedBy = req.user._id;
+        mediaEntry.vetoedBy_uuid = req.user.uuid;
 
         await party.save();
 
@@ -1405,15 +1478,23 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
         broadcastToParty(partyId, {
             type: 'MEDIA_VETOED',
             mediaId: mediaId,
-            vetoedBy: userId,
+            vetoedBy: req.user._id,
+            vetoedBy_uuid: req.user.uuid,
             reason: reason,
-            vetoedAt: mediaEntry.vetoedAt
+            vetoedAt: mediaEntry.vetoedAt,
+            refundedBidsCount: bidsToRefund.length,
+            refundedUsersCount: refundsByUser.size
         });
+
+        const totalRefunded = Array.from(refundsByUser.values()).reduce((sum, r) => sum + r.totalAmount, 0);
 
         res.json({
             message: 'Media vetoed successfully',
             mediaId: mediaId,
-            reason: reason
+            reason: reason,
+            refundedBidsCount: bidsToRefund.length,
+            refundedUsersCount: refundsByUser.size,
+            refundedAmount: totalRefunded
         });
     } catch (err) {
         console.error('Error vetoing media:', err);
@@ -1586,16 +1667,14 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
     }
 });
 
-// Remove a media item from a party (veto functionality)
+// Remove a media item from a party (veto functionality with refunds)
 router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
-        const userId = req.user._id;
-
-        // Validate IDs
-        if (!mongoose.isValidObjectId(partyId) || !mongoose.isValidObjectId(mediaId)) {
-            return res.status(400).json({ error: 'Invalid party or media ID format' });
-        }
+        const Bid = require('../models/Bid');
+        const User = require('../models/User');
+        const Media = require('../models/Media');
+        const mongoose = require('mongoose');
 
         // Find the party
         const party = await Party.findById(partyId);
@@ -1603,21 +1682,96 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Check if user is the host (only host can veto)
-        if (party.host.toString() !== userId) {
-            return res.status(403).json({ error: 'Only the party host can veto' });
+        // Check if user is the host OR admin
+        const isHost = party.host.toString() === req.user._id.toString();
+        const isAdmin = req.user.role && req.user.role.includes('admin');
+        
+        if (!isHost && !isAdmin) {
+            return res.status(403).json({ error: 'Only the party host or admin can veto' });
         }
 
         // Find the media in the party's queue
-        const mediaIndex = party.media.findIndex(entry => entry.mediaId.toString() === mediaId);
+        const mediaIndex = party.media.findIndex(entry => 
+            (entry.mediaId && entry.mediaId.toString() === mediaId) || 
+            (entry.media_uuid === mediaId)
+        );
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in party queue' });
         }
 
+        const mediaEntry = party.media[mediaIndex];
+
+        // Resolve actual mediaId (handle both ObjectId and UUID)
+        let actualMediaId = mediaId;
+        if (!mongoose.isValidObjectId(mediaId)) {
+            const mediaDoc = await Media.findOne({ uuid: mediaId });
+            if (!mediaDoc) {
+                return res.status(404).json({ error: 'Media not found' });
+            }
+            actualMediaId = mediaDoc._id.toString();
+        }
+        
+        // Find all active/played bids for this media in this party
+        const bidsToRefund = await Bid.find({
+            mediaId: actualMediaId,
+            partyId: partyId,
+            status: { $in: ['active', 'played'] }
+        }).populate('userId', 'balance uuid username');
+        
+        console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);
+        
+        // Group bids by userId for efficient refunds
+        const refundsByUser = new Map();
+        
+        for (const bid of bidsToRefund) {
+            const userId = bid.userId._id.toString();
+            
+            if (!refundsByUser.has(userId)) {
+                refundsByUser.set(userId, {
+                    user: bid.userId,
+                    totalAmount: 0,
+                    bidIds: []
+                });
+            }
+            
+            const refund = refundsByUser.get(userId);
+            refund.totalAmount += bid.amount;
+            refund.bidIds.push(bid._id);
+        }
+        
+        // Refund all users and update bid statuses
+        const refundPromises = [];
+        
+        for (const [userId, refund] of refundsByUser) {
+            // Refund user balance (add back the amount)
+            refundPromises.push(
+                User.findByIdAndUpdate(userId, {
+                    $inc: { balance: refund.totalAmount }
+                })
+            );
+            
+            console.log(`💰 Refunding £${refund.totalAmount.toFixed(2)} to user ${refund.user.username}`);
+            
+            // Update all bids for this user to 'vetoed' status
+            refundPromises.push(
+                Bid.updateMany(
+                    { _id: { $in: refund.bidIds } },
+                    { 
+                        $set: { 
+                            status: 'vetoed'
+                        } 
+                    }
+                )
+            );
+        }
+        
+        await Promise.all(refundPromises);
+
         // Update the media status to vetoed instead of removing it completely
-        party.media[mediaIndex].status = 'vetoed';
-        party.media[mediaIndex].vetoedAt = new Date();
-        party.media[mediaIndex].vetoedBy = userId;
+        mediaEntry.status = 'vetoed';
+        mediaEntry.vetoedAt = new Date();
+        mediaEntry.vetoedBy = req.user._id;
+        mediaEntry.vetoedBy_uuid = req.user.uuid;
 
         await party.save();
 
@@ -1626,14 +1780,22 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         broadcastToParty(partyId, {
             type: 'MEDIA_VETOED',
             mediaId: mediaId,
-            vetoedAt: party.media[mediaIndex].vetoedAt,
-            vetoedBy: userId
+            vetoedAt: mediaEntry.vetoedAt,
+            vetoedBy: req.user._id,
+            vetoedBy_uuid: req.user.uuid,
+            refundedBidsCount: bidsToRefund.length,
+            refundedUsersCount: refundsByUser.size
         });
+
+        const totalRefunded = Array.from(refundsByUser.values()).reduce((sum, r) => sum + r.totalAmount, 0);
 
         res.json({
             message: 'Media vetoed successfully',
             mediaId: mediaId,
-            vetoedAt: party.media[mediaIndex].vetoedAt
+            vetoedAt: mediaEntry.vetoedAt,
+            refundedBidsCount: bidsToRefund.length,
+            refundedUsersCount: refundsByUser.size,
+            refundedAmount: totalRefunded
         });
 
     } catch (err) {
@@ -1878,20 +2040,27 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
 });
 
 // @route   PUT /api/parties/:partyId/media/:mediaId/veto
-// @desc    Veto a media item (host only) - sets status to 'vetoed' and removes from queue
-// @access  Private (host only)
+// @desc    Veto a media item (host or admin) - sets status to 'vetoed', removes from queue, and refunds all bids
+// @access  Private (host or admin only)
 router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
+        const Bid = require('../models/Bid');
+        const User = require('../models/User');
+        const Media = require('../models/Media');
+        const mongoose = require('mongoose');
         
         const party = await Party.findById(partyId);
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
         
-        // Check if user is the host
-        if (party.host.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: 'Only the host can veto' });
+        // Check if user is the host OR admin
+        const isHost = party.host.toString() === req.user._id.toString();
+        const isAdmin = req.user.role && req.user.role.includes('admin');
+        
+        if (!isHost && !isAdmin) {
+            return res.status(403).json({ error: 'Only the host or admin can veto' });
         }
         
         // Find the media in the party
@@ -1904,6 +2073,72 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
             return res.status(404).json({ error: 'Media not found in party' });
         }
         
+        // Resolve actual mediaId (handle both ObjectId and UUID)
+        let actualMediaId = mediaId;
+        if (!mongoose.isValidObjectId(mediaId)) {
+            const mediaDoc = await Media.findOne({ uuid: mediaId });
+            if (!mediaDoc) {
+                return res.status(404).json({ error: 'Media not found' });
+            }
+            actualMediaId = mediaDoc._id.toString();
+        }
+        
+        // Find all active/played bids for this media in this party
+        const bidsToRefund = await Bid.find({
+            mediaId: actualMediaId,
+            partyId: partyId,
+            status: { $in: ['active', 'played'] }
+        }).populate('userId', 'balance uuid username');
+        
+        console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);
+        
+        // Group bids by userId for efficient refunds
+        const refundsByUser = new Map();
+        
+        for (const bid of bidsToRefund) {
+            const userId = bid.userId._id.toString();
+            
+            if (!refundsByUser.has(userId)) {
+                refundsByUser.set(userId, {
+                    user: bid.userId,
+                    totalAmount: 0,
+                    bidIds: []
+                });
+            }
+            
+            const refund = refundsByUser.get(userId);
+            refund.totalAmount += bid.amount;
+            refund.bidIds.push(bid._id);
+        }
+        
+        // Refund all users and update bid statuses
+        const refundPromises = [];
+        
+        for (const [userId, refund] of refundsByUser) {
+            // Refund user balance (add back the amount)
+            refundPromises.push(
+                User.findByIdAndUpdate(userId, {
+                    $inc: { balance: refund.totalAmount }
+                })
+            );
+            
+            console.log(`💰 Refunding £${refund.totalAmount.toFixed(2)} to user ${refund.user.username}`);
+            
+            // Update all bids for this user to 'vetoed' status
+            refundPromises.push(
+                Bid.updateMany(
+                    { _id: { $in: refund.bidIds } },
+                    { 
+                        $set: { 
+                            status: 'vetoed'
+                        } 
+                    }
+                )
+            );
+        }
+        
+        await Promise.all(refundPromises);
+        
         // Update media status to vetoed
         mediaEntry.status = 'vetoed';
         mediaEntry.vetoedAt = new Date();
@@ -1912,8 +2147,25 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
         
         await party.save();
         
+        // Broadcast veto via WebSocket
+        const { broadcastToParty } = require('../utils/broadcast');
+        broadcastToParty(partyId, {
+            type: 'MEDIA_VETOED',
+            mediaId: mediaId,
+            vetoedBy: req.user._id,
+            vetoedBy_uuid: req.user.uuid,
+            vetoedAt: mediaEntry.vetoedAt,
+            refundedBidsCount: bidsToRefund.length,
+            refundedUsersCount: refundsByUser.size
+        });
+        
+        const totalRefunded = Array.from(refundsByUser.values()).reduce((sum, r) => sum + r.totalAmount, 0);
+        
         res.json({
             message: 'Media vetoed successfully',
+            refundedBidsCount: bidsToRefund.length,
+            refundedUsersCount: refundsByUser.size,
+            refundedAmount: totalRefunded,
             party: party
         });
         

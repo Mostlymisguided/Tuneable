@@ -837,21 +837,31 @@ const Party: React.FC = () => {
   };
 
   const handleVetoClick = async (media: any) => {
-    if (!isHost) {
-      toast.error('Only the host can veto media');
+    const mediaData = media.mediaId || media;
+    const mediaId = mediaData._id || mediaData.id || mediaData.uuid;
+    const isAdmin = user?.role?.includes('admin');
+    
+    if (!isHost && !isAdmin) {
+      toast.error('Only the host or admin can veto media');
       return;
     }
 
+    const confirmed = window.confirm(
+      `Are you sure you want to veto "${mediaData.title || 'this media'}"? All bids will be refunded to users.`
+    );
+    
+    if (!confirmed) return;
+
     try {
-      // Veto the media (sets status to 'vetoed')
-      await partyAPI.vetoMedia(partyId!, media._id || media.id);
-      toast.success('Media vetoed');
+      // Veto the media (sets status to 'vetoed' and refunds bids)
+      await partyAPI.vetoMedia(partyId!, mediaId);
+      toast.success('Media vetoed and bids refunded');
       
       // Refresh party data
       await fetchPartyDetails();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error vetoing media:', error);
-      toast.error('Failed to veto media');
+      toast.error(error.response?.data?.error || 'Failed to veto media');
     }
   };
   
@@ -1593,11 +1603,26 @@ const Party: React.FC = () => {
                       getDisplayMedia().map((item: any, index: number) => {
                         // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
                         const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+                        const isAdmin = user?.role?.includes('admin');
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
                             className="card flex items-center hover:border-white relative"
                           >
+                            {/* Admin Veto Button - Top Right */}
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVetoClick(item);
+                                }}
+                                className="absolute top-2 right-2 z-20 p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
+                                title="Veto this tune (Admin Only)"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                            
                             {/* Queue Number Badge - In Left Gutter */}
                             <div className="absolute -left-8 md:-left-12 top-1/2 -translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
                               <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
@@ -1707,15 +1732,6 @@ const Party: React.FC = () => {
                                     Bid £{(queueBidAmounts[mediaData._id || mediaData.id] || party?.minimumBid || 0.33).toFixed(2)}
                                   </button>
                                 </div>
-                                {isHost && (
-                                  <button
-                                    onClick={() => handleVetoClick(item)}
-                                    className="w-5 h-5 bg-red-500/20 bg-slate-600 rounded-md"
-                                    title="Veto this tune"
-                                  >
-                                    <X className="h-5 w-5" />
-                                  </button>
-                                )}
                               </div>
                             </div>
                           </div>
