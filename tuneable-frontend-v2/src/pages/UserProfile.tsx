@@ -67,16 +67,28 @@ interface UserProfile {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  // Social media fields
+  // Social media fields (now top-level, available to all users)
+  socialMedia?: {
+    facebook?: string;
+    instagram?: string;
+    soundcloud?: string;
+    spotify?: string;
+    youtube?: string;
+    twitter?: string;
+  };
   creatorProfile?: {
-    socialMedia?: {
-      facebook?: string;
-      instagram?: string;
-      soundcloud?: string;
-      spotify?: string;
-      youtube?: string;
-      twitter?: string;
-    };
+    artistName?: string;
+    bio?: string;
+    genres?: string[];
+    roles?: string[];
+    website?: string;
+    label?: string;
+    management?: string;
+    distributor?: string;
+    verificationStatus?: string;
+    verificationMethod?: string;
+    verifiedAt?: string;
+    verifiedBy?: string;
   };
 }
 
@@ -248,10 +260,11 @@ const UserProfile: React.FC = () => {
           region: user.secondaryLocation.region || '',
           country: user.secondaryLocation.country || ''
         } : null,
-        socialMedia: {
-          soundcloud: user.creatorProfile?.socialMedia?.soundcloud || '',
-          facebook: user.creatorProfile?.socialMedia?.facebook || '',
-          instagram: user.creatorProfile?.socialMedia?.instagram || ''
+        
+        Media: {
+          soundcloud: user.socialMedia?.soundcloud || '',
+          facebook: user.socialMedia?.facebook || '',
+          instagram: user.socialMedia?.instagram || ''
         }
       });
     }
@@ -408,44 +421,44 @@ const UserProfile: React.FC = () => {
     const socialLinks = [];
     
     // Facebook - manual URL only
-    if (user?.creatorProfile?.socialMedia?.facebook) {
+    if (user?.socialMedia?.facebook) {
       socialLinks.push({
         name: 'Facebook',
         icon: Facebook,
-        url: user.creatorProfile.socialMedia.facebook,
+        url: user.socialMedia.facebook,
         platform: 'facebook' as const,
         color: 'hover:bg-blue-600/30 hover:border-blue-500'
       });
     }
     
     // YouTube - manual URL only
-    if (user?.creatorProfile?.socialMedia?.youtube) {
+    if (user?.socialMedia?.youtube) {
       socialLinks.push({
         name: 'YouTube',
         icon: Youtube,
-        url: user.creatorProfile.socialMedia.youtube,
+        url: user.socialMedia.youtube,
         platform: undefined, // YouTube not supported in modal
         color: 'hover:bg-red-600/30 hover:border-red-500'
       });
     }
     
     // SoundCloud - manual URL only
-    if (user?.creatorProfile?.socialMedia?.soundcloud) {
+    if (user?.socialMedia?.soundcloud) {
       socialLinks.push({
         name: 'SoundCloud',
         icon: Music2,
-        url: user.creatorProfile.socialMedia.soundcloud,
+        url: user.socialMedia.soundcloud,
         platform: 'soundcloud' as const,
         color: 'hover:bg-orange-600/30 hover:border-orange-500'
       });
     }
     
     // Instagram - manual URL only
-    if (user?.creatorProfile?.socialMedia?.instagram) {
+    if (user?.socialMedia?.instagram) {
       socialLinks.push({
         name: 'Instagram',
         icon: Instagram,
-        url: user.creatorProfile.socialMedia.instagram,
+        url: user.socialMedia.instagram,
         platform: 'instagram' as const,
         color: 'hover:bg-pink-600/30 hover:border-pink-500'
       });
@@ -461,7 +474,7 @@ const UserProfile: React.FC = () => {
     const unconnected = [];
     
     // Check if Facebook has manual URL
-    if (!user?.creatorProfile?.socialMedia?.facebook) {
+    if (!user?.socialMedia?.facebook) {
       unconnected.push({
         name: 'Facebook',
         icon: Facebook,
@@ -471,7 +484,7 @@ const UserProfile: React.FC = () => {
     }
     
     // Check if SoundCloud has manual URL
-    if (!user?.creatorProfile?.socialMedia?.soundcloud) {
+    if (!user?.socialMedia?.soundcloud) {
       unconnected.push({
         name: 'SoundCloud',
         icon: Music2,
@@ -481,7 +494,7 @@ const UserProfile: React.FC = () => {
     }
     
     // Check if Instagram has manual URL
-    if (!user?.creatorProfile?.socialMedia?.instagram) {
+    if (!user?.socialMedia?.instagram) {
       unconnected.push({
         name: 'Instagram',
         icon: Instagram,
@@ -503,7 +516,7 @@ const UserProfile: React.FC = () => {
 
   // Social media modal handlers
   const openSocialModal = (platform: 'facebook' | 'instagram' | 'soundcloud') => {
-    const currentUrl = user?.creatorProfile?.socialMedia?.[platform];
+    const currentUrl = user?.socialMedia?.[platform];
     setSocialModal({
       isOpen: true,
       platform,
@@ -556,7 +569,7 @@ const UserProfile: React.FC = () => {
 
   const handleSaveProfileInternal = async () => {
     try {
-      // Format the data for the backend - move socialMedia under creatorProfile
+      // Format the data for the backend - socialMedia is now top-level
       const { socialMedia, homeLocation, secondaryLocation, ...otherFields } = editForm;
       const formattedData = {
         ...otherFields,
@@ -564,9 +577,7 @@ const UserProfile: React.FC = () => {
         secondaryLocation: secondaryLocation && (secondaryLocation.city || secondaryLocation.region || secondaryLocation.country)
           ? secondaryLocation
           : null,
-        creatorProfile: {
-          socialMedia: socialMedia
-        }
+        socialMedia: socialMedia
       };
       
       await authAPI.updateProfile(formattedData);

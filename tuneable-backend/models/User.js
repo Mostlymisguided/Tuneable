@@ -94,6 +94,16 @@ const userSchema = new mongoose.Schema({
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
   
+  // Social media links (available to all users)
+  socialMedia: {
+    instagram: String,
+    facebook: String,
+    soundcloud: String,
+    spotify: String,
+    youtube: String,
+    twitter: String
+  },
+  
   // Creator profile for verified creators/artists
   creatorProfile: {
     artistName: { type: String },
@@ -101,14 +111,6 @@ const userSchema = new mongoose.Schema({
     genres: [String],
     roles: [String], // ['artist', 'producer', 'songwriter', etc.]
     website: { type: String },
-    socialMedia: {
-      instagram: String,
-      facebook: String,
-      soundcloud: String,
-      spotify: String,
-      youtube: String,
-      twitter: String
-    },
     label: String,
     management: String,
     distributor: String,

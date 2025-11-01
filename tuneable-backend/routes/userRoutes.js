@@ -631,8 +631,8 @@ router.put('/profile/social-media', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: `Invalid ${platform} URL format` });
     }
 
-    // Update the social media URL in creatorProfile
-    const updateField = `creatorProfile.socialMedia.${platform}`;
+    // Update the social media URL in top-level socialMedia
+    const updateField = `socialMedia.${platform}`;
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { [updateField]: url },
@@ -644,7 +644,7 @@ router.put('/profile/social-media', authMiddleware, async (req, res) => {
     res.json({ 
       message: `${platform} URL updated successfully`, 
       user,
-      socialMedia: user.creatorProfile?.socialMedia 
+      socialMedia: user.socialMedia 
     });
   } catch (error) {
     res.status(500).json({ error: 'Error updating social media URL', details: error.message });
@@ -893,6 +893,7 @@ router.get('/:userId/profile', async (req, res) => {
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
+      socialMedia: user.socialMedia || {},
       creatorProfile: user.creatorProfile,
     };
 
@@ -905,10 +906,10 @@ router.get('/:userId/profile', async (req, res) => {
       // Also hide from creatorProfile if it exists
       if (userResponse.creatorProfile) {
         delete userResponse.creatorProfile.artistName; // If artistName contains real name
-        // Hide social media links in anonymous mode
-        if (userResponse.creatorProfile.socialMedia) {
-          delete userResponse.creatorProfile.socialMedia;
-        }
+      }
+      // Hide social media links in anonymous mode (now top-level)
+      if (userResponse.socialMedia) {
+        delete userResponse.socialMedia;
       }
     } else {
       // Include names if not anonymous or viewing own profile

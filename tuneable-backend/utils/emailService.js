@@ -40,10 +40,10 @@ async function sendCreatorApplicationNotification(user) {
             ${user.creatorProfile.proofFiles?.length ? `<p><strong>Proof Files:</strong> ${user.creatorProfile.proofFiles.length} document(s) uploaded</p>` : ''}
           </div>
 
-          ${user.creatorProfile.socialMedia && Object.values(user.creatorProfile.socialMedia).some(v => v) ? `
+          ${user.socialMedia && Object.values(user.socialMedia).some(v => v) ? `
             <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <h3 style="margin-top: 0; color: #1f2937;">Social Media</h3>
-              ${Object.entries(user.creatorProfile.socialMedia)
+              ${Object.entries(user.socialMedia)
                 .filter(([_, url]) => url)
                 .map(([platform, url]) => `<p><strong>${platform}:</strong> <a href="${url}">${url}</a></p>`)
                 .join('')}
