@@ -85,7 +85,6 @@ const Navbar: React.FC = () => {
                   Podcasts
                 </Link> */}
                 <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-4">
-                  <NotificationBell />
                   <Link
                     to="/wallet"
                     className="hidden sm:block text-sm text-gray-300 hover:text-white transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-700/50"
@@ -112,6 +111,7 @@ const Navbar: React.FC = () => {
                     <span className="hidden sm:inline">{user.username}</span>
                     <span className="sm:hidden">{user.username?.slice(0, 8)}</span>
                   </Link>
+                  <NotificationBell />
                   <button
                     onClick={handleLogout}
                     className="px-2 sm:px-3 py-1 sm:py-2 text-gray-300 rounded-lg font-medium transition-colors text-sm sm:text-base"

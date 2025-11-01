@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
+import TagInputModal from '../components/TagInputModal';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
@@ -90,6 +91,10 @@ const Party: React.FC = () => {
   
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, number>>({});
+  
+  // Tag modal state
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<any>(null);
   
   const [showVetoed] = useState(false);
 
@@ -308,13 +313,27 @@ const Party: React.FC = () => {
         setCurrentPartyId(partyId!);
         setGlobalPlayerActive(true);
         
+      // Only autoplay if web player is empty (no current media)
+      // This preserves playback across page loads/navigation
       if (cleanedQueue.length > 0) {
-        console.log('Setting current media to:', cleanedQueue[0].title);
-        setCurrentMedia(cleanedQueue[0], 0, true); // Auto-play for jukebox experience
+        if (!currentMedia) {
+          // Web player is empty - safe to autoplay
+          console.log('Web player is empty, setting current media to:', cleanedQueue[0].title);
+          setCurrentMedia(cleanedQueue[0], 0, true); // Auto-play for jukebox experience
+        } else {
+          // Web player already has media - preserve it, don't interrupt
+          console.log('Web player already has media, preserving playback:', currentMedia.title);
+          // Queue is still updated above, so when current media ends, party queue will continue
+        }
       } else {
-        // If no queued media, clear the current media to stop the WebPlayer
-        console.log('No queued media, clearing WebPlayer');
-        setCurrentMedia(null, 0);
+        // If no queued media, only clear if web player is empty
+        // Don't interrupt existing playback from other parties/sources
+        if (!currentMedia) {
+          console.log('No queued media and web player is empty, clearing WebPlayer');
+          setCurrentMedia(null, 0);
+        } else {
+          console.log('No queued media but web player is active, preserving playback:', currentMedia.title);
+        }
       }
     }
     
@@ -329,7 +348,7 @@ const Party: React.FC = () => {
       setIsHost(checkIsHost);
       console.log('🔍 isHost check:', { userUuid, hostUuid, isHost: checkIsHost, partyHost: party.host });
     }
-  }, [party, user, partyId, currentPartyId, setQueue, setCurrentMedia, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
+  }, [party, user, partyId, currentPartyId, currentMedia, setQueue, setCurrentMedia, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
   // Update WebPlayer queue when sorting changes
   useEffect(() => {
@@ -581,47 +600,59 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleAddMediaToParty = async (media: any) => {
+  const handleAddMediaToParty = (media: any) => {
     if (!partyId) return;
     
-    const bidAmount = newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33;
+    // Store pending media and show tag modal
+    setPendingMedia(media);
+    setShowTagModal(true);
+  };
+
+  const handleTagSubmit = async (tags: string[]) => {
+    if (!partyId || !pendingMedia) return;
+    
+    const bidAmount = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] || party?.minimumBid || 0.33;
     
     try {
       // Get the appropriate URL based on music source
       const musicSource = party?.musicSource || 'youtube';
       let url = '';
       
-      if (musicSource === 'youtube' && media.sources?.youtube) {
-        url = media.sources.youtube;
-      } else if (musicSource === 'spotify' && media.sources?.spotify) {
-        url = media.sources.spotify;
-      } else if (media.sources) {
+      if (musicSource === 'youtube' && pendingMedia.sources?.youtube) {
+        url = pendingMedia.sources.youtube;
+      } else if (musicSource === 'spotify' && pendingMedia.sources?.spotify) {
+        url = pendingMedia.sources.spotify;
+      } else if (pendingMedia.sources) {
         // Fallback to first available source
-        url = Object.values(media.sources)[0] as string;
+        url = Object.values(pendingMedia.sources)[0] as string;
       }
       
       await partyAPI.addMediaToParty(partyId, {
         url,
-        title: media.title,
-        artist: media.artist,
+        title: pendingMedia.title,
+        artist: pendingMedia.artist,
         bidAmount,
         platform: musicSource,
-        duration: media.duration,
-        tags: media.tags || [],
-        category: media.category || 'Music'
+        duration: pendingMedia.duration,
+        tags: tags, // Use user-provided tags from modal
+        category: pendingMedia.category || 'Music'
       });
       
-      toast.success(`Added ${media.title} to party with £${bidAmount.toFixed(2)} bid!`);
+      toast.success(`Added ${pendingMedia.title} to party with £${bidAmount.toFixed(2)} bid!`);
       
       // Close search panel and refresh party
       setShowAddMediaPanel(false);
       setAddMediaSearchQuery('');
       setAddMediaResults({ database: [], youtube: [] });
+      setShowTagModal(false);
+      setPendingMedia(null);
       fetchPartyDetails();
       
     } catch (error: any) {
       console.error('Error adding media:', error);
       toast.error(error.response?.data?.error || 'Failed to add media to party');
+      setShowTagModal(false);
+      setPendingMedia(null);
     }
   };
 
@@ -1932,6 +1963,18 @@ const Party: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Tag Input Modal */}
+      <TagInputModal
+        isOpen={showTagModal}
+        onClose={() => {
+          setShowTagModal(false);
+          setPendingMedia(null);
+        }}
+        onSubmit={handleTagSubmit}
+        mediaTitle={pendingMedia?.title}
+        mediaArtist={pendingMedia?.artist}
+      />
     </div>
   );
 };

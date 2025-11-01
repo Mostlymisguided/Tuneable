@@ -613,13 +613,14 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
                 try {
                     const videoDetails = await getVideoDetails(videoId);
                     extractedDuration = videoDetails.duration || duration || 180;
+                    // Note: We no longer use videoDetails.tags - only user-provided tags are used
                 } catch (error) {
                     console.error('Error fetching video details:', error);
                 }
             }
         }
 
-        // Use provided tags (user-generated) or empty array
+        // Use only user-provided tags (no extraction from YouTube)
         let videoTags = Array.isArray(tags) ? tags : [];
         let videoCategory = category || 'Unknown';
         

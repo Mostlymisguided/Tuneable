@@ -55,7 +55,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="bg-gray-900 rounded-lg max-w-md w-full p-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
