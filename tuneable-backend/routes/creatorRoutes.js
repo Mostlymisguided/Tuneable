@@ -221,6 +221,18 @@ router.patch('/applications/:userId/review', authMiddleware, adminMiddleware, as
 
     await user.save();
 
+    // Send notification to user
+    try {
+      const notificationService = require('../services/notificationService');
+      await notificationService.notifyCreatorApplication(
+        user._id.toString(),
+        status,
+        status === 'rejected' ? reviewNotes : null
+      ).catch(err => console.error('Error sending creator application notification:', err));
+    } catch (error) {
+      console.error('Error setting up creator application notification:', error);
+    }
+
     res.json({
       message: `Creator application ${status}`,
       user: {

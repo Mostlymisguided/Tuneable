@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('./db'); // Import the database connection module
 const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
+const { initializeSocketIO } = require('./utils/socketIO'); // Import Socket.IO setup for notifications
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 require('dotenv').config({ path: envFile });
 
@@ -29,6 +30,7 @@ const creatorRoutes = require('./routes/creatorRoutes'); // Import creator appli
 const reportRoutes = require('./routes/reportRoutes'); // Report routes
 const emailRoutes = require('./routes/emailRoutes'); // Email routes
 const labelRoutes = require('./routes/labelRoutes'); // Import label routes
+const notificationRoutes = require('./routes/notificationRoutes'); // Import notification routes
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -148,6 +150,7 @@ app.use('/api/creator', creatorRoutes); // Creator application routes
 app.use('/api/reports', reportRoutes); // Report routes
 app.use('/api/email', emailRoutes); // Email routes
 app.use('/api/labels', labelRoutes); // Label routes
+app.use('/api/notifications', notificationRoutes); // Notification routes
 app.use('/api/webhooks/instagram', instagramWebhooks); // Instagram webhooks
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');
@@ -186,6 +189,10 @@ if (require.main === module) {
     // Currently only used if party.type === 'live' (MVP uses remote parties only)
     setWebSocketServer(server);
     console.log('✅ WebSocket server initialized (for future live parties).');
+    
+    // Set up Socket.IO server for real-time notifications
+    initializeSocketIO(server);
+    console.log('✅ Socket.IO server initialized (for notifications).');
   });
 }
 

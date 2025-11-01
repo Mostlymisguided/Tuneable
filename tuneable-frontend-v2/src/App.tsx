@@ -35,6 +35,7 @@ import CreatorUpload from './pages/CreatorUpload';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 import GlobalTunes from './pages/GlobalTunes';
+import Notifications from './pages/Notifications';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -249,6 +250,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <Admin />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/notifications" 
+              element={
+                <ProtectedRoute>
+                  <Notifications />
                 </ProtectedRoute>
               } 
             />

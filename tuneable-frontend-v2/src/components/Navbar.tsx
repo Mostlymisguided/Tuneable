@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -84,6 +85,7 @@ const Navbar: React.FC = () => {
                   Podcasts
                 </Link> */}
                 <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-4">
+                  <NotificationBell />
                   <Link
                     to="/wallet"
                     className="hidden sm:block text-sm text-gray-300 hover:text-white transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-700/50"

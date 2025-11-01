@@ -10,14 +10,27 @@ interface User {
   personalInviteCode: string;
   balance: number;
   tuneBytes?: number;
-  homeLocation: {
-    city: string;
-    country: string;
+  homeLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
     coordinates?: {
       lat: number;
       lng: number;
     };
+    detectedFromIP?: boolean;
   };
+  secondaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  } | null;
   role: string[];
   isActive: boolean;
   joinedParties?: {
@@ -463,6 +476,19 @@ export const userAPI = {
     const response = await api.get(`/users/${userId}/tag-rankings`, { params });
     return response.data;
   },
+
+  // Update notification preferences
+  updateNotificationPreferences: async (preferences: {
+    bid_received?: boolean;
+    bid_outbid?: boolean;
+    comment_reply?: boolean;
+    tune_bytes_earned?: boolean;
+    email?: boolean;
+    anonymousMode?: boolean;
+  }) => {
+    const response = await api.put('/users/notification-preferences', preferences);
+    return response.data;
+  },
 };
 
 export const claimAPI = {
@@ -552,6 +578,66 @@ export const reportAPI = {
 };
 
 // TuneBytes API functions
+// Notification API
+export const notificationAPI = {
+  // Get user's notifications
+  getNotifications: async (page: number = 1, limit: number = 20, unreadOnly: boolean = false) => {
+    const response = await api.get('/notifications', {
+      params: { page, limit, unreadOnly }
+    });
+    return response.data;
+  },
+
+  // Get unread count
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
+    return response.data;
+  },
+
+  // Mark notification as read
+  markAsRead: async (notificationId: string) => {
+    const response = await api.put(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  // Mark all notifications as read
+  markAllAsRead: async () => {
+    const response = await api.put('/notifications/read-all');
+    return response.data;
+  },
+
+  // Delete notification
+  deleteNotification: async (notificationId: string) => {
+    const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+
+  // Admin: Send notification to user(s)
+  sendNotification: async (userIds: string[], title: string, message: string, link?: string, linkText?: string, type: string = 'admin_announcement') => {
+    const response = await api.post('/notifications/admin/send', {
+      userIds,
+      title,
+      message,
+      link,
+      linkText,
+      type
+    });
+    return response.data;
+  },
+
+  // Admin: Broadcast notification to all users
+  broadcastNotification: async (title: string, message: string, link?: string, linkText?: string, type: string = 'admin_announcement') => {
+    const response = await api.post('/notifications/admin/broadcast', {
+      title,
+      message,
+      link,
+      linkText,
+      type
+    });
+    return response.data;
+  },
+};
+
 export const tuneBytesAPI = {
   // Get user's TuneBytes statistics
   getStats: async (userId: string) => {

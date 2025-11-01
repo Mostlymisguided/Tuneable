@@ -140,12 +140,28 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 
     await claim.save();
 
+    // Get media for notification and ownership assignment
+    const media = await Media.findById(claim.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    // Send notification to user
+    try {
+      const notificationService = require('../services/notificationService');
+      await notificationService.notifyClaim(
+        claim.userId.toString(),
+        status,
+        claim.mediaId.toString(),
+        media.title,
+        status === 'rejected' ? reviewNotes : null
+      ).catch(err => console.error('Error sending claim notification:', err));
+    } catch (error) {
+      console.error('Error setting up claim notification:', error);
+    }
+
         // If approved, add user to media's owners and assign ownership percentage
         if (status === 'approved') {
-          const media = await Media.findById(claim.mediaId);
-          if (!media) {
-            return res.status(404).json({ error: 'Media not found' });
-          }
 
           // Add ownership with default percentage (admin can specify in request)
           const ownershipPercentage = req.body.ownershipPercentage || 50; // Default 50%

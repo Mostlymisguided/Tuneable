@@ -165,10 +165,27 @@ class TuneBytesService {
             earnedAt: new Date(),
             bidId: bid._id,
             discoveryRank: calculation.calculation.discoveryRank,
-            reason: 'popularity_growth'
+            reason: calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth'
           }
         }
       });
+
+      // Send notification if TuneBytes earned is significant (> 0.1)
+      if (calculation.tuneBytesEarned >= 0.1) {
+        try {
+          const notificationService = require('../services/notificationService');
+          const reason = calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth';
+          await notificationService.notifyTuneBytesEarned(
+            user._id.toString(),
+            calculation.tuneBytesEarned,
+            reason,
+            media._id.toString(),
+            media.title
+          ).catch(err => console.error('Error sending TuneBytes earned notification:', err));
+        } catch (error) {
+          console.error('Error setting up TuneBytes notification:', error);
+        }
+      }
 
       console.log(`✅ Awarded ${calculation.tuneBytesEarned.toFixed(2)} TuneBytes to ${user.username} for bid on "${media.title}"`);
 
