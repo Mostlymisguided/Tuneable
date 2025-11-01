@@ -742,6 +742,27 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
           console.error('Error setting up tag rankings calculation:', error);
         }
 
+        // Update label stats if media has a label (async, don't block response)
+        try {
+          const labelStatsService = require('../services/labelStatsService');
+          if (media.label && Array.isArray(media.label) && media.label.length > 0) {
+            // Get all unique labelIds from media's label array
+            const labelIds = media.label
+              .map(l => l.labelId)
+              .filter(id => id != null)
+              .filter((id, index, self) => self.indexOf(id) === index); // Remove duplicates
+            
+            // Update stats for each label
+            labelIds.forEach(labelId => {
+              labelStatsService.calculateAndUpdateLabelStats(labelId).catch(error => {
+                console.error(`Failed to update stats for label ${labelId}:`, error);
+              });
+            });
+          }
+        } catch (error) {
+          console.error('Error setting up label stats calculation:', error);
+        }
+
         // Send email notification for high-value bids
         try {
           await sendHighValueBidNotification(bid, media, user, 10);
@@ -1009,6 +1030,27 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
           });
         } catch (error) {
           console.error('Error setting up tag rankings calculation:', error);
+        }
+
+        // Update label stats if media has a label (async, don't block response)
+        try {
+          const labelStatsService = require('../services/labelStatsService');
+          if (populatedMedia.label && Array.isArray(populatedMedia.label) && populatedMedia.label.length > 0) {
+            // Get all unique labelIds from media's label array
+            const labelIds = populatedMedia.label
+              .map(l => l.labelId)
+              .filter(id => id != null)
+              .filter((id, index, self) => self.indexOf(id) === index); // Remove duplicates
+            
+            // Update stats for each label
+            labelIds.forEach(labelId => {
+              labelStatsService.calculateAndUpdateLabelStats(labelId).catch(error => {
+                console.error(`Failed to update stats for label ${labelId}:`, error);
+              });
+            });
+          }
+        } catch (error) {
+          console.error('Error setting up label stats calculation:', error);
         }
 
         // Send email notification for high-value bids

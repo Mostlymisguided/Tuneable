@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter } from 'lucide-react';
+import { labelAPI } from '../lib/api';
 
 interface Label {
   _id: string;
@@ -33,7 +34,6 @@ interface Label {
     averageBidAmount: number;
     topBidAmount: number;
     totalBidCount: number;
-    followerCount: number;
   };
   verificationStatus: string;
   createdAt: string;
@@ -79,18 +79,14 @@ const LabelProfile: React.FC = () => {
   const fetchLabelData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/labels/${slug}`);
-      const data = await response.json();
+      const data = await labelAPI.getLabelBySlug(slug!);
       
-      if (response.ok) {
-        setLabel(data.label);
-        setRecentReleases(data.recentReleases || []);
-        setTopMedia(data.topMedia || []);
-      } else {
-        console.error('Error fetching label:', data.error);
-      }
-    } catch (error) {
+      setLabel(data.label);
+      setRecentReleases(data.recentReleases || []);
+      setTopMedia(data.topMedia || []);
+    } catch (error: any) {
       console.error('Error fetching label data:', error);
+      // Handle error (label not found, etc.)
     } finally {
       setLoading(false);
     }
@@ -178,10 +174,6 @@ const LabelProfile: React.FC = () => {
                 <div className="flex items-center space-x-1">
                   <TrendingUp className="w-4 h-4" />
                   <span>{formatCurrency(label.stats.totalBidAmount)} total bids</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Users className="w-4 h-4" />
-                  <span>{label.stats.followerCount} followers</span>
                 </div>
               </div>
             </div>

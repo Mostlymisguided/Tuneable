@@ -491,6 +491,124 @@ export const userAPI = {
   },
 };
 
+export const labelAPI = {
+  // Get all labels (public)
+  getLabels: async (params?: {
+    page?: number;
+    limit?: number;
+    genre?: string;
+    sortBy?: 'totalBidAmount' | 'artistCount' | 'name';
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+  }) => {
+    const response = await api.get('/labels', { params });
+    return response.data;
+  },
+
+  // Get label by slug (public)
+  getLabelBySlug: async (slug: string, refresh?: boolean) => {
+    const params = refresh ? { refresh: true } : {};
+    const response = await api.get(`/labels/${slug}`, { params });
+    return response.data;
+  },
+
+  // Get label's artists (public)
+  getLabelArtists: async (slug: string) => {
+    const response = await api.get(`/labels/${slug}/artists`);
+    return response.data;
+  },
+
+  // Get label's media (public)
+  getLabelMedia: async (slug: string, params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'releaseDate' | 'totalBidAmount';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get(`/labels/${slug}/media`, { params });
+    return response.data;
+  },
+
+  // Create label (authenticated)
+  createLabel: async (labelData: {
+    name: string;
+    description?: string;
+    email: string;
+    website?: string;
+    genres?: string[];
+    foundedYear?: number;
+  }) => {
+    const response = await api.post('/labels', labelData);
+    return response.data;
+  },
+
+  // Update label (authenticated, admin only)
+  updateLabel: async (labelId: string, updates: {
+    name?: string;
+    description?: string;
+    email?: string;
+    website?: string;
+    genres?: string[];
+    foundedYear?: number;
+    logo?: string;
+    coverImage?: string;
+    location?: {
+      city?: string;
+      country?: string;
+      coordinates?: {
+        lat: number;
+        lng: number;
+      };
+    };
+    socialMedia?: {
+      instagram?: string;
+      facebook?: string;
+      soundcloud?: string;
+      spotify?: string;
+      youtube?: string;
+      twitter?: string;
+      tiktok?: string;
+    };
+  }) => {
+    const response = await api.put(`/labels/${labelId}`, updates);
+    return response.data;
+  },
+
+  // Add admin to label (authenticated, owner only)
+  addAdmin: async (labelId: string, userId: string, role: 'admin' | 'moderator') => {
+    const response = await api.post(`/labels/${labelId}/admins`, { userId, role });
+    return response.data;
+  },
+
+  // Remove admin from label (authenticated, owner only)
+  removeAdmin: async (labelId: string, userId: string) => {
+    const response = await api.delete(`/labels/${labelId}/admins/${userId}`);
+    return response.data;
+  },
+
+  // Admin: Verify label
+  verifyLabel: async (labelId: string) => {
+    const response = await api.post(`/labels/${labelId}/verify`);
+    return response.data;
+  },
+
+  // Admin: Get all labels
+  getAllLabels: async (params?: {
+    verificationStatus?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/labels/admin/all', { params });
+    return response.data;
+  },
+
+  // Admin: Recalculate label stats
+  recalculateStats: async (labelId?: string) => {
+    const response = await api.post('/labels/admin/recalculate-stats', { labelId });
+    return response.data;
+  },
+};
+
 export const claimAPI = {
   submitClaim: async (formData: FormData) => {
     const response = await api.post('/claims/submit', formData, {

@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
     }
 
     const labels = await Label.find(query)
-      .select('name slug logo description genres stats.totalBidAmount stats.artistCount stats.releaseCount stats.followerCount')
+      .select('name slug logo description genres stats.totalBidAmount stats.artistCount stats.releaseCount')
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -67,38 +67,82 @@ router.get('/', async (req, res) => {
 // Get label by slug (public)
 router.get('/:slug', async (req, res) => {
   try {
+    const { refresh = false } = req.query;
+    const labelStatsService = require('../services/labelStatsService');
+    
     const label = await Label.findBySlug(req.params.slug);
     
     if (!label) {
       return res.status(404).json({ error: 'Label not found' });
     }
 
+    // Recalculate stats if requested or if stats are stale (older than 1 hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const statsUpdatedAt = label.stats?.lastBidAt || label.updatedAt;
+    const isStale = !statsUpdatedAt || statsUpdatedAt < oneHourAgo;
+
+    if (refresh === 'true' || refresh === true || isStale) {
+      console.log(`🔄 Recalculating stats for label ${label.name} ${isStale ? '(stale)' : '(forced)'}`);
+      await labelStatsService.calculateAndUpdateLabelStats(label._id, true);
+    }
+    
+    // Reload label to get updated stats (always reload after potential recalculation)
+    const updatedLabel = await Label.findById(label._id);
+    const labelToReturn = updatedLabel || label;
+
     // Get recent releases
     const recentReleases = await Media.find({ 
       'label.labelId': label._id,
       isActive: true 
     })
-    .select('title artist coverArt releaseDate stats.totalBidAmount')
+    .select('title artist coverArt releaseDate globalMediaAggregate uuid')
     .sort({ releaseDate: -1 })
-    .limit(10);
+    .limit(10)
+    .lean();
 
     // Get top performing media
     const topMedia = await Media.find({ 
       'label.labelId': label._id,
       isActive: true 
     })
-    .select('title artist coverArt stats.totalBidAmount stats.bidCount')
-    .sort({ 'stats.totalBidAmount': -1 })
-    .limit(5);
+    .select('title artist coverArt globalMediaAggregate uuid')
+    .sort({ globalMediaAggregate: -1 })
+    .limit(5)
+    .lean();
+
+    // Format media for response
+    const formattedRecentReleases = recentReleases.map(m => ({
+      _id: m._id,
+      uuid: m.uuid,
+      title: m.title,
+      artist: Array.isArray(m.artist) && m.artist.length > 0 ? m.artist[0].name : 'Unknown Artist',
+      coverArt: m.coverArt,
+      releaseDate: m.releaseDate,
+      stats: {
+        totalBidAmount: m.globalMediaAggregate || 0
+      }
+    }));
+
+    const formattedTopMedia = topMedia.map(m => ({
+      _id: m._id,
+      uuid: m.uuid,
+      title: m.title,
+      artist: Array.isArray(m.artist) && m.artist.length > 0 ? m.artist[0].name : 'Unknown Artist',
+      coverArt: m.coverArt,
+      stats: {
+        totalBidAmount: m.globalMediaAggregate || 0,
+        bidCount: 0 // Would need to aggregate from bids if needed
+      }
+    }));
 
     res.json({
-      label,
-      recentReleases,
-      topMedia
+      label: labelToReturn,
+      recentReleases: formattedRecentReleases,
+      topMedia: formattedTopMedia
     });
   } catch (error) {
     console.error('Error fetching label:', error);
-    res.status(500).json({ error: 'Failed to fetch label' });
+    res.status(500).json({ error: 'Failed to fetch label', details: error.message });
   }
 });
 
@@ -297,44 +341,6 @@ router.delete('/:id/admins/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// Follow/Unfollow label
-router.post('/:id/follow', authMiddleware, async (req, res) => {
-  try {
-    const label = await Label.findById(req.params.id);
-    
-    if (!label) {
-      return res.status(404).json({ error: 'Label not found' });
-    }
-
-    const isFollowing = label.followers.some(follower => 
-      follower.userId.toString() === req.user.id
-    );
-
-    if (isFollowing) {
-      // Unfollow
-      label.followers = label.followers.filter(follower => 
-        follower.userId.toString() !== req.user.id
-      );
-    } else {
-      // Follow
-      label.followers.push({
-        userId: req.user.id,
-        followedAt: new Date()
-      });
-    }
-
-    await label.save();
-
-    res.json({ 
-      isFollowing: !isFollowing,
-      followerCount: label.followers.length
-    });
-  } catch (error) {
-    console.error('Error following/unfollowing label:', error);
-    res.status(500).json({ error: 'Failed to follow/unfollow label' });
-  }
-});
-
 // ========================================
 // ADMIN ROUTES
 // ========================================
@@ -388,6 +394,39 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching admin labels:', error);
     res.status(500).json({ error: 'Failed to fetch labels' });
+  }
+});
+
+// Recalculate label stats (admin only)
+router.post('/admin/recalculate-stats', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const labelStatsService = require('../services/labelStatsService');
+    
+    const { labelId } = req.body;
+    
+    if (labelId) {
+      // Recalculate stats for specific label
+      await labelStatsService.calculateAndUpdateLabelStats(labelId, true);
+      
+      // Also recalculate rankings
+      await labelStatsService.calculateLabelRankings();
+      
+      res.json({ message: 'Label stats recalculated successfully' });
+    } else {
+      // Recalculate stats for all labels
+      const result = await labelStatsService.recalculateAllLabelStats();
+      
+      // Also recalculate rankings
+      await labelStatsService.calculateLabelRankings();
+      
+      res.json({
+        message: 'All label stats recalculated successfully',
+        ...result
+      });
+    }
+  } catch (error) {
+    console.error('Error recalculating label stats:', error);
+    res.status(500).json({ error: 'Failed to recalculate label stats', details: error.message });
   }
 });
 

@@ -112,13 +112,6 @@ const labelSchema = new mongoose.Schema({
     allowDirectUploads: { type: Boolean, default: true } // Whether artists can upload directly
   },
   
-  // Followers & Social
-  followers: [{ 
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    followedAt: { type: Date, default: Date.now }
-  }],
-  followerCount: { type: Number, default: 0 },
-  
   isActive: { type: Boolean, default: true }
 }, { 
   timestamps: true,
