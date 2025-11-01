@@ -14,7 +14,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
       callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
-      profileFields: ['id', 'emails', 'name', 'picture.type(large)', 'location']
+      profileFields: ['id', 'emails', 'name', 'picture.type(large)']
     },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -35,16 +35,14 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           user.profilePic = photoUrl;
         }
         
-        // Update location if available and not already set
-        if (profile._json && profile._json.location && !user.homeLocation?.city) {
-          user.homeLocation = {
-            city: profile._json.location.name || null,
-            region: null,
-            country: null,
-            countryCode: null,
-            coordinates: null,
-            detectedFromIP: false
-          };
+        // Update names from Facebook if provided
+        if (profile.name) {
+          if (profile.name.givenName) {
+            user.givenName = profile.name.givenName;
+          }
+          if (profile.name.familyName) {
+            user.familyName = profile.name.familyName;
+          }
         }
         
         await user.save();
@@ -71,16 +69,14 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
             user.profilePic = photoUrl;
           }
           
-          // Update location if available and not already set
-          if (profile._json && profile._json.location && !user.homeLocation?.city) {
-            user.homeLocation = {
-              city: profile._json.location.name || null,
-              region: null,
-              country: null,
-              countryCode: null,
-              coordinates: null,
-              detectedFromIP: false
-            };
+          // Update names from Facebook if provided
+          if (profile.name) {
+            if (profile.name.givenName) {
+              user.givenName = profile.name.givenName;
+            }
+            if (profile.name.familyName) {
+              user.familyName = profile.name.familyName;
+            }
           }
           
           await user.save();
@@ -108,27 +104,12 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
       const usernameValue = (profile.name.givenName + profile.name.familyName + Math.random().toString(36).substr(2, 4)).replace(/\s+/g, '');
       
-      // Extract location data from Facebook profile
-      let locationData = null;
-      if (profile._json && profile._json.location) {
-        locationData = {
-          city: profile._json.location.name || null,
-          region: null,
-          country: null,
-          countryCode: null,
-          coordinates: null,
-          type: 'home',
-          detectedFromIP: false
-        };
-      }
-      
       console.log('Creating new user with:', {
         facebookId: profile.id,
         email: emailValue,
         username: usernameValue,
         givenName: profile.name.givenName,
-        familyName: profile.name.familyName,
-        location: locationData
+        familyName: profile.name.familyName
       });
       
       // Get high-res profile picture
@@ -146,7 +127,6 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         givenName: profile.name.givenName,
         familyName: profile.name.familyName,
         profilePic: profilePicUrl,
-        homeLocation: locationData,
         isActive: true,
         role: ['user'],
         balance: 0,

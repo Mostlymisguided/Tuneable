@@ -16,7 +16,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       req.session.pendingInviteCode = req.query.invite;
     }
     passport.authenticate('facebook', { 
-      scope: ['email', 'user_location'] 
+      scope: ['email'] 
     })(req, res, next);
   });
 
