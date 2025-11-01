@@ -23,9 +23,10 @@ import {
   Bell,
   MapPin,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Building
 } from 'lucide-react';
-import { userAPI, authAPI } from '../lib/api';
+import { userAPI, authAPI, labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
@@ -205,6 +206,20 @@ const UserProfile: React.FC = () => {
     isOpen: false,
     platform: null,
     currentUrl: undefined
+  });
+
+  // Label creation modal state
+  const [labelModal, setLabelModal] = useState({
+    isOpen: false,
+    isLoading: false,
+    formData: {
+      name: '',
+      description: '',
+      email: '',
+      website: '',
+      genres: [] as string[],
+      foundedYear: ''
+    }
   });
 
   // Check if viewing own profile
@@ -551,6 +566,57 @@ const UserProfile: React.FC = () => {
     }
   };
 
+  // Label creation handlers
+  const handleAddLabelClick = () => {
+    setLabelModal({
+      isOpen: true,
+      isLoading: false,
+      formData: {
+        name: '',
+        description: '',
+        email: currentUser?.email || '',
+        website: '',
+        genres: [],
+        foundedYear: ''
+      }
+    });
+  };
+
+  const handleCreateLabel = async () => {
+    if (!labelModal.formData.name || !labelModal.formData.email) {
+      toast.error('Label name and email are required');
+      return;
+    }
+
+    try {
+      setLabelModal(prev => ({ ...prev, isLoading: true }));
+      
+      const response = await labelAPI.createLabel({
+        name: labelModal.formData.name,
+        description: labelModal.formData.description || undefined,
+        email: labelModal.formData.email,
+        website: labelModal.formData.website || undefined,
+        genres: labelModal.formData.genres.length > 0 ? labelModal.formData.genres : undefined,
+        foundedYear: labelModal.formData.foundedYear ? parseInt(labelModal.formData.foundedYear) : undefined
+      });
+      
+      toast.success('Label created successfully!');
+      
+      // Navigate to the label profile
+      if (response.label?.slug) {
+        navigate(`/label/${response.label.slug}`);
+      } else {
+        // Refresh user profile to show updated data
+        await fetchUserProfile();
+        setLabelModal({ isOpen: false, isLoading: false, formData: { name: '', description: '', email: '', website: '', genres: [], foundedYear: '' } });
+      }
+    } catch (error: any) {
+      console.error('Error creating label:', error);
+      toast.error(error.response?.data?.error || 'Failed to create label');
+      setLabelModal(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
   // Edit profile handlers
   const handleSaveProfile = async () => {
     if (isSettingsMode) {
@@ -773,6 +839,18 @@ const UserProfile: React.FC = () => {
               
               <div className="mb-6"></div>
 
+              {/* Add Label Button - Only for creators/admins viewing own profile */}
+              {isOwnProfile && currentUser && (currentUser.role?.includes('creator') || currentUser.role?.includes('admin')) && (
+                <div className="mb-4">
+                  <button
+                    onClick={handleAddLabelClick}
+                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
+                  >
+                    <Building className="w-4 h-4" />
+                    <span>Add Label</span>
+                  </button>
+                </div>
+              )}
 
               {/* Social Media Buttons - Hide in anonymous mode (unless own profile) */}
               {!((user as any)?.preferences?.anonymousMode && !isOwnProfile) && getSocialMediaLinks().length > 0 && (
@@ -1925,6 +2003,105 @@ const UserProfile: React.FC = () => {
           currentUrl={socialModal.currentUrl}
           onSave={handleSaveSocialMedia}
         />
+      )}
+
+      {/* Create Label Modal */}
+      {labelModal.isOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white">Create Label</h2>
+              <button
+                onClick={() => setLabelModal({ isOpen: false, isLoading: false, formData: { name: '', description: '', email: '', website: '', genres: [], foundedYear: '' } })}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-white font-medium mb-2">Label Name *</label>
+                <input
+                  type="text"
+                  value={labelModal.formData.name}
+                  onChange={(e) => setLabelModal(prev => ({ ...prev, formData: { ...prev.formData, name: e.target.value } }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="Enter label name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white font-medium mb-2">Email *</label>
+                <input
+                  type="email"
+                  value={labelModal.formData.email}
+                  onChange={(e) => setLabelModal(prev => ({ ...prev, formData: { ...prev.formData, email: e.target.value } }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="label@example.com"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white font-medium mb-2">Description</label>
+                <textarea
+                  value={labelModal.formData.description}
+                  onChange={(e) => setLabelModal(prev => ({ ...prev, formData: { ...prev.formData, description: e.target.value } }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  rows={3}
+                  placeholder="Tell us about your label..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white font-medium mb-2">Website</label>
+                <input
+                  type="url"
+                  value={labelModal.formData.website}
+                  onChange={(e) => setLabelModal(prev => ({ ...prev, formData: { ...prev.formData, website: e.target.value } }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="https://example.com"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white font-medium mb-2">Founded Year</label>
+                <input
+                  type="number"
+                  value={labelModal.formData.foundedYear}
+                  onChange={(e) => setLabelModal(prev => ({ ...prev, formData: { ...prev.formData, foundedYear: e.target.value } }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="2020"
+                  min="1900"
+                  max={new Date().getFullYear()}
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleCreateLabel}
+                disabled={labelModal.isLoading || !labelModal.formData.name || !labelModal.formData.email}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              >
+                {labelModal.isLoading ? (
+                  <span className="flex items-center justify-center space-x-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creating...</span>
+                  </span>
+                ) : (
+                  'Create Label'
+                )}
+              </button>
+              <button
+                onClick={() => setLabelModal({ isOpen: false, isLoading: false, formData: { name: '', description: '', email: '', website: '', genres: [], foundedYear: '' } })}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
