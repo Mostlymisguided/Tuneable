@@ -1020,6 +1020,26 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
     // Populate user data for response
     await comment.populate('userId', 'username profilePic uuid');
 
+    // Send notification if this is a reply to another comment
+    if (parentCommentId) {
+      try {
+        const notificationService = require('../services/notificationService');
+        const parentComment = await Comment.findById(parentCommentId);
+        if (parentComment && parentComment.userId.toString() !== userId.toString()) {
+          notificationService.notifyCommentReply(
+            parentComment.userId.toString(),
+            userId.toString(),
+            media._id.toString(),
+            parentCommentId,
+            comment._id.toString(),
+            media.title
+          ).catch(err => console.error('Error sending comment reply notification:', err));
+        }
+      } catch (error) {
+        console.error('Error setting up comment reply notification:', error);
+      }
+    }
+
     res.status(201).json({
       message: 'Comment created successfully',
       comment,
@@ -1197,6 +1217,20 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up TuneBytes calculation:', error);
     }
 
+    // Invalidate and recalculate tag rankings for this user (async, don't block response)
+    try {
+      const tagRankingsService = require('../services/tagRankingsService');
+      tagRankingsService.invalidateUserTagRankings(userId).catch(error => {
+        console.error('Failed to invalidate tag rankings:', error);
+      });
+      // Recalculate tag rankings in background
+      tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(error => {
+        console.error('Failed to recalculate tag rankings:', error);
+      });
+    } catch (error) {
+      console.error('Error setting up tag rankings calculation:', error);
+    }
+
     // Add or update media in global party
     if (!partyMediaEntry) {
       partyMediaEntry = {
@@ -1222,15 +1256,57 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     
     await globalParty.save();
 
+    // Store previous top bid info for outbid notification
+    const previousTopBidAmount = media.globalMediaBidTop || 0;
+    const previousTopBidderId = media.globalMediaBidTopUser;
+    const wasNewTopBid = amount > previousTopBidAmount;
+
     // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
     media.bids.push(bid._id);
+    
+    // Update top bid if this is higher
+    if (wasNewTopBid) {
+      media.globalMediaBidTop = amount;
+      media.globalMediaBidTopUser = userId;
+    }
     
     // Also add to globalBids array
     media.globalBids = media.globalBids || [];
     media.globalBids.push(bid._id);
     
     await media.save();
+
+    // Send notifications (async, don't block response)
+    try {
+      const notificationService = require('../services/notificationService');
+      
+      // Notify media owner if bidder is not the owner
+      const mediaOwnerId = media.addedBy?.toString() || media.addedBy?._id?.toString();
+      if (mediaOwnerId && mediaOwnerId !== userId.toString()) {
+        notificationService.notifyBidReceived(
+          mediaOwnerId,
+          userId.toString(),
+          media._id.toString(),
+          bid._id.toString(),
+          amount,
+          media.title
+        ).catch(err => console.error('Error sending bid received notification:', err));
+      }
+      
+      // Notify previous top bidder if they were outbid (and it's not the same user)
+      if (wasNewTopBid && previousTopBidderId && previousTopBidderId.toString() !== userId.toString()) {
+        notificationService.notifyOutbid(
+          previousTopBidderId.toString(),
+          media._id.toString(),
+          bid._id.toString(),
+          amount,
+          media.title
+        ).catch(err => console.error('Error sending outbid notification:', err));
+      }
+    } catch (error) {
+      console.error('Error setting up notifications:', error);
+    }
 
     // Update user balance
     user.balance = (userBalancePence - bidAmountPence) / 100;

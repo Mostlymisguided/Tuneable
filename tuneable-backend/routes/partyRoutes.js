@@ -211,12 +211,12 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 model: 'Bid',
                 populate: {
                     path: 'userId',
-                    select: 'username profilePic uuid homeLocation'
+                    select: 'username profilePic uuid homeLocation secondaryLocation'
                 }
             })
-            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation')
-            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation')
-            .populate('addedBy', 'username profilePic uuid homeLocation');
+            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+            .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
 
             // Convert to party media format for consistent frontend handling
             party.media = allMediaWithBids.map(media => ({
@@ -266,30 +266,30 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                         model: 'Bid',
                         populate: {
                             path: 'userId',
-                            select: 'username profilePic uuid homeLocation',  // ✅ Added profilePic, uuid, and location for top bidders display
+                            select: 'username profilePic uuid homeLocation secondaryLocation',  // ✅ Added profilePic, uuid, and location for top bidders display
                         },
                     },
                     {
                         path: 'globalMediaBidTopUser',
                         model: 'User',
-                        select: 'username profilePic uuid homeLocation'
+                        select: 'username profilePic uuid homeLocation secondaryLocation'
                     },
                     {
                         path: 'globalMediaAggregateTopUser',
                         model: 'User',
-                        select: 'username profilePic uuid homeLocation'
+                        select: 'username profilePic uuid homeLocation secondaryLocation'
                     }
                 ]
             })
             .populate({
                 path: 'media.partyMediaBidTopUser',
                 model: 'User',
-                select: 'username profilePic uuid homeLocation'
+                select: 'username profilePic uuid homeLocation secondaryLocation'
             })
             .populate({
                 path: 'media.partyMediaAggregateTopUser',
                 model: 'User',
-                select: 'username profilePic uuid homeLocation'
+                select: 'username profilePic uuid homeLocation secondaryLocation'
             })
             .populate({
                 path: 'partiers',
@@ -728,6 +728,20 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
           console.error('Error setting up TuneBytes calculation:', error);
         }
 
+        // Invalidate and recalculate tag rankings for this user (async, don't block response)
+        try {
+          const tagRankingsService = require('../services/tagRankingsService');
+          tagRankingsService.invalidateUserTagRankings(userId).catch(error => {
+            console.error('Failed to invalidate tag rankings:', error);
+          });
+          // Recalculate tag rankings in background
+          tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(error => {
+            console.error('Failed to recalculate tag rankings:', error);
+          });
+        } catch (error) {
+          console.error('Error setting up tag rankings calculation:', error);
+        }
+
         // Send email notification for high-value bids
         try {
           await sendHighValueBidNotification(bid, media, user, 10);
@@ -774,6 +788,8 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         media.globalMediaAggregateTop = userGlobalAggregate;
         media.globalMediaAggregateTopUser = userId;
         await media.save();
+
+        // Note: For first bid on new media, the bidder is typically the owner, so no bid_received notification needed
 
         // Update user balance
         user.balance = (userBalancePence - bidAmountPence) / 100;
@@ -981,6 +997,20 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
           console.error('Error setting up TuneBytes calculation:', error);
         }
 
+        // Invalidate and recalculate tag rankings for this user (async, don't block response)
+        try {
+          const tagRankingsService = require('../services/tagRankingsService');
+          tagRankingsService.invalidateUserTagRankings(userId).catch(error => {
+            console.error('Failed to invalidate tag rankings:', error);
+          });
+          // Recalculate tag rankings in background
+          tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(error => {
+            console.error('Failed to recalculate tag rankings:', error);
+          });
+        } catch (error) {
+          console.error('Error setting up tag rankings calculation:', error);
+        }
+
         // Send email notification for high-value bids
         try {
           await sendHighValueBidNotification(bid, populatedMedia, user, 10);
@@ -1005,9 +1035,20 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         // Update media global bid value
         const media = await Media.findById(actualMediaId);
         if (media) {
+            // Store previous top bid info for outbid notification
+            const previousTopBidAmount = media.globalMediaBidTop || 0;
+            const previousTopBidderId = media.globalMediaBidTopUser;
+            const wasNewTopBid = bidAmount > previousTopBidAmount;
+            
             media.globalMediaAggregate = (media.globalMediaAggregate || 0) + bidAmount; // Updated to schema grammar
             media.bids = media.bids || [];
             media.bids.push(bid._id);
+            
+            // Update top bid if this is higher
+            if (wasNewTopBid) {
+                media.globalMediaBidTop = bidAmount;
+                media.globalMediaBidTopUser = userId;
+            }
             
             // Also add to globalBids array if this is a global bid
             if (party.type === 'global') {
@@ -1016,6 +1057,37 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             }
             
             await media.save();
+
+            // Send notifications (async, don't block response)
+            try {
+                const notificationService = require('../services/notificationService');
+                
+                // Notify media owner if bidder is not the owner
+                const mediaOwnerId = media.addedBy?.toString() || media.addedBy?._id?.toString();
+                if (mediaOwnerId && mediaOwnerId !== userId.toString()) {
+                    notificationService.notifyBidReceived(
+                        mediaOwnerId,
+                        userId.toString(),
+                        actualMediaId.toString(),
+                        bid._id.toString(),
+                        bidAmount,
+                        populatedMedia.title
+                    ).catch(err => console.error('Error sending bid received notification:', err));
+                }
+                
+                // Notify previous top bidder if they were outbid (and it's not the same user)
+                if (wasNewTopBid && previousTopBidderId && previousTopBidderId.toString() !== userId.toString()) {
+                    notificationService.notifyOutbid(
+                        previousTopBidderId.toString(),
+                        actualMediaId.toString(),
+                        bid._id.toString(),
+                        bidAmount,
+                        populatedMedia.title
+                    ).catch(err => console.error('Error sending outbid notification:', err));
+                }
+            } catch (error) {
+                console.error('Error setting up notifications:', error);
+            }
         }
 
         // Note: Bid tracking is now handled automatically by BidMetricsEngine
@@ -1623,12 +1695,12 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                 model: 'Bid',
                 populate: {
                     path: 'userId',
-                    select: 'username profilePic uuid homeLocation'
+                    select: 'username profilePic uuid homeLocation secondaryLocation'
                 }
             })
-            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation')
-            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation')
-            .populate('addedBy', 'username profilePic uuid homeLocation');
+            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+            .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
 
             console.log(`🌍 Global Party time sorting: Found ${bids.length} bids within time period, ${allMediaWithBids.length} media with bids`);
         } else {

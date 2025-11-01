@@ -38,36 +38,44 @@ const userSchema = new mongoose.Schema({
     discoveryRank: Number, // 1st, 2nd, 3rd bidder, etc.
     reason: { type: String, enum: ['discovery', 'popularity_growth'] }
   }],
-  locations: {
-    primary: {
-      city: { type: String },
-      region: { type: String }, // State, province, or region
-      country: { type: String },
-      countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
-      coordinates: {
-        lat: { type: Number },
-        lng: { type: Number },
-      },
-      type: { type: String, enum: ['home', 'base', 'studio'], default: 'home' },
-      detectedFromIP: { type: Boolean, default: false } // Track if auto-detected from IP
+  homeLocation: {
+    city: { type: String },
+    region: { type: String }, // State, province, or region
+    country: { type: String },
+    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number },
     },
-    secondary: {
-      city: { type: String },
-      region: { type: String },
-      country: { type: String },
-      countryCode: { type: String },
-      coordinates: {
-        lat: { type: Number },
-        lng: { type: Number },
-      },
-      type: { type: String, enum: ['secondary', 'travel', 'work'], default: 'secondary' }
+    detectedFromIP: { type: Boolean, default: false } // Track if auto-detected from IP
+  },
+  secondaryLocation: {
+    city: { type: String },
+    region: { type: String },
+    country: { type: String },
+    countryCode: { type: String },
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number },
     }
   },
   preferences: {
     theme: { type: String, default: 'light' },
+    anonymousMode: { type: Boolean, default: false },
     notifications: {
       email: { type: Boolean, default: true },
       sms: { type: Boolean, default: false },
+      types: {
+        bid_received: { type: Boolean, default: true },
+        bid_outbid: { type: Boolean, default: true },
+        comment_reply: { type: Boolean, default: true },
+        creator_approved: { type: Boolean, default: true },
+        creator_rejected: { type: Boolean, default: true },
+        claim_approved: { type: Boolean, default: true },
+        claim_rejected: { type: Boolean, default: true },
+        tune_bytes_earned: { type: Boolean, default: true },
+        admin_announcement: { type: Boolean, default: true },
+      },
     },
   },
   role: { 
@@ -137,7 +145,18 @@ const userSchema = new mongoose.Schema({
     partyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
     joinedAt: { type: Date, default: Date.now },
     role: { type: String, enum: ['partier', 'host', 'moderator'], default: 'partier' }
-  }]
+  }],
+  
+  // Tag rankings - cached top tags by bid aggregate (performance optimization)
+  tagRankings: [{
+    tag: { type: String, required: true },
+    aggregate: { type: Number, required: true }, // Total bid amount for this tag
+    rank: { type: Number, required: true }, // User's rank for this tag (1-indexed)
+    totalUsers: { type: Number, required: true }, // Total users who bid on this tag
+    percentile: { type: Number, required: true }, // Percentile ranking (0-100)
+    lastUpdated: { type: Date, default: Date.now }
+  }],
+  tagRankingsUpdatedAt: { type: Date } // Last time tag rankings were recalculated
 }, { 
   timestamps: true,
   toJSON: { virtuals: true }, 

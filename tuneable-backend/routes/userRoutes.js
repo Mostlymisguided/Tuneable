@@ -326,7 +326,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { username, email, password, cellPhone, givenName, familyName, homeLocation, parentInviteCode } = req.body;
+      const { username, email, password, cellPhone, givenName, familyName, homeLocation, locations, parentInviteCode } = req.body;
       
       // Validate invite code (required)
       if (!parentInviteCode || parentInviteCode.length !== 5) {
@@ -346,27 +346,42 @@ router.post(
         countryCode: null 
       };
       
-      let primaryLocation;
+      let homeLocationData;
       
-      // Use location data provided by frontend (which may be auto-detected)
-      if (homeLocation && Object.keys(homeLocation).length > 0 && 
-          (homeLocation.city || homeLocation.country)) {
-        primaryLocation = {
-          city: homeLocation.city || null,
-          region: homeLocation.region || null,
-          country: homeLocation.country || null,
-          countryCode: homeLocation.country ? countryCodeMap[homeLocation.country] || null : null,
-          coordinates: homeLocation.coordinates || null,
+      // Support legacy locations.primary/secondary for backward compatibility, but prefer homeLocation/secondaryLocation
+      const locationData = homeLocation || locations?.primary;
+      
+      if (locationData && Object.keys(locationData).length > 0 && 
+          (locationData.city || locationData.country)) {
+        homeLocationData = {
+          city: locationData.city || null,
+          region: locationData.region || null,
+          country: locationData.country || null,
+          countryCode: locationData.country ? countryCodeMap[locationData.country] || null : null,
+          coordinates: locationData.coordinates || null,
           detectedFromIP: false // Since user confirmed/edited it in the form
         };
-        console.log('Using user-provided location:', primaryLocation);
+        console.log('Using user-provided location:', homeLocationData);
       } else {
         // No location provided - use null values
-        primaryLocation = {
+        homeLocationData = {
           ...defaultLocation,
           detectedFromIP: false
         };
-        console.log('No location provided by user:', primaryLocation);
+        console.log('No location provided by user:', homeLocationData);
+      }
+      
+      // Handle secondary location
+      let secondaryLocationData = null;
+      if (locations?.secondary && Object.keys(locations.secondary).length > 0 &&
+          (locations.secondary.city || locations.secondary.country)) {
+        secondaryLocationData = {
+          city: locations.secondary.city || null,
+          region: locations.secondary.region || null,
+          country: locations.secondary.country || null,
+          countryCode: locations.secondary.country ? countryCodeMap[locations.secondary.country] || null : null,
+          coordinates: locations.secondary.coordinates || null
+        };
       }
       
       const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -390,9 +405,8 @@ router.post(
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
-        locations: {
-          primary: primaryLocation
-        }
+        homeLocation: homeLocationData,
+        secondaryLocation: secondaryLocationData
       });
       await user.save();
       
@@ -535,17 +549,55 @@ router.get('/profile', authMiddleware, async (req, res) => {
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { profilePic, ...updatedFields } = req.body; // Ensure profilePic isn't overwritten
+    const { profilePic, homeLocation, secondaryLocation, locations, ...updatedFields } = req.body; // Ensure profilePic isn't overwritten
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      updatedFields,
-      { new: true }
-    ).select('-password');
-
+    const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    res.json({ message: 'Profile updated successfully', user });
+    // Handle location updates
+    // Support both new format (homeLocation/secondaryLocation) and legacy (locations)
+    if (homeLocation !== undefined || (locations && locations.primary !== undefined)) {
+      const locationData = homeLocation || locations?.primary;
+      if (locationData) {
+        user.homeLocation = {
+          ...user.homeLocation,
+          city: locationData.city !== undefined ? locationData.city : user.homeLocation?.city,
+          region: locationData.region !== undefined ? locationData.region : user.homeLocation?.region,
+          country: locationData.country !== undefined ? locationData.country : user.homeLocation?.country,
+          countryCode: locationData.country && countryCodeMap[locationData.country]
+            ? countryCodeMap[locationData.country]
+            : (user.homeLocation?.countryCode || null),
+          coordinates: locationData.coordinates !== undefined ? locationData.coordinates : user.homeLocation?.coordinates,
+          detectedFromIP: locationData.detectedFromIP !== undefined ? locationData.detectedFromIP : (user.homeLocation?.detectedFromIP || false)
+        };
+      }
+    }
+    
+    if (secondaryLocation !== undefined || (locations && locations.secondary !== undefined)) {
+      const secondaryData = secondaryLocation !== undefined ? secondaryLocation : locations?.secondary;
+      if (secondaryData === null || (secondaryData && Object.keys(secondaryData).length === 0 && !secondaryData.city && !secondaryData.country)) {
+        // Remove secondary location
+        user.secondaryLocation = null;
+      } else if (secondaryData) {
+        user.secondaryLocation = {
+          ...user.secondaryLocation,
+          city: secondaryData.city !== undefined ? secondaryData.city : user.secondaryLocation?.city,
+          region: secondaryData.region !== undefined ? secondaryData.region : user.secondaryLocation?.region,
+          country: secondaryData.country !== undefined ? secondaryData.country : user.secondaryLocation?.country,
+          countryCode: secondaryData.country && countryCodeMap[secondaryData.country]
+            ? countryCodeMap[secondaryData.country]
+            : (user.secondaryLocation?.countryCode || null),
+          coordinates: secondaryData.coordinates !== undefined ? secondaryData.coordinates : user.secondaryLocation?.coordinates
+        };
+      }
+    }
+
+    // Update other fields
+    Object.assign(user, updatedFields);
+    await user.save();
+
+    const updatedUser = await User.findById(user._id).select('-password');
+    res.json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (error) {
     res.status(500).json({ error: 'Error updating profile', details: error.message });
   }
@@ -600,6 +652,63 @@ router.put('/profile/social-media', authMiddleware, async (req, res) => {
 });
 
 // Profile Picture Upload Route
+// @route   PUT /api/users/notification-preferences
+// @desc    Update user notification preferences
+// @access  Private
+router.put('/notification-preferences', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user._id;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const {
+      bid_received,
+      bid_outbid,
+      comment_reply,
+      tune_bytes_earned,
+      email,
+      anonymousMode,
+    } = req.body;
+
+    // Initialize preferences if they don't exist
+    if (!user.preferences) {
+      user.preferences = {};
+    }
+    if (!user.preferences.notifications) {
+      user.preferences.notifications = {};
+    }
+    if (!user.preferences.notifications.types) {
+      user.preferences.notifications.types = {};
+    }
+
+    // Update notification types (only the ones that are optional)
+    if (bid_received !== undefined) user.preferences.notifications.types.bid_received = bid_received;
+    if (bid_outbid !== undefined) user.preferences.notifications.types.bid_outbid = bid_outbid;
+    if (comment_reply !== undefined) user.preferences.notifications.types.comment_reply = comment_reply;
+    if (tune_bytes_earned !== undefined) user.preferences.notifications.types.tune_bytes_earned = tune_bytes_earned;
+
+    // Update delivery methods (only email - SMS removed)
+    if (email !== undefined) user.preferences.notifications.email = email;
+
+    // Update privacy settings
+    if (anonymousMode !== undefined) user.preferences.anonymousMode = anonymousMode;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Notification preferences updated successfully',
+      preferences: user.preferences.notifications,
+    });
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    res.status(500).json({ error: 'Failed to update notification preferences' });
+  }
+});
+
 router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (req, res) => {
   try {
       if (!req.file) {
@@ -758,26 +867,54 @@ router.get('/:userId/profile', async (req, res) => {
     const mediaWithBids = Object.values(bidsByMedia)  
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
+    // Check if user is viewing their own profile (authenticated)
+    const isOwnProfile = req.user && (
+      req.user.userId?.toString() === user._id.toString() || 
+      req.user._id?.toString() === user._id.toString()
+    );
+
+    // Build user object
+    const userResponse = {
+      id: user.uuid, // Use UUID as primary ID for external API
+      uuid: user.uuid,
+      _id: user._id,
+      username: user.username,
+      profilePic: user.profilePic,
+      email: user.email,
+      balance: user.balance,
+      personalInviteCode: user.personalInviteCode,
+      cellPhone: user.cellPhone || '',
+      homeLocation: user.homeLocation || null,
+      secondaryLocation: user.secondaryLocation || null,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      globalUserAggregateRank: userAggregateRank,
+      globalUserBidAvg: globalUserBidAvg,
+      globalUserBids: globalUserBids,
+      creatorProfile: user.creatorProfile,
+    };
+
+    // If anonymous mode is enabled and not viewing own profile, hide names
+    if (user.preferences?.anonymousMode && !isOwnProfile) {
+      // Remove givenName and familyName from response
+      // They're not explicitly included above, but we'll ensure they're not
+      delete userResponse.givenName;
+      delete userResponse.familyName;
+      // Also hide from creatorProfile if it exists
+      if (userResponse.creatorProfile) {
+        delete userResponse.creatorProfile.artistName; // If artistName contains real name
+      }
+    } else {
+      // Include names if not anonymous or viewing own profile
+      if (user.givenName !== undefined) userResponse.givenName = user.givenName;
+      if (user.familyName !== undefined) userResponse.familyName = user.familyName;
+    }
+
     res.json({
       message: 'User profile fetched successfully',
-      user: {
-        id: user.uuid, // Use UUID as primary ID for external API
-        uuid: user.uuid,
-        username: user.username,
-        profilePic: user.profilePic,
-        email: user.email,
-        balance: user.balance,
-        personalInviteCode: user.personalInviteCode,
-        homeLocation: user.homeLocation,
-        role: user.role,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        globalUserAggregateRank: userAggregateRank,
-        globalUserBidAvg: globalUserBidAvg,
-        globalUserBids: globalUserBids,
-        creatorProfile: user.creatorProfile,
-      },
+      user: userResponse,
       stats: {
         totalBids,
         totalAmountBid,
@@ -862,7 +999,7 @@ router.get('/referrals', authMiddleware, async (req, res) => {
     const referrals = await User.find({ 
       parentInviteCode: user.personalInviteCode 
     })
-      .select('username profilePic createdAt homeLocation uuid')
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid')
       .sort({ createdAt: -1 })
       .lean();
     
@@ -873,7 +1010,7 @@ router.get('/referrals', authMiddleware, async (req, res) => {
         username: r.username,
         profilePic: r.profilePic,
         joinedAt: r.createdAt,
-        location: r.homeLocation,
+        location: r.homeLocation || null, // Return home location, or null
         uuid: r.uuid
       }))
     });
@@ -992,102 +1129,74 @@ router.patch('/admin/invite-requests/:id/reject', authMiddleware, async (req, re
 router.get('/:userId/tag-rankings', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { limit = 20 } = req.query;
+    const { limit = 20, refresh = false } = req.query;
 
-    console.log('🏷️ User tag rankings request for:', userId);
+    console.log('🏷️ User tag rankings request for:', userId, refresh ? '(force refresh)' : '');
 
-    // Resolve user ID
+    // Resolve user ID (handle both UUID and ObjectId)
     const User = require('../models/User');
-    const Bid = require('../models/Bid');
-    const Media = require('../models/Media');
+    const mongoose = require('mongoose');
+    const tagRankingsService = require('../services/tagRankingsService');
     
-    // Use ObjectId directly (no resolution needed)
-    if (!isValidObjectId(userId)) {
+    // Find user by UUID or ObjectId
+    let actualUserId;
+    let user;
+    
+    if (userId.includes('-')) {
+      // UUID format
+      user = await User.findOne({ uuid: userId }).select('_id tagRankings tagRankingsUpdatedAt');
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      actualUserId = user._id;
+    } else if (mongoose.Types.ObjectId.isValid(userId)) {
+      // ObjectId format
+      actualUserId = new mongoose.Types.ObjectId(userId);
+      user = await User.findById(actualUserId).select('_id tagRankings tagRankingsUpdatedAt');
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+    } else {
       return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
-    // Get all active bids by this user
-    const userBids = await Bid.find({ 
-      userId: userId,
-      status: 'active'
-    })
-      .populate('mediaId', 'tags')
-      .lean();
-
-    console.log(`📊 Found ${userBids.length} active bids for user`);
-
-    // Aggregate by tag (GlobalUserTagAggregate)
-    const tagAggregates = {};
-    userBids.forEach(bid => {
-      if (bid.mediaId?.tags) {
-        bid.mediaId.tags.forEach(tag => {
-          tagAggregates[tag] = (tagAggregates[tag] || 0) + bid.amount;
-        });
-      }
-    });
-
-    console.log(`📊 User has bid on ${Object.keys(tagAggregates).length} different tags`);
-
-    // Calculate GlobalUserTagAggregateRank for each tag
-    const tagRankings = [];
+    // Check if we have cached rankings and they're recent (unless forcing refresh)
+    const hasCachedRankings = user.tagRankings && user.tagRankings.length > 0;
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const isStale = !user.tagRankingsUpdatedAt || user.tagRankingsUpdatedAt < oneHourAgo;
     
-    for (const [tag, userAggregate] of Object.entries(tagAggregates)) {
-      // Get all bids on media with this tag
-      const mediaWithTag = await Media.find({ tags: tag }).select('_id').lean();
-      const mediaIds = mediaWithTag.map(m => m._id);
-      
-      // Get all bids on these media items
-      const allBidsForTag = await Bid.find({
-        mediaId: { $in: mediaIds },
-        status: 'active'
-      }).lean();
-      
-      // Aggregate by user
-      const userTagTotals = {};
-      allBidsForTag.forEach(bid => {
-        const uid = bid.userId.toString();
-        userTagTotals[uid] = (userTagTotals[uid] || 0) + bid.amount;
-      });
-      
-      // Sort users by aggregate
-      const sortedUsers = Object.entries(userTagTotals)
-        .sort(([, a], [, b]) => b - a);
-      
-      // Find this user's rank
-      const rankIndex = sortedUsers.findIndex(([uid]) => uid === resolvedUserId.toString());
-      const rank = rankIndex + 1;
-      const totalUsers = sortedUsers.length;
-      const percentile = totalUsers > 0 ? ((totalUsers - rank) / totalUsers * 100).toFixed(1) : '0';
-      
-      tagRankings.push({
-        tag,
-        aggregate: userAggregate,
-        rank,
-        totalUsers,
-        percentile: parseFloat(percentile)
-      });
-      
-      console.log(`  Tag "${tag}": £${userAggregate.toFixed(2)} - Rank #${rank} of ${totalUsers}`);
+    let tagRankings = [];
+
+    if (hasCachedRankings && !refresh && !isStale) {
+      // Use cached rankings
+      tagRankings = user.tagRankings || [];
+      console.log(`✅ Using cached tag rankings (${tagRankings.length} tags, updated ${user.tagRankingsUpdatedAt})`);
+    } else {
+      // Calculate and update tag rankings
+      console.log(`🔄 Calculating tag rankings ${hasCachedRankings ? '(stale cache)' : '(no cache)'}`);
+      tagRankings = await tagRankingsService.calculateAndUpdateUserTagRankings(
+        actualUserId, 
+        parseInt(limit), 
+        refresh === 'true' || refresh === true
+      );
     }
 
-    // Sort by aggregate (highest first)
-    tagRankings.sort((a, b) => b.aggregate - a.aggregate);
-
-    // Limit results
+    // Limit results to requested limit
     const limitedRankings = tagRankings.slice(0, parseInt(limit));
 
     console.log('✅ Returning', limitedRankings.length, 'tag rankings');
 
     res.json({
       tagRankings: limitedRankings,
-      totalTags: tagRankings.length
+      totalTags: tagRankings.length,
+      cached: hasCachedRankings && !refresh && !isStale,
+      lastUpdated: user.tagRankingsUpdatedAt
     });
   } catch (error) {
     console.error('Error fetching user tag rankings:', error);
-    res.status(500).json({ error: 'Failed to fetch tag rankings' });
+    res.status(500).json({ error: 'Failed to fetch tag rankings', details: error.message });
   }
 });
-
 // ========================================
 // TUNEBYTES ROUTES
 // ========================================
