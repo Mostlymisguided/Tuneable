@@ -1464,6 +1464,12 @@ const Party: React.FC = () => {
                                         {media.title}
                                       </p>
                                       <p className="text-gray-400 text-sm truncate">{media.artist}</p>
+                                      {media.duration && (
+                                        <div className="flex items-center space-x-1 mt-1">
+                                          <Clock className="h-3 w-3 text-gray-500" />
+                                          <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">
@@ -1510,6 +1516,12 @@ const Party: React.FC = () => {
                                     <div className="flex-1 min-w-0">
                                       <p className="text-white font-medium truncate">{media.title}</p>
                                       <p className="text-gray-400 text-sm truncate">{media.artist}</p>
+                                      {media.duration && (
+                                        <div className="flex items-center space-x-1 mt-1">
+                                          <Clock className="h-3 w-3 text-gray-500" />
+                                          <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">

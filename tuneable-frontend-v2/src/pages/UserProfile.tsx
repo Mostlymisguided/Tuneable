@@ -21,7 +21,9 @@ import {
   Music2,
   Settings,
   Bell,
-  MapPin
+  MapPin,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,10 +47,10 @@ interface UserProfile {
       region?: string;
       country?: string;
       countryCode?: string;
-      coordinates?: {
-        lat: number;
-        lng: number;
-      };
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
       detectedFromIP?: boolean;
     };
     secondaryLocation?: {
@@ -59,7 +61,7 @@ interface UserProfile {
       coordinates?: {
         lat: number;
         lng: number;
-      };
+  };
     } | null;
   role: string[];
   isActive: boolean;
@@ -136,6 +138,7 @@ const UserProfile: React.FC = () => {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [mediaWithBids, setMediaWithBids] = useState<MediaWithBids[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
+  const [showAllTunes, setShowAllTunes] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -198,8 +201,8 @@ const UserProfile: React.FC = () => {
   useEffect(() => {
     if (userId) {
       // Always fetch from API to ensure we have complete profile data including givenName, familyName, cellPhone
-      fetchUserProfile();
-    }
+        fetchUserProfile();
+      }
   }, [userId]);
 
 
@@ -570,7 +573,7 @@ const UserProfile: React.FC = () => {
       toast.success('Profile updated successfully!');
       // Only update modal state if NOT in settings mode
       if (!isSettingsMode) {
-        setIsEditingProfile(false);
+      setIsEditingProfile(false);
       }
       // Refresh user data
       await fetchUserProfile();
@@ -738,7 +741,7 @@ const UserProfile: React.FC = () => {
                             user.homeLocation?.country
                           ].filter(Boolean).join(', ')}
                         </span>
-                      </div>
+              </div>
                     ) : null}
                     {user.secondaryLocation?.city || user.secondaryLocation?.country ? (
                       <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
@@ -749,18 +752,18 @@ const UserProfile: React.FC = () => {
                             user.secondaryLocation?.region,
                             user.secondaryLocation?.country
                           ].filter(Boolean).join(', ')}
-                        </span>
-                      </div>
-                    ) : null}
+                    </span>
                   </div>
-                )}
+                    ) : null}
+                </div>
+              )}
               </div>
               
               <div className="mb-6"></div>
 
 
-              {/* Social Media Buttons */}
-              {getSocialMediaLinks().length > 0 && (
+              {/* Social Media Buttons - Hide in anonymous mode (unless own profile) */}
+              {!((user as any)?.preferences?.anonymousMode && !isOwnProfile) && getSocialMediaLinks().length > 0 && (
                 <div className="mb-4">
                   <div className="flex flex-wrap gap-2">
                     {getSocialMediaLinks().map((social) => (
@@ -823,8 +826,8 @@ const UserProfile: React.FC = () => {
         {/* Conditional Rendering: Settings Mode vs Normal Mode */}
         {!isSettingsMode ? (
           <>
-            {/* Bidding Statistics */}
-            {stats && (
+        {/* Bidding Statistics */}
+        {stats && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
             <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -852,51 +855,13 @@ const UserProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Top Tags */}
-        {tagRankings.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-center text-white mb-4">Top Tags</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tagRankings.slice(0, 6).map((ranking, index) => (
-                <div 
-                  key={ranking.tag} 
-                  className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-6 hover:border-purple-500/60 transition-all"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-purple-600/50 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-white font-bold text-sm">#{index + 1}</span>
-                      </div>
-                      <span className="text-white font-medium text-lg">{ranking.tag}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Total Bid</span>
-                      <span className="text-xl font-bold text-white">£{ranking.aggregate.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Rank</span>
-                      <span className="text-lg font-bold text-purple-400">#{ranking.rank}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Percentile</span>
-                      <span className="text-sm text-purple-300">Top {ranking.percentile}%</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Songs with Bids */}
         {mediaWithBids.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl text-center font-bold text-white mb-4">Top Tunes</h2>
             <div className="bg-black/20 rounded-lg p-6">
               <div className="space-y-4">
-                {mediaWithBids.map((mediaData, index) => (
+                {(showAllTunes ? mediaWithBids : mediaWithBids.slice(0, 10)).map((mediaData, index) => (
                   <div key={mediaData.media?._id || mediaData.media?.uuid || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
                     <div className="flex-shrink-0">
                       <div className="flex items-center justify-center w-12 h-12 bg-purple-600/50 rounded-full">
@@ -977,6 +942,57 @@ const UserProfile: React.FC = () => {
                   </div>
                 ))}
               </div>
+              
+              {/* Show More/Less Button */}
+              {mediaWithBids.length > 10 && (
+                <div className="flex justify-center mt-6">
+                  <button
+                    onClick={() => setShowAllTunes(!showAllTunes)}
+                    className="px-6 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center space-x-2"
+                  >
+                    <span>{showAllTunes ? 'Show Less' : `Show More (${mediaWithBids.length - 10} more)`}</span>
+                    {showAllTunes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Top Tags */}
+        {tagRankings.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-center text-white mb-4">Top Tags</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tagRankings.slice(0, 6).map((ranking, index) => (
+                <div 
+                  key={ranking.tag} 
+                  className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-6 hover:border-purple-500/60 transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 bg-purple-600/50 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-bold text-sm">#{index + 1}</span>
+                      </div>
+                      <span className="text-white font-medium text-lg">{ranking.tag}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Total Bid</span>
+                      <span className="text-xl font-bold text-white">£{ranking.aggregate.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Rank</span>
+                      <span className="text-lg font-bold text-purple-400">#{ranking.rank}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Percentile</span>
+                      <span className="text-sm text-purple-300">Top {ranking.percentile}%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1480,20 +1496,20 @@ const UserProfile: React.FC = () => {
               <div className="mb-4">
                 <label className="block text-white font-medium mb-3">Home Location</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
+                <div>
                     <label className="block text-white text-sm mb-2">City</label>
-                    <input
-                      type="text"
-                      value={editForm.homeLocation.city}
-                      onChange={(e) => setEditForm({ 
-                        ...editForm, 
-                        homeLocation: { ...editForm.homeLocation, city: e.target.value }
-                      })}
-                      className="input"
-                      placeholder="Enter city"
-                    />
-                  </div>
-                  <div>
+                  <input
+                    type="text"
+                    value={editForm.homeLocation.city}
+                    onChange={(e) => setEditForm({ 
+                      ...editForm, 
+                      homeLocation: { ...editForm.homeLocation, city: e.target.value }
+                    })}
+                    className="input"
+                    placeholder="Enter city"
+                  />
+                </div>
+                <div>
                     <label className="block text-white text-sm mb-2">Region/State</label>
                     <input
                       type="text"
@@ -1508,14 +1524,14 @@ const UserProfile: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-white text-sm mb-2">Country</label>
-                    <select
-                      value={editForm.homeLocation.country}
-                      onChange={(e) => setEditForm({ 
-                        ...editForm, 
-                        homeLocation: { ...editForm.homeLocation, country: e.target.value }
-                      })}
-                      className="input"
-                    >
+                  <select
+                    value={editForm.homeLocation.country}
+                    onChange={(e) => setEditForm({ 
+                      ...editForm, 
+                      homeLocation: { ...editForm.homeLocation, country: e.target.value }
+                    })}
+                    className="input"
+                  >
                     <option value="">Select Country</option>
                     <option value="United Kingdom">United Kingdom</option>
                     <option value="Afghanistan">Afghanistan</option>

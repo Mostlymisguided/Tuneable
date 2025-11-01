@@ -896,7 +896,7 @@ router.get('/:userId/profile', async (req, res) => {
       creatorProfile: user.creatorProfile,
     };
 
-    // If anonymous mode is enabled and not viewing own profile, hide names
+    // If anonymous mode is enabled and not viewing own profile, hide names and social media
     if (user.preferences?.anonymousMode && !isOwnProfile) {
       // Remove givenName and familyName from response
       // They're not explicitly included above, but we'll ensure they're not
@@ -905,6 +905,10 @@ router.get('/:userId/profile', async (req, res) => {
       // Also hide from creatorProfile if it exists
       if (userResponse.creatorProfile) {
         delete userResponse.creatorProfile.artistName; // If artistName contains real name
+        // Hide social media links in anonymous mode
+        if (userResponse.creatorProfile.socialMedia) {
+          delete userResponse.creatorProfile.socialMedia;
+        }
       }
     } else {
       // Include names if not anonymous or viewing own profile
