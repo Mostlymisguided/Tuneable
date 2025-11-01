@@ -17,31 +17,27 @@ export interface User {
     discoveryRank: number;
     reason: 'discovery' | 'popularity_growth';
   }[];
-  locations: {
-    primary: {
-      city?: string;
-      region?: string;
-      country?: string;
-      countryCode?: string;
-      coordinates?: {
-        lat: number;
-        lng: number;
-      };
-      type?: string;
-      detectedFromIP?: boolean;
+  homeLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
     };
-    secondary?: {
-      city?: string;
-      region?: string;
-      country?: string;
-      countryCode?: string;
-      coordinates?: {
-        lat: number;
-        lng: number;
-      };
-      type?: string;
-    };
+    detectedFromIP?: boolean;
   };
+  secondaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  } | null;
   role: string[];
   isActive: boolean;
   joinedParties?: {
@@ -83,6 +79,11 @@ export interface RegisterData {
     region?: string;
     country?: string;
   };
+  secondaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+  } | null;
 }
 
 // Creator subdocument interface

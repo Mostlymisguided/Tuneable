@@ -36,14 +36,13 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         }
         
         // Update location if available and not already set
-        if (profile._json && profile._json.location && !user.locations.primary.city) {
-          user.locations.primary = {
+        if (profile._json && profile._json.location && !user.homeLocation?.city) {
+          user.homeLocation = {
             city: profile._json.location.name || null,
             region: null,
             country: null,
             countryCode: null,
             coordinates: null,
-            type: 'home',
             detectedFromIP: false
           };
         }
@@ -73,14 +72,13 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           }
           
           // Update location if available and not already set
-          if (profile._json && profile._json.location && !user.locations.primary.city) {
-            user.locations.primary = {
+          if (profile._json && profile._json.location && !user.homeLocation?.city) {
+            user.homeLocation = {
               city: profile._json.location.name || null,
               region: null,
               country: null,
               countryCode: null,
               coordinates: null,
-              type: 'home',
               detectedFromIP: false
             };
           }
@@ -148,9 +146,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         givenName: profile.name.givenName,
         familyName: profile.name.familyName,
         profilePic: profilePicUrl,
-        locations: {
-          primary: locationData
-        },
+        homeLocation: locationData,
         isActive: true,
         role: ['user'],
         balance: 0,

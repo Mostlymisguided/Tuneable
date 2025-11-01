@@ -11,14 +11,27 @@ interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
-  homeLocation: {
-    city: string;
-    country: string;
+  homeLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
     coordinates?: {
       lat: number;
       lng: number;
     };
+    detectedFromIP?: boolean;
   };
+  secondaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  } | null;
   role: string[];
   isActive: boolean;
   joinedParties?: {
@@ -39,9 +52,15 @@ interface RegisterData {
   givenName?: string;
   familyName?: string;
   homeLocation?: {
-    city: string;
-    country: string;
+    city?: string;
+    region?: string;
+    country?: string;
   };
+  secondaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+  } | null;
 }
 
 interface AuthContextType {

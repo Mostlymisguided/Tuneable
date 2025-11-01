@@ -29,12 +29,25 @@ interface UserProfile {
   familyName?: string;
   homeLocation?: {
     city?: string;
+    region?: string;
     country?: string;
+    countryCode?: string;
     coordinates?: {
       lat: number;
       lng: number;
     };
+    detectedFromIP?: boolean;
   };
+  secondaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  } | null;
   balance: number;
   personalInviteCode: string;
   facebookId?: string;
@@ -55,8 +68,14 @@ const Profile: React.FC = () => {
     cellPhone: '',
     homeLocation: {
       city: '',
+      region: '',
       country: ''
-    }
+    },
+    secondaryLocation: null as {
+      city: string;
+      region: string;
+      country: string;
+    } | null
   });
 
   useEffect(() => {
@@ -76,8 +95,14 @@ const Profile: React.FC = () => {
         cellPhone: (response.user as any).cellPhone || '',
         homeLocation: {
           city: response.user.homeLocation?.city || '',
+          region: response.user.homeLocation?.region || '',
           country: response.user.homeLocation?.country || ''
-        }
+        },
+        secondaryLocation: response.user.secondaryLocation ? {
+          city: response.user.secondaryLocation.city || '',
+          region: response.user.secondaryLocation.region || '',
+          country: response.user.secondaryLocation.country || ''
+        } : null
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -138,8 +163,14 @@ const Profile: React.FC = () => {
         cellPhone: profile?.cellPhone || '',
         homeLocation: {
           city: profile?.homeLocation?.city || '',
+          region: profile?.homeLocation?.region || '',
           country: profile?.homeLocation?.country || ''
-        }
+        },
+        secondaryLocation: profile?.secondaryLocation ? {
+          city: profile.secondaryLocation.city || '',
+          region: profile.secondaryLocation.region || '',
+          country: profile.secondaryLocation.country || ''
+        } : null
       });
     }
     setIsEditing(!isEditing);
@@ -412,6 +443,22 @@ const Profile: React.FC = () => {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Region/State
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.homeLocation.region}
+                      onChange={(e) => setEditForm({
+                        ...editForm, 
+                        homeLocation: {...editForm.homeLocation, region: e.target.value}
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="Enter region/state"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Country
                     </label>
                     <input
@@ -433,10 +480,15 @@ const Profile: React.FC = () => {
                     <div>
                       <p className="text-sm text-gray-500">Location</p>
                       <p className="font-medium">
-                        {profile.homeLocation?.city && profile.homeLocation?.country
-                          ? `${profile.homeLocation.city}, ${profile.homeLocation.country}`
-                          : 'Not set'
-                        }
+                        {(() => {
+                          const location = profile.homeLocation;
+                          if (location?.city && location?.country) {
+                            return location.region 
+                              ? `${location.city}, ${location.region}, ${location.country}`
+                              : `${location.city}, ${location.country}`;
+                          }
+                          return 'Not set';
+                        })()}
                       </p>
                     </div>
                   </div>

@@ -39,6 +39,11 @@ const AuthPage: React.FC = () => {
       region: '',
       country: '',
     },
+    secondaryLocation: null as {
+      city: string;
+      region: string;
+      country: string;
+    } | null,
   });
 
   const { login, register } = useAuth();

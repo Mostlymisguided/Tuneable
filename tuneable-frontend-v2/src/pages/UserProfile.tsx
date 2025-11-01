@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { 
-  MapPin, 
   Coins, 
   Music, 
   TrendingUp,
   Clock,
   BarChart3,
   Activity,
-  Edit3,
   Save,
   X,
   Loader2,
@@ -20,7 +18,10 @@ import {
   Youtube,
   Instagram,
   Play,
-  Music2
+  Music2,
+  Settings,
+  Bell,
+  MapPin
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,14 +37,30 @@ interface UserProfile {
   email: string;
   balance: number;
   personalInviteCode?: string;
-  homeLocation: {
-    city: string;
-    country: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
+  givenName?: string;
+  familyName?: string;
+  cellPhone?: string;
+    homeLocation?: {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      coordinates?: {
+        lat: number;
+        lng: number;
+      };
+      detectedFromIP?: boolean;
     };
-  };
+    secondaryLocation?: {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      coordinates?: {
+        lat: number;
+        lng: number;
+      };
+    } | null;
   role: string[];
   isActive: boolean;
   createdAt: string;
@@ -109,6 +126,7 @@ interface UserStats {
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
   
   // Web player store for playing media
@@ -121,16 +139,41 @@ const UserProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Edit profile state
+  // Settings mode - controlled by query params
+  const isSettingsMode = searchParams.get('settings') === 'true';
+  const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications') || 'profile';
+  
+  // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Notification preferences state
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    bid_received: true,
+    bid_outbid: true,
+    comment_reply: true,
+    tune_bytes_earned: true,
+    email: true,
+    anonymousMode: false,
+    inApp: true // Always true
+  });
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const [editForm, setEditForm] = useState({
     username: '',
     givenName: '',
     familyName: '',
     cellPhone: '',
-    homeLocation: { city: '', country: '' },
+    homeLocation: {
+      city: '',
+      region: '',
+      country: ''
+    },
+    secondaryLocation: null as {
+      city: string;
+      region: string;
+      country: string;
+    } | null,
     socialMedia: {
       soundcloud: '',
       facebook: '',
@@ -154,47 +197,54 @@ const UserProfile: React.FC = () => {
 
   useEffect(() => {
     if (userId) {
-      // If viewing own profile, use current user data from AuthContext
-      if (currentUser && (currentUser._id === userId || currentUser.uuid === userId)) {
-        // Convert AuthContext User to UserProfile format
-        const userProfile: UserProfile = {
-          id: currentUser.id,
-          _id: currentUser._id,
-          uuid: currentUser.uuid || currentUser.id,
-          username: currentUser.username,
-          email: currentUser.email,
-          profilePic: currentUser.profilePic,
-          balance: currentUser.balance,
-          personalInviteCode: currentUser.personalInviteCode,
-          homeLocation: currentUser.homeLocation,
-          role: currentUser.role,
-          isActive: currentUser.isActive,
-          createdAt: new Date().toISOString(), // Fallback values
-          updatedAt: new Date().toISOString(),
-          // Social media fields
-          creatorProfile: (currentUser as any).creatorProfile,
-        };
-        setUser(userProfile);
-        setLoading(false);
-      } else {
-        fetchUserProfile();
-      }
+      // Always fetch from API to ensure we have complete profile data including givenName, familyName, cellPhone
+      fetchUserProfile();
     }
-  }, [userId, currentUser]);
+  }, [userId]);
 
+
+  // Settings handlers
+  const handleSettingsClick = () => {
+    setSearchParams({ settings: 'true', tab: 'profile' });
+  };
+
+  const handleSettingsTabChange = (tab: 'profile' | 'notifications') => {
+    setSearchParams({ settings: 'true', tab });
+  };
+
+  const exitSettings = () => {
+    setSearchParams({});
+  };
 
   // Populate edit form when user data loads
   useEffect(() => {
-    if (user && isOwnProfile) {
+    // Check if this is the user's own profile
+    const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid || currentUser.uuid === user.id || currentUser._id === user.id);
+    
+    if (user && ownProfile) {
+      console.log('📝 Populating edit form with user data:', {
+        givenName: user.givenName,
+        familyName: user.familyName,
+        cellPhone: user.cellPhone,
+        homeLocation: user.homeLocation,
+        userId: user._id || user.id,
+        currentUserId: currentUser._id || currentUser.uuid
+      });
       setEditForm({
         username: user.username || '',
-        givenName: (user as any).givenName || '',
-        familyName: (user as any).familyName || '',
-        cellPhone: (user as any).cellPhone || '',
+        givenName: user.givenName || '',
+        familyName: user.familyName || '',
+        cellPhone: user.cellPhone || '',
         homeLocation: {
           city: user.homeLocation?.city || '',
+          region: user.homeLocation?.region || '',
           country: user.homeLocation?.country || ''
         },
+        secondaryLocation: user.secondaryLocation ? {
+          city: user.secondaryLocation.city || '',
+          region: user.secondaryLocation.region || '',
+          country: user.secondaryLocation.country || ''
+        } : null,
         socialMedia: {
           soundcloud: user.creatorProfile?.socialMedia?.soundcloud || '',
           facebook: user.creatorProfile?.socialMedia?.facebook || '',
@@ -202,12 +252,53 @@ const UserProfile: React.FC = () => {
         }
       });
     }
+  }, [user, currentUser]);
+
+  // Load notification preferences when user data is loaded
+  useEffect(() => {
+    if (user && isOwnProfile) {
+      // Load preferences from user object if available
+      const prefs = (user as any).preferences;
+      if (prefs) {
+        const notifPrefs = prefs.notifications || {};
+        setNotificationPrefs({
+          bid_received: notifPrefs.types?.bid_received ?? true,
+          bid_outbid: notifPrefs.types?.bid_outbid ?? true,
+          comment_reply: notifPrefs.types?.comment_reply ?? true,
+          tune_bytes_earned: notifPrefs.types?.tune_bytes_earned ?? true,
+          email: notifPrefs.email ?? true,
+          anonymousMode: prefs.anonymousMode ?? false,
+          inApp: true // Always true
+        });
+      }
+    }
   }, [user, isOwnProfile]);
+
+  // Save notification preferences
+  const handleSaveNotificationPrefs = async () => {
+    try {
+      setIsSavingPrefs(true);
+      await userAPI.updateNotificationPreferences(notificationPrefs);
+      toast.success('Notification preferences saved successfully!');
+    } catch (error: any) {
+      console.error('Error saving notification preferences:', error);
+      toast.error(error.response?.data?.error || 'Failed to save notification preferences');
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
       const response = await userAPI.getProfile(userId!);
+      console.log('📥 Full API response:', response);
+      console.log('📥 User data from API:', {
+        cellPhone: response.user?.cellPhone,
+        givenName: response.user?.givenName,
+        familyName: response.user?.familyName,
+        fullUser: response.user
+      });
       setUser(response.user);
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
@@ -319,6 +410,7 @@ const UserProfile: React.FC = () => {
         name: 'Facebook',
         icon: Facebook,
         url: user.creatorProfile.socialMedia.facebook,
+        platform: 'facebook' as const,
         color: 'hover:bg-blue-600/30 hover:border-blue-500'
       });
     }
@@ -329,6 +421,7 @@ const UserProfile: React.FC = () => {
         name: 'YouTube',
         icon: Youtube,
         url: user.creatorProfile.socialMedia.youtube,
+        platform: undefined, // YouTube not supported in modal
         color: 'hover:bg-red-600/30 hover:border-red-500'
       });
     }
@@ -339,6 +432,7 @@ const UserProfile: React.FC = () => {
         name: 'SoundCloud',
         icon: Music2,
         url: user.creatorProfile.socialMedia.soundcloud,
+        platform: 'soundcloud' as const,
         color: 'hover:bg-orange-600/30 hover:border-orange-500'
       });
     }
@@ -349,6 +443,7 @@ const UserProfile: React.FC = () => {
         name: 'Instagram',
         icon: Instagram,
         url: user.creatorProfile.socialMedia.instagram,
+        platform: 'instagram' as const,
         color: 'hover:bg-pink-600/30 hover:border-pink-500'
       });
     }
@@ -441,11 +536,31 @@ const UserProfile: React.FC = () => {
 
   // Edit profile handlers
   const handleSaveProfile = async () => {
+    if (isSettingsMode) {
+      // Save and exit settings mode
+      try {
+        await handleSaveProfileInternal();
+        exitSettings();
+      } catch (error) {
+        // Error already handled in handleSaveProfileInternal
+      }
+      return;
+    }
+    // Legacy modal behavior (keep for potential revert)
+    await handleSaveProfileInternal();
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfileInternal = async () => {
     try {
       // Format the data for the backend - move socialMedia under creatorProfile
-      const { socialMedia, ...otherFields } = editForm;
+      const { socialMedia, homeLocation, secondaryLocation, ...otherFields } = editForm;
       const formattedData = {
         ...otherFields,
+        homeLocation: homeLocation,
+        secondaryLocation: secondaryLocation && (secondaryLocation.city || secondaryLocation.region || secondaryLocation.country)
+          ? secondaryLocation
+          : null,
         creatorProfile: {
           socialMedia: socialMedia
         }
@@ -453,12 +568,16 @@ const UserProfile: React.FC = () => {
       
       await authAPI.updateProfile(formattedData);
       toast.success('Profile updated successfully!');
-      setIsEditingProfile(false);
+      // Only update modal state if NOT in settings mode
+      if (!isSettingsMode) {
+        setIsEditingProfile(false);
+      }
       // Refresh user data
       await fetchUserProfile();
     } catch (err: any) {
       console.error('Error updating profile:', err);
       toast.error(err.response?.data?.error || 'Failed to update profile');
+      throw err; // Re-throw so caller can handle it
     }
   };
 
@@ -532,15 +651,28 @@ const UserProfile: React.FC = () => {
           >
             Back
           </button>
-            {/* Edit Profile Button - Only show when viewing own profile */}
-            {isOwnProfile && (
+            {/* Settings Button - Only show when viewing own profile and not in settings mode */}
+            {isOwnProfile && !isSettingsMode && (
              <div className='inline rounded-full items-center absolute right-3 mb-4'>
              <button
-                onClick={() => setIsEditingProfile(true)}
+                onClick={handleSettingsClick}
                 className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
               >
-                <Edit3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Edit Profile</span>
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+              </div>
+            )}
+            
+            {/* Exit Settings Button - Only show in settings mode */}
+            {isOwnProfile && isSettingsMode && (
+             <div className='inline rounded-full items-center absolute right-3 mb-4'>
+             <button
+                onClick={exitSettings}
+                className="px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Exit Settings</span>
               </button>
               </div>
             )}
@@ -589,21 +721,43 @@ const UserProfile: React.FC = () => {
             <div className="ml-6 flex-1 text-white">
               <div className="">
                 <h1 className="text-4xl font-bold mb-4">{user.username}</h1>
+                {(user.givenName || user.familyName) && (
+                  <p className="text-xl text-gray-300 mb-2">
+                    {user.givenName} {user.familyName}
+                  </p>
+                )}
+                {(user.homeLocation?.city || user.homeLocation?.country || user.secondaryLocation?.city || user.secondaryLocation?.country) && (
+                  <div className="flex flex-col gap-2 mb-4">
+                    {user.homeLocation?.city || user.homeLocation?.country ? (
+                      <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span>
+                          {[
+                            user.homeLocation?.city,
+                            user.homeLocation?.region,
+                            user.homeLocation?.country
+                          ].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                    ) : null}
+                    {user.secondaryLocation?.city || user.secondaryLocation?.country ? (
+                      <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span>
+                          {[
+                            user.secondaryLocation?.city,
+                            user.secondaryLocation?.region,
+                            user.secondaryLocation?.country
+                          ].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
               
               <div className="mb-6"></div>
 
-              {/* Location */}
-              {user.homeLocation && (
-                <div className="mb-4">
-                  <div className="bg-purple-600/50 rounded-full pl-3 px-2 inline-flex items-center">
-                    <MapPin className="w-4 h-4" />
-                    <span className="p-2 text-white">
-                      {user.homeLocation.city}  {user.homeLocation.country}
-                    </span>
-                  </div>
-                </div>
-              )}
 
               {/* Social Media Buttons */}
               {getSocialMediaLinks().length > 0 && (
@@ -666,8 +820,11 @@ const UserProfile: React.FC = () => {
           </div>
         </div>
 
-        {/* Bidding Statistics */}
-        {stats && (
+        {/* Conditional Rendering: Settings Mode vs Normal Mode */}
+        {!isSettingsMode ? (
+          <>
+            {/* Bidding Statistics */}
+            {stats && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
             <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -832,6 +989,416 @@ const UserProfile: React.FC = () => {
             <p className="text-gray-400">This user hasn't placed any bids yet.</p>
           </div>
         )}
+          </>
+        ) : (
+          /* SETTINGS MODE */
+          <>
+            {/* Tabs Navigation */}
+            <div className="border-b border-gray-700 mb-6">
+              <nav className="flex space-x-8">
+                <button
+                  onClick={() => handleSettingsTabChange('profile')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    settingsTab === 'profile'
+                      ? 'border-purple-500 text-purple-400'
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => handleSettingsTabChange('notifications')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    settingsTab === 'notifications'
+                      ? 'border-purple-500 text-purple-400'
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Preferences
+                </button>
+              </nav>
+            </div>
+
+            {/* Tab Content */}
+            {settingsTab === 'profile' && (
+              <div className="card p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Edit Profile</h2>
+                
+                {/* Username */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Username</label>
+                  <input
+                    type="text"
+                    value={editForm.username}
+                    onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                    className="input"
+                    placeholder="Enter username"
+                  />
+                </div>
+
+                {/* Name Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">First Name</label>
+                    <input
+                      type="text"
+                      value={editForm.givenName}
+                      onChange={(e) => setEditForm({ ...editForm, givenName: e.target.value })}
+                      className="input"
+                      placeholder="Enter first name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Last Name</label>
+                    <input
+                      type="text"
+                      value={editForm.familyName}
+                      onChange={(e) => setEditForm({ ...editForm, familyName: e.target.value })}
+                      className="input"
+                      placeholder="Enter last name"
+                    />
+                  </div>
+                </div>
+
+                {/* Cell Phone */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editForm.cellPhone}
+                    onChange={(e) => setEditForm({ ...editForm, cellPhone: e.target.value })}
+                    className="input"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+
+                {/* Home Location */}
+                <div className="mb-6">
+                  <label className="block text-white font-medium mb-3">Home Location</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-white text-sm mb-2">City</label>
+                      <input
+                        type="text"
+                        value={editForm.homeLocation.city}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          homeLocation: { ...editForm.homeLocation, city: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-2">Region/State</label>
+                      <input
+                        type="text"
+                        value={editForm.homeLocation.region}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          homeLocation: { ...editForm.homeLocation, region: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="Enter region/state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-2">Country</label>
+                      <select
+                        value={editForm.homeLocation.country}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          homeLocation: { ...editForm.homeLocation, country: e.target.value }
+                        })}
+                        className="input"
+                      >
+                        <option value="">Select Country</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Germany">Germany</option>
+                        <option value="France">France</option>
+                        <option value="Spain">Spain</option>
+                        <option value="Italy">Italy</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="Belgium">Belgium</option>
+                        {/* Add more countries as needed */}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secondary Location */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-white font-medium">Secondary Location</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editForm.secondaryLocation) {
+                          setEditForm({
+                            ...editForm,
+                            secondaryLocation: null
+                          });
+                        } else {
+                          setEditForm({
+                            ...editForm,
+                            secondaryLocation: { city: '', region: '', country: '' }
+                          });
+                        }
+                      }}
+                      className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                    >
+                      {editForm.secondaryLocation ? 'Remove' : 'Add Secondary Location'}
+                    </button>
+                  </div>
+                  {editForm.secondaryLocation ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-white text-sm mb-2">City</label>
+                        <input
+                          type="text"
+                          value={editForm.secondaryLocation.city}
+                          onChange={(e) => setEditForm({ 
+                            ...editForm, 
+                            secondaryLocation: { ...editForm.secondaryLocation!, city: e.target.value }
+                          })}
+                          className="input"
+                          placeholder="Enter city"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">Region/State</label>
+                        <input
+                          type="text"
+                          value={editForm.secondaryLocation.region}
+                          onChange={(e) => setEditForm({ 
+                            ...editForm, 
+                            secondaryLocation: { ...editForm.secondaryLocation!, region: e.target.value }
+                          })}
+                          className="input"
+                          placeholder="Enter region/state"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">Country</label>
+                        <select
+                          value={editForm.secondaryLocation.country}
+                          onChange={(e) => setEditForm({ 
+                            ...editForm, 
+                            secondaryLocation: { ...editForm.secondaryLocation!, country: e.target.value }
+                          })}
+                          className="input"
+                        >
+                          <option value="">Select Country</option>
+                          <option value="United Kingdom">United Kingdom</option>
+                          <option value="United States">United States</option>
+                          <option value="Canada">Canada</option>
+                          <option value="Australia">Australia</option>
+                          <option value="Germany">Germany</option>
+                          <option value="France">France</option>
+                          <option value="Spain">Spain</option>
+                          <option value="Italy">Italy</option>
+                          <option value="Netherlands">Netherlands</option>
+                          <option value="Belgium">Belgium</option>
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm">No secondary location added</p>
+                  )}
+                </div>
+
+                {/* Social Media Section */}
+                <div className="mb-6">
+                  <label className="block text-white font-medium mb-3">Social Media</label>
+                  <div className="space-y-3">
+                    {getSocialMediaLinks()
+                      .filter((social) => social.platform) // Only show platforms that can be edited via modal
+                      .map((social) => (
+                      <div key={social.name} className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <social.icon className="w-5 h-5" />
+                          <span className="text-white">{social.name}</span>
+                        </div>
+                        <button
+                          onClick={() => openSocialModal(social.platform!)}
+                          className="px-3 py-1 bg-purple-600/40 hover:bg-purple-500 rounded text-sm text-white transition-colors"
+                        >
+                          {social.url ? 'Edit' : 'Add'}
+                        </button>
+                      </div>
+                    ))}
+                    {getUnconnectedSocialAccounts().map((social) => (
+                      <div key={social.name} className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <social.icon className="w-5 h-5" />
+                          <span className="text-gray-400">{social.name}</span>
+                        </div>
+                        <button
+                          onClick={() => openSocialModal(social.platform)}
+                          className="px-3 py-1 bg-purple-600/40 hover:bg-purple-500 rounded text-sm text-white transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={exitSettings}
+                    className="px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveProfile}
+                    className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center space-x-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>Save Changes</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {settingsTab === 'notifications' && (
+              <div className="card p-6">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Bell className="h-6 w-6" />
+                  Preferences
+                </h2>
+                <p className="text-gray-400 mb-6">Choose which notifications you want to receive</p>
+
+                {/* Notification Types */}
+                <div className="space-y-4 mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-3">Notification Types</h3>
+                  
+                  {[
+                    { key: 'bid_received', label: 'Bid Received', desc: 'When someone bids on your media' },
+                    { key: 'bid_outbid', label: 'Outbid', desc: 'When you are outbid on media' },
+                    { key: 'comment_reply', label: 'Comment Replies', desc: 'When someone replies to your comment' },
+                    { key: 'tune_bytes_earned', label: 'TuneBytes Earned', desc: 'When you earn TuneBytes' },
+                  ].map(({ key, label, desc }) => (
+                    <div key={key} className="flex items-start justify-between p-4 bg-black/20 rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            id={key}
+                            checked={notificationPrefs[key as keyof typeof notificationPrefs]}
+                            onChange={(e) => setNotificationPrefs({
+                              ...notificationPrefs,
+                              [key]: e.target.checked
+                            })}
+                            className="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                          />
+                          <label htmlFor={key} className="text-white font-medium cursor-pointer">
+                            {label}
+                          </label>
+                        </div>
+                        <p className="text-sm text-gray-400 ml-8 mt-1">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Delivery Methods */}
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Delivery Methods</h3>
+                  
+                  <div className="p-4 bg-black/20 rounded-lg">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <input
+                        type="checkbox"
+                        id="inApp"
+                        checked={true}
+                        disabled
+                        className="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                      />
+                      <label htmlFor="inApp" className="text-white font-medium">
+                        In-App Notifications
+                      </label>
+                      <span className="text-xs text-gray-400">(Always enabled)</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black/20 rounded-lg">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <input
+                        type="checkbox"
+                        id="email"
+                        checked={notificationPrefs.email}
+                        onChange={(e) => setNotificationPrefs({
+                          ...notificationPrefs,
+                          email: e.target.checked
+                        })}
+                        className="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                      />
+                      <label htmlFor="email" className="text-white font-medium">
+                        Email Notifications
+                      </label>
+                    </div>
+                    <p className="text-sm text-gray-400 ml-8">Receive notifications via email</p>
+                  </div>
+                </div>
+
+                {/* Privacy Settings */}
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Privacy</h3>
+                  
+                  <div className="p-4 bg-black/20 rounded-lg">
+                    <div className="flex items-start space-x-3 mb-2">
+                      <input
+                        type="checkbox"
+                        id="anonymousMode"
+                        checked={notificationPrefs.anonymousMode}
+                        onChange={(e) => setNotificationPrefs({
+                          ...notificationPrefs,
+                          anonymousMode: e.target.checked
+                        })}
+                        className="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="anonymousMode" className="text-white font-medium cursor-pointer block">
+                          Anonymous Mode
+                        </label>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Hide your name from public profiles while keeping your username and bidding activity visible for platform transparency
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveNotificationPrefs}
+                    disabled={isSavingPrefs}
+                    className="px-6 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSavingPrefs ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        <span>Save Preferences</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Edit Profile Modal */}
@@ -909,31 +1476,46 @@ const UserProfile: React.FC = () => {
                 />
               </div>
 
-              {/* Location */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">City</label>
-                  <input
-                    type="text"
-                    value={editForm.homeLocation.city}
-                    onChange={(e) => setEditForm({ 
-                      ...editForm, 
-                      homeLocation: { ...editForm.homeLocation, city: e.target.value }
-                    })}
-                    className="input"
-                    placeholder="Enter city"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Country</label>
-                  <select
-                    value={editForm.homeLocation.country}
-                    onChange={(e) => setEditForm({ 
-                      ...editForm, 
-                      homeLocation: { ...editForm.homeLocation, country: e.target.value }
-                    })}
-                    className="input"
-                  >
+              {/* Home Location */}
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-3">Home Location</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-white text-sm mb-2">City</label>
+                    <input
+                      type="text"
+                      value={editForm.homeLocation.city}
+                      onChange={(e) => setEditForm({ 
+                        ...editForm, 
+                        homeLocation: { ...editForm.homeLocation, city: e.target.value }
+                      })}
+                      className="input"
+                      placeholder="Enter city"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm mb-2">Region/State</label>
+                    <input
+                      type="text"
+                      value={editForm.homeLocation.region}
+                      onChange={(e) => setEditForm({ 
+                        ...editForm, 
+                        homeLocation: { ...editForm.homeLocation, region: e.target.value }
+                      })}
+                      className="input"
+                      placeholder="Enter region/state"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white text-sm mb-2">Country</label>
+                    <select
+                      value={editForm.homeLocation.country}
+                      onChange={(e) => setEditForm({ 
+                        ...editForm, 
+                        homeLocation: { ...editForm.homeLocation, country: e.target.value }
+                      })}
+                      className="input"
+                    >
                     <option value="">Select Country</option>
                     <option value="United Kingdom">United Kingdom</option>
                     <option value="Afghanistan">Afghanistan</option>
@@ -1140,6 +1722,88 @@ const UserProfile: React.FC = () => {
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                </div>
+              </div>
+
+              {/* Secondary Location */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-white font-medium">Secondary Location</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editForm.secondaryLocation) {
+                        setEditForm({
+                          ...editForm,
+                          secondaryLocation: null
+                        });
+                      } else {
+                        setEditForm({
+                          ...editForm,
+                          secondaryLocation: { city: '', region: '', country: '' }
+                        });
+                      }
+                    }}
+                    className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    {editForm.secondaryLocation ? 'Remove' : 'Add Secondary Location'}
+                  </button>
+                </div>
+                {editForm.secondaryLocation ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-white text-sm mb-2">City</label>
+                      <input
+                        type="text"
+                        value={editForm.secondaryLocation.city}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { ...editForm.secondaryLocation!, city: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-2">Region/State</label>
+                      <input
+                        type="text"
+                        value={editForm.secondaryLocation.region}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { ...editForm.secondaryLocation!, region: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="Enter region/state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-2">Country</label>
+                      <select
+                        value={editForm.secondaryLocation.country}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { ...editForm.secondaryLocation!, country: e.target.value }
+                        })}
+                        className="input"
+                      >
+                        <option value="">Select Country</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Germany">Germany</option>
+                        <option value="France">France</option>
+                        <option value="Spain">Spain</option>
+                        <option value="Italy">Italy</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="Belgium">Belgium</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-400 text-sm">No secondary location added</p>
+                )}
               </div>
 
               {/* Social Media Links */}
