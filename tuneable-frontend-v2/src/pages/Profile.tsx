@@ -46,7 +46,7 @@ interface UserProfile {
     coordinates?: {
       lat: number;
       lng: number;
-    };
+  };
   } | null;
   balance: number;
   personalInviteCode: string;
