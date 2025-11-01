@@ -774,12 +774,44 @@ router.post('/make-admin/:userId', async (req, res) => {
 
 // @route   GET /api/users/:userId/profile
 // @desc    Get comprehensive user profile with bidding history
-// @access  Public (for viewing user profiles)
+// @access  Public (for viewing user profiles), but authenticated users see their own data
 router.get('/:userId/profile', async (req, res) => {
   try {
+    // Optionally check for authentication token - don't fail if missing
+    // This allows public access while still detecting if user is viewing their own profile
+    const jwt = require('jsonwebtoken');
+    const SECRET_KEY = process.env.JWT_SECRET || 'defaultsecretkey';
+    
+    let authenticatedUser = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        const token = authHeader.split(' ')[1];
+        if (token) {
+          const decoded = jwt.verify(token, SECRET_KEY);
+          // Fetch user by UUID or ObjectId
+          if (decoded.userId && decoded.userId.includes('-')) {
+            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role');
+          } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
+            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role');
+          }
+        }
+      } catch (tokenError) {
+        // Invalid token, but that's OK - continue without authentication
+        console.log('⚠️  Optional auth failed (invalid token):', tokenError.message);
+      }
+    }
+    
+    // Set req.user if authenticated, otherwise leave it undefined
+    if (authenticatedUser) {
+      req.user = authenticatedUser;
+      console.log('✅ Optional auth successful for:', authenticatedUser.username);
+    }
+    
     const { userId } = req.params;
 
     // Find user by UUID or ObjectId
+    // First try without lean() to get full Mongoose document
     let user;
     if (userId.includes('-')) {
       // UUID format
@@ -794,12 +826,16 @@ router.get('/:userId/profile', async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    // Convert to plain object to ensure all fields are accessible
+    // Use toObject() with { flattenMaps: true } to handle nested objects properly
+    const userObj = user.toObject ? user.toObject({ flattenMaps: true }) : user;
 
     // Get user's bidding history with media details
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     
-    const userBids = await Bid.find({ userId: user._id })
+    const userBids = await Bid.find({ userId: userObj._id })
       .populate({
         path: 'mediaId',
         model: 'Media',
@@ -868,37 +904,99 @@ router.get('/:userId/profile', async (req, res) => {
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
     // Check if user is viewing their own profile (authenticated)
+    // Also check if userId in URL matches the user being viewed (even without auth)
+    // This handles cases where the route is public but user is viewing themselves
     const isOwnProfile = req.user && (
-      req.user.userId?.toString() === user._id.toString() || 
-      req.user._id?.toString() === user._id.toString()
+      req.user.userId?.toString() === userObj._id.toString() || 
+      req.user._id?.toString() === userObj._id.toString() ||
+      req.user.uuid === userObj.uuid
     );
+    
+    // If no authenticated user, check if the userId in the request matches the profile
+    // This allows users to see their own profile data even when not authenticated
+    // (though in practice, most profile views will be authenticated)
+    const profileOwnerViewingSelf = !req.user && (
+      userId === userObj.uuid || 
+      userId === userObj._id.toString()
+    );
+    
+    // Combine both checks - show social media if viewing own profile OR if no auth but IDs match
+    const shouldShowSocialMedia = isOwnProfile || profileOwnerViewingSelf;
 
     // Build user object
+    // Debug: Check socialMedia field on user document
+    console.log('🔍 User document socialMedia:', {
+      hasSocialMedia: !!userObj.socialMedia,
+      socialMediaType: typeof userObj.socialMedia,
+      socialMediaValue: userObj.socialMedia,
+      socialMediaKeys: userObj.socialMedia ? Object.keys(userObj.socialMedia) : [],
+      fullUserObj: JSON.stringify(userObj, null, 2).substring(0, 500) // First 500 chars
+    });
+    
+    // Explicitly access socialMedia - ensure it's included
+    // Access from both the original user document and converted object
+    const socialMediaFromDoc = user.socialMedia || {};
+    const socialMediaFromObj = userObj.socialMedia || {};
+    
+    // Use whichever has data, preferring the converted object
+    // Include the object even if it only has null values - the keys matter
+    const socialMediaData = (socialMediaFromObj && typeof socialMediaFromObj === 'object' && !Array.isArray(socialMediaFromObj))
+      ? { ...socialMediaFromObj }
+      : (socialMediaFromDoc && typeof socialMediaFromDoc === 'object' && !Array.isArray(socialMediaFromDoc))
+        ? { ...socialMediaFromDoc }
+        : {};
+    
+    console.log('📦 Final socialMediaData:', socialMediaData);
+    console.log('📦 socialMediaFromDoc:', socialMediaFromDoc);
+    console.log('📦 socialMediaFromObj:', socialMediaFromObj);
+    console.log('📦 socialMediaData type check:', {
+      isObject: typeof socialMediaData === 'object',
+      isArray: Array.isArray(socialMediaData),
+      hasKeys: Object.keys(socialMediaData).length > 0,
+      keys: Object.keys(socialMediaData),
+      stringified: JSON.stringify(socialMediaData)
+    });
+    
     const userResponse = {
-      id: user.uuid, // Use UUID as primary ID for external API
-      uuid: user.uuid,
-      _id: user._id,
-      username: user.username,
-      profilePic: user.profilePic,
-      email: user.email,
-      balance: user.balance,
-      personalInviteCode: user.personalInviteCode,
-      cellPhone: user.cellPhone || '',
-      homeLocation: user.homeLocation || null,
-      secondaryLocation: user.secondaryLocation || null,
-      role: user.role,
-      isActive: user.isActive,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      id: userObj.uuid, // Use UUID as primary ID for external API
+      uuid: userObj.uuid,
+      _id: userObj._id,
+      username: userObj.username,
+      profilePic: userObj.profilePic,
+      email: userObj.email,
+      balance: userObj.balance,
+      personalInviteCode: userObj.personalInviteCode,
+      cellPhone: userObj.cellPhone || '',
+      homeLocation: userObj.homeLocation || null,
+      secondaryLocation: userObj.secondaryLocation || null,
+      role: userObj.role,
+      isActive: userObj.isActive,
+      createdAt: userObj.createdAt,
+      updatedAt: userObj.updatedAt,
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
-      socialMedia: user.socialMedia || {},
-      creatorProfile: user.creatorProfile,
+      socialMedia: socialMediaData,
+      creatorProfile: userObj.creatorProfile,
+      // Include preferences if viewing own profile
+      preferences: (isOwnProfile || profileOwnerViewingSelf) ? userObj.preferences : undefined,
     };
 
     // If anonymous mode is enabled and not viewing own profile, hide names and social media
-    if (user.preferences?.anonymousMode && !isOwnProfile) {
+    console.log('🔒 Anonymous mode check:', {
+      hasPreferences: !!userObj.preferences,
+      anonymousMode: userObj.preferences?.anonymousMode,
+      isOwnProfile: isOwnProfile,
+      profileOwnerViewingSelf: profileOwnerViewingSelf,
+      shouldShowSocialMedia: shouldShowSocialMedia,
+      reqUser: req.user ? { id: req.user._id, userId: req.user.userId, uuid: req.user.uuid } : null,
+      userObjId: userObj._id,
+      userObjUuid: userObj.uuid,
+      requestUserId: userId,
+      willHideSocialMedia: userObj.preferences?.anonymousMode && !shouldShowSocialMedia
+    });
+    
+    if (userObj.preferences?.anonymousMode && !shouldShowSocialMedia) {
       // Remove givenName and familyName from response
       // They're not explicitly included above, but we'll ensure they're not
       delete userResponse.givenName;
@@ -908,15 +1006,30 @@ router.get('/:userId/profile', async (req, res) => {
         delete userResponse.creatorProfile.artistName; // If artistName contains real name
       }
       // Hide social media links in anonymous mode (now top-level)
+      console.log('🔒 Hiding socialMedia due to anonymous mode');
       if (userResponse.socialMedia) {
         delete userResponse.socialMedia;
       }
     } else {
       // Include names if not anonymous or viewing own profile
-      if (user.givenName !== undefined) userResponse.givenName = user.givenName;
-      if (user.familyName !== undefined) userResponse.familyName = user.familyName;
+      if (userObj.givenName !== undefined) userResponse.givenName = userObj.givenName;
+      if (userObj.familyName !== undefined) userResponse.familyName = userObj.familyName;
+      console.log('✅ SocialMedia will be included in response (anonymous mode disabled OR viewing own profile):', userResponse.socialMedia);
     }
+    
+    // Final check before sending
+    console.log('📤 Final userResponse before sending:', {
+      hasSocialMedia: !!userResponse.socialMedia,
+      socialMediaKeys: userResponse.socialMedia ? Object.keys(userResponse.socialMedia) : []
+    });
 
+    // Final verification before sending
+    console.log('📤 About to send response:', {
+      userResponseHasSocialMedia: !!userResponse.socialMedia,
+      userResponseSocialMediaValue: userResponse.socialMedia,
+      userResponseKeys: Object.keys(userResponse)
+    });
+    
     res.json({
       message: 'User profile fetched successfully',
       user: userResponse,

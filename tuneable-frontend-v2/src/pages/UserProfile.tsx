@@ -312,6 +312,8 @@ const UserProfile: React.FC = () => {
         cellPhone: response.user?.cellPhone,
         givenName: response.user?.givenName,
         familyName: response.user?.familyName,
+        preferences: response.user?.preferences,
+        anonymousMode: response.user?.preferences?.anonymousMode,
         fullUser: response.user
       });
       setUser(response.user);
