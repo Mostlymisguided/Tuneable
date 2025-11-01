@@ -219,6 +219,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             user.profilePic = photoUrl;
           }
           
+          // Update location if available and not already set
+          if (profile._json && profile._json.locale && !user.homeLocation?.city) {
+            // Google profile may include locale information
+            // Note: Google OAuth doesn't typically provide location, but we check locale as a fallback
+            // This could be enhanced if we request additional scopes
+          }
+          
           await user.save();
           return done(null, user);
         }
@@ -242,6 +249,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               existingUser.profilePic = photoUrl;
             }
             
+            // Update location if available and not already set
+            if (profile._json && profile._json.locale && !existingUser.homeLocation?.city) {
+              // Google profile may include locale information
+              // Note: Google OAuth doesn't typically provide location, but we check locale as a fallback
+            }
+            
             await existingUser.save();
             return done(null, existingUser);
           }
@@ -249,9 +262,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
+        // Note: Using req parameter if available (more reliable than arguments[4])
         let parentInviteCode = null;
-        if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
-          const code = arguments[4].session.pendingInviteCode;
+        // Try to get session from req object (if passed as 5th parameter)
+        let session = null;
+        if (arguments.length > 4 && arguments[4] && arguments[4].session) {
+          session = arguments[4].session;
+        }
+        if (session && session.pendingInviteCode) {
+          const code = session.pendingInviteCode;
           // Validate invite code
           const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {
@@ -265,7 +284,27 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         }
         
         const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
-        const usernameValue = profile.displayName || profile.emails[0].value.split('@')[0];
+        
+        // Generate username with proper sanitization and fallbacks
+        let usernameValue = null;
+        if (profile.displayName) {
+          // Sanitize displayName: remove spaces, special chars, limit length
+          usernameValue = profile.displayName
+            .replace(/\s+/g, '')
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .substring(0, 20); // Limit length
+        } else if (profile.name && (profile.name.givenName || profile.name.familyName)) {
+          // Use name fields as fallback
+          const nameParts = [profile.name.givenName, profile.name.familyName].filter(Boolean);
+          usernameValue = nameParts.join('') + Math.random().toString(36).substr(2, 4);
+          usernameValue = usernameValue.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
+        } else if (emailValue) {
+          // Use email prefix as last resort
+          usernameValue = emailValue.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+        } else {
+          // Final fallback
+          usernameValue = `google_${profile.id.substring(0, 10)}`;
+        }
         
         // Ensure username is unique
         let finalUsername = usernameValue;
@@ -290,15 +329,23 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           profilePicUrl = profilePicUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
         }
 
+        // Extract location data from Google profile (if available)
+        // Note: Google OAuth doesn't typically provide location in basic profile
+        // This would require additional scopes and Google People API
+        let locationData = null;
+        // If we ever get location from Google, we can add it here
+        // For now, we'll leave it null and let IP detection handle it if needed
+
         const newUser = new User({
           googleId: profile.id,
           googleAccessToken: accessToken,
           googleRefreshToken: refreshToken,
           email: emailValue,
           username: finalUsername,
-          givenName: profile.name.givenName,
-          familyName: profile.name.familyName,
+          givenName: profile.name ? profile.name.givenName : null,
+          familyName: profile.name ? profile.name.familyName : null,
           profilePic: profilePicUrl,
+          homeLocation: locationData,
           isActive: true,
           role: ['user'],
           balance: 0,
