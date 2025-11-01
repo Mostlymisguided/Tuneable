@@ -211,12 +211,21 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           user.googleAccessToken = accessToken;
           user.googleRefreshToken = refreshToken;
           
-          // Update profile picture if user doesn't have one
-          if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
-            // Request larger image by modifying the URL
+          // Update profile picture from Google (always refresh from source of truth)
+          if (profile.photos && profile.photos.length > 0) {
             let photoUrl = profile.photos[0].value;
             photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
             user.profilePic = photoUrl;
+          }
+          
+          // Update names from Google if provided
+          if (profile.name) {
+            if (profile.name.givenName) {
+              user.givenName = profile.name.givenName;
+            }
+            if (profile.name.familyName) {
+              user.familyName = profile.name.familyName;
+            }
           }
           
           // Update location if available and not already set
@@ -241,12 +250,21 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             existingUser.googleAccessToken = accessToken;
             existingUser.googleRefreshToken = refreshToken;
             
-            // Update profile picture if user doesn't have one
-            if (profile.photos && profile.photos.length > 0 && !existingUser.profilePic) {
-              // Request larger image by modifying the URL
+            // Update profile picture from Google (always refresh from source of truth)
+            if (profile.photos && profile.photos.length > 0) {
               let photoUrl = profile.photos[0].value;
               photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
               existingUser.profilePic = photoUrl;
+            }
+            
+            // Update names from Google if provided
+            if (profile.name) {
+              if (profile.name.givenName) {
+                existingUser.givenName = profile.name.givenName;
+              }
+              if (profile.name.familyName) {
+                existingUser.familyName = profile.name.familyName;
+              }
             }
             
             // Update location if available and not already set
