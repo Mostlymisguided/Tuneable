@@ -10,6 +10,7 @@ interface User {
   profilePic?: string;
   homeLocation?: {
     city?: string;
+    region?: string;
     country?: string;
   };
 }
@@ -89,12 +90,13 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
     // These props are available but not currently displayed in compact view
   }
 
-  const formatLocation = (homeLocation?: { city?: string; country?: string }) => {
+  const formatLocation = (homeLocation?: { city?: string; region?: string; country?: string }) => {
     if (!homeLocation) return null;
-    if (homeLocation.city && homeLocation.country) {
-      return `${homeLocation.city}, ${homeLocation.country}`;
+    const { city, region, country } = homeLocation;
+    if (city && country) {
+      return region ? `${city}, ${region}, ${country}` : `${city}, ${country}`;
     }
-    return homeLocation.country || homeLocation.city || null;
+    return country || city || null;
   };
 
   const UserBadge: React.FC<{ 
