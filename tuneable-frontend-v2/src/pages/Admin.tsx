@@ -56,9 +56,6 @@ const Admin: React.FC = () => {
   const [mediaCount, setMediaCount] = useState<number>(0);
   const [activeParties, setActiveParties] = useState<number>(0);
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
-  const [mediaCount, setMediaCount] = useState<number>(0);
-  const [activePartiesCount, setActivePartiesCount] = useState<number>(0);
-  const [isLoadingOverview, setIsLoadingOverview] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -82,7 +79,7 @@ const Admin: React.FC = () => {
         loadUsers();
         loadCreatorApplications();
         loadClaims();
-        loadOverviewData();
+        loadOverviewStats();
       } else {
         setIsAdmin(false);
         navigate('/');
@@ -182,25 +179,6 @@ const Admin: React.FC = () => {
     }
   };
 
-  const loadOverviewData = async () => {
-    try {
-      setIsLoadingOverview(true);
-      
-      // Fetch media count
-      const mediaResponse = await mediaAPI.getMedia({ limit: 1 });
-      setMediaCount(mediaResponse.pagination?.total || 0);
-      
-      // Fetch active parties count
-      const partiesResponse = await partyAPI.getParties();
-      const activeParties = partiesResponse.parties?.filter((party: any) => party.status === 'active') || [];
-      setActivePartiesCount(activeParties.length);
-    } catch (error) {
-      console.error('Error loading overview data:', error);
-      toast.error('Failed to load overview data');
-    } finally {
-      setIsLoadingOverview(false);
-    }
-  };
 
   const promoteToAdmin = async (userId: string) => {
     try {
@@ -393,7 +371,7 @@ const Admin: React.FC = () => {
                       {isLoadingOverview ? (
                         <span className="text-gray-500">Loading...</span>
                       ) : (
-                        activePartiesCount.toLocaleString()
+                        activeParties.toLocaleString()
                       )}
                     </p>
                   </div>
