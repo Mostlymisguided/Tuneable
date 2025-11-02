@@ -1233,8 +1233,14 @@ router.patch('/admin/invite-requests/:id/approve', authMiddleware, async (req, r
       return res.status(400).json({ error: 'Request already processed' });
     }
 
-    // Generate a one-time use invite code
-    const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase().substring(0, 5);
+    // Use the approving admin's personal invite code
+    // Fetch the full admin user object to get their personalInviteCode
+    const admin = await User.findById(req.user._id);
+    if (!admin || !admin.personalInviteCode) {
+      return res.status(500).json({ error: 'Admin user or invite code not found' });
+    }
+    
+    const inviteCode = admin.personalInviteCode;
     
     request.status = 'approved';
     request.inviteCode = inviteCode;
