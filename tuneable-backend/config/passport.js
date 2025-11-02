@@ -177,9 +177,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:8000/api/auth/google/callback"
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:8000/api/auth/google/callback",
+      passReqToCallback: true  // Required to access req object in callback for state validation
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         console.log('Google profile:', profile);
         
@@ -260,15 +261,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
-        // Note: Using req parameter if available (more reliable than arguments[4])
+        // With passReqToCallback: true, req is available as first parameter
         let parentInviteCode = null;
-        // Try to get session from req object (if passed as 5th parameter)
-        let session = null;
-        if (arguments.length > 4 && arguments[4] && arguments[4].session) {
-          session = arguments[4].session;
-        }
-        if (session && session.pendingInviteCode) {
-          const code = session.pendingInviteCode;
+        if (req && req.session && req.session.pendingInviteCode) {
+          const code = req.session.pendingInviteCode;
           // Validate invite code
           const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {

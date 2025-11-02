@@ -1,6 +1,7 @@
 const express = require('express');
 const passport = require('../config/passport');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -65,17 +66,40 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       req.session = req.session || {};
       req.session.pendingInviteCode = req.query.invite;
     }
+    
+    // Generate random state parameter for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex');
+    req.session = req.session || {};
+    req.session.oauthState = state;
+    
     passport.authenticate('google', { 
       scope: [
         'profile', 
         'email',
         'https://www.googleapis.com/auth/youtube.readonly'  // For YouTube import feature
-      ] 
+      ],
+      state: state  // Pass state parameter for security
     })(req, res, next);
   });
 
   router.get('/google/callback', 
-    passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),
+    (req, res, next) => {
+      // Validate state parameter for CSRF protection
+      const state = req.query.state;
+      const sessionState = req.session?.oauthState;
+      
+      if (!state || !sessionState || state !== sessionState) {
+        console.error('Invalid OAuth state parameter - possible CSRF attack');
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/login?error=oauth_state_mismatch`);
+      }
+      
+      // Clear state from session after validation
+      delete req.session.oauthState;
+      
+      // Continue with passport authentication
+      passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' })(req, res, next);
+    },
     async (req, res) => {
       try {
         // Generate JWT token for the authenticated user using UUID
