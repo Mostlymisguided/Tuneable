@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { authAPI } from '../lib/api';
@@ -8,8 +8,6 @@ const ForgotPassword: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [email, setEmail] = useState('');
-
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
