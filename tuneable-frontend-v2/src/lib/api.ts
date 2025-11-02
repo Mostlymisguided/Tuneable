@@ -314,6 +314,12 @@ export const mediaAPI = {
     const response = await api.get('/media/public', { params });
     return response.data;
   },
+
+  // Admin: Get media statistics
+  getStats: async () => {
+    const response = await api.get('/media/admin/stats');
+    return response.data;
+  },
   
   uploadMedia: async (file: File, metadata: { title: string; artist: string }) => {
     const formData = new FormData();
