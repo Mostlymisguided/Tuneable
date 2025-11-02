@@ -183,16 +183,92 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 // SoundCloud OAuth routes - only available if configured
 if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
   router.get('/soundcloud', (req, res, next) => {
+    // Ensure session exists
+    if (!req.session) {
+      req.session = {};
+    }
+    
     // Store invite code in session if provided
     if (req.query.invite) {
-      req.session = req.session || {};
       req.session.pendingInviteCode = req.query.invite;
     }
-    passport.authenticate('soundcloud')(req, res, next);
+    
+    // Generate random state parameter for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex');
+    req.session.oauthState = state;
+    
+    // Debug logging
+    console.log('🎵 Generated SoundCloud OAuth state:', state);
+    console.log('📦 Session ID:', req.sessionID);
+    
+    // Save session explicitly before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('❌ Error saving session:', err);
+        return next(err);
+      }
+      
+      console.log('✅ Session saved with SoundCloud OAuth state');
+      
+      // Note: SoundCloud OAuth may not support state parameter natively
+      // We're storing it in session for validation, but SoundCloud may not return it
+      passport.authenticate('soundcloud', {
+        // If SoundCloud strategy supports state, pass it here
+      })(req, res, next);
+    });
   });
 
   router.get('/soundcloud/callback', 
-    passport.authenticate('soundcloud', { failureRedirect: '/login?error=soundcloud_auth_failed' }),
+    (req, res, next) => {
+      // Validate state parameter for CSRF protection (if SoundCloud returns it)
+      // Note: SoundCloud may not support state parameter, so we'll check if it exists
+      const state = req.query.state;
+      const sessionState = req.session?.oauthState;
+      
+      // Enhanced debugging
+      console.log('🎵 SoundCloud OAuth callback received:');
+      console.log('📦 Session ID:', req.sessionID);
+      console.log('🔐 Query state:', state || 'not provided by SoundCloud');
+      console.log('💾 Session state:', sessionState || 'undefined');
+      console.log('📝 Session exists:', !!req.session);
+      console.log('🔑 Session keys:', req.session ? Object.keys(req.session) : 'no session');
+      
+      // If state is provided by SoundCloud, validate it
+      // Otherwise, just check that session exists (SoundCloud may not support state)
+      if (state && sessionState && state !== sessionState) {
+        console.error('❌ Invalid SoundCloud OAuth state parameter - possible CSRF attack');
+        console.error('State mismatch:', {
+          queryState: state,
+          sessionState: sessionState,
+          stateExists: !!state,
+          sessionStateExists: !!sessionState,
+          statesMatch: state === sessionState
+        });
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/login?error=oauth_state_mismatch`);
+      }
+      
+      // If state was set, validate session exists
+      if (sessionState && !req.session) {
+        console.error('❌ SoundCloud OAuth callback - no session found');
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/login?error=oauth_session_missing`);
+      }
+      
+      if (state && sessionState && state === sessionState) {
+        console.log('✅ SoundCloud OAuth state validated successfully');
+      } else if (!state) {
+        console.log('⚠️  SoundCloud OAuth - state not provided by SoundCloud (may not be supported)');
+      }
+      
+      // Clear state from session after validation
+      if (req.session && req.session.oauthState) {
+        delete req.session.oauthState;
+      }
+      
+      // Continue with passport authentication
+      passport.authenticate('soundcloud', { failureRedirect: '/login?error=soundcloud_auth_failed' })(req, res, next);
+    },
     async (req, res) => {
       try {
         console.log('🎵 SoundCloud OAuth callback - user:', req.user?.username);

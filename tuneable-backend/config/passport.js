@@ -390,9 +390,10 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
   passport.use(new SoundCloudStrategy({
       clientID: process.env.SOUNDCLOUD_CLIENT_ID,
       clientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET,
-      callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback"
+      callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback",
+      passReqToCallback: true  // Enable passing req to callback for session access
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         console.log('SoundCloud profile:', profile);
         
@@ -443,8 +444,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
         let parentInviteCode = null;
-        if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
-          const code = arguments[4].session.pendingInviteCode;
+        if (req && req.session && req.session.pendingInviteCode) {
+          const code = req.session.pendingInviteCode;
           // Validate invite code
           const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {
