@@ -632,7 +632,6 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             existingMedia = await Media.findOne({
                 $or: [
                     { 'sources.youtube': url },
-                    { 'sources.spotify': url },
                     { 'sources.upload': url }
                 ]
             });

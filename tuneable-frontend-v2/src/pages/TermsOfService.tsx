@@ -38,7 +38,7 @@ const TermsOfService: React.FC = () => {
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>Create and join music listening parties</li>
                 <li>Bid on songs to influence party playlists</li>
-                <li>Stream music from various platforms including YouTube, Spotify, and podcasts</li>
+                <li>Stream music from various platforms including YouTube and podcasts</li>
                 <li>Connect with other music enthusiasts</li>
                 <li>Manage a digital wallet for bidding on songs</li>
               </ul>
@@ -118,7 +118,7 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">6.2 Third-Party Content</h3>
                 <p className="mb-2">
-                  Music and media content streamed through the Service is provided by third-party platforms (YouTube, Spotify, etc.). 
+                  Music and media content streamed through the Service is provided by third-party platforms (YouTube, etc.). 
                   Users must comply with the terms of service of these third-party providers.
                 </p>
 
@@ -261,7 +261,6 @@ const TermsOfService: React.FC = () => {
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li><strong>YouTube:</strong> For music streaming (subject to YouTube Terms of Service)</li>
-                <li><strong>Spotify:</strong> For music streaming (subject to Spotify Terms of Service)</li>
                 <li><strong>Facebook:</strong> For OAuth authentication</li>
                 <li><strong>Google:</strong> For OAuth authentication</li>
                 <li><strong>SoundCloud:</strong> For OAuth authentication</li>

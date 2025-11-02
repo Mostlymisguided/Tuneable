@@ -31,7 +31,6 @@ const CreatorRegister: React.FC = () => {
       instagram: '',
       facebook: '',
       soundcloud: '',
-      spotify: '',
       youtube: '',
       twitter: ''
     },
@@ -312,7 +311,6 @@ const CreatorRegister: React.FC = () => {
             instagram: 'Instagram',
             facebook: 'Facebook',
             soundcloud: 'SoundCloud',
-            spotify: 'Spotify',
             youtube: 'YouTube',
             twitter: 'Twitter/X'
           }).map(([key, label]) => (

@@ -336,8 +336,6 @@ const TuneProfile: React.FC = () => {
         return { icon: Youtube, color: 'hover:bg-red-600/30 hover:border-red-500', bgColor: 'bg-red-600/20' };
       case 'soundcloud':
         return { icon: Music2, color: 'hover:bg-orange-600/30 hover:border-orange-500', bgColor: 'bg-orange-600/20' };
-      case 'spotify':
-        return { icon: Music, color: 'hover:bg-green-600/30 hover:border-green-500', bgColor: 'bg-green-600/20' };
       default:
         return { icon: ExternalLink, color: 'hover:bg-purple-600/30 hover:border-purple-500', bgColor: 'bg-purple-600/20' };
     }
@@ -384,21 +382,6 @@ const TuneProfile: React.FC = () => {
       });
     }
     
-    // Auto-populate Spotify link from externalIds if not already in sources
-    if (media?.externalIds?.spotify && !media?.sources?.spotify) {
-      const spotifyId = media.externalIds.spotify;
-      const spotifyUrl = `https://open.spotify.com/track/${spotifyId}`;
-      const { icon, color, bgColor } = getPlatformIcon('spotify');
-      links.push({
-        platform: 'spotify',
-        url: spotifyUrl,
-        icon,
-        color,
-        bgColor,
-        displayName: 'Spotify'
-      });
-    }
-    
     return links;
   };
 
@@ -408,7 +391,7 @@ const TuneProfile: React.FC = () => {
     
     const existingSources = media?.sources || {};
     const existingExternalIds = media?.externalIds || {};
-    const allPlatforms = ['YouTube', 'SoundCloud', 'Spotify'];
+    const allPlatforms = ['YouTube', 'SoundCloud'];
     
     return allPlatforms
       .filter(platform => {
@@ -638,15 +621,11 @@ const TuneProfile: React.FC = () => {
             // Handle Mongoose metadata corruption
             sources = source.url.sources;
             break;
-          } else if (source && source.platform === 'youtube' && source.url) {
-            (sources as any).youtube = source.url;
-          } else if (source && source.platform === 'spotify' && source.url) {
-            (sources as any).spotify = source.url;
-          } else if (source?.youtube) {
-            (sources as any).youtube = source.youtube;
-          } else if (source?.spotify) {
-            (sources as any).spotify = source.spotify;
-          }
+        } else if (source && source.platform === 'youtube' && source.url) {
+          (sources as any).youtube = source.url;
+        } else if (source?.youtube) {
+          (sources as any).youtube = source.youtube;
+        }
         }
       } else if (typeof media.sources === 'object') {
         // Preserve the original sources object

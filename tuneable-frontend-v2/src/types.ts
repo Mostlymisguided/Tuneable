@@ -282,7 +282,7 @@ export interface Party {
   partyUserBidTopUser?: string; // User who made highest bid
   
   startTime: string;
-  musicSource: 'youtube' | 'spotify' | 'direct_upload';
+  musicSource: 'youtube' | 'direct_upload';
   endTime?: string;
   privacy: 'public' | 'private';
   type: 'remote' | 'live' | 'global';

@@ -99,7 +99,6 @@ const PrivacyPolicy: React.FC = () => {
                 <li><strong>Facebook:</strong> For OAuth authentication (see Facebook's privacy policy)</li>
                 <li><strong>Stripe:</strong> For payment processing (see Stripe's privacy policy)</li>
                 <li><strong>YouTube:</strong> For music streaming (see YouTube's privacy policy)</li>
-                <li><strong>Spotify:</strong> For music streaming (see Spotify's privacy policy)</li>
               </ul>
             </section>
 

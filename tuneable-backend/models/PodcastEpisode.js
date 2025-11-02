@@ -32,7 +32,7 @@ const podcastEpisodeSchema = new mongoose.Schema({
   rssUrl: { type: String, required: true },
   source: { 
     type: String, 
-    enum: ['rss', 'spotify', 'apple', 'google', 'manual'],
+    enum: ['rss', 'apple', 'google', 'manual'],
     default: 'rss' 
   },
   
@@ -45,7 +45,6 @@ const podcastEpisodeSchema = new mongoose.Schema({
   language: { type: String, default: 'en' },
   
   // Platform-specific IDs
-  spotifyId: { type: String, default: null },
   appleId: { type: String, default: null },
   googleId: { type: String, default: null },
   taddyUuid: { type: String, default: null }, // Taddy episode UUID

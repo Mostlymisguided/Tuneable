@@ -16,7 +16,7 @@ const formatTime = (seconds: number): string => {
 };
 
 // Helper function to detect player type
-const detectPlayerType = (media: any): 'youtube' | 'audio' | 'spotify' | null => {
+const detectPlayerType = (media: any): 'youtube' | 'audio' | null => {
   if (!media || !media.sources) return null;
   
   // Check if sources is an array
@@ -24,15 +24,12 @@ const detectPlayerType = (media: any): 'youtube' | 'audio' | 'spotify' | null =>
     for (const source of media.sources) {
       if (source?.platform === 'youtube' && source.url) return 'youtube';
       if (source?.platform === 'upload' && source.url) return 'audio';
-      if (source?.platform === 'spotify' && source.url) return 'spotify';
       // Handle direct properties
       if (source?.youtube) return 'youtube';
-      if (source?.spotify) return 'spotify';
     }
   } else if (typeof media.sources === 'object') {
     if (media.sources.youtube) return 'youtube';
     if (media.sources.upload) return 'audio';
-    if (media.sources.spotify) return 'spotify';
   }
   
   return null;
@@ -46,11 +43,9 @@ const extractSourceUrl = (media: any, playerType: string): string | null => {
     for (const source of media.sources) {
       if (source?.platform === playerType && source.url) return source.url;
       if (playerType === 'youtube' && source?.youtube) return source.youtube;
-      if (playerType === 'spotify' && source?.spotify) return source.spotify;
     }
   } else if (typeof media.sources === 'object') {
     if (playerType === 'youtube' && media.sources.youtube) return media.sources.youtube;
-    if (playerType === 'spotify' && media.sources.spotify) return media.sources.spotify;
   }
   
   return null;
@@ -276,12 +271,6 @@ const PersistentWebPlayer: React.FC = () => {
     
     if (!detectedPlayerType) {
       console.log('No valid player type detected');
-      return;
-    }
-
-    // Skip Spotify for MVP
-    if (detectedPlayerType === 'spotify') {
-      console.log('Spotify not supported in MVP');
       return;
     }
 

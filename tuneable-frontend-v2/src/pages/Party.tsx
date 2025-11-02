@@ -25,10 +25,7 @@ interface PartyMedia {
   duration?: number;
   sources?: {
     youtube?: string;
-    spotify?: string;
     upload?: string;
-    spotifyId?: string;
-    spotifyUrl?: string;
   };
   globalMediaAggregate?: number; // Updated to schema grammar
   bids?: any[];
@@ -280,12 +277,8 @@ const Party: React.FC = () => {
                   break;
                 } else if (source && source.platform === 'youtube' && source.url) {
                   (sources as any).youtube = source.url;
-                } else if (source && source.platform === 'spotify' && source.url) {
-                  (sources as any).spotify = source.url;
                 } else if (source?.youtube) {
                   (sources as any).youtube = source.youtube;
-                } else if (source?.spotify) {
-                  (sources as any).spotify = source.spotify;
                 }
               }
             } else if (typeof actualMedia.sources === 'object') {
@@ -366,8 +359,6 @@ const Party: React.FC = () => {
             for (const source of item.sources) {
               if (source && source.platform === 'youtube' && source.url) {
                 (sources as any).youtube = source.url;
-              } else if (source && source.platform === 'spotify' && source.url) {
-                (sources as any).spotify = source.url;
               }
             }
           } else if (typeof item.sources === 'object') {
@@ -620,8 +611,6 @@ const Party: React.FC = () => {
       
       if (musicSource === 'youtube' && pendingMedia.sources?.youtube) {
         url = pendingMedia.sources.youtube;
-      } else if (musicSource === 'spotify' && pendingMedia.sources?.spotify) {
-        url = pendingMedia.sources.spotify;
       } else if (pendingMedia.sources) {
         // Fallback to first available source
         url = Object.values(pendingMedia.sources)[0] as string;
@@ -1031,12 +1020,8 @@ const Party: React.FC = () => {
             break;
           } else if (source && source.platform === 'youtube' && source.url) {
             (sources as any).youtube = source.url;
-          } else if (source && source.platform === 'spotify' && source.url) {
-            (sources as any).spotify = source.url;
           } else if (source?.youtube) {
             (sources as any).youtube = source.youtube;
-          } else if (source?.spotify) {
-            (sources as any).spotify = source.spotify;
           }
         }
       } else if (typeof mediaData.sources === 'object') {

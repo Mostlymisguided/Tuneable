@@ -146,11 +146,10 @@ const DataDeletion: React.FC = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Third-Party Data</h2>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  If you've connected third-party services (Facebook, Spotify, etc.), you may need to manage your data separately:
+                  If you've connected third-party services (Facebook, etc.), you may need to manage your data separately:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 text-gray-700">
                   <li><strong>Facebook:</strong> Manage data through Facebook Settings → Apps and Websites</li>
-                  <li><strong>Spotify:</strong> Manage data through Spotify Account Settings</li>
                   <li><strong>Stripe:</strong> Payment data is managed according to Stripe's policies</li>
                 </ul>
               </div>

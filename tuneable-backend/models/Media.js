@@ -303,7 +303,6 @@ mediaSchema.index({ globalMediaBidTop: -1 });
 mediaSchema.index({ globalMediaAggregateTop: -1 });
 mediaSchema.index({ addedBy: 1 });
 mediaSchema.index({ "sources.youtube": 1 });
-mediaSchema.index({ "sources.spotify": 1 });
 mediaSchema.index({ contentType: 1 });
 mediaSchema.index({ contentForm: 1 });
 mediaSchema.index({ creatorNames: 1 }); // Index for searching by creator name
@@ -327,7 +326,6 @@ mediaSchema.index({ "externalIds.podcastIndex": 1 }); // Index for Podcast Index
 mediaSchema.index({ "externalIds.taddy": 1 }); // Index for Taddy UUID lookups
 mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
 mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
-mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify lookups
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.target_uuid": 1 }); // Index for finding relationships to specific media
 mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by owner
