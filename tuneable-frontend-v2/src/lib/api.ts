@@ -143,6 +143,17 @@ export const authAPI = {
     const response = await api.get('/users/referrals');
     return response.data;
   },
+
+  // Password reset
+  requestPasswordReset: async (email: string) => {
+    const response = await api.post('/email/password-reset/request', { email });
+    return response.data;
+  },
+
+  confirmPasswordReset: async (token: string, newPassword: string) => {
+    const response = await api.post('/email/password-reset/confirm', { token, newPassword });
+    return response.data;
+  },
 };
 
 // Payment API
