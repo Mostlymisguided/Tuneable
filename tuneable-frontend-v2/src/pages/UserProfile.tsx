@@ -358,19 +358,6 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const loadTagRankingsForUser = async (userIdentifier: string) => {
-    try {
-      console.log('🏷️ Loading tag rankings for user:', userIdentifier);
-      const response = await userAPI.getTagRankings(userIdentifier, 10);
-      console.log('📊 Tag rankings response:', response);
-      setTagRankings(response.tagRankings || []);
-      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
-    } catch (err: any) {
-      console.error('❌ Error loading tag rankings:', err);
-      // Silent fail - not critical
-    }
-  };
-
   const loadTagRankings = async () => {
     try {
       console.log('🏷️ Loading tag rankings for user:', userId);
