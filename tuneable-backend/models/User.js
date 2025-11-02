@@ -130,7 +130,8 @@ const userSchema = new mongoose.Schema({
   oauthVerified: {
     instagram: { type: Boolean, default: false },
     facebook: { type: Boolean, default: false },
-    soundcloud: { type: Boolean, default: false }
+    soundcloud: { type: Boolean, default: false },
+    google: { type: Boolean, default: false }
   },
   
   // Label affiliations

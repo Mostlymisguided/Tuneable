@@ -310,6 +310,9 @@ const Admin: React.FC = () => {
                         Role
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        OAuth Verified
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                         Balance
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -343,6 +346,46 @@ const Admin: React.FC = () => {
                                 {role}
                               </span>
                             ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex space-x-1">
+                            {user.oauthVerified?.facebook && (
+                              <span 
+                                className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-blue-900 text-blue-200"
+                                title="Facebook verified"
+                              >
+                                FB
+                              </span>
+                            )}
+                            {user.oauthVerified?.google && (
+                              <span 
+                                className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-200"
+                                title="Google verified"
+                              >
+                                G
+                              </span>
+                            )}
+                            {user.oauthVerified?.instagram && (
+                              <span 
+                                className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-pink-900 text-pink-200"
+                                title="Instagram verified"
+                              >
+                                IG
+                              </span>
+                            )}
+                            {user.oauthVerified?.soundcloud && (
+                              <span 
+                                className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-orange-900 text-orange-200"
+                                title="SoundCloud verified"
+                              >
+                                SC
+                              </span>
+                            )}
+                            {(!user.oauthVerified?.facebook && !user.oauthVerified?.google && 
+                              !user.oauthVerified?.instagram && !user.oauthVerified?.soundcloud) && (
+                              <span className="text-xs text-gray-500">None</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

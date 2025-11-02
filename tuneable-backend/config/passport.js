@@ -28,6 +28,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       if (user) {
         // User exists, update their Facebook access token
         user.facebookAccessToken = accessToken;
+        user.oauthVerified = user.oauthVerified || {};
+        user.oauthVerified.facebook = true; // Mark Facebook OAuth as verified
         
         // Update profile picture if user doesn't have one
         if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
@@ -62,6 +64,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           // Link Facebook account to existing user
           user.facebookId = profile.id;
           user.facebookAccessToken = accessToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.facebook = true; // Mark Facebook OAuth as verified
           
           // Update profile picture if user doesn't have one or is linking Facebook for first time
           if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstFacebookLink)) {
@@ -134,7 +138,14 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         balance: 0,
         // Generate invite codes
         personalInviteCode: generateInviteCode(),
-        parentInviteCode: parentInviteCode
+        parentInviteCode: parentInviteCode,
+        // Mark Facebook OAuth as verified
+        oauthVerified: {
+          facebook: true,
+          instagram: false,
+          soundcloud: false,
+          google: false
+        }
       });
       
       await newUser.save();
@@ -232,6 +243,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             existingUser.googleId = profile.id;
             existingUser.googleAccessToken = accessToken;
             existingUser.googleRefreshToken = refreshToken;
+            existingUser.oauthVerified = existingUser.oauthVerified || {};
+            existingUser.oauthVerified.google = true; // Mark Google OAuth as verified
             
             // Update profile picture from Google only if user doesn't have one or is first time linking
             const isFirstGoogleLink = !existingUser.googleId;
@@ -461,6 +474,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         if (user) {
           // User exists, update their SoundCloud access token
           user.soundcloudAccessToken = accessToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.soundcloud = true; // Mark SoundCloud OAuth as verified
           
           // Update username if not set
           if (profile.username && !user.soundcloudUsername) {
@@ -488,6 +503,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             user.soundcloudId = profile.id;
             user.soundcloudUsername = profile.username;
             user.soundcloudAccessToken = accessToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.soundcloud = true; // Mark SoundCloud OAuth as verified
             
             // Update profile picture if user doesn't have one or is linking SoundCloud for first time
             if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstSoundCloudLink)) {
@@ -551,7 +568,14 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           balance: 0,
           // Generate invite codes
           personalInviteCode: generateInviteCode(),
-          parentInviteCode: parentInviteCode
+          parentInviteCode: parentInviteCode,
+          // Mark SoundCloud OAuth as verified
+          oauthVerified: {
+            soundcloud: true,
+            facebook: false,
+            instagram: false,
+            google: false
+          }
         });
         
         await newUser.save();
@@ -669,6 +693,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
             user.instagramId = profile.id;
             user.instagramUsername = profile.username;
             user.instagramAccessToken = accessToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.instagram = true; // Mark Instagram OAuth as verified
             
             // Update profile picture if user doesn't have one or is linking Instagram for first time
             if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstInstagramLink)) {
