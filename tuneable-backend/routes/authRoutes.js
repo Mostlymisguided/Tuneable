@@ -59,7 +59,17 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 }
 
 // Google OAuth routes - only available if configured
+// Debug logging for Google OAuth configuration
+console.log('🔍 Google OAuth Environment Check:');
+console.log('GOOGLE_CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+console.log('GOOGLE_CLIENT_ID length:', process.env.GOOGLE_CLIENT_ID?.length || 0);
+console.log('GOOGLE_CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+console.log('GOOGLE_CLIENT_SECRET length:', process.env.GOOGLE_CLIENT_SECRET?.length || 0);
+console.log('GOOGLE_CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL || 'not set (using default)');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  console.log('✅ Google OAuth configured successfully');
   router.get('/google', (req, res, next) => {
     // Store invite code in session if provided
     if (req.query.invite) {
@@ -126,6 +136,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   );
 } else {
   // Google OAuth not configured - return 503 Service Unavailable
+  console.log('⚠️  Google OAuth NOT configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
   router.get('/google', (req, res) => {
     res.status(503).json({ error: 'Google OAuth not configured' });
   });
