@@ -204,6 +204,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           // User exists, update their Google tokens
           user.googleAccessToken = accessToken;
           user.googleRefreshToken = refreshToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.google = true; // Mark Google OAuth as verified
           
           // Update profile picture from Google only if user doesn't have one
           if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
@@ -361,7 +363,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           balance: 0,
           // Generate invite codes
           personalInviteCode: generateInviteCode(),
-          parentInviteCode: parentInviteCode
+          parentInviteCode: parentInviteCode,
+          // Mark Google OAuth as verified
+          oauthVerified: {
+            google: true,
+            facebook: false,
+            instagram: false,
+            soundcloud: false
+          }
         });
         
         await newUser.save();
@@ -666,6 +675,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         if (user) {
           // User exists, update their Instagram access token
           user.instagramAccessToken = accessToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.instagram = true; // Mark Instagram OAuth as verified
           
           // Update username if not set
           if (profile.username && !user.instagramUsername) {
@@ -758,7 +769,14 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           balance: 0,
           // Generate invite codes
           personalInviteCode: generateInviteCode(),
-          parentInviteCode: parentInviteCode
+          parentInviteCode: parentInviteCode,
+          // Mark Instagram OAuth as verified
+          oauthVerified: {
+            instagram: true,
+            facebook: false,
+            soundcloud: false,
+            google: false
+          }
         });
         
         await newUser.save();

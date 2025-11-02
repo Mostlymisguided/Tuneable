@@ -24,10 +24,16 @@ import { toast } from 'react-toastify';
 interface User {
   _id: string;
   username: string;
-  email: string;
+  email?: string;
   role: string[];
   balance: number;
   createdAt: string;
+  oauthVerified?: {
+    instagram?: boolean;
+    facebook?: boolean;
+    soundcloud?: boolean;
+    google?: boolean;
+  };
 }
 
 const Admin: React.FC = () => {
