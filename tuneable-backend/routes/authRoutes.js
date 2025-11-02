@@ -76,7 +76,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       scope: [
         'profile', 
         'email',
-        'https://www.googleapis.com/auth/youtube.readonly'  // For YouTube import feature
+        // 'https://www.googleapis.com/auth/youtube.readonly'  // Commented out - requires Google verification. For YouTube import feature (admin only)
       ],
       state: state  // Pass state parameter for security
     })(req, res, next);

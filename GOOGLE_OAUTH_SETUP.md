@@ -53,7 +53,7 @@ FRONTEND_URL=https://your-frontend-domain.com
    - Add scopes:
      - `profile`
      - `email`
-     - `https://www.googleapis.com/auth/youtube.readonly`
+     - ~~`https://www.googleapis.com/auth/youtube.readonly`~~ (Optional - currently commented out to avoid verification requirement)
 
 7. Configure OAuth 2.0 Client:
    - **Name**: Tuneable OAuth Client (or your preferred name)
@@ -73,9 +73,9 @@ FRONTEND_URL=https://your-frontend-domain.com
 Our implementation requests the following Google permissions:
 - **`profile`** - User's basic profile information
 - **`email`** - User's email address
-- **`https://www.googleapis.com/auth/youtube.readonly`** - Read-only access to YouTube account (for YouTube liked videos import feature)
+- **`https://www.googleapis.com/auth/youtube.readonly`** - Read-only access to YouTube account (for YouTube liked videos import feature) - **Currently commented out to avoid Google verification requirement**
 
-**Note:** The YouTube scope is required if you want users to be able to import their liked YouTube videos. If you don't need this feature, you can remove the scope from the code in `authRoutes.js` line 72.
+**Note:** The YouTube scope requires Google app verification. It's currently commented out in `authRoutes.js`. If you want to enable YouTube import feature later, uncomment the scope and submit for Google verification.
 
 ### Testing
 
@@ -117,7 +117,8 @@ Before deploying to production:
 - [ ] Set `GOOGLE_CALLBACK_URL` to production URL
 - [ ] Add production callback URL to Google Cloud Console
 - [ ] Add production JavaScript origin to Google Cloud Console
-- [ ] Verify OAuth consent screen is configured
+- [ ] Verify OAuth consent screen is configured (only profile and email scopes)
+- [ ] Publish OAuth consent screen (should work without verification for basic scopes)
 - [ ] Test the flow on production environment
-- [ ] Verify YouTube Data API v3 is enabled (if using YouTube import)
+- [ ] (Optional) Uncomment YouTube scope and submit for verification if YouTube import is needed
 
