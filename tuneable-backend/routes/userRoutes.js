@@ -1138,6 +1138,50 @@ router.get('/referrals', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/admin/all
+// @desc    Get all users (admin only)
+// @access  Private (Admin)
+router.get('/admin/all', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { limit = 100, skip = 0, search } = req.query;
+    
+    // Build query
+    const query = {};
+    if (search) {
+      query.$or = [
+        { username: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(query)
+      .select('-password') // Exclude passwords
+      .select('-passwordResetToken -passwordResetExpires') // Exclude reset tokens
+      .select('-emailVerificationToken -emailVerificationExpires') // Exclude verification tokens
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(skip))
+      .lean();
+
+    const total = await User.countDocuments(query);
+
+    res.json({
+      users,
+      total,
+      limit: parseInt(limit),
+      skip: parseInt(skip)
+    });
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 // @route   GET /api/users/admin/invite-requests
 // @desc    Get all invite requests (admin only)
 // @access  Private (Admin)

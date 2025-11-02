@@ -85,7 +85,7 @@ const Admin: React.FC = () => {
   const loadUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users', {
+      const response = await fetch('/api/users/admin/all', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -94,9 +94,13 @@ const Admin: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users || []);
+      } else {
+        console.error('Failed to load users:', response.statusText);
+        toast.error('Failed to load users');
       }
     } catch (error) {
       console.error('Error loading users:', error);
+      toast.error('Error loading users');
     }
   };
 
