@@ -190,6 +190,12 @@ export const partyAPI = {
     return response.data;
   },
   
+  // Admin: Get party statistics
+  getStats: async () => {
+    const response = await api.get('/parties/admin/stats');
+    return response.data;
+  },
+  
   getPartyDetails: async (partyId: string): Promise<{ party: Party }> => {
     const response = await api.get(`/parties/${partyId}/details`);
     return response.data;

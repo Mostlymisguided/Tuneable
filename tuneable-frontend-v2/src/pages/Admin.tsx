@@ -54,6 +54,9 @@ const Admin: React.FC = () => {
   const [sortField, setSortField] = useState<string>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [mediaCount, setMediaCount] = useState<number>(0);
+  const [activeParties, setActiveParties] = useState<number>(0);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(false);
+  const [mediaCount, setMediaCount] = useState<number>(0);
   const [activePartiesCount, setActivePartiesCount] = useState<number>(0);
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
 
@@ -160,6 +163,23 @@ const Admin: React.FC = () => {
     return sortDirection === 'asc' 
       ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
       : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
+  };
+
+  const loadOverviewStats = async () => {
+    try {
+      setIsLoadingOverview(true);
+      const [mediaStats, partyStats] = await Promise.all([
+        mediaAPI.getStats(),
+        partyAPI.getStats()
+      ]);
+      setMediaCount(mediaStats.totalMedia || 0);
+      setActiveParties(partyStats.activeParties || 0);
+    } catch (error) {
+      console.error('Error loading overview stats:', error);
+      toast.error('Failed to load overview statistics');
+    } finally {
+      setIsLoadingOverview(false);
+    }
   };
 
   const loadOverviewData = async () => {

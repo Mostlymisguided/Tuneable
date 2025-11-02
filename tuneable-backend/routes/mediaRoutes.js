@@ -1497,5 +1497,26 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/admin/stats
+// @desc    Get media statistics (admin only)
+// @access  Private (Admin)
+router.get('/admin/stats', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const totalMedia = await Media.countDocuments({ contentType: { $in: ['music'] } });
+    
+    res.json({
+      totalMedia
+    });
+  } catch (error) {
+    console.error('Error fetching media stats:', error);
+    res.status(500).json({ error: 'Failed to fetch media stats' });
+  }
+});
+
 module.exports = router;
 

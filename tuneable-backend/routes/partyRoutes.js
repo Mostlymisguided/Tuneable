@@ -2226,4 +2226,27 @@ router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) =
     }
 });
 
+// @route   GET /api/parties/admin/stats
+// @desc    Get party statistics (admin only)
+// @access  Private (Admin)
+router.get('/admin/stats', authMiddleware, async (req, res) => {
+    try {
+        // Check if user is admin
+        if (!req.user.role || !req.user.role.includes('admin')) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const activeParties = await Party.countDocuments({ status: 'active' });
+        const totalParties = await Party.countDocuments({});
+        
+        res.json({
+            activeParties,
+            totalParties
+        });
+    } catch (error) {
+        console.error('Error fetching party stats:', error);
+        res.status(500).json({ error: 'Failed to fetch party stats' });
+    }
+});
+
 module.exports = router;
