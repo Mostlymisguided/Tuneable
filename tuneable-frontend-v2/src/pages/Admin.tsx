@@ -18,7 +18,7 @@ import {
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
-import { authAPI, creatorAPI, claimAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI, userAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -84,23 +84,11 @@ const Admin: React.FC = () => {
 
   const loadUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/users/admin/all', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || []);
-      } else {
-        console.error('Failed to load users:', response.statusText);
-        toast.error('Failed to load users');
-      }
+      const data = await userAPI.getAllUsers();
+      setUsers(data.users || []);
     } catch (error) {
       console.error('Error loading users:', error);
-      toast.error('Error loading users');
+      toast.error('Failed to load users');
     }
   };
 

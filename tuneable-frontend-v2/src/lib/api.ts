@@ -451,6 +451,16 @@ export const userAPI = {
     return response.data;
   },
   
+  // Admin: Get all users (admin only)
+  getAllUsers: async (limit?: number, skip?: number, search?: string) => {
+    const params: any = {};
+    if (limit) params.limit = limit;
+    if (skip) params.skip = skip;
+    if (search) params.search = search;
+    const response = await api.get('/users/admin/all', { params });
+    return response.data;
+  },
+
   // Admin: Get invite requests
   getInviteRequests: async (status?: string) => {
     const params = status ? { status } : {};
