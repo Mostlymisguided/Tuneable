@@ -71,25 +71,42 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('✅ Google OAuth configured successfully');
   router.get('/google', (req, res, next) => {
+    // Ensure session exists
+    if (!req.session) {
+      req.session = {};
+    }
+    
     // Store invite code in session if provided
     if (req.query.invite) {
-      req.session = req.session || {};
       req.session.pendingInviteCode = req.query.invite;
     }
     
     // Generate random state parameter for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
-    req.session = req.session || {};
     req.session.oauthState = state;
     
-    passport.authenticate('google', { 
-      scope: [
-        'profile', 
-        'email',
-        // 'https://www.googleapis.com/auth/youtube.readonly'  // Commented out - requires Google verification. For YouTube import feature (admin only)
-      ],
-      state: state  // Pass state parameter for security
-    })(req, res, next);
+    // Debug logging
+    console.log('🔐 Generated OAuth state:', state);
+    console.log('📦 Session ID:', req.sessionID);
+    
+    // Save session explicitly before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('❌ Error saving session:', err);
+        return next(err);
+      }
+      
+      console.log('✅ Session saved with OAuth state');
+      
+      passport.authenticate('google', { 
+        scope: [
+          'profile', 
+          'email',
+          // 'https://www.googleapis.com/auth/youtube.readonly'  // Commented out - requires Google verification. For YouTube import feature (admin only)
+        ],
+        state: state  // Pass state parameter for security
+      })(req, res, next);
+    });
   });
 
   router.get('/google/callback', 
@@ -98,11 +115,28 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       const state = req.query.state;
       const sessionState = req.session?.oauthState;
       
+      // Enhanced debugging
+      console.log('🔍 OAuth callback received:');
+      console.log('📦 Session ID:', req.sessionID);
+      console.log('🔐 Query state:', state);
+      console.log('💾 Session state:', sessionState);
+      console.log('📝 Session exists:', !!req.session);
+      console.log('🔑 Session keys:', req.session ? Object.keys(req.session) : 'no session');
+      
       if (!state || !sessionState || state !== sessionState) {
-        console.error('Invalid OAuth state parameter - possible CSRF attack');
+        console.error('❌ Invalid OAuth state parameter - possible CSRF attack');
+        console.error('State mismatch:', {
+          queryState: state,
+          sessionState: sessionState,
+          stateExists: !!state,
+          sessionStateExists: !!sessionState,
+          statesMatch: state === sessionState
+        });
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         return res.redirect(`${frontendUrl}/login?error=oauth_state_mismatch`);
       }
+      
+      console.log('✅ OAuth state validated successfully');
       
       // Clear state from session after validation
       delete req.session.oauthState;

@@ -102,9 +102,11 @@ console.log('JSON body parsing middleware added.');
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-session-secret-key',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Changed to true to ensure session is created for OAuth state
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax', // 'lax' works for OAuth redirects
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
