@@ -98,17 +98,23 @@ console.log('CORS enabled for allowed origins:', allowedOrigins);
 app.use(express.json());
 console.log('JSON body parsing middleware added.');
 
+// Trust proxy - required for Render/Heroku (they use reverse proxies)
+// This ensures req.protocol is correctly set to 'https' for secure cookies
+app.set('trust proxy', 1);
+
 // Session configuration for OAuth
+// For OAuth redirects that cross domains (app → Google → app), we need SameSite: 'none' with Secure: true
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-session-secret-key',
   resave: false,
   saveUninitialized: true, // Changed to true to ensure session is created for OAuth state
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    secure: process.env.NODE_ENV === 'production', // Must be true for SameSite: 'none'
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax', // 'lax' works for OAuth redirects
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' required for cross-site OAuth redirects
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  },
+  name: 'tuneable.sid' // Custom session name
 }));
 
 // Initialize Passport
