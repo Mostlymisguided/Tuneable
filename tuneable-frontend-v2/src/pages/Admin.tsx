@@ -21,7 +21,7 @@ import {
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
-import { authAPI, creatorAPI, claimAPI, userAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -53,6 +53,9 @@ const Admin: React.FC = () => {
   const [isLoadingClaims, setIsLoadingClaims] = useState(false);
   const [sortField, setSortField] = useState<string>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [mediaCount, setMediaCount] = useState<number>(0);
+  const [activePartiesCount, setActivePartiesCount] = useState<number>(0);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -76,6 +79,7 @@ const Admin: React.FC = () => {
         loadUsers();
         loadCreatorApplications();
         loadClaims();
+        loadOverviewData();
       } else {
         setIsAdmin(false);
         navigate('/');
@@ -156,6 +160,26 @@ const Admin: React.FC = () => {
     return sortDirection === 'asc' 
       ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
       : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
+  };
+
+  const loadOverviewData = async () => {
+    try {
+      setIsLoadingOverview(true);
+      
+      // Fetch media count
+      const mediaResponse = await mediaAPI.getMedia({ limit: 1 });
+      setMediaCount(mediaResponse.pagination?.total || 0);
+      
+      // Fetch active parties count
+      const partiesResponse = await partyAPI.getParties();
+      const activeParties = partiesResponse.parties?.filter((party: any) => party.status === 'active') || [];
+      setActivePartiesCount(activeParties.length);
+    } catch (error) {
+      console.error('Error loading overview data:', error);
+      toast.error('Failed to load overview data');
+    } finally {
+      setIsLoadingOverview(false);
+    }
   };
 
   const promoteToAdmin = async (userId: string) => {
@@ -329,7 +353,13 @@ const Admin: React.FC = () => {
                   <Music className="h-8 w-8 text-green-400" />
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-400">Media Items</p>
-                    <p className="text-2xl font-bold text-white">-</p>
+                    <p className="text-2xl font-bold text-white">
+                      {isLoadingOverview ? (
+                        <span className="text-gray-500">Loading...</span>
+                      ) : (
+                        mediaCount.toLocaleString()
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -339,7 +369,13 @@ const Admin: React.FC = () => {
                   <Database className="h-8 w-8 text-purple-400" />
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-400">Active Parties</p>
-                    <p className="text-2xl font-bold text-white">-</p>
+                    <p className="text-2xl font-bold text-white">
+                      {isLoadingOverview ? (
+                        <span className="text-gray-500">Loading...</span>
+                      ) : (
+                        activePartiesCount.toLocaleString()
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
