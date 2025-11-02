@@ -25,6 +25,8 @@ FRONTEND_URL=http://localhost:5173
 
 **Note:** Use `onboarding@resend.dev` for immediate testing. It works right away!
 
+**Important:** In production (Render), make sure `FRONTEND_URL` is set to your production domain (e.g., `https://tuneable.stream`) so password reset and verification links point to the correct frontend.
+
 ---
 
 ## 📧 Verify tuneable.stream Domain (Optional but Recommended)
