@@ -94,6 +94,9 @@ const userSchema = new mongoose.Schema({
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
   
+  // Last login tracking
+  lastLoginAt: { type: Date },
+  
   // Social media links (available to all users)
   socialMedia: {
     instagram: String,

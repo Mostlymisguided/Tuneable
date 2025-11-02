@@ -500,6 +500,11 @@ router.post(
       if (!user || !(await bcrypt.compare(password, user.password))) {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
+      
+      // Update last login time
+      user.lastLoginAt = new Date();
+      await user.save();
+      
       // Generate JWT token using UUID
       const token = jwt.sign({ 
         userId: user.uuid,  // Use UUID instead of _id

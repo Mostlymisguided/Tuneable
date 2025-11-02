@@ -49,6 +49,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           }
         }
         
+        // Update last login time
+        user.lastLoginAt = new Date();
         await user.save();
         return done(null, user);
       }
@@ -85,6 +87,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
             }
           }
           
+          // Update last login time
+          user.lastLoginAt = new Date();
           await user.save();
           return done(null, user);
         }
@@ -145,7 +149,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           instagram: false,
           soundcloud: false,
           google: false
-        }
+        },
+        lastLoginAt: new Date()
       });
       
       await newUser.save();
@@ -231,6 +236,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             // This could be enhanced if we request additional scopes
           }
           
+          // Update last login time
+          user.lastLoginAt = new Date();
           await user.save();
           return done(null, user);
         }
@@ -272,6 +279,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               // Note: Google OAuth doesn't typically provide location, but we check locale as a fallback
             }
             
+            // Update last login time
+            existingUser.lastLoginAt = new Date();
             await existingUser.save();
             return done(null, existingUser);
           }
@@ -370,7 +379,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             facebook: false,
             instagram: false,
             soundcloud: false
-          }
+          },
+          lastLoginAt: new Date()
         });
         
         await newUser.save();
@@ -496,6 +506,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             user.profilePic = profile.photos[0].value;
           }
           
+          // Update last login time
+          user.lastLoginAt = new Date();
           await user.save();
           return done(null, user);
         }
@@ -520,6 +532,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
               user.profilePic = profile.photos[0].value;
             }
             
+            // Update last login time
+            user.lastLoginAt = new Date();
             await user.save();
             return done(null, user);
           }
@@ -584,7 +598,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             facebook: false,
             instagram: false,
             google: false
-          }
+          },
+          lastLoginAt: new Date()
         });
         
         await newUser.save();
@@ -688,6 +703,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
             user.profilePic = profile.photos[0].value;
           }
           
+          // Update last login time
+          user.lastLoginAt = new Date();
           await user.save();
           return done(null, user);
         }
@@ -712,6 +729,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
               user.profilePic = profile.photos[0].value;
             }
             
+            // Update last login time
+            user.lastLoginAt = new Date();
             await user.save();
             return done(null, user);
           }
@@ -776,7 +795,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
             facebook: false,
             soundcloud: false,
             google: false
-          }
+          },
+          lastLoginAt: new Date()
         });
         
         await newUser.save();

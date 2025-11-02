@@ -13,7 +13,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Mail
+  Mail,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
@@ -28,6 +31,7 @@ interface User {
   role: string[];
   balance: number;
   createdAt: string;
+  lastLoginAt?: string;
   oauthVerified?: {
     instagram?: boolean;
     facebook?: boolean;
@@ -47,6 +51,8 @@ const Admin: React.FC = () => {
   const [claims, setClaims] = useState<any[]>([]);
   const [isLoadingApplications, setIsLoadingApplications] = useState(false);
   const [isLoadingClaims, setIsLoadingClaims] = useState(false);
+  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     checkAdminStatus();
@@ -90,6 +96,66 @@ const Admin: React.FC = () => {
       console.error('Error loading users:', error);
       toast.error('Failed to load users');
     }
+  };
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // Toggle direction if clicking same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to descending
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const getSortedUsers = () => {
+    return [...users].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'username':
+          aValue = a.username?.toLowerCase() || '';
+          bValue = b.username?.toLowerCase() || '';
+          break;
+        case 'email':
+          aValue = a.email?.toLowerCase() || '';
+          bValue = b.email?.toLowerCase() || '';
+          break;
+        case 'role':
+          aValue = a.role?.[0] || '';
+          bValue = b.role?.[0] || '';
+          break;
+        case 'balance':
+          aValue = a.balance || 0;
+          bValue = b.balance || 0;
+          break;
+        case 'createdAt':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        case 'lastLoginAt':
+          aValue = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+          bValue = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
   };
 
   const promoteToAdmin = async (userId: string) => {
@@ -298,23 +364,62 @@ const Admin: React.FC = () => {
                 <table className="min-w-full divide-y divide-gray-700">
                   <thead className="bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        User
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('username')}
+                      >
+                        <div className="flex items-center">
+                          User
+                          {getSortIcon('username')}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Email
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('email')}
+                      >
+                        <div className="flex items-center">
+                          Email
+                          {getSortIcon('email')}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Role
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('role')}
+                      >
+                        <div className="flex items-center">
+                          Role
+                          {getSortIcon('role')}
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                         OAuth Verified
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Balance
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('balance')}
+                      >
+                        <div className="flex items-center">
+                          Balance
+                          {getSortIcon('balance')}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Joined
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('createdAt')}
+                      >
+                        <div className="flex items-center">
+                          Joined
+                          {getSortIcon('createdAt')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('lastLoginAt')}
+                      >
+                        <div className="flex items-center">
+                          Last Login
+                          {getSortIcon('lastLoginAt')}
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                         Actions
@@ -322,7 +427,7 @@ const Admin: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-gray-800 divide-y divide-gray-700">
-                    {users.map((user) => (
+                    {getSortedUsers().map((user) => (
                       <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-white">{user.username}</div>
