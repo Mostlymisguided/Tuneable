@@ -266,6 +266,13 @@ const AuthPage: React.FC = () => {
           </svg>
           Sign in with Facebook
         </button>
+        <br></br>
+        <button onClick={() => handleSocialAuth('soundcloud')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-[#FF5500] hover:bg-[#FF4400] focus:ring-orange-500 focus:ring-offset-orange-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
+          <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.568 17.548c-.188.363-.578.594-1.01.594-.062 0-.125-.006-.188-.02l-7.423-1.36c-.51-.094-.868-.518-.868-1.04V7.298c0-.394.216-.76.568-.95.35-.19.78-.179 1.113.04l6.774 4.18c.356.22.577.615.577 1.037v5.044c0 .387-.216.748-.565.94zm-1.673-6.25l-5.46-3.37v6.74l5.46-1.002v-2.368z"/>
+          </svg>
+          Sign in with SoundCloud
+        </button>
       </div>
 
       <div className="flex w-full items-center gap-2 py-8 text-sm text-slate-600">
@@ -348,6 +355,13 @@ const AuthPage: React.FC = () => {
             <path d="M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759h-306v-759h-255v-296h255v-218q0-186 104-288.5t277-102.5q147 0 228 12z"></path>
           </svg>
           Sign up with Facebook
+        </button>
+        
+        <button onClick={() => handleSocialAuth('soundcloud')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-[#FF5500] hover:bg-[#FF4400] focus:ring-orange-500 focus:ring-offset-orange-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
+          <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.568 17.548c-.188.363-.578.594-1.01.594-.062 0-.125-.006-.188-.02l-7.423-1.36c-.51-.094-.868-.518-.868-1.04V7.298c0-.394.216-.76.568-.95.35-.19.78-.179 1.113.04l6.774 4.18c.356.22.577.615.577 1.037v5.044c0 .387-.216.748-.565.94zm-1.673-6.25l-5.46-3.37v6.74l5.46-1.002v-2.368z"/>
+          </svg>
+          Sign up with SoundCloud
         </button>
       </div>
 
