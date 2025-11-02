@@ -5,6 +5,7 @@ const SoundCloudStrategy = require('passport-soundcloud').Strategy;
 const InstagramStrategy = require('passport-instagram-graph').Strategy;
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
@@ -393,7 +394,48 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
       callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback",
       passReqToCallback: true  // Enable passing req to callback for session access
     },
-    async (req, accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profileFromLibrary, done) => {
+      // The passport-soundcloud library fails due to SoundCloud's API security updates
+      // We'll manually fetch the profile using the access token with proper Authorization header
+      let profile = profileFromLibrary;
+      
+      try {
+        // If the library failed to get profile (profile is null or missing id), fetch it manually
+        if (!profile || !profile.id) {
+          console.log('🔄 Manually fetching SoundCloud profile due to library limitation');
+          
+          try {
+            const response = await axios.get('https://api.soundcloud.com/me.json', {
+              headers: {
+                'Authorization': `OAuth ${accessToken}`  // SoundCloud requires OAuth prefix
+              }
+            });
+            
+            console.log('✅ Successfully fetched SoundCloud profile manually');
+            
+            // Transform SoundCloud API response to Passport profile format
+            profile = {
+              provider: 'soundcloud',
+              id: response.data.id.toString(),
+              username: response.data.username,
+              displayName: response.data.full_name || response.data.username,
+              emails: response.data.email ? [{ value: response.data.email }] : [],
+              photos: response.data.avatar_url ? [{ value: response.data.avatar_url }] : [],
+              _raw: JSON.stringify(response.data),
+              _json: response.data
+            };
+          } catch (fetchError) {
+            console.error('❌ Failed to manually fetch SoundCloud profile:', fetchError);
+            console.error('Error response:', fetchError.response?.data);
+            console.error('Error status:', fetchError.response?.status);
+            // Continue with original profile (might be partial) or fail
+            if (!profile) {
+              return done(fetchError, null);
+            }
+          }
+        }
+        
+        // Use the profile (either from library or manually fetched)
       try {
         console.log('🎵 SoundCloud OAuth callback - profile received');
         console.log('📦 Access token exists:', !!accessToken);
@@ -537,12 +579,50 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         
         return done(null, newUser);
         
-      } catch (error) {
-        console.error('SoundCloud OAuth error:', error);
-        return done(error, null);
+        } catch (error) {
+          console.error('SoundCloud OAuth error:', error);
+          return done(error, null);
+        }
+      } catch (outerError) {
+        // Error in profile fetching or validation
+        console.error('SoundCloud OAuth outer error:', outerError);
+        return done(outerError, null);
       }
     }
-  ));
+  );
+  
+  // Override the userProfile method to use manual fetch with proper Authorization header
+  strategy.userProfile = async function(accessToken, done) {
+    try {
+      console.log('🔄 Fetching SoundCloud profile with proper Authorization header');
+      const response = await axios.get('https://api.soundcloud.com/me.json', {
+        headers: {
+          'Authorization': `OAuth ${accessToken}`  // SoundCloud requires OAuth prefix
+        }
+      });
+      
+      const profile = {
+        provider: 'soundcloud',
+        id: response.data.id.toString(),
+        username: response.data.username,
+        displayName: response.data.full_name || response.data.username,
+        emails: response.data.email ? [{ value: response.data.email }] : [],
+        photos: response.data.avatar_url ? [{ value: response.data.avatar_url }] : [],
+        _raw: JSON.stringify(response.data),
+        _json: response.data
+      };
+      
+      console.log('✅ SoundCloud profile fetched successfully');
+      return done(null, profile);
+    } catch (error) {
+      console.error('❌ Error fetching SoundCloud profile:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      return done(new Error('failed to fetch user profile', error), null);
+    }
+  };
+  
+  passport.use(strategy);
 } else {
   console.log('⚠️  SoundCloud OAuth not configured - SOUNDCLOUD_CLIENT_ID or SOUNDCLOUD_CLIENT_SECRET missing');
 }
