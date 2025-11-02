@@ -395,7 +395,21 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
     },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
-        console.log('SoundCloud profile:', profile);
+        console.log('🎵 SoundCloud OAuth callback - profile received');
+        console.log('📦 Access token exists:', !!accessToken);
+        console.log('👤 Profile data:', {
+          id: profile?.id,
+          username: profile?.username,
+          displayName: profile?.displayName,
+          emails: profile?.emails,
+          photos: profile?.photos
+        });
+        
+        // Validate profile data
+        if (!profile || !profile.id) {
+          console.error('❌ SoundCloud profile is missing or invalid:', profile);
+          return done(new Error('Invalid SoundCloud profile data'), null);
+        }
         
         // Check if user already exists with this SoundCloud ID
         let user = await User.findOne({ soundcloudId: profile.id });
