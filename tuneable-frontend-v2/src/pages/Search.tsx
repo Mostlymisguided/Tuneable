@@ -39,7 +39,7 @@ const SearchPage: React.FC = () => {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [activeTab] = useState<'songs' | 'podcasts'>('songs');
   const [party, setParty] = useState<any>(null);
-  const [musicSource, setMusicSource] = useState<'youtube'>('youtube');
+  const [mediaSource, setMediaSource] = useState<'youtube'>('youtube');
   const [podcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
   const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
   const [hasMoreExternal, setHasMoreExternal] = useState(false);
@@ -53,12 +53,12 @@ const SearchPage: React.FC = () => {
       return;
     }
 
-    // Fetch party details to determine music source
+    // Fetch party details to determine media source
     const fetchPartyDetails = async () => {
       try {
         const response = await partyAPI.getPartyDetails(partyId);
         setParty(response.party);
-        setMusicSource((response.party as any).musicSource || 'youtube');
+        setMediaSource((response.party as any).mediaSource || 'youtube');
         
       } catch (error) {
         console.error('Error fetching party details:', error);
@@ -437,9 +437,9 @@ const SearchPage: React.FC = () => {
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Add Songs</h1>
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Music Source:</span>
+              <span className="text-sm text-gray-500">Media Source:</span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                musicSource === 'youtube' 
+                mediaSource === 'youtube' 
                   ? 'bg-red-100 text-red-800' 
                   : 'bg-green-100 text-green-800'
               }`}>

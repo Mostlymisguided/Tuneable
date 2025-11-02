@@ -52,12 +52,7 @@ const Dashboard: React.FC = () => {
             <p className="text-gray-400">What everyone is playing and bidding on right now</p>
           </div>
           <div className="flex gap-2">
-            <button className="btn-secondary" onClick={() => navigate(`/parties`)}>Browse Tunes</button>
-            {globalParty && (
-              <button className="btn-primary inline-flex items-center gap-2" onClick={playFirst} disabled={isLoading || !globalParty?.media?.length}>
-                <Play className="h-4 w-4" /> Play
-              </button>
-            )}
+            <button className="btn-secondary" onClick={() => navigate(`/party/${globalParty._id || globalParty.id}`)}>Browse Tunes</button>
           </div>
         </div>
 
@@ -75,11 +70,7 @@ const Dashboard: React.FC = () => {
               <div className="text-gray-300 text-sm">£{(m.globalMediaAggregate || 0).toFixed(2)}</div>
             </div>
           ))}
-          {globalParty && (
-            <button className="mt-2 text-purple-400 inline-flex items-center" onClick={() => navigate(`/party/${globalParty._id || globalParty.id}`)}>
-              Open Global Tunes <ArrowRight className="h-4 w-4 ml-1" />
-            </button>
-          )}
+      
         </div>
       </div>
 

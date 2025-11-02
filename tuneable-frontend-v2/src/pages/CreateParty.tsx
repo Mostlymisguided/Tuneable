@@ -75,7 +75,7 @@ const CreateParty: React.FC = () => {
       // Prepare party data based on schedule type
       const partyData = {
         ...formData,
-        musicSource: 'youtube', // Default to YouTube for backward compatibility
+        mediaSource: 'youtube', // Default to YouTube for backward compatibility
         tags: tagsArray,
         // For automatic schedule, don't send startTime (backend will set to now)
         // For custom schedule, send the selected startTime

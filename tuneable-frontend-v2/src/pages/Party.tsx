@@ -504,11 +504,11 @@ const Party: React.FC = () => {
         }
       } else {
         // Regular search logic
-        const musicSource = party?.musicSource || 'youtube';
+        const mediaSource = party?.mediaSource || 'youtube';
         
         // Search local database first
         console.log('🔍 Searching for new media:', addMediaSearchQuery);
-        response = await searchAPI.search(addMediaSearchQuery, musicSource);
+        response = await searchAPI.search(addMediaSearchQuery, mediaSource);
       
       let databaseResults = [];
       let youtubeResults = [];
@@ -524,7 +524,7 @@ const Party: React.FC = () => {
       // If we got local results but want to show YouTube too, fetch YouTube
       if (databaseResults.length > 0 && response.hasMoreExternal) {
         console.log('🎥 Also fetching YouTube results...');
-        const youtubeResponse = await searchAPI.search(addMediaSearchQuery, musicSource, undefined, undefined, true);
+        const youtubeResponse = await searchAPI.search(addMediaSearchQuery, mediaSource, undefined, undefined, true);
         if (youtubeResponse.videos) {
           youtubeResults = youtubeResponse.videos;
           setYoutubeNextPageToken(youtubeResponse.nextPageToken || null);
@@ -559,8 +559,8 @@ const Party: React.FC = () => {
     
     setIsLoadingMoreYouTube(true);
     try {
-      const musicSource = party?.musicSource || 'youtube';
-      const response = await searchAPI.search(addMediaSearchQuery, musicSource, youtubeNextPageToken, undefined, true);
+      const mediaSource = party?.mediaSource || 'youtube';
+      const response = await searchAPI.search(addMediaSearchQuery, mediaSource, youtubeNextPageToken, undefined, true);
       
       if (response.videos) {
         // Append new results to existing YouTube results
@@ -605,11 +605,11 @@ const Party: React.FC = () => {
     const bidAmount = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] || party?.minimumBid || 0.33;
     
     try {
-      // Get the appropriate URL based on music source
-      const musicSource = party?.musicSource || 'youtube';
+      // Get the appropriate URL based on media source
+      const mediaSource = party?.mediaSource || 'youtube';
       let url = '';
       
-      if (musicSource === 'youtube' && pendingMedia.sources?.youtube) {
+      if (mediaSource === 'youtube' && pendingMedia.sources?.youtube) {
         url = pendingMedia.sources.youtube;
       } else if (pendingMedia.sources) {
         // Fallback to first available source
@@ -621,7 +621,7 @@ const Party: React.FC = () => {
         title: pendingMedia.title,
         artist: pendingMedia.artist,
         bidAmount,
-        platform: musicSource,
+        platform: mediaSource,
         duration: pendingMedia.duration,
         tags: tags, // Use user-provided tags from modal
         category: pendingMedia.category || 'Music'

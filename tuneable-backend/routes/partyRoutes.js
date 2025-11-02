@@ -46,7 +46,7 @@ router.post('/', adminMiddleware, async (req, res) => {
       console.log('🔥 Create Party Request Received:', req.body);
       console.log('🔑 Authenticated User:', req.user);
   
-      const { name, location, startTime, privacy, type, musicSource, minimumBid, tags, description } = req.body;
+      const { name, location, startTime, privacy, type, mediaSource, minimumBid, tags, description } = req.body;
   
       if (!name ) {
         console.log('❌ Missing Name');
@@ -79,7 +79,7 @@ router.post('/', adminMiddleware, async (req, res) => {
         privacy: privacy || 'public',
         type: type || 'remote',
         status: startTime ? 'scheduled' : 'active', // If no startTime provided, party starts immediately
-        musicSource: musicSource || 'youtube',
+        mediaSource: mediaSource || 'youtube',
         minimumBid: minimumBid || 0.33,
         tags: tags || [],
         description: description || '',
@@ -395,7 +395,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             watershed: party.watershed,
             type: party.type,
             status: party.status,
-            musicSource: party.musicSource,
+            mediaSource: party.mediaSource,
             createdAt: party.createdAt,
             updatedAt: party.updatedAt,
             media: processedMedia, // ✅ Return flattened, sorted media

@@ -14,7 +14,7 @@ const PartySchema = new mongoose.Schema({
   
   partyCode: { type: String, required: true, unique: true },
   location: {type: String, required: true},
-  musicSource: {
+  mediaSource: {
     type: String,
     enum: ['youtube', 'direct_upload'],
     default: 'youtube',
