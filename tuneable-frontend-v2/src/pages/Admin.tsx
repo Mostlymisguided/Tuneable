@@ -500,6 +500,13 @@ const Admin: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">
+                            {user.lastLoginAt 
+                              ? new Date(user.lastLoginAt).toLocaleString()
+                              : <span className="text-gray-500">Never</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           {!user.role.includes('admin') && (
                             <button
                               onClick={() => promoteToAdmin(user._id)}
