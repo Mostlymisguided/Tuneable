@@ -244,9 +244,6 @@ const AuthPage: React.FC = () => {
         <p className="mb-3 text-2xl font-semibold leading-5 text-slate-900">
           Login to your account
         </p>
-        <p className="mt-2 text-sm leading-4 text-slate-600">
-          You must be logged in to perform this action.
-        </p>
       </div>
 
       <div className="flex items-center justify-center flex-col">
@@ -321,7 +318,7 @@ const AuthPage: React.FC = () => {
         </p>
       <div className="mt-6 text-center text-sm text-slate-600">
         Don't have an account?{' '}
-        <Link to="/register" className="font-medium text-white">
+        <Link to="/register" className="font-medium underline">
           Sign up
         </Link>
       </div>
@@ -335,7 +332,7 @@ const AuthPage: React.FC = () => {
           Create your account
         </p>
         <p className="mt-2 text-sm leading-4 text-slate-600">
-          Join Tuneable to start sharing your music
+          Join Tuneable To Start Sharing Music
         </p>
       </div>
 
