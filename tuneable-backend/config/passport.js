@@ -15,9 +15,10 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
       callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
-      profileFields: ['id', 'emails', 'name', 'picture.type(large)']
+      profileFields: ['id', 'emails', 'name', 'picture.type(large)'],
+      passReqToCallback: true  // Enable passing req to callback for session access
     },
-  async (accessToken, refreshToken, profile, done) => {
+  async (req, accessToken, refreshToken, profile, done) => {
     try {
       console.log('Facebook profile:', profile);
       
@@ -36,12 +37,12 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           user.profilePic = photoUrl;
         }
         
-        // Update names from Facebook if provided
+        // Update names from Facebook only if not already set
         if (profile.name) {
-          if (profile.name.givenName) {
+          if (profile.name.givenName && !user.givenName) {
             user.givenName = profile.name.givenName;
           }
-          if (profile.name.familyName) {
+          if (profile.name.familyName && !user.familyName) {
             user.familyName = profile.name.familyName;
           }
         }
@@ -70,12 +71,12 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
             user.profilePic = photoUrl;
           }
           
-          // Update names from Facebook if provided
+          // Update names from Facebook only if not already set
           if (profile.name) {
-            if (profile.name.givenName) {
+            if (profile.name.givenName && !user.givenName) {
               user.givenName = profile.name.givenName;
             }
-            if (profile.name.familyName) {
+            if (profile.name.familyName && !user.familyName) {
               user.familyName = profile.name.familyName;
             }
           }
@@ -88,8 +89,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       // Create new user
       // Check for invite code in session (passed from OAuth initiation)
       let parentInviteCode = null;
-      if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
-        const code = arguments[4].session.pendingInviteCode;
+      if (req && req.session && req.session.pendingInviteCode) {
+        const code = req.session.pendingInviteCode;
         // Validate invite code
         const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
         if (inviter) {
@@ -193,19 +194,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           user.googleAccessToken = accessToken;
           user.googleRefreshToken = refreshToken;
           
-          // Update profile picture from Google (always refresh from source of truth)
-          if (profile.photos && profile.photos.length > 0) {
+          // Update profile picture from Google only if user doesn't have one
+          if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
             let photoUrl = profile.photos[0].value;
             photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
             user.profilePic = photoUrl;
           }
           
-          // Update names from Google if provided
+          // Update names from Google only if not already set
           if (profile.name) {
-            if (profile.name.givenName) {
+            if (profile.name.givenName && !user.givenName) {
               user.givenName = profile.name.givenName;
             }
-            if (profile.name.familyName) {
+            if (profile.name.familyName && !user.familyName) {
               user.familyName = profile.name.familyName;
             }
           }
@@ -232,19 +233,20 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             existingUser.googleAccessToken = accessToken;
             existingUser.googleRefreshToken = refreshToken;
             
-            // Update profile picture from Google (always refresh from source of truth)
-            if (profile.photos && profile.photos.length > 0) {
+            // Update profile picture from Google only if user doesn't have one or is first time linking
+            const isFirstGoogleLink = !existingUser.googleId;
+            if (profile.photos && profile.photos.length > 0 && (!existingUser.profilePic || isFirstGoogleLink)) {
               let photoUrl = profile.photos[0].value;
               photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
               existingUser.profilePic = photoUrl;
             }
             
-            // Update names from Google if provided
+            // Update names from Google only if not already set
             if (profile.name) {
-              if (profile.name.givenName) {
+              if (profile.name.givenName && !existingUser.givenName) {
                 existingUser.givenName = profile.name.givenName;
               }
-              if (profile.name.familyName) {
+              if (profile.name.familyName && !existingUser.familyName) {
                 existingUser.familyName = profile.name.familyName;
               }
             }
@@ -627,9 +629,10 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   passport.use(new InstagramStrategy({
       clientID: process.env.INSTAGRAM_CLIENT_ID,
       clientSecret: process.env.INSTAGRAM_CLIENT_SECRET,
-      callbackURL: process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback"
+      callbackURL: process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback",
+      passReqToCallback: true  // Enable passing req to callback for session access
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         console.log('Instagram profile:', profile);
         
@@ -680,8 +683,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
         let parentInviteCode = null;
-        if (arguments[4] && arguments[4].session && arguments[4].session.pendingInviteCode) {
-          const code = arguments[4].session.pendingInviteCode;
+        if (req && req.session && req.session.pendingInviteCode) {
+          const code = req.session.pendingInviteCode;
           // Validate invite code
           const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {
