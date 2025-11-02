@@ -388,7 +388,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // SoundCloud OAuth Strategy - only configure if environment variables are available
 if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
-  passport.use(new SoundCloudStrategy({
+  // Create strategy instance (don't use passport.use yet, we need to override userProfile first)
+  const strategy = new SoundCloudStrategy({
       clientID: process.env.SOUNDCLOUD_CLIENT_ID,
       clientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET,
       callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback",
@@ -436,7 +437,6 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         }
         
         // Use the profile (either from library or manually fetched)
-      try {
         console.log('🎵 SoundCloud OAuth callback - profile received');
         console.log('📦 Access token exists:', !!accessToken);
         console.log('👤 Profile data:', {
@@ -579,14 +579,9 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         
         return done(null, newUser);
         
-        } catch (error) {
-          console.error('SoundCloud OAuth error:', error);
-          return done(error, null);
-        }
-      } catch (outerError) {
-        // Error in profile fetching or validation
-        console.error('SoundCloud OAuth outer error:', outerError);
-        return done(outerError, null);
+      } catch (error) {
+        console.error('SoundCloud OAuth error:', error);
+        return done(error, null);
       }
     }
   );
