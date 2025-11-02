@@ -227,10 +227,23 @@ const UserProfile: React.FC = () => {
 
   useEffect(() => {
     if (userId) {
-      // Always fetch from API to ensure we have complete profile data including givenName, familyName, cellPhone
+      // If userId is "profile", redirect to proper profile route
+      if (userId === 'profile') {
+        if (currentUser && (currentUser._id || currentUser.uuid)) {
+          // Redirect to proper user profile route
+          navigate(`/user/${currentUser._id || currentUser.uuid}${searchParams.toString() ? '?' + searchParams.toString() : ''}`, { replace: true });
+          return;
+        } else {
+          // No current user, redirect to profile page which will handle auth
+          navigate('/profile', { replace: true });
+          return;
+        }
+      } else {
+        // Always fetch from API to ensure we have complete profile data including givenName, familyName, cellPhone
         fetchUserProfile();
       }
-  }, [userId]);
+    }
+  }, [userId, currentUser, navigate, searchParams]);
 
 
   // Settings handlers
@@ -342,6 +355,19 @@ const UserProfile: React.FC = () => {
       toast.error('Failed to load user profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTagRankingsForUser = async (userIdentifier: string) => {
+    try {
+      console.log('🏷️ Loading tag rankings for user:', userIdentifier);
+      const response = await userAPI.getTagRankings(userIdentifier, 10);
+      console.log('📊 Tag rankings response:', response);
+      setTagRankings(response.tagRankings || []);
+      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
+    } catch (err: any) {
+      console.error('❌ Error loading tag rankings:', err);
+      // Silent fail - not critical
     }
   };
 

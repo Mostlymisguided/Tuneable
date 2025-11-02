@@ -7,9 +7,14 @@ const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { handleOAuthCallback } = useAuth();
+  const hasRun = React.useRef(false);
 
   useEffect(() => {
+    // Prevent duplicate runs (React StrictMode in development causes double renders)
+    if (hasRun.current) return;
+    
     const handleAuth = async () => {
+      hasRun.current = true;
       const token = searchParams.get('token');
       const error = searchParams.get('error');
 
@@ -28,8 +33,8 @@ const AuthCallback: React.FC = () => {
           // Check if this was a social media OAuth connection
           const oauthSuccess = searchParams.get('oauth_success');
           if (oauthSuccess === 'true') {
-            // Redirect to user profile with success parameter
-            navigate('/user/profile?oauth_success=true');
+            // Redirect to profile page (will redirect to /user/:userId via ProfileRedirect)
+            navigate('/profile?oauth_success=true');
           } else {
             navigate('/dashboard');
           }
