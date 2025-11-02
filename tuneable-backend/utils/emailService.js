@@ -655,6 +655,112 @@ async function sendClaimStatusNotification(user, claim, media, status, adminMess
   }
 }
 
+// Send invite request approval email
+async function sendInviteApprovalEmail(request, inviteCode) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: request.email,
+      subject: '🎵 Welcome to Tuneable - Your Invite Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">🎵 Your Invite to Tuneable Has Been Approved!</h2>
+          
+          <p>Hi ${request.name},</p>
+          
+          <p>Great news! Your request to join Tuneable has been approved. We're excited to have you as part of our community!</p>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <h3 style="margin-top: 0; color: #1f2937;">Your Invite Code</h3>
+            <div style="background: white; padding: 20px; border-radius: 8px; display: inline-block; border: 2px solid #9333ea;">
+              <span style="font-size: 32px; font-weight: bold; color: #9333ea; font-family: monospace; letter-spacing: 5px;">${inviteCode}</span>
+            </div>
+          </div>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/register?invite=${inviteCode}" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 16px; font-weight: bold;">
+              Create Your Account
+            </a>
+          </div>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404;"><strong>Important:</strong> This invite code is single-use. Please use it within 30 days.</p>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated email from Tuneable. If you have any questions, feel free to reach out to our support team.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending invite approval email:', error);
+      return false;
+    }
+
+    console.log('✅ Invite approval email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending invite approval email:', error.message);
+    return false;
+  }
+}
+
+// Send invite request rejection email
+async function sendInviteRejectionEmail(request, reason) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: request.email,
+      subject: 'Update on Your Tuneable Invite Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">Thank You for Your Interest in Tuneable</h2>
+          
+          <p>Hi ${request.name},</p>
+          
+          <p>Thank you for your interest in joining Tuneable. We've reviewed your request, and unfortunately we're unable to provide you with an invite at this time.</p>
+          
+          ${reason ? `
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #1f2937;">Feedback</h3>
+              <p style="white-space: pre-wrap; color: #4b5563;">${reason}</p>
+            </div>
+          ` : ''}
+          
+          <p>We appreciate your understanding. If you'd like to request an invite again in the future, please feel free to submit a new request through our website.</p>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/request-invite" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Submit New Request
+            </a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated email from Tuneable. If you have any questions, feel free to reach out to our support team.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending invite rejection email:', error);
+      return false;
+    }
+
+    console.log('✅ Invite rejection email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending invite rejection email:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -666,5 +772,7 @@ module.exports = {
   sendPasswordReset,
   sendWelcomeEmail,
   sendOwnershipNotification,
-  sendClaimStatusNotification
+  sendClaimStatusNotification,
+  sendInviteApprovalEmail,
+  sendInviteRejectionEmail
 };

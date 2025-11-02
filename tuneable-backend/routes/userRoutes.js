@@ -1242,7 +1242,15 @@ router.patch('/admin/invite-requests/:id/approve', authMiddleware, async (req, r
     request.approvedAt = new Date();
     await request.save();
 
-    // TODO: Send email with invite code
+    // Send email with invite code
+    try {
+      const { sendInviteApprovalEmail } = require('../utils/emailService');
+      await sendInviteApprovalEmail(request, inviteCode).catch(err => 
+        console.error('Error sending invite approval email:', err)
+      );
+    } catch (error) {
+      console.error('Error setting up invite approval email:', error);
+    }
     
     res.json({
       message: 'Invite request approved',
@@ -1279,6 +1287,16 @@ router.patch('/admin/invite-requests/:id/reject', authMiddleware, async (req, re
     request.status = 'rejected';
     request.rejectedReason = reason || null;
     await request.save();
+
+    // Send email notification
+    try {
+      const { sendInviteRejectionEmail } = require('../utils/emailService');
+      await sendInviteRejectionEmail(request, reason || null).catch(err => 
+        console.error('Error sending invite rejection email:', err)
+      );
+    } catch (error) {
+      console.error('Error setting up invite rejection email:', error);
+    }
 
     res.json({
       message: 'Invite request rejected',

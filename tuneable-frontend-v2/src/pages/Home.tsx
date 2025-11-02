@@ -26,7 +26,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Users className="h-8 w-8 text-orange-400" />,
-      title: "Provide participatory musical experiences in public and private spaces",
+      title: "Host musical experiences in public and private spaces",
       description: "Creating inclusive spaces where everyone can contribute to the musical experience."
     },
     {
@@ -90,7 +90,7 @@ const Home: React.FC = () => {
               How Tuneable Works
             </h2>
             <p className="text-xl text-gray-300">
-              Create Parties, Bid on Tunes, and Control The Music Together
+              Bid on Tunes, Support Artists and Control The Music Together
             </p>
           </div>
 
@@ -235,7 +235,7 @@ const Home: React.FC = () => {
               to="/parties"
               className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors"
             >
-              Explore Parties
+              Explore Music
             </Link>
           </div>
         </div>
