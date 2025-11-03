@@ -225,7 +225,6 @@ const UserProfile: React.FC = () => {
 
   // Label affiliations state
   const [labelAffiliations, setLabelAffiliations] = useState<any[]>([]);
-  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
 
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
@@ -366,7 +365,6 @@ const UserProfile: React.FC = () => {
 
   const loadLabelAffiliations = async () => {
     try {
-      setIsLoadingLabels(true);
       // Only load if viewing own profile
       const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
       if (ownProfile && currentUser) {
@@ -378,8 +376,6 @@ const UserProfile: React.FC = () => {
     } catch (err: any) {
       console.error('Error loading label affiliations:', err);
       // Silent fail - not critical
-    } finally {
-      setIsLoadingLabels(false);
     }
   };
 
