@@ -815,6 +815,122 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   }
 });
 
+// Get creator stats (for creators/admins)
+// @route   GET /api/users/me/creator-stats
+// @desc    Get creator statistics (media count, labels owned, bid amounts, etc.)
+// @access  Private (creator/admin only)
+router.get('/me/creator-stats', authMiddleware, async (req, res) => {
+  try {
+    const Media = require('../models/Media');
+    const Label = require('../models/Label');
+    const Bid = require('../models/Bid');
+
+    const userId = req.user._id;
+
+    // Get media where user is owner
+    const ownedMedia = await Media.find({
+      'mediaOwners.userId': userId,
+      isActive: true
+    }).select('_id title globalMediaAggregate createdAt');
+
+    // Get media where user is verified creator (across all creator roles)
+    const creatorRoles = [
+      'artist.userId', 'producer.userId', 'featuring.userId',
+      'songwriter.userId', 'composer.userId',
+      'host.userId', 'guest.userId', 'narrator.userId',
+      'director.userId', 'cinematographer.userId', 'editor.userId',
+      'author.userId', 'label.userId'
+    ];
+
+    const creatorMediaQuery = {
+      $or: creatorRoles.map(role => ({ [role]: userId })),
+      isActive: true
+    };
+
+    const creatorMedia = await Media.find(creatorMediaQuery)
+      .select('_id title globalMediaAggregate createdAt');
+
+    // Combine and deduplicate media IDs
+    const allMediaIds = [
+      ...new Set([
+        ...ownedMedia.map(m => m._id.toString()),
+        ...creatorMedia.map(m => m._id.toString())
+      ])
+    ];
+
+    // Get total bid amount on all creator's media
+    let totalBidAmount = [{ total: 0 }];
+    if (allMediaIds.length > 0) {
+      totalBidAmount = await Bid.aggregate([
+        {
+          $match: {
+            mediaId: { $in: allMediaIds.map(id => new mongoose.Types.ObjectId(id)) },
+            status: { $in: ['active', 'played'] }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' }
+          }
+        }
+      ]);
+    }
+
+    // Get labels where user is owner or admin
+    const labels = await Label.find({
+      'admins.userId': userId
+    }).select('_id name slug logo verificationStatus stats');
+
+    const labelsOwned = labels.filter(label => 
+      label.admins.some(admin => 
+        admin.userId.toString() === userId.toString() && admin.role === 'owner'
+      )
+    ).length;
+
+    const labelsAdmin = labels.length - labelsOwned;
+
+    // Get recent media (last 5)
+    const recentMedia = await Media.find({
+      $or: [
+        { 'mediaOwners.userId': userId },
+        ...creatorRoles.map(role => ({ [role]: userId }))
+      ],
+      isActive: true
+    })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .select('_id uuid title artist coverArt globalMediaAggregate createdAt');
+
+    res.json({
+      stats: {
+        totalMedia: allMediaIds.length,
+        ownedMedia: ownedMedia.length,
+        creatorMedia: creatorMedia.length,
+        totalBidAmount: totalBidAmount[0]?.total || 0,
+        labelsOwned,
+        labelsAdmin,
+        totalLabels: labels.length
+      },
+      recentMedia,
+      labels: labels.map(label => ({
+        _id: label._id,
+        name: label.name,
+        slug: label.slug,
+        logo: label.logo,
+        verificationStatus: label.verificationStatus,
+        totalBidAmount: label.stats?.totalBidAmount || 0
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching creator stats:', error);
+    res.status(500).json({
+      error: 'Error fetching creator stats',
+      details: error.message
+    });
+  }
+});
+
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {

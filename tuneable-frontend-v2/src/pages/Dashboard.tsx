@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
+import { showCreatorDashboard } from '../utils/permissionHelpers';
 
 interface LibraryItem {
   mediaId: string;
@@ -55,6 +56,11 @@ const Dashboard: React.FC = () => {
   const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, number>>({});
   const [isAddingTune, setIsAddingTune] = useState(false);
 
+  // Creator Dashboard state
+  const [creatorStats, setCreatorStats] = useState<any>(null);
+  const [isLoadingCreatorStats, setIsLoadingCreatorStats] = useState(false);
+  const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels'>('overview');
+
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
     const youtubePatterns = [
@@ -95,6 +101,24 @@ const Dashboard: React.FC = () => {
     };
     loadTuneLibrary();
   }, []);
+
+  useEffect(() => {
+    const loadCreatorStats = async () => {
+      if (!showCreatorDashboard(user)) return;
+      
+      try {
+        setIsLoadingCreatorStats(true);
+        const data = await userAPI.getCreatorStats();
+        setCreatorStats(data);
+      } catch (error) {
+        console.error('Failed to load creator stats:', error);
+        // Don't show error toast - creator dashboard is optional
+      } finally {
+        setIsLoadingCreatorStats(false);
+      }
+    };
+    loadCreatorStats();
+  }, [user]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -350,15 +374,265 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl text-center font-bold text-gray-300">
-          Welcome back, {user?.username}!
-        </h1>
-        <p className="text-center text-gray-400 mt-2">
-          Ready to create some amazing music experiences?
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl text-center font-bold text-gray-300">
+            Welcome back, {user?.username}!
+          </h1>
+          <p className="text-center text-gray-400 mt-2">
+            Ready to create some amazing music experiences?
+          </p>
+        </div>
+
+        {/* Creator Dashboard */}
+        {showCreatorDashboard(user) && (
+          <div className="mb-8">
+            {/* Header */}
+            <div className="bg-gray-800 border-b border-gray-700 rounded-t-lg">
+              <div className="px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex items-center">
+                  <Award className="h-6 w-6 text-purple-400 mr-3" />
+                  <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="bg-gray-800 border-b border-gray-700">
+              <div className="px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-8">
+                  <button
+                    onClick={() => setCreatorActiveTab('overview')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'overview'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Overview
+                  </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('media')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'media'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Music className="h-4 w-4 mr-2" />
+                    My Media
+                  </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('labels')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'labels'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    Labels
+                  </button>
+                </nav>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="bg-gray-800 rounded-b-lg p-6">
+              {isLoadingCreatorStats ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                  <p className="text-gray-400 mt-2">Loading creator stats...</p>
+                </div>
+              ) : creatorStats ? (
+                <>
+                  {creatorActiveTab === 'overview' && (
+                    <div className="space-y-6">
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Total Media</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {creatorStats.stats?.totalMedia || 0}
+                              </p>
+                            </div>
+                            <Music className="h-8 w-8 text-purple-400 opacity-50" />
+                          </div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Total Bid Amount</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                £{((creatorStats.stats?.totalBidAmount || 0) / 100).toFixed(2)}
+                              </p>
+                            </div>
+                            <Coins className="h-8 w-8 text-green-400 opacity-50" />
+                          </div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Labels Owned</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {creatorStats.stats?.labelsOwned || 0}
+                              </p>
+                            </div>
+                            <Building className="h-8 w-8 text-blue-400 opacity-50" />
+                          </div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Labels Admin</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {creatorStats.stats?.labelsAdmin || 0}
+                              </p>
+                            </div>
+                            <Users className="h-8 w-8 text-orange-400 opacity-50" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="bg-gray-900 rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <button
+                            onClick={() => navigate('/upload')}
+                            className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Upload className="h-5 w-5 text-white mr-3" />
+                              <span className="text-white font-medium">Upload Media</span>
+                            </div>
+                            <ArrowUp className="h-4 w-4 text-white" />
+                          </button>
+                          <button
+                            onClick={() => navigate('/labels/create')}
+                            className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Building className="h-5 w-5 text-white mr-3" />
+                              <span className="text-white font-medium">Create Label</span>
+                            </div>
+                            <Plus className="h-4 w-4 text-white" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Recent Media */}
+                      {creatorStats.recentMedia && creatorStats.recentMedia.length > 0 && (
+                        <div className="bg-gray-900 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-white mb-4">Recent Media</h3>
+                          <div className="space-y-3">
+                            {creatorStats.recentMedia.map((media: any) => (
+                              <div
+                                key={media._id}
+                                onClick={() => navigate(`/tune/${media.uuid || media._id}`)}
+                                className="flex items-center gap-3 p-3 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
+                              >
+                                {media.coverArt && (
+                                  <img
+                                    src={media.coverArt}
+                                    alt={media.title}
+                                    className="h-12 w-12 rounded object-cover"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white font-medium truncate">{media.title}</p>
+                                  <p className="text-gray-400 text-sm truncate">
+                                    {Array.isArray(media.artist) && media.artist.length > 0
+                                      ? media.artist[0].name || media.artist[0]
+                                      : 'Unknown Artist'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-purple-400 font-medium">
+                                    £{((media.globalMediaAggregate || 0) / 100).toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {creatorActiveTab === 'media' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-white">My Media</h3>
+                        <button
+                          onClick={() => navigate('/upload')}
+                          className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Media
+                        </button>
+                      </div>
+                      <p className="text-gray-400">Media management coming soon...</p>
+                    </div>
+                  )}
+
+                  {creatorActiveTab === 'labels' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-white">My Labels</h3>
+                        <button
+                          onClick={() => navigate('/labels/create')}
+                          className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Label
+                        </button>
+                      </div>
+                      {creatorStats.labels && creatorStats.labels.length > 0 ? (
+                        <div className="space-y-3">
+                          {creatorStats.labels.map((label: any) => (
+                            <div
+                              key={label._id}
+                              onClick={() => navigate(`/label/${label.slug}`)}
+                              className="flex items-center gap-3 p-4 bg-gray-900 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
+                            >
+                              {label.logo && (
+                                <img
+                                  src={label.logo}
+                                  alt={label.name}
+                                  className="h-12 w-12 rounded object-cover"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-white font-medium">{label.name}</p>
+                                  {label.verificationStatus === 'verified' && (
+                                    <span className="px-2 py-0.5 bg-green-600 text-green-100 text-xs rounded">
+                                      Verified
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-gray-400 text-sm">
+                                  £{((label.totalBidAmount || 0) / 100).toFixed(2)} total bids
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-400">No labels yet. Create your first label to get started!</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
 
       {/* Add Tune Section */}
       <div className="card mb-8">
@@ -782,6 +1056,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
