@@ -535,6 +535,12 @@ export const userAPI = {
     const response = await api.post('/users/admin/replenish-invite-credits', { userId, credits });
     return response.data;
   },
+
+  // Get user's tune library (all media they've bid on)
+  getTuneLibrary: async () => {
+    const response = await api.get('/users/me/tune-library');
+    return response.data;
+  },
 };
 
 export const labelAPI = {

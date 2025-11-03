@@ -591,6 +591,230 @@ router.get('/invited', authMiddleware, async (req, res) => {
   }
 });
 
+// Get user's tune library (all media they've bid on with metrics)
+router.get('/me/tune-library', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const Bid = require('../models/Bid');
+    const Media = require('../models/Media');
+    const TuneBytesTransaction = require('../models/TuneBytesTransaction');
+    
+    // Get all bids for this user (active/played only)
+    const userBids = await Bid.find({ 
+      userId: user._id,
+      status: { $in: ['active', 'played'] }
+    }).lean();
+    
+    if (userBids.length === 0) {
+      return res.json({ 
+        library: [],
+        total: 0
+      });
+    }
+    
+    // Group bids by mediaId and calculate aggregates
+    const mediaAggregates = {};
+    
+    userBids.forEach(bid => {
+      // Skip bids without mediaId
+      if (!bid.mediaId) {
+        console.warn('Bid missing mediaId:', bid._id);
+        return;
+      }
+      
+      const mediaId = bid.mediaId.toString();
+      
+      if (!mediaAggregates[mediaId]) {
+        mediaAggregates[mediaId] = {
+          mediaId: mediaId,
+          userBidTotal: 0,
+          bidCount: 0,
+          lastBidAt: bid.createdAt,
+          firstBidAt: bid.createdAt
+        };
+      }
+      
+      mediaAggregates[mediaId].userBidTotal += bid.amount || 0;
+      mediaAggregates[mediaId].bidCount += 1;
+      
+      if (new Date(bid.createdAt) > new Date(mediaAggregates[mediaId].lastBidAt)) {
+        mediaAggregates[mediaId].lastBidAt = bid.createdAt;
+      }
+      if (new Date(bid.createdAt) < new Date(mediaAggregates[mediaId].firstBidAt)) {
+        mediaAggregates[mediaId].firstBidAt = bid.createdAt;
+      }
+    });
+    
+    // Get all unique media IDs
+    const mediaIds = Object.keys(mediaAggregates)
+      .map(id => {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return new mongoose.Types.ObjectId(id);
+        }
+        return id;
+      })
+      .filter(id => id !== null && id !== undefined);
+    
+    if (mediaIds.length === 0) {
+      return res.json({ 
+        library: [],
+        total: 0
+      });
+    }
+    
+    // Fetch media details
+    const mediaItems = await Media.find({ _id: { $in: mediaIds } })
+      .select('title artist coverArt duration bpm globalMediaAggregate uuid _id tags')
+      .lean();
+    
+    // Create media lookup
+    const mediaLookup = {};
+    mediaItems.forEach(media => {
+      mediaLookup[media._id.toString()] = media;
+    });
+    
+    // Get TuneBytes earned per media for this user (only if we have mediaIds)
+    let tuneBytesByMedia = [];
+    if (mediaIds.length > 0) {
+      try {
+        const userIdObjId = mongoose.Types.ObjectId.isValid(user._id) 
+          ? new mongoose.Types.ObjectId(user._id) 
+          : user._id;
+        
+        tuneBytesByMedia = await TuneBytesTransaction.aggregate([
+          {
+            $match: {
+              userId: userIdObjId,
+              status: 'confirmed',
+              mediaId: { $in: mediaIds }
+            }
+          },
+          {
+            $group: {
+              _id: '$mediaId',
+              totalTuneBytes: { $sum: '$tuneBytesEarned' }
+            }
+          }
+        ]);
+      } catch (tuneBytesError) {
+        console.error('Error fetching TuneBytes:', tuneBytesError);
+        console.error('TuneBytes error stack:', tuneBytesError.stack);
+        // Continue without TuneBytes data
+      }
+    }
+    
+    // Create TuneBytes lookup
+    const tuneBytesLookup = {};
+    tuneBytesByMedia.forEach(item => {
+      if (item._id) {
+        tuneBytesLookup[item._id.toString()] = item.totalTuneBytes;
+      }
+    });
+    
+    // Get total bid counts per media (for calculating average)
+    let bidCountsByMedia = [];
+    try {
+      bidCountsByMedia = await Bid.aggregate([
+        {
+          $match: {
+            mediaId: { $in: mediaIds },
+            status: { $in: ['active', 'played'] }
+          }
+        },
+        {
+          $group: {
+            _id: '$mediaId',
+            totalBidCount: { $sum: 1 }
+          }
+        }
+      ]);
+    } catch (bidCountError) {
+      console.error('Error fetching bid counts:', bidCountError);
+      // Continue without bid count data
+    }
+    
+    // Create bid count lookup
+    const bidCountLookup = {};
+    bidCountsByMedia.forEach(item => {
+      if (item._id) {
+        bidCountLookup[item._id.toString()] = item.totalBidCount;
+      }
+    });
+    
+    // Build library items
+    const library = Object.values(mediaAggregates)
+      .map(aggregate => {
+        const media = mediaLookup[aggregate.mediaId];
+        if (!media) {
+          console.warn('Media not found for mediaId:', aggregate.mediaId);
+          return null;
+        }
+        
+        try {
+          // Transform artist array to string
+          let artistName = 'Unknown Artist';
+          if (Array.isArray(media.artist) && media.artist.length > 0) {
+            artistName = media.artist[0].name || media.artist[0] || 'Unknown Artist';
+          } else if (typeof media.artist === 'string') {
+            artistName = media.artist;
+          }
+          
+          const globalMediaAggregate = media.globalMediaAggregate || 0;
+          const totalBidCount = bidCountLookup[aggregate.mediaId] || 1;
+          const globalMediaAggregateAvg = totalBidCount > 0 
+            ? globalMediaAggregate / totalBidCount 
+            : 0;
+          
+          return {
+            mediaId: media._id?.toString() || media._id,
+            mediaUuid: media.uuid || media._id?.toString() || media._id,
+            title: media.title || 'Unknown Title',
+            artist: artistName,
+            coverArt: media.coverArt || null,
+            duration: media.duration || null,
+            bpm: media.bpm || null,
+            tags: media.tags || [],
+            globalMediaAggregate: globalMediaAggregate,
+            globalMediaAggregateAvg: globalMediaAggregateAvg,
+            globalUserMediaAggregate: aggregate.userBidTotal || 0,
+            bidCount: aggregate.bidCount || 0,
+            tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,
+            lastBidAt: aggregate.lastBidAt,
+            firstBidAt: aggregate.firstBidAt
+          };
+        } catch (buildError) {
+          console.error('Error building library item for mediaId:', aggregate.mediaId, buildError);
+          return null;
+        }
+      })
+      .filter(item => item !== null); // Remove any null items from missing media
+    
+    // Sort by last bid date (most recent first) by default
+    library.sort((a, b) => {
+      try {
+        return new Date(b.lastBidAt).getTime() - new Date(a.lastBidAt).getTime();
+      } catch (sortError) {
+        return 0;
+      }
+    });
+    
+    res.json({ 
+      library,
+      total: library.length
+    });
+  } catch (error) {
+    console.error('Error fetching tune library:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Error fetching tune library', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {

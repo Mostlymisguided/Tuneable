@@ -72,46 +72,63 @@ const NotificationBell: React.FC = () => {
     }
     
     // Connect to Socket.IO server
-    socketRef.current = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      withCredentials: true,
-      auth: {
-        token // Send token in auth object (alternative to emit)
-      }
-    });
+    try {
+      socketRef.current = io(socketUrl, {
+        transports: ['websocket', 'polling'],
+        withCredentials: true,
+        auth: {
+          token // Send token in auth object (alternative to emit)
+        },
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        timeout: 5000
+      });
 
-    socketRef.current.on('connect', () => {
-      console.log('Socket.IO connected');
-      // Authenticate with JWT token
-      socketRef.current?.emit('authenticate', { token });
-    });
+      socketRef.current.on('connect', () => {
+        console.log('Socket.IO connected');
+        // Authenticate with JWT token
+        socketRef.current?.emit('authenticate', { token });
+      });
 
-    socketRef.current.on('authenticated', (data) => {
-      console.log('Socket.IO authenticated:', data);
-    });
+      socketRef.current.on('authenticated', (data) => {
+        console.log('Socket.IO authenticated:', data);
+      });
 
-    // Listen for new notifications
-    socketRef.current.on('notification', (notification: Notification) => {
-      console.log('New notification received:', notification);
-      setNotifications(prev => [notification, ...prev]);
-      setUnreadCount(prev => prev + 1);
-    });
+      socketRef.current.on('connect_error', (error) => {
+        console.warn('Socket.IO connection error (non-critical):', error.message);
+        // Silently fail - notifications will work via polling
+      });
 
-    // Listen for unread count updates
-    socketRef.current.on('unread-count', (data: { count: number }) => {
-      setUnreadCount(data.count);
-    });
+      socketRef.current.on('disconnect', (reason) => {
+        console.log('Socket.IO disconnected:', reason);
+      });
 
-    socketRef.current.on('disconnect', () => {
-      console.log('Socket.IO disconnected');
-    });
+      // Listen for new notifications
+      socketRef.current.on('notification', (notification: Notification) => {
+        console.log('New notification received:', notification);
+        setNotifications(prev => [notification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      });
 
-    socketRef.current.on('error', (error) => {
-      console.error('Socket.IO error:', error);
-    });
+      // Listen for unread count updates
+      socketRef.current.on('unread-count', (data: { count: number }) => {
+        setUnreadCount(data.count);
+      });
+
+      socketRef.current.on('error', (error) => {
+        console.warn('Socket.IO error (non-critical):', error);
+      });
+    } catch (error) {
+      console.warn('Socket.IO initialization failed (non-critical):', error);
+      // Continue without Socket.IO - notifications will work via polling
+    }
 
     return () => {
-      socketRef.current?.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
   }, [user]);
 

@@ -1,15 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users } from 'lucide-react';
-import { partyAPI, userAPI } from '../lib/api';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { partyAPI, userAPI, mediaAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { toast } from 'react-toastify';
+
+interface LibraryItem {
+  mediaId: string;
+  mediaUuid: string;
+  title: string;
+  artist: string;
+  coverArt?: string;
+  duration?: number;
+  bpm?: number;
+  globalMediaAggregate: number;
+  globalMediaAggregateAvg: number;
+  globalUserMediaAggregate: number;
+  bidCount: number;
+  tuneBytesEarned: number;
+  lastBidAt: string;
+}
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   const [globalParty, setGlobalParty] = useState<any>(null);
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
   const [isLoadingInvited, setIsLoadingInvited] = useState(false);
+  const [tuneLibrary, setTuneLibrary] = useState<LibraryItem[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [sortField, setSortField] = useState<string>('lastBidAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     const load = async () => {
@@ -38,6 +61,168 @@ const Dashboard: React.FC = () => {
     };
     loadInvitedUsers();
   }, []);
+
+  useEffect(() => {
+    const loadTuneLibrary = async () => {
+      try {
+        setIsLoadingLibrary(true);
+        const data = await userAPI.getTuneLibrary();
+        setTuneLibrary(data.library || []);
+      } catch (error) {
+        console.error('Failed to load tune library:', error);
+        toast.error('Failed to load tune library');
+      } finally {
+        setIsLoadingLibrary(false);
+      }
+    };
+    loadTuneLibrary();
+  }, []);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const getSortedLibrary = () => {
+    return [...tuneLibrary].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'title':
+          aValue = a.title?.toLowerCase() || '';
+          bValue = b.title?.toLowerCase() || '';
+          break;
+        case 'artist':
+          aValue = a.artist?.toLowerCase() || '';
+          bValue = b.artist?.toLowerCase() || '';
+          break;
+        case 'duration':
+          aValue = a.duration || 0;
+          bValue = b.duration || 0;
+          break;
+        case 'globalMediaAggregateAvg':
+          aValue = a.globalMediaAggregateAvg || 0;
+          bValue = b.globalMediaAggregateAvg || 0;
+          break;
+        case 'globalUserMediaAggregate':
+          aValue = a.globalUserMediaAggregate || 0;
+          bValue = b.globalUserMediaAggregate || 0;
+          break;
+        case 'tuneBytesEarned':
+          aValue = a.tuneBytesEarned || 0;
+          bValue = b.tuneBytesEarned || 0;
+          break;
+        case 'lastBidAt':
+        default:
+          aValue = new Date(a.lastBidAt).getTime();
+          bValue = new Date(b.lastBidAt).getTime();
+          break;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handlePlay = async (item: LibraryItem) => {
+    try {
+      // Fetch full media details with sources
+      const mediaId = item.mediaUuid || item.mediaId;
+      const mediaData = await mediaAPI.getProfile(mediaId);
+      const media = mediaData.media || mediaData;
+
+      // Clean and format sources
+      let sources: any = {};
+      if (media.sources) {
+        if (Array.isArray(media.sources)) {
+          for (const source of media.sources) {
+            if (source?.platform === 'youtube' && source?.url) {
+              sources.youtube = source.url;
+            }
+          }
+        } else if (typeof media.sources === 'object') {
+          sources = media.sources;
+        }
+      }
+
+      const formattedMedia = {
+        id: item.mediaUuid || item.mediaId,
+        _id: item.mediaId,
+        title: item.title,
+        artist: item.artist,
+        duration: item.duration,
+        coverArt: item.coverArt,
+        sources: sources,
+        globalMediaAggregate: item.globalMediaAggregate,
+        bids: [],
+        addedBy: null,
+        totalBidValue: item.globalMediaAggregate
+      } as any;
+
+      setQueue([formattedMedia]);
+      setCurrentMedia(formattedMedia, 0, true);
+      setGlobalPlayerActive(true);
+      toast.success(`Now playing: ${item.title}`);
+    } catch (error) {
+      console.error('Error loading media for playback:', error);
+      toast.error('Failed to load media for playback');
+    }
+  };
+
+  const handleIncreaseBid = async (item: LibraryItem) => {
+    if (!user) {
+      toast.info('Please log in to place a bid');
+      navigate('/login');
+      return;
+    }
+
+    const amountStr = prompt(`Enter bid amount for "${item.title}" (minimum £0.33):`);
+    if (!amountStr) return;
+
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount < 0.33) {
+      toast.error('Minimum bid is £0.33');
+      return;
+    }
+
+    if ((user as any)?.balance < amount) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
+    try {
+      await mediaAPI.placeGlobalBid(item.mediaUuid || item.mediaId, amount);
+      toast.success(`Bid of £${amount.toFixed(2)} placed successfully!`);
+      // Reload library to update bid amounts
+      const data = await userAPI.getTuneLibrary();
+      setTuneLibrary(data.library || []);
+    } catch (error: any) {
+      console.error('Error placing bid:', error);
+      toast.error(error.response?.data?.error || 'Failed to place bid');
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -221,6 +406,152 @@ const Dashboard: React.FC = () => {
               </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Tune Library Section */}
+      <div className="card mt-8">
+        <div className="flex items-center mb-4">
+          <Music className="h-6 w-6 text-purple-400 mr-2" />
+          <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
+          <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+            {tuneLibrary.length}
+          </span>
+        </div>
+        
+        {isLoadingLibrary ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+          </div>
+        ) : tuneLibrary.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
+            <p>You haven't bid on any media yet.</p>
+            <p className="text-sm mt-2">Start bidding on tunes to build your library!</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-800">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Artwork
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                    onClick={() => handleSort('title')}
+                  >
+                    <div className="flex items-center">
+                      Title
+                      {getSortIcon('title')}
+                    </div>
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                    onClick={() => handleSort('artist')}
+                  >
+                    <div className="flex items-center">
+                      Artist
+                      {getSortIcon('artist')}
+                    </div>
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                    onClick={() => handleSort('duration')}
+                  >
+                    <div className="flex items-center">
+                      Duration
+                      {getSortIcon('duration')}
+                    </div>
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                    onClick={() => handleSort('globalMediaAggregateAvg')}
+                  >
+                    <div className="flex items-center">
+                      Avg Bid
+                      {getSortIcon('globalMediaAggregateAvg')}
+                    </div>
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                    onClick={() => handleSort('globalUserMediaAggregate')}
+                  >
+                    <div className="flex items-center">
+                      Your Bid
+                      {getSortIcon('globalUserMediaAggregate')}
+                    </div>
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                    onClick={() => handleSort('tuneBytesEarned')}
+                  >
+                    <div className="flex items-center">
+                      TuneBytes
+                      {getSortIcon('tuneBytesEarned')}
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-gray-800 divide-y divide-gray-700">
+                {getSortedLibrary().map((item) => (
+                  <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlay(item)}>
+                        {item.coverArt ? (
+                          <img 
+                            src={item.coverArt} 
+                            alt={item.title}
+                            className="w-full h-full rounded object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gray-700 rounded flex items-center justify-center">
+                            <Music className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors shadow-lg">
+                            <Play className="h-4 w-4 text-white ml-0.5" fill="currentColor" />
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-medium text-white">{item.title}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">{item.artist}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">£{item.globalMediaAggregateAvg.toFixed(2)}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-green-400">£{item.globalUserMediaAggregate.toFixed(2)}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <button
+                        onClick={() => handleIncreaseBid(item)}
+                        className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                        title="Increase bid"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Bid
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
