@@ -638,7 +638,7 @@ export const labelAPI = {
   },
 
   // Add admin to label (authenticated, owner only)
-  addAdmin: async (labelId: string, userId: string, role: 'admin' | 'moderator') => {
+  addAdmin: async (labelId: string, userId: string, role: 'admin') => {
     const response = await api.post(`/labels/${labelId}/admins`, { userId, role });
     return response.data;
   },

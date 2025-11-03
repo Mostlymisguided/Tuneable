@@ -43,7 +43,7 @@ const labelSchema = new mongoose.Schema({
   // Management & Staff
   admins: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    role: { type: String, enum: ['owner', 'admin', 'moderator'], required: true },
+    role: { type: String, enum: ['owner', 'admin'], required: true },
     addedAt: { type: Date, default: Date.now },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }],
