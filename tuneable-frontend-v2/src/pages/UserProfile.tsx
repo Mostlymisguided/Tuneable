@@ -24,7 +24,8 @@ import {
   MapPin,
   ChevronDown,
   ChevronUp,
-  Building
+  Building,
+  CheckCircle
 } from 'lucide-react';
 import { userAPI, authAPI, labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -222,6 +223,10 @@ const UserProfile: React.FC = () => {
     }
   });
 
+  // Label affiliations state
+  const [labelAffiliations, setLabelAffiliations] = useState<any[]>([]);
+  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
+
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
 
@@ -347,14 +352,34 @@ const UserProfile: React.FC = () => {
       setUser(response.user);
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
-      // Also load tag rankings
+      // Also load tag rankings and label affiliations
       loadTagRankings();
+      loadLabelAffiliations();
     } catch (err: any) {
       console.error('Error fetching user profile:', err);
       setError(err.response?.data?.error || 'Failed to load user profile');
       toast.error('Failed to load user profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLabelAffiliations = async () => {
+    try {
+      setIsLoadingLabels(true);
+      // Only load if viewing own profile
+      const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
+      if (ownProfile && currentUser) {
+        const response = await userAPI.getLabelAffiliations();
+        setLabelAffiliations(response.labelAffiliations || []);
+      }
+      // If viewing another user's profile, we'd need an endpoint to get their labels
+      // For now, we'll skip this - can be added later
+    } catch (err: any) {
+      console.error('Error loading label affiliations:', err);
+      // Silent fail - not critical
+    } finally {
+      setIsLoadingLabels(false);
     }
   };
 
@@ -862,6 +887,50 @@ const UserProfile: React.FC = () => {
                     <Building className="w-4 h-4" />
                     <span>Add Label</span>
                   </button>
+                </div>
+              )}
+
+              {/* Label Affiliations - Above social media */}
+              {labelAffiliations.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-2">Label Affiliations</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {labelAffiliations.map((affiliation) => {
+                      if (!affiliation.label) return null;
+                      const roleColors: Record<string, string> = {
+                        artist: 'bg-purple-600/20 text-purple-300 border-purple-500/30',
+                        producer: 'bg-blue-600/20 text-blue-300 border-blue-500/30',
+                        manager: 'bg-green-600/20 text-green-300 border-green-500/30',
+                        staff: 'bg-gray-600/20 text-gray-300 border-gray-500/30'
+                      };
+                      const roleColor = roleColors[affiliation.role] || 'bg-gray-600/20 text-gray-300 border-gray-500/30';
+                      
+                      return (
+                        <a
+                          key={affiliation.labelId}
+                          href={`/label/${affiliation.label.slug}`}
+                          className={`flex items-center space-x-2 px-3 py-2 bg-black/20 border rounded-lg transition-all hover:bg-black/30 ${roleColor}`}
+                        >
+                          {affiliation.label.logo ? (
+                            <img
+                              src={affiliation.label.logo}
+                              alt={affiliation.label.name}
+                              className="h-6 w-6 rounded-full object-cover"
+                            />
+                          ) : (
+                            <Building className="h-4 w-4" />
+                          )}
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{affiliation.label.name}</span>
+                            <span className="text-xs opacity-75 capitalize">{affiliation.role}</span>
+                          </div>
+                          {affiliation.label.verificationStatus === 'verified' && (
+                            <CheckCircle className="h-3 w-3 text-green-400" />
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

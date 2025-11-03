@@ -686,6 +686,11 @@ router.get('/:mediaId/profile', async (req, res) => {
         path: 'addedBy',
         model: 'User',
         select: 'username profilePic uuid',
+      })
+      .populate({
+        path: 'label.labelId',
+        model: 'Label',
+        select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.totalBidAmount'
       });
 
     // Fetch recent comments

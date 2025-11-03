@@ -445,30 +445,83 @@ router.post('/:id/verify', authMiddleware, adminMiddleware, async (req, res) => 
 // Get all labels for admin (with verification status)
 router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { verificationStatus, page = 1, limit = 20 } = req.query;
+    const { 
+      verificationStatus, 
+      genre,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1, 
+      limit = 20 
+    } = req.query;
     
     const query = {};
     if (verificationStatus) {
       query.verificationStatus = verificationStatus;
     }
+    if (genre) {
+      query.genres = genre;
+    }
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    // Build sort object
+    const sort = {};
+    if (sortBy === 'name') {
+      sort.name = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'verificationStatus') {
+      sort.verificationStatus = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'totalBidAmount') {
+      sort['stats.totalBidAmount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'artistCount') {
+      sort['stats.artistCount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'releaseCount') {
+      sort['stats.releaseCount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'lastBidAt') {
+      sort['stats.lastBidAt'] = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sort.createdAt = sortOrder === 'desc' ? -1 : 1;
+    }
 
     const labels = await Label.find(query)
-      .select('name slug email verificationStatus stats.totalBidAmount stats.artistCount')
-      .sort({ createdAt: -1 })
+      .select('name slug email logo verificationStatus verificationMethod verifiedAt verifiedBy stats.totalBidAmount stats.artistCount stats.releaseCount stats.lastBidAt genres createdAt updatedAt')
+      .populate('admins.userId', 'username email uuid profilePic')
+      .populate('verifiedBy', 'username')
+      .sort(sort)
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
+
+    // Format labels to include owner info
+    const formattedLabels = labels.map(label => {
+      const owners = label.admins
+        .filter(admin => admin.role === 'owner')
+        .map(admin => ({
+          username: admin.userId?.username || 'Unknown',
+          email: admin.userId?.email || '',
+          uuid: admin.userId?.uuid || '',
+          profilePic: admin.userId?.profilePic || null
+        }));
+
+      return {
+        ...label,
+        owners,
+        ownerCount: owners.length
+      };
+    });
 
     const total = await Label.countDocuments(query);
 
     res.json({
-      labels,
+      labels: formattedLabels,
       totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       total
     });
   } catch (error) {
     console.error('Error fetching admin labels:', error);
-    res.status(500).json({ error: 'Failed to fetch labels' });
+    res.status(500).json({ error: 'Failed to fetch labels', details: error.message });
   }
 });
 

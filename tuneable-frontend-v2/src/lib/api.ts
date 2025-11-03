@@ -547,6 +547,11 @@ export const userAPI = {
     const response = await api.get('/users/me/tune-library');
     return response.data;
   },
+
+  getLabelAffiliations: async () => {
+    const response = await api.get('/users/me/labels');
+    return response.data;
+  },
 };
 
 export const labelAPI = {
@@ -653,6 +658,10 @@ export const labelAPI = {
   // Admin: Get all labels
   getAllLabels: async (params?: {
     verificationStatus?: string;
+    genre?: string;
+    search?: string;
+    sortBy?: 'name' | 'verificationStatus' | 'totalBidAmount' | 'artistCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
+    sortOrder?: 'asc' | 'desc';
     page?: number;
     limit?: number;
   }) => {

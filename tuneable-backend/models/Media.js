@@ -146,7 +146,7 @@ const mediaSchema = new mongoose.Schema({
   transcript: { type: String }, // Podcast/video transcript
   bpm: { type: Number },
   key: { type: String },
-  pitch: { type: Number },
+  pitch: { type: Number, default: 440 },
   timeSignature: { type: String, default: '4/4' },
   bitrate: { type: Number },
   sampleRate: { type: Number },

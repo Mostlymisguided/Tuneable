@@ -25,7 +25,9 @@ import {
   Music2,
   Coins,
   Loader2,
-  Flag
+  Flag,
+  Building,
+  CheckCircle
 } from 'lucide-react';
 import { mediaAPI, claimAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
@@ -81,6 +83,24 @@ interface Media {
   };
   uploadedAt?: string;
   updatedAt?: string;
+  label?: Array<{
+    name?: string;
+    labelId?: {
+      _id?: string;
+      name: string;
+      slug?: string;
+      logo?: string;
+      verificationStatus?: string;
+      stats?: {
+        artistCount?: number;
+        releaseCount?: number;
+        totalBidAmount?: number;
+      };
+    } | string;
+    verified?: boolean;
+    catalogNumber?: string;
+    releaseDate?: string | Date;
+  }>;
 }
 
 interface Bid {
@@ -158,7 +178,7 @@ const TuneProfile: React.FC = () => {
     language: '',
     bitrate: 0,
     sampleRate: 0,
-    pitch: 0,
+    pitch: 440,
     timeSignature: '',
     elements: [] as string[],
     coverArt: ''
@@ -289,7 +309,7 @@ const TuneProfile: React.FC = () => {
         language: (media as any).language || '',
         bitrate: media.bitrate || 0,
         sampleRate: media.sampleRate || 0,
-        pitch: media.pitch || 0,
+        pitch: media.pitch || 440,
         timeSignature: media.timeSignature || '',
         elements: media.elements || [],
         coverArt: media.coverArt || ''
@@ -502,9 +522,13 @@ const TuneProfile: React.FC = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getFieldValue = (value: any, fallback = 'Not specified') => {
+  const getFieldValue = (value: any, fieldName?: string, fallback = 'Not specified') => {
     if (value === null || value === undefined || value === '') return fallback;
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : fallback;
+    // Special handling for pitch - display as whole number with Hz
+    if (fieldName === 'pitch' && typeof value === 'number') {
+      return `${Math.round(value)} Hz`;
+    }
     return value.toString();
   };
 
@@ -729,7 +753,7 @@ const TuneProfile: React.FC = () => {
     { label: 'BPM', value: media.bpm, icon: Headphones },
     { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
     { label: 'Tags', value: media.tags, icon: Tag },
-    { label: 'Pitch', value: media.pitch, icon: Music },
+    { label: 'Pitch', value: media.pitch, fieldName: 'pitch', icon: Music },
     { label: 'Album', value: media.album, icon: Disc },
     { label: 'Release Date', value: media.releaseDate, icon: Calendar },
     { label: 'Explicit', value: media.explicit ? 'Yes' : 'No', icon: Globe },
@@ -1107,7 +1131,7 @@ const TuneProfile: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-300">{field.label}</div>
                       <div className="text-white font-medium">
-                        {getFieldValue(field.value)}
+                        {getFieldValue(field.value, (field as any).fieldName)}
                       </div>
                     </div>
                   </div>
@@ -1126,6 +1150,77 @@ const TuneProfile: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Label Section - Above external links, below metrics */}
+        {media.label && Array.isArray(media.label) && media.label.length > 0 && (
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <Building className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
+              Label
+            </h2>
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <div className="space-y-3">
+                {media.label.map((labelItem: any, index: number) => {
+                  const label = labelItem.labelId || labelItem;
+                  if (!label || (typeof label === 'object' && !label.name)) return null;
+                  
+                  const labelName = typeof label === 'string' ? label : label.name;
+                  const labelSlug = typeof label === 'object' ? label.slug : null;
+                  const labelLogo = typeof label === 'object' ? label.logo : null;
+                  const isVerified = typeof label === 'object' ? label.verificationStatus === 'verified' : false;
+                  const catalogNumber = labelItem.catalogNumber;
+                  const releaseDate = labelItem.releaseDate;
+                  
+                  return (
+                    <div key={index} className="flex items-center space-x-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all">
+                      {labelLogo ? (
+                        <img
+                          src={labelLogo}
+                          alt={labelName}
+                          className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-purple-600/20 flex items-center justify-center flex-shrink-0">
+                          <Building className="h-6 w-6 text-purple-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {labelSlug ? (
+                          <a
+                            href={`/label/${labelSlug}`}
+                            className="text-lg font-semibold text-white hover:text-purple-400 transition-colors block truncate"
+                          >
+                            {labelName}
+                          </a>
+                        ) : (
+                          <div className="text-lg font-semibold text-white truncate">{labelName}</div>
+                        )}
+                        <div className="flex items-center space-x-3 mt-1">
+                          {catalogNumber && (
+                            <span className="text-sm text-gray-400">Catalog: {catalogNumber}</span>
+                          )}
+                          {releaseDate && (
+                            <span className="text-sm text-gray-400">
+                              Released: {new Date(releaseDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isVerified && (
+                        <div className="flex-shrink-0">
+                          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium flex items-center space-x-1">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Verified</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Links Section */}
         {media.sources && Object.keys(media.sources).length > 0 && (
@@ -1630,14 +1725,14 @@ const TuneProfile: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-white font-medium mb-2">Pitch</label>
+                    <label className="block text-white font-medium mb-2">Pitch (Hz)</label>
                     <input
                       type="number"
-                      step="0.1"
+                      step="1"
                       value={editForm.pitch}
-                      onChange={(e) => setEditForm({ ...editForm, pitch: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setEditForm({ ...editForm, pitch: parseInt(e.target.value) || 440 })}
                       className="input"
-                      placeholder="440.0"
+                      placeholder="440"
                     />
                   </div>
                 </div>

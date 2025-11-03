@@ -1806,4 +1806,49 @@ router.post('/:userId/tunebytes/recalculate', authMiddleware, async (req, res) =
   }
 });
 
+// Get user's label affiliations
+router.get('/me/labels', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .populate({
+        path: 'labelAffiliations.labelId',
+        select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.totalBidAmount'
+      })
+      .select('labelAffiliations');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Filter to only active affiliations
+    const activeAffiliations = (user.labelAffiliations || []).filter(
+      (affiliation) => affiliation.status === 'active'
+    );
+
+    // Format the response
+    const formattedAffiliations = activeAffiliations.map((affiliation) => ({
+      labelId: affiliation.labelId?._id || affiliation.labelId,
+      role: affiliation.role,
+      status: affiliation.status,
+      joinedAt: affiliation.joinedAt,
+      label: affiliation.labelId ? {
+        _id: affiliation.labelId._id,
+        name: affiliation.labelId.name,
+        slug: affiliation.labelId.slug,
+        logo: affiliation.labelId.logo,
+        verificationStatus: affiliation.labelId.verificationStatus,
+        stats: affiliation.labelId.stats
+      } : null
+    }));
+
+    res.json({
+      labelAffiliations: formattedAffiliations,
+      count: formattedAffiliations.length
+    });
+  } catch (error) {
+    console.error('Error fetching user label affiliations:', error);
+    res.status(500).json({ error: 'Failed to fetch label affiliations', details: error.message });
+  }
+});
+
 module.exports = router;

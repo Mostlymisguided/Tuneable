@@ -16,12 +16,13 @@ import {
   Mail,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Building
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
-import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -59,6 +60,12 @@ const Admin: React.FC = () => {
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<any>(null);
   const [isLoadingQuota, setIsLoadingQuota] = useState(false);
+  const [labels, setLabels] = useState<any[]>([]);
+  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
+  const [labelSortField, setLabelSortField] = useState<string>('createdAt');
+  const [labelSortDirection, setLabelSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [labelFilterStatus, setLabelFilterStatus] = useState<string>('');
+  const [labelSearchQuery, setLabelSearchQuery] = useState<string>('');
 
   useEffect(() => {
     checkAdminStatus();
@@ -84,6 +91,7 @@ const Admin: React.FC = () => {
         loadClaims();
         loadOverviewStats();
         loadQuotaStatus();
+        loadLabels();
       } else {
         setIsAdmin(false);
         navigate('/');
@@ -291,6 +299,84 @@ const Admin: React.FC = () => {
     }
   };
 
+  const loadLabels = async () => {
+    try {
+      setIsLoadingLabels(true);
+      const params: any = {
+        sortBy: labelSortField,
+        sortOrder: labelSortDirection,
+        page: 1,
+        limit: 100
+      };
+      if (labelFilterStatus) {
+        params.verificationStatus = labelFilterStatus;
+      }
+      if (labelSearchQuery) {
+        params.search = labelSearchQuery;
+      }
+      const data = await labelAPI.getAllLabels(params);
+      setLabels(data.labels || []);
+    } catch (error) {
+      console.error('Error loading labels:', error);
+      toast.error('Failed to load labels');
+    } finally {
+      setIsLoadingLabels(false);
+    }
+  };
+
+  const handleLabelSort = (field: string) => {
+    if (labelSortField === field) {
+      setLabelSortDirection(labelSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setLabelSortField(field);
+      setLabelSortDirection('desc');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'labels' && isAdmin) {
+      loadLabels();
+    }
+  }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab]);
+
+  const getLabelSortIcon = (field: string) => {
+    if (labelSortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
+    }
+    return labelSortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
+  };
+
+  const handleVerifyLabel = async (labelId: string) => {
+    try {
+      await labelAPI.verifyLabel(labelId);
+      toast.success('Label verified successfully');
+      loadLabels();
+    } catch (error: any) {
+      console.error('Error verifying label:', error);
+      toast.error(error.response?.data?.error || 'Failed to verify label');
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getVerificationStatusBadge = (status: string) => {
+    switch (status) {
+      case 'verified':
+        return <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Verified</span>;
+      case 'pending':
+        return <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>;
+      case 'rejected':
+        return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Rejected</span>;
+      default:
+        return <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs font-medium">Unverified</span>;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -314,6 +400,7 @@ const Admin: React.FC = () => {
   const tabs = [
     { id: 'overview', name: 'Overview', icon: BarChart3 },
     { id: 'users', name: 'Users', icon: Users },
+    { id: 'labels', name: 'Labels', icon: Building },
     { id: 'creators', name: 'Creator Applications', icon: Award },
     { id: 'claims', name: 'Tune Claims', icon: Music },
     { id: 'reports', name: 'Tune Reports', icon: AlertTriangle },
@@ -669,6 +756,238 @@ const Admin: React.FC = () => {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'labels' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Label Management</h2>
+              <button
+                onClick={loadLabels}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Search by Name
+                  </label>
+                  <input
+                    type="text"
+                    value={labelSearchQuery}
+                    onChange={(e) => {
+                      setLabelSearchQuery(e.target.value);
+                      if (e.target.value.length === 0 || e.target.value.length >= 2) {
+                        loadLabels();
+                      }
+                    }}
+                    placeholder="Search labels..."
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Verification Status
+                  </label>
+                  <select
+                    value={labelFilterStatus}
+                    onChange={(e) => {
+                      setLabelFilterStatus(e.target.value);
+                      loadLabels();
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="unverified">Unverified</option>
+                    <option value="pending">Pending</option>
+                    <option value="verified">Verified</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {isLoadingLabels ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : labels.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <Building className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No labels found</p>
+              </div>
+            ) : (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Label
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleLabelSort('verificationStatus')}
+                        >
+                          <div className="flex items-center">
+                            Status
+                            {getLabelSortIcon('verificationStatus')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Owner(s)
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleLabelSort('totalBidAmount')}
+                        >
+                          <div className="flex items-center">
+                            Total Bids
+                            {getLabelSortIcon('totalBidAmount')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleLabelSort('artistCount')}
+                        >
+                          <div className="flex items-center">
+                            Artists
+                            {getLabelSortIcon('artistCount')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleLabelSort('releaseCount')}
+                        >
+                          <div className="flex items-center">
+                            Releases
+                            {getLabelSortIcon('releaseCount')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleLabelSort('createdAt')}
+                        >
+                          <div className="flex items-center">
+                            Created
+                            {getLabelSortIcon('createdAt')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleLabelSort('lastBidAt')}
+                        >
+                          <div className="flex items-center">
+                            Last Activity
+                            {getLabelSortIcon('lastBidAt')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                      {labels.map((label) => (
+                        <tr key={label._id} className="hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {label.logo && (
+                                <img
+                                  src={label.logo}
+                                  alt={label.name}
+                                  className="h-10 w-10 rounded-full object-cover mr-3"
+                                />
+                              )}
+                              <div>
+                                <div className="text-sm font-medium text-white">{label.name}</div>
+                                <div className="text-xs text-gray-400">{label.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getVerificationStatusBadge(label.verificationStatus)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {label.owners && label.owners.length > 0 ? (
+                                <div className="space-y-1">
+                                  {label.owners.map((owner: any, idx: number) => (
+                                    <div key={idx} className="flex items-center space-x-2">
+                                      {owner.profilePic && (
+                                        <img
+                                          src={owner.profilePic}
+                                          alt={owner.username}
+                                          className="h-6 w-6 rounded-full object-cover"
+                                        />
+                                      )}
+                                      <span>{owner.username}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-500">No owners</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              £{(label.stats?.totalBidAmount || 0).toFixed(2)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {label.stats?.artistCount || 0}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {label.stats?.releaseCount || 0}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {formatDate(label.createdAt)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {label.stats?.lastBidAt ? formatDate(label.stats.lastBidAt) : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              {label.verificationStatus !== 'verified' && (
+                                <button
+                                  onClick={() => handleVerifyLabel(label._id)}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                  title="Verify label"
+                                >
+                                  Verify
+                                </button>
+                              )}
+                              <button
+                                onClick={() => navigate(`/label/${label.slug}`)}
+                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                title="View label"
+                              >
+                                View
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
