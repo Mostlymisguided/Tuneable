@@ -1,16 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, Play, ArrowRight } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift } from 'lucide-react';
 import { partyAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { useWebPlayerStore } from '../stores/webPlayerStore';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   const [globalParty, setGlobalParty] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -18,20 +15,12 @@ const Dashboard: React.FC = () => {
         const res = await partyAPI.getParties();
         const g = (res.parties || []).find((p: any) => p.type === 'global');
         setGlobalParty(g || null);
-      } finally {
-        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load global party:', error);
       }
     };
     load();
   }, []);
-
-  const playFirst = () => {
-    if (!globalParty?.media?.length) return;
-    const first = globalParty.media[0];
-    setQueue(globalParty.media);
-    setCurrentMedia(first, 0, true);
-    setGlobalPlayerActive(true);
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
