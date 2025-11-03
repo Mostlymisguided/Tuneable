@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema({
   personalInviteCode: { type: String, required: true, unique: true },
   parentInviteCode: { type: String, required: false },
   balance: { type: Number, default: 0 }, // New field for wallet balance
+  inviteCredits: { type: Number, default: 10 }, // Invite credits for inviting new users
   tuneBytes: { 
     type: Number, 
     default: 0 

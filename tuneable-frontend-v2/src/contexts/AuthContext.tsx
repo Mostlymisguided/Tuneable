@@ -11,6 +11,7 @@ interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
+  inviteCredits?: number;
   homeLocation?: {
     city?: string;
     region?: string;

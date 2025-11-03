@@ -97,18 +97,28 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       // Create new user
       // Check for invite code in session (passed from OAuth initiation)
       let parentInviteCode = null;
+      let inviter = null;
       if (req && req.session && req.session.pendingInviteCode) {
         const code = req.session.pendingInviteCode;
         // Validate invite code
-        const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+        inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
         if (inviter) {
           parentInviteCode = code.toUpperCase();
         }
       }
       
       // Require invite code for new users
-      if (!parentInviteCode) {
+      if (!parentInviteCode || !inviter) {
         return done(new Error('Valid invite code required to create account'), null);
+      }
+      
+      // Check if inviter has invite credits (admins have unlimited credits)
+      const isInviterAdmin = inviter.role && inviter.role.includes('admin');
+      if (!isInviterAdmin) {
+        // Check if inviter has invite credits
+        if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
+          return done(new Error('This invite code has no remaining invites'), null);
+        }
       }
       
       const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
@@ -154,6 +164,13 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       });
       
       await newUser.save();
+      
+      // Decrement inviter's invite credits (unless admin - admins have unlimited)
+      if (!isInviterAdmin && inviter.inviteCredits > 0) {
+        inviter.inviteCredits -= 1;
+        await inviter.save();
+        console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
+      }
       
       // Auto-join new OAuth user to Global Party
       try {
@@ -290,18 +307,28 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         // Check for invite code in session (passed from OAuth initiation)
         // With passReqToCallback: true, req is available as first parameter
         let parentInviteCode = null;
+        let inviter = null;
         if (req && req.session && req.session.pendingInviteCode) {
           const code = req.session.pendingInviteCode;
           // Validate invite code
-          const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+          inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {
             parentInviteCode = code.toUpperCase();
           }
         }
         
         // Require invite code for new users
-        if (!parentInviteCode) {
+        if (!parentInviteCode || !inviter) {
           return done(new Error('Valid invite code required to create account'), null);
+        }
+        
+        // Check if inviter has invite credits (admins have unlimited credits)
+        const isInviterAdmin = inviter.role && inviter.role.includes('admin');
+        if (!isInviterAdmin) {
+          // Check if inviter has invite credits
+          if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
+            return done(new Error('This invite code has no remaining invites'), null);
+          }
         }
         
         const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
@@ -384,6 +411,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         });
         
         await newUser.save();
+        
+        // Decrement inviter's invite credits (unless admin - admins have unlimited)
+        if (!isInviterAdmin && inviter.inviteCredits > 0) {
+          inviter.inviteCredits -= 1;
+          await inviter.save();
+          console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
+        }
         
         // Auto-join new Google OAuth user to Global Party
         try {
@@ -542,18 +576,28 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
         let parentInviteCode = null;
+        let inviter = null;
         if (req && req.session && req.session.pendingInviteCode) {
           const code = req.session.pendingInviteCode;
           // Validate invite code
-          const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+          inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {
             parentInviteCode = code.toUpperCase();
           }
         }
         
         // Require invite code for new users
-        if (!parentInviteCode) {
+        if (!parentInviteCode || !inviter) {
           return done(new Error('Valid invite code required to create account'), null);
+        }
+        
+        // Check if inviter has invite credits (admins have unlimited credits)
+        const isInviterAdmin = inviter.role && inviter.role.includes('admin');
+        if (!isInviterAdmin) {
+          // Check if inviter has invite credits
+          if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
+            return done(new Error('This invite code has no remaining invites'), null);
+          }
         }
         
         const usernameValue = profile.username || `soundcloud_${profile.id}`;
@@ -603,6 +647,13 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         });
         
         await newUser.save();
+        
+        // Decrement inviter's invite credits (unless admin - admins have unlimited)
+        if (!isInviterAdmin && inviter.inviteCredits > 0) {
+          inviter.inviteCredits -= 1;
+          await inviter.save();
+          console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
+        }
         
         // Auto-join new SoundCloud OAuth user to Global Party
         try {
@@ -739,18 +790,28 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
         let parentInviteCode = null;
+        let inviter = null;
         if (req && req.session && req.session.pendingInviteCode) {
           const code = req.session.pendingInviteCode;
           // Validate invite code
-          const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+          inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
           if (inviter) {
             parentInviteCode = code.toUpperCase();
           }
         }
         
         // Require invite code for new users
-        if (!parentInviteCode) {
+        if (!parentInviteCode || !inviter) {
           return done(new Error('Valid invite code required to create account'), null);
+        }
+        
+        // Check if inviter has invite credits (admins have unlimited credits)
+        const isInviterAdmin = inviter.role && inviter.role.includes('admin');
+        if (!isInviterAdmin) {
+          // Check if inviter has invite credits
+          if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
+            return done(new Error('This invite code has no remaining invites'), null);
+          }
         }
         
         const usernameValue = profile.username || `instagram_${profile.id}`;
@@ -800,6 +861,13 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         });
         
         await newUser.save();
+        
+        // Decrement inviter's invite credits (unless admin - admins have unlimited)
+        if (!isInviterAdmin && inviter.inviteCredits > 0) {
+          inviter.inviteCredits -= 1;
+          await inviter.save();
+          console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
+        }
         
         // Auto-join new Instagram OAuth user to Global Party
         try {

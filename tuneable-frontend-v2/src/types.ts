@@ -8,6 +8,7 @@ export interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
+  inviteCredits?: number;
   tuneBytes?: number;
   tuneBytesHistory?: {
     mediaId: string;

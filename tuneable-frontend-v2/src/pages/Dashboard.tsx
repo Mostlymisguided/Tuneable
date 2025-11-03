@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift } from 'lucide-react';
-import { partyAPI } from '../lib/api';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users } from 'lucide-react';
+import { partyAPI, userAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [globalParty, setGlobalParty] = useState<any>(null);
+  const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
+  const [isLoadingInvited, setIsLoadingInvited] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -20,6 +22,21 @@ const Dashboard: React.FC = () => {
       }
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    const loadInvitedUsers = async () => {
+      try {
+        setIsLoadingInvited(true);
+        const data = await userAPI.getInvitedUsers();
+        setInvitedUsers(data.invitedUsers || []);
+      } catch (error) {
+        console.error('Failed to load invited users:', error);
+      } finally {
+        setIsLoadingInvited(false);
+      }
+    };
+    loadInvitedUsers();
   }, []);
 
   return (
@@ -134,6 +151,72 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="bg-orange-100 p-3 rounded-lg">
+              <UserPlus className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">Invite Credits</p>
+              <p className="text-2xl font-semibold text-white">
+                {user?.inviteCredits ?? 10}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Invited Users Section */}
+      <div className="card mt-8">
+        <div className="flex items-center mb-4">
+          <Users className="h-6 w-6 text-purple-400 mr-2" />
+          <h2 className="text-2xl font-semibold text-white">Invited Users</h2>
+          <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+            {invitedUsers.length}
+          </span>
+        </div>
+        
+        {isLoadingInvited ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+          </div>
+        ) : invitedUsers.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <Users className="h-12 w-12 mx-auto mb-4 text-gray-500" />
+            <p>No users have signed up with your invite code yet.</p>
+            <p className="text-sm mt-2">Share your invite code: <span className="font-mono text-purple-400">{user?.personalInviteCode}</span></p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {invitedUsers.map((invitedUser) => (
+              <div key={invitedUser._id || invitedUser.id} className="flex items-center justify-between bg-black/20 rounded px-4 py-3">
+                <div className="flex items-center gap-3">
+                  {invitedUser.profilePic ? (
+                    <img 
+                      src={invitedUser.profilePic} 
+                      alt={invitedUser.username} 
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-purple-900 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-purple-300" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-white font-medium">{invitedUser.username}</div>
+                    <div className="text-gray-400 text-sm">
+                      Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+                {invitedUser.email && (
+                  <div className="text-gray-400 text-sm">{invitedUser.email}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

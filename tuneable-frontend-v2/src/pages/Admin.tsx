@@ -30,6 +30,7 @@ interface User {
   email?: string;
   role: string[];
   balance: number;
+  inviteCredits?: number;
   createdAt: string;
   lastLoginAt?: string;
   oauthVerified?: {
@@ -134,6 +135,10 @@ const Admin: React.FC = () => {
         case 'balance':
           aValue = a.balance || 0;
           bValue = b.balance || 0;
+          break;
+        case 'inviteCredits':
+          aValue = a.inviteCredits ?? 10;
+          bValue = b.inviteCredits ?? 10;
           break;
         case 'createdAt':
           aValue = new Date(a.createdAt).getTime();
@@ -247,6 +252,26 @@ const Admin: React.FC = () => {
     } catch (error: any) {
       console.error('Error reviewing claim:', error);
       toast.error(error.response?.data?.error || 'Failed to review claim');
+    }
+  };
+
+  const handleReplenishCredits = async (userId: string, username: string) => {
+    const creditsStr = prompt(`How many invite credits would you like to add to ${username}?`);
+    if (!creditsStr) return;
+    
+    const credits = parseInt(creditsStr);
+    if (isNaN(credits) || credits <= 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    
+    try {
+      await userAPI.replenishInviteCredits(userId, credits);
+      toast.success(`Successfully added ${credits} invite credits to ${username}`);
+      loadUsers(); // Reload users list
+    } catch (error: any) {
+      console.error('Error replenishing credits:', error);
+      toast.error(error.response?.data?.error || 'Failed to replenish invite credits');
     }
   };
 
@@ -439,6 +464,15 @@ const Admin: React.FC = () => {
                       </th>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('inviteCredits')}
+                      >
+                        <div className="flex items-center">
+                          Invite Credits
+                          {getSortIcon('inviteCredits')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
                         onClick={() => handleSort('createdAt')}
                       >
                         <div className="flex items-center">
@@ -527,6 +561,28 @@ const Admin: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">£{user.balance.toFixed(2)}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className={`text-sm font-semibold ${
+                              (user.inviteCredits ?? 10) === 0 
+                                ? 'text-red-400' 
+                                : (user.inviteCredits ?? 10) <= 3 
+                                ? 'text-yellow-400' 
+                                : 'text-green-400'
+                            }`}>
+                              {user.inviteCredits ?? 10}
+                            </div>
+                            {!user.role.includes('admin') && (
+                              <button
+                                onClick={() => handleReplenishCredits(user._id, user.username)}
+                                className="text-xs text-purple-400 hover:text-purple-300 underline"
+                                title="Replenish invite credits"
+                              >
+                                +
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">

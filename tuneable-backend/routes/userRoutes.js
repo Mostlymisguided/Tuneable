@@ -338,6 +338,15 @@ router.post(
         return res.status(400).json({ error: 'Invalid invite code' });
       }
       
+      // Check if inviter has invite credits (admins have unlimited credits)
+      const isInviterAdmin = inviter.role && inviter.role.includes('admin');
+      if (!isInviterAdmin) {
+        // Check if inviter has invite credits
+        if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
+          return res.status(400).json({ error: 'This invite code has no remaining invites' });
+        }
+      }
+      
       // Determine primary location from form data
       const defaultLocation = { 
         city: null, 
@@ -419,6 +428,13 @@ router.post(
       await user.save();
       
       console.log('User registered successfully:', user);
+
+      // Decrement inviter's invite credits (unless admin - admins have unlimited)
+      if (!isInviterAdmin && inviter.inviteCredits > 0) {
+        inviter.inviteCredits -= 1;
+        await inviter.save();
+        console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
+      }
 
       // Auto-join new user to Global Party
       try {
@@ -548,6 +564,30 @@ router.get('/profile', authMiddleware, async (req, res) => {
     res.json({ message: 'User profile', user: userWithStats });
   } catch (error) {
     res.status(500).json({ error: 'Error ing user profile', details: error.message });
+  }
+});
+
+// Get list of users invited by the current user
+router.get('/invited', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    // Find all users who used this user's personalInviteCode
+    const invitedUsers = await User.find({ 
+      parentInviteCode: user.personalInviteCode 
+    })
+    .select('-password -passwordResetToken -passwordResetExpires -emailVerificationToken -emailVerificationExpires')
+    .sort({ createdAt: -1 })
+    .lean();
+    
+    res.json({ 
+      invitedUsers,
+      count: invitedUsers.length 
+    });
+  } catch (error) {
+    console.error('Error fetching invited users:', error);
+    res.status(500).json({ error: 'Error fetching invited users', details: error.message });
   }
 });
 
@@ -1184,6 +1224,47 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching all users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// @route   POST /api/users/admin/replenish-invite-credits
+// @desc    Replenish invite credits for a user (admin only)
+// @access  Private (Admin)
+router.post('/admin/replenish-invite-credits', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, credits } = req.body;
+    
+    if (!userId || credits === undefined || credits < 0) {
+      return res.status(400).json({ error: 'userId and valid credits amount are required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Set or add credits (depending on if we want to set or add)
+    // For now, we'll add credits to existing amount
+    const currentCredits = targetUser.inviteCredits || 0;
+    targetUser.inviteCredits = currentCredits + parseInt(credits);
+    await targetUser.save();
+
+    res.json({
+      message: `Successfully added ${credits} invite credits to ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        inviteCredits: targetUser.inviteCredits
+      }
+    });
+  } catch (error) {
+    console.error('Error replenishing invite credits:', error);
+    res.status(500).json({ error: 'Failed to replenish invite credits' });
   }
 });
 

@@ -9,6 +9,7 @@ interface User {
   profilePic?: string;
   personalInviteCode: string;
   balance: number;
+  inviteCredits?: number;
   tuneBytes?: number;
   homeLocation?: {
     city?: string;
@@ -520,6 +521,18 @@ export const userAPI = {
     anonymousMode?: boolean;
   }) => {
     const response = await api.put('/users/notification-preferences', preferences);
+    return response.data;
+  },
+
+  // Get list of users invited by current user
+  getInvitedUsers: async () => {
+    const response = await api.get('/users/invited');
+    return response.data;
+  },
+
+  // Admin: Replenish invite credits for a user
+  replenishInviteCredits: async (userId: string, credits: number) => {
+    const response = await api.post('/users/admin/replenish-invite-credits', { userId, credits });
     return response.data;
   },
 };
