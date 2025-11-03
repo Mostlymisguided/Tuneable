@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { partyAPI, userAPI, mediaAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { toast } from 'react-toastify';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface LibraryItem {
   mediaId: string;
@@ -33,6 +34,7 @@ const Dashboard: React.FC = () => {
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -362,50 +364,64 @@ const Dashboard: React.FC = () => {
           </span>
         </div>
         
-        {isLoadingInvited ? (
+        {isLoadingInvited && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
           </div>
-        ) : invitedUsers.length === 0 ? (
+        )}
+        {!isLoadingInvited && invitedUsers.length === 0 && (
           <div className="text-center py-8 text-gray-400">
             <Users className="h-12 w-12 mx-auto mb-4 text-gray-500" />
             <p>No users have signed up with your invite code yet.</p>
             <p className="text-sm mt-2">Share your invite code: <span className="font-mono text-purple-400">{user?.personalInviteCode}</span></p>
           </div>
-        ) : (
+        )}
+        {!isLoadingInvited && invitedUsers.length > 0 && (
           <div className="space-y-3">
-            {invitedUsers.map((invitedUser) => (
-              <div key={invitedUser._id || invitedUser.id} className="flex items-center justify-between bg-black/20 rounded px-4 py-3">
-                <div className="flex items-center gap-3">
-                  {invitedUser.profilePic ? (
-                    <img 
-                      src={invitedUser.profilePic} 
-                      alt={invitedUser.username} 
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-purple-900 flex items-center justify-center">
-                      <Users className="h-5 w-5 text-purple-300" />
+            {(showAllInvitedUsers ? invitedUsers : invitedUsers.slice(0, 3)).map((invitedUser) => {
+              const userName = (invitedUser.givenName || invitedUser.familyName) 
+                ? `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
+                : `Joined ${new Date(invitedUser.createdAt).toLocaleDateString()}`;
+              
+              return (
+                <div key={invitedUser._id || invitedUser.id} className="flex items-center gap-3 bg-black/20 rounded px-4 py-3">
+                  <img 
+                    src={invitedUser.profilePic || DEFAULT_PROFILE_PIC} 
+                    alt={invitedUser.username} 
+                    className="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white font-medium">{invitedUser.username}</div>
+                    <div className="text-gray-400 text-sm">
+                      {userName}
                     </div>
-                  )}
-                <div>
-                  <div className="text-white font-medium">{invitedUser.username}</div>
-                  <div className="text-gray-400 text-sm">
-                    {(invitedUser.givenName || invitedUser.familyName) ? (
-                      `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
-                    ) : (
-                      `Joined ${new Date(invitedUser.createdAt).toLocaleDateString()}`
+                    {(invitedUser.givenName || invitedUser.familyName) && (
+                      <div className="text-gray-500 text-xs mt-1">
+                        Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
+                      </div>
                     )}
                   </div>
-                  {(invitedUser.givenName || invitedUser.familyName) && (
-                    <div className="text-gray-500 text-xs mt-1">
-                      Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
-                    </div>
-                  )}
                 </div>
+              );
+            })}
+            {invitedUsers.length > 3 && (
+              <div className="flex justify-center pt-2">
+                <button
+                  onClick={() => setShowAllInvitedUsers(!showAllInvitedUsers)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  <span>{showAllInvitedUsers ? 'Show Less' : `Show More (${invitedUsers.length - 3} more)`}</span>
+                  {showAllInvitedUsers ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
               </div>
-              </div>
-            ))}
+            )}
           </div>
         )}
       </div>
