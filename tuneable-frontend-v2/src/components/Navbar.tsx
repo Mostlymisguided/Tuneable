@@ -57,7 +57,7 @@ const Navbar: React.FC = () => {
                     </Link>
                   </>
                 )}
-                {((user as any).creatorProfile?.verificationStatus === 'verified' || user.role?.includes('admin')) && (
+                {(user.role?.includes('creator') || user.role?.includes('admin')) && (
                   <Link
                     to="/creator/upload"
                     className="hidden sm:block px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium transition-colors"

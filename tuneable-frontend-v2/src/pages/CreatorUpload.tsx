@@ -41,11 +41,9 @@ const CreatorUpload: React.FC = () => {
 
   // Check if user is verified creator or admin
   const isAdmin = user && (user as any).role?.includes('admin');
-  const isVerifiedCreator = user && 
-    (user as any).creatorProfile && 
-    (user as any).creatorProfile.verificationStatus === 'verified';
+  const isCreator = user && (user as any).role?.includes('creator');
 
-  if (!isVerifiedCreator && !isAdmin) {
+  if (!isCreator && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full card bg-black/40 border border-red-500/30 rounded-lg p-8 text-center">

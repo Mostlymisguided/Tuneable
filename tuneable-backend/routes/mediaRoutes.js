@@ -65,10 +65,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const isAdmin = user.role && user.role.includes('admin');
-    const isVerifiedCreator = user.creatorProfile && user.creatorProfile.verificationStatus === 'verified';
-    
-    if (!isAdmin && !isVerifiedCreator) {
+    const { canUploadMedia } = require('../utils/permissionHelpers');
+    if (!canUploadMedia(user)) {
       return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
     
@@ -806,15 +804,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     
     // Check permissions: must be admin OR media owner OR verified creator
-    const isAdmin = req.user.role && req.user.role.includes('admin');
-    const isMediaOwner = media.mediaOwners && media.mediaOwners.some(
-      owner => owner.userId.toString() === userId.toString()
-    );
-    const isVerifiedCreator = media.getVerifiedCreators().some(
-      creator => creator.userId.toString() === userId.toString()
-    );
-    
-    if (!isAdmin && !isMediaOwner && !isVerifiedCreator) {
+    const { canEditMedia } = require('../utils/permissionHelpers');
+    if (!canEditMedia(req.user, media)) {
       return res.status(403).json({ error: 'Not authorized to edit this media' });
     }
     

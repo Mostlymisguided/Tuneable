@@ -35,6 +35,7 @@ import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { canEditMedia } from '../utils/permissionHelpers';
 
 interface Media {
   _id: string;
@@ -244,22 +245,7 @@ const TuneProfile: React.FC = () => {
 
   // Check if user can edit this tune
   const canEditTune = () => {
-    if (!user || !media) return false;
-    
-    // Check if user is admin
-    const isAdmin = user.role && user.role.includes('admin');
-    if (isAdmin) return true;
-    
-    // Check if user is a verified creator
-    // Note: verifiedCreators is an array of user IDs
-    const isVerifiedCreator = (media as any).verifiedCreators?.some(
-      (creatorId: any) => {
-        const id = typeof creatorId === 'string' ? creatorId : creatorId._id || creatorId.toString();
-        return id === (user as any)._id || id === (user as any).id || id === user.uuid;
-      }
-    );
-    
-    return isVerifiedCreator;
+    return canEditMedia(user, media);
   };
 
   // Populate edit form when media loads
