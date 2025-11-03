@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, X, ExternalLink } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { searchAPI } from '../lib/api';
 
 interface QuotaStatus {
