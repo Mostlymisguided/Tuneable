@@ -10,6 +10,7 @@ import BidModal from '../components/BidModal';
 import PartyQueueSearch from '../components/PartyQueueSearch';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
+import QuotaWarningBanner from '../components/QuotaWarningBanner';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
@@ -1402,6 +1403,9 @@ const Party: React.FC = () => {
                     {showAddMediaPanel && (
                       <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
                         <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
+                        
+                        {/* Quota Warning Banner */}
+                        <QuotaWarningBanner className="mb-4" />
                         
                         {/* Search Input */}
                         <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">

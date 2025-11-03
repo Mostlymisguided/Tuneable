@@ -3,6 +3,8 @@ const NodeCache = require('node-cache');
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
 const Media = require('../models/Media'); // Unified media model
 const { transformResponse } = require('../utils/uuidTransform');
+const { getQuotaStatus, getQuotaHistory, resetQuota } = require('../services/quotaTracker');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
@@ -356,6 +358,57 @@ router.get('/youtube-url', async (req, res) => {
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
         res.status(500).json({ error: 'Failed to process YouTube URL: ' + error.message });
+    }
+});
+
+// Get quota status (public endpoint - can be called by any authenticated user)
+router.get('/quota-status', authMiddleware, async (req, res) => {
+    try {
+        const status = getQuotaStatus();
+        res.json(status);
+    } catch (error) {
+        console.error('Error fetching quota status:', error);
+        res.status(500).json({ error: 'Failed to fetch quota status' });
+    }
+});
+
+// Get quota history (admin only)
+router.get('/admin/quota-history', authMiddleware, async (req, res) => {
+    try {
+        // Check if user is admin
+        const User = require('../models/User');
+        const user = await User.findById(req.user._id);
+        if (!user || !user.role || !user.role.includes('admin')) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const limit = parseInt(req.query.limit) || 50;
+        const history = getQuotaHistory(limit);
+        res.json({ history });
+    } catch (error) {
+        console.error('Error fetching quota history:', error);
+        res.status(500).json({ error: 'Failed to fetch quota history' });
+    }
+});
+
+// Reset quota manually (admin only)
+router.post('/admin/quota-reset', authMiddleware, async (req, res) => {
+    try {
+        // Check if user is admin
+        const User = require('../models/User');
+        const user = await User.findById(req.user._id);
+        if (!user || !user.role || !user.role.includes('admin')) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const status = resetQuota();
+        res.json({ 
+            message: 'Quota reset successfully',
+            status 
+        });
+    } catch (error) {
+        console.error('Error resetting quota:', error);
+        res.status(500).json({ error: 'Failed to reset quota' });
     }
 });
 

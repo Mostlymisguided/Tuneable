@@ -21,7 +21,7 @@ import {
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
-import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -57,6 +57,8 @@ const Admin: React.FC = () => {
   const [mediaCount, setMediaCount] = useState<number>(0);
   const [activeParties, setActiveParties] = useState<number>(0);
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
+  const [quotaStatus, setQuotaStatus] = useState<any>(null);
+  const [isLoadingQuota, setIsLoadingQuota] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -81,6 +83,7 @@ const Admin: React.FC = () => {
         loadCreatorApplications();
         loadClaims();
         loadOverviewStats();
+        loadQuotaStatus();
       } else {
         setIsAdmin(false);
         navigate('/');
@@ -181,6 +184,19 @@ const Admin: React.FC = () => {
       toast.error('Failed to load overview statistics');
     } finally {
       setIsLoadingOverview(false);
+    }
+  };
+
+  const loadQuotaStatus = async () => {
+    try {
+      setIsLoadingQuota(true);
+      const status = await searchAPI.getQuotaStatus();
+      setQuotaStatus(status);
+    } catch (error) {
+      console.error('Error loading quota status:', error);
+      // Don't show error toast for quota status - it's not critical
+    } finally {
+      setIsLoadingQuota(false);
     }
   };
 
@@ -360,7 +376,7 @@ const Admin: React.FC = () => {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">System Overview</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-gray-800 rounded-lg p-6">
                 <div className="flex items-center">
                   <Users className="h-8 w-8 text-blue-400" />
@@ -399,6 +415,47 @@ const Admin: React.FC = () => {
                         activeParties.toLocaleString()
                       )}
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-6">
+                <div className="flex items-center">
+                  <Youtube className={`h-8 w-8 ${
+                    quotaStatus?.status === 'critical' ? 'text-red-400' :
+                    quotaStatus?.status === 'warning' ? 'text-yellow-400' :
+                    quotaStatus?.status === 'caution' ? 'text-orange-400' :
+                    'text-green-400'
+                  }`} />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-400">YouTube API Quota</p>
+                    <p className="text-2xl font-bold text-white">
+                      {isLoadingQuota ? (
+                        <span className="text-gray-500">Loading...</span>
+                      ) : quotaStatus ? (
+                        <>
+                          {quotaStatus.usage.toLocaleString()} / {quotaStatus.limit.toLocaleString()}
+                          <span className="text-sm ml-2 text-gray-400">
+                            ({quotaStatus.percentage.toFixed(1)}%)
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-gray-500">N/A</span>
+                      )}
+                    </p>
+                    {quotaStatus && (
+                      <div className="mt-2 w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            quotaStatus.status === 'critical' ? 'bg-red-500' :
+                            quotaStatus.status === 'warning' ? 'bg-yellow-500' :
+                            quotaStatus.status === 'caution' ? 'bg-orange-500' :
+                            'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(100, quotaStatus.percentage)}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { recordQuotaUsage, QUOTA_COSTS } = require('./quotaTracker');
 
 // YouTube category mapping
 const getCategoryName = async (categoryId, apiKey) => {
@@ -10,6 +11,9 @@ const getCategoryName = async (categoryId, apiKey) => {
                 key: apiKey,
             },
         });
+        
+        // Track quota usage (videoCategories.list = 1 unit)
+        recordQuotaUsage(QUOTA_COSTS.VIDEO_CATEGORIES, 'getCategoryName', { categoryId });
         
         if (response.data.items && response.data.items.length > 0) {
             return response.data.items[0].snippet.title;
@@ -36,6 +40,9 @@ const searchYouTube = async (query, pageToken = null) => {
         },
     });
 
+    // Track quota usage for search.list (100 units)
+    recordQuotaUsage(QUOTA_COSTS.SEARCH_LIST, 'searchYouTube', { query, resultCount: searchResponse.data.items?.length || 0 });
+
     const videos = searchResponse.data.items.map((item) => ({
         id: item.id.videoId,
         title: item.snippet.title,
@@ -54,6 +61,11 @@ const searchYouTube = async (query, pageToken = null) => {
             key: apiKey,
         },
     });
+
+    // Track quota usage for videos.list with contentDetails (1 unit per 50 videos, minimum 1)
+    const videoCount = videos.length;
+    const quotaCost = Math.ceil(videoCount / 50) * QUOTA_COSTS.VIDEOS_LIST_CONTENT_DETAILS;
+    recordQuotaUsage(quotaCost, 'searchYouTube-details', { videoCount });
 
     // ✅ Helper Function: Convert YouTube Duration (ISO 8601) to Seconds
 const parseDuration = (duration) => {
@@ -119,11 +131,14 @@ const getVideoDetails = async (videoId) => {
             },
         });
 
+        // Track quota usage for videos.list with snippet (1 unit per video, but minimum 1 for call)
+        recordQuotaUsage(QUOTA_COSTS.VIDEOS_LIST_SNIPPET, 'getVideoDetails', { videoId });
+
         if (response.data.items && response.data.items.length > 0) {
             const video = response.data.items[0];
             const categoryId = video.snippet.categoryId;
             
-            // Get category name with error handling
+            // Get category name with error handling (this also tracks quota)
             let categoryName = 'Unknown';
             try {
                 categoryName = await getCategoryName(categoryId, apiKey);

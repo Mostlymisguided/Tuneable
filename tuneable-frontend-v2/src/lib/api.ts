@@ -443,6 +443,12 @@ export const searchAPI = {
     });
     return response.data;
   },
+
+  // Get quota status
+  getQuotaStatus: async () => {
+    const response = await api.get('/search/quota-status');
+    return response.data;
+  },
 };
 
 // Top Tunes API

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { searchAPI, partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
 import TagInputModal from '../components/TagInputModal';
+import QuotaWarningBanner from '../components/QuotaWarningBanner';
 
 // Define types directly to avoid import issues
 interface SearchResult {
@@ -519,37 +520,52 @@ const SearchPage: React.FC = () => {
           </div>
         )} */}
         
+        {/* Quota Warning Banner */}
+        {activeTab === 'songs' && (
+          <QuotaWarningBanner className="mb-4" />
+        )}
+
         {/* Search Bar */}
-        <div className="flex space-x-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder={activeTab === 'songs' 
-                ? 'Search for songs on YouTube...'
-                : podcastSource === 'local' 
-                  ? 'Search for podcast episodes in our database...'
-                  : podcastSource === 'taddy'
-                    ? 'Search for podcast episodes on Taddy...'
-                    : 'Search for podcast episodes on Apple Podcasts...'
-              }
-              className="input pl-10"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch(query);
+        <div className="space-y-2">
+          <div className="flex space-x-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder={activeTab === 'songs' 
+                  ? 'Search for songs on YouTube or paste a YouTube URL...'
+                  : podcastSource === 'local' 
+                    ? 'Search for podcast episodes in our database...'
+                    : podcastSource === 'taddy'
+                      ? 'Search for podcast episodes on Taddy...'
+                      : 'Search for podcast episodes on Apple Podcasts...'
                 }
-              }}
-            />
+                className="input pl-10"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch(query);
+                  }
+                }}
+              />
+            </div>
+            <button
+              onClick={() => handleSearch(query)}
+              disabled={isLoading || !query.trim()}
+              className="btn-primary disabled:opacity-50"
+            >
+              {isLoading ? 'Searching...' : 'Search'}
+            </button>
           </div>
-          <button
-            onClick={() => handleSearch(query)}
-            disabled={isLoading || !query.trim()}
-            className="btn-primary disabled:opacity-50"
-          >
-            {isLoading ? 'Searching...' : 'Search'}
-          </button>
+          {activeTab === 'songs' && (
+            <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
+              <Link className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+              <span>
+                💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
+              </span>
+            </div>
+          )}
         </div>
 
       </div>
