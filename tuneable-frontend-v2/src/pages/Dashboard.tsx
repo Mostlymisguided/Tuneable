@@ -203,16 +203,22 @@ const Dashboard: React.FC = () => {
                       <Users className="h-5 w-5 text-purple-300" />
                     </div>
                   )}
-                  <div>
-                    <div className="text-white font-medium">{invitedUser.username}</div>
-                    <div className="text-gray-400 text-sm">
+                <div>
+                  <div className="text-white font-medium">{invitedUser.username}</div>
+                  <div className="text-gray-400 text-sm">
+                    {(invitedUser.givenName || invitedUser.familyName) ? (
+                      `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
+                    ) : (
+                      `Joined ${new Date(invitedUser.createdAt).toLocaleDateString()}`
+                    )}
+                  </div>
+                  {(invitedUser.givenName || invitedUser.familyName) && (
+                    <div className="text-gray-500 text-xs mt-1">
                       Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
                     </div>
-                  </div>
+                  )}
                 </div>
-                {invitedUser.email && (
-                  <div className="text-gray-400 text-sm">{invitedUser.email}</div>
-                )}
+              </div>
               </div>
             ))}
           </div>
