@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
-import { partyAPI, userAPI, mediaAPI } from '../lib/api';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon } from 'lucide-react';
+import { userAPI, mediaAPI, searchAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import QuotaWarningBanner from '../components/QuotaWarningBanner';
 
 interface LibraryItem {
   mediaId: string;
@@ -23,11 +24,21 @@ interface LibraryItem {
   lastBidAt: string;
 }
 
+interface SearchResult {
+  _id?: string;
+  id?: string;
+  title: string;
+  artist: string;
+  coverArt?: string;
+  duration?: number;
+  sources?: Record<string, string>;
+  isLocal?: boolean;
+}
+
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
-  const [globalParty, setGlobalParty] = useState<any>(null);
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
   const [isLoadingInvited, setIsLoadingInvited] = useState(false);
   const [tuneLibrary, setTuneLibrary] = useState<LibraryItem[]>([]);
@@ -35,19 +46,24 @@ const Dashboard: React.FC = () => {
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
+  const [showAllLibrary, setShowAllLibrary] = useState(false);
+  
+  // Add Tune feature state
+  const [addTuneQuery, setAddTuneQuery] = useState('');
+  const [addTuneResults, setAddTuneResults] = useState<SearchResult[]>([]);
+  const [isSearchingTune, setIsSearchingTune] = useState(false);
+  const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, number>>({});
+  const [isAddingTune, setIsAddingTune] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await partyAPI.getParties();
-        const g = (res.parties || []).find((p: any) => p.type === 'global');
-        setGlobalParty(g || null);
-      } catch (error) {
-        console.error('Failed to load global party:', error);
-      }
-    };
-    load();
-  }, []);
+  // Helper function to detect YouTube URLs
+  const isYouTubeUrl = (query: string) => {
+    const youtubePatterns = [
+      /youtube\.com\/watch\?v=/,
+      /youtu\.be\//,
+      /youtube\.com\/embed\//
+    ];
+    return youtubePatterns.some(pattern => pattern.test(query));
+  };
 
   useEffect(() => {
     const loadInvitedUsers = async () => {
@@ -226,6 +242,113 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleAddTuneSearch = async () => {
+    if (!addTuneQuery.trim()) {
+      toast.error('Please enter a search query or YouTube URL');
+      return;
+    }
+
+    setIsSearchingTune(true);
+    setAddTuneResults([]);
+
+    try {
+      let response;
+      
+      // Check if it's a YouTube URL
+      if (isYouTubeUrl(addTuneQuery)) {
+        console.log('🎥 Detected YouTube URL, processing...');
+        response = await searchAPI.searchByYouTubeUrl(addTuneQuery);
+        console.log('🎥 YouTube URL response:', response);
+        
+        let results: SearchResult[] = [];
+        if (response.source === 'local' && response.videos) {
+          results = response.videos.map((v: any) => ({ ...v, isLocal: true }));
+          toast.success(`Found "${response.videos[0]?.title}" in our database`);
+        } else if (response.source === 'external' && response.videos) {
+          results = response.videos.map((v: any) => ({ ...v, isLocal: false }));
+          toast.success(`Found "${response.videos[0]?.title}" from YouTube`);
+        }
+        
+        setAddTuneResults(results);
+        
+        // Initialize bid amounts
+        const minBid = 0.33;
+        const newBidAmounts: Record<string, number> = {};
+        results.forEach((media: SearchResult) => {
+          newBidAmounts[media._id || media.id || ''] = minBid;
+        });
+        setAddTuneBidAmounts(newBidAmounts);
+      } else {
+        // Regular search
+        console.log('🔍 Searching for media:', addTuneQuery);
+        response = await searchAPI.search(addTuneQuery, 'youtube');
+        
+        let results: SearchResult[] = [];
+        if (response.source === 'local' && response.videos) {
+          results = response.videos.map((v: any) => ({ ...v, isLocal: true }));
+        } else if (response.videos) {
+          results = response.videos.map((v: any) => ({ ...v, isLocal: false }));
+        }
+        
+        setAddTuneResults(results);
+        
+        // Initialize bid amounts
+        const minBid = 0.33;
+        const newBidAmounts: Record<string, number> = {};
+        results.forEach((media: SearchResult) => {
+          newBidAmounts[media._id || media.id || ''] = minBid;
+        });
+        setAddTuneBidAmounts(newBidAmounts);
+      }
+    } catch (error: any) {
+      console.error('Error searching for tune:', error);
+      toast.error(error.response?.data?.error || 'Failed to search for tune');
+    } finally {
+      setIsSearchingTune(false);
+    }
+  };
+
+  const handleAddTune = async (media: SearchResult) => {
+    if (!user) {
+      toast.info('Please log in to add tunes');
+      navigate('/login');
+      return;
+    }
+
+    const mediaId = media._id || media.id;
+    if (!mediaId) {
+      toast.error('Invalid media ID');
+      return;
+    }
+
+    const bidAmount = addTuneBidAmounts[mediaId] || 0.33;
+    
+    if ((user as any)?.balance < bidAmount) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
+    setIsAddingTune(true);
+
+    try {
+      await mediaAPI.placeGlobalBid(mediaId, bidAmount);
+      toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} bid!`);
+      
+      // Clear search
+      setAddTuneQuery('');
+      setAddTuneResults([]);
+      
+      // Reload library to show new tune
+      const data = await userAPI.getTuneLibrary();
+      setTuneLibrary(data.library || []);
+    } catch (error: any) {
+      console.error('Error adding tune:', error);
+      toast.error(error.response?.data?.error || 'Failed to add tune');
+    } finally {
+      setIsAddingTune(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -237,37 +360,106 @@ const Dashboard: React.FC = () => {
         </p>
       </div>
 
-      {/* Global Tunes Hero */}
+      {/* Add Tune Section */}
       <div className="card mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-white">Global Tunes</h2>
-            <p className="text-gray-400">What everyone is playing and bidding on right now</p>
-          </div>
-          <div className="flex gap-2">
-            <button className="btn-secondary" onClick={() => navigate(`/party/${globalParty._id || globalParty.id}`)}>Browse Tunes</button>
-          </div>
+        <div className="flex items-center mb-4">
+          <Music className="h-6 w-6 text-purple-400 mr-2" />
+          <h2 className="text-2xl font-semibold text-white">Add Tune</h2>
         </div>
-
-        {/* Mini queue preview */}
-        <div className="mt-4 space-y-2">
-          {(globalParty?.media || []).slice(0, 5).map((m: any) => (
-            <div key={m._id || m.id} className="flex items-center justify-between bg-black/20 rounded px-3 py-2">
-              <div className="flex items-center gap-3">
-                {m.coverArt && <img src={m.coverArt} alt="" className="h-10 w-10 rounded object-cover" />}
-                <div>
-                  <div className="text-white">{m.title}</div>
-                  <div className="text-gray-400 text-sm">{m.artist}</div>
+        
+        <QuotaWarningBanner className="mb-4" />
+        
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="flex-1 relative">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              value={addTuneQuery}
+              onChange={(e) => setAddTuneQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddTuneSearch();
+                }
+              }}
+              placeholder="Search for tunes in our database or paste a YouTube URL..."
+              className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          <button
+            onClick={handleAddTuneSearch}
+            disabled={isSearchingTune || !addTuneQuery.trim()}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {isSearchingTune ? 'Searching...' : 'Search'}
+          </button>
+        </div>
+        
+        {addTuneQuery && (
+          <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
+            <LinkIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+            <span>
+              💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
+            </span>
+          </div>
+        )}
+        
+        {/* Search Results */}
+        {addTuneResults.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {addTuneResults.map((result) => (
+              <div key={result._id || result.id} className="flex items-center justify-between bg-black/20 rounded px-4 py-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {result.coverArt && (
+                    <img 
+                      src={result.coverArt} 
+                      alt={result.title}
+                      className="h-12 w-12 rounded object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white font-medium truncate">{result.title}</div>
+                    <div className="text-gray-400 text-sm truncate">{result.artist}</div>
+                    {result.isLocal && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-purple-900 text-purple-200 text-xs rounded">
+                        In Database
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-gray-400 text-xs">Bid Amount</div>
+                    <input
+                      type="number"
+                      min="0.33"
+                      step="0.01"
+                      value={addTuneBidAmounts[result._id || result.id || ''] || 0.33}
+                      onChange={(e) => {
+                        const amount = parseFloat(e.target.value);
+                        setAddTuneBidAmounts(prev => ({
+                          ...prev,
+                          [result._id || result.id || '']: amount || 0.33
+                        }));
+                      }}
+                      className="w-20 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleAddTune(result)}
+                    disabled={isAddingTune}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {isAddingTune ? 'Adding...' : 'Add'}
+                  </button>
                 </div>
               </div>
-              <div className="text-gray-300 text-sm">£{(m.globalMediaAggregate || 0).toFixed(2)}</div>
-            </div>
-          ))}
-      
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-
+{/* User Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
           <div className="flex items-center">
@@ -514,7 +706,7 @@ const Dashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {getSortedLibrary().map((item) => (
+                {(showAllLibrary ? getSortedLibrary() : getSortedLibrary().slice(0, 5)).map((item) => (
                   <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlay(item)}>
@@ -537,7 +729,12 @@ const Dashboard: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white">{item.title}</div>
+                      <button
+                        onClick={() => navigate(`/tune/${item.mediaUuid || item.mediaId}`)}
+                        className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                      >
+                        {item.title}
+                      </button>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-300">{item.artist}</div>
@@ -568,6 +765,21 @@ const Dashboard: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            {getSortedLibrary().length > 5 && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => setShowAllLibrary(!showAllLibrary)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  <span>{showAllLibrary ? 'Show Less' : `Show More (${getSortedLibrary().length - 5} more)`}</span>
+                  {showAllLibrary ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
