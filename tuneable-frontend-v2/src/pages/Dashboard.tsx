@@ -1082,11 +1082,86 @@ const Dashboard: React.FC = () => {
                                     <table className="w-full">
                                       <thead className="bg-gray-800">
                                         <tr>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Label</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
+                                                setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Label
+                                              {labelsSortField === 'name' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'artistCount' ? '' : 'artistCount');
+                                                setLabelsSortDirection(labelsSortField === 'artistCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Artists
+                                              {labelsSortField === 'artistCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'releaseCount' ? '' : 'releaseCount');
+                                                setLabelsSortDirection(labelsSortField === 'releaseCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Releases
+                                              {labelsSortField === 'releaseCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
+                                                setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Total Bids
+                                              {labelsSortField === 'totalBids' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'verificationStatus' ? '' : 'verificationStatus');
+                                                setLabelsSortDirection(labelsSortField === 'verificationStatus' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Status
+                                              {labelsSortField === 'verificationStatus' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
                                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                         </tr>
                                       </thead>
@@ -1174,12 +1249,87 @@ const Dashboard: React.FC = () => {
                                     <table className="w-full">
                                       <thead className="bg-gray-800">
                                         <tr>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Label</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
+                                                setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Label
+                                              {labelsSortField === 'name' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
                                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Your Role</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'artistCount' ? '' : 'artistCount');
+                                                setLabelsSortDirection(labelsSortField === 'artistCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Artists
+                                              {labelsSortField === 'artistCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'releaseCount' ? '' : 'releaseCount');
+                                                setLabelsSortDirection(labelsSortField === 'releaseCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Releases
+                                              {labelsSortField === 'releaseCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
+                                                setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Total Bids
+                                              {labelsSortField === 'totalBids' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'verificationStatus' ? '' : 'verificationStatus');
+                                                setLabelsSortDirection(labelsSortField === 'verificationStatus' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Status
+                                              {labelsSortField === 'verificationStatus' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
                                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                         </tr>
                                       </thead>
