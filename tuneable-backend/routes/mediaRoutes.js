@@ -13,6 +13,9 @@ const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../ut
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const MetadataExtractor = require('../utils/metadataExtractor');
 
+// Default cover art URL for media without cover art (matches frontend constant)
+const DEFAULT_COVER_ART = 'https://uploads.tuneable.stream/cover-art/default-cover.png';
+
 // Configure media upload
 const mediaUpload = createMediaUpload();
 const coverArtUpload = createCoverArtUpload();
@@ -309,7 +312,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     
     // Set default cover art if none was provided or extracted
     if (!media.coverArt) {
-      media.coverArt = '/default-cover.jpg';
+      media.coverArt = DEFAULT_COVER_ART;
       await media.save();
       console.log('✅ Set default cover art for media');
     }

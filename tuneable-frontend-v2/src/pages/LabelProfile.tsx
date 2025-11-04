@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { penceToPounds } from '../utils/currency';
 
 interface Label {
   _id: string;
@@ -250,15 +251,6 @@ const LabelProfile: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
   // Get social media links for display
   const getSocialMediaLinks = () => {
     if (!label?.socialMedia) return [];
@@ -477,7 +469,7 @@ const LabelProfile: React.FC = () => {
               {label.stats.totalBidAmount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-6 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{formatCurrency(label.stats.totalBidAmount || 0)}</div>
+                  <div className="text-2xl font-bold text-white">{penceToPounds(label.stats.totalBidAmount || 0)}</div>
                   <div className="text-sm text-gray-300">Total Bids</div>
                 </div>
               )}
@@ -563,9 +555,14 @@ const LabelProfile: React.FC = () => {
                           className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-white font-medium truncate">{release.title}</h4>
+                          <Link 
+                            to={`/tune/${release._id || release.uuid}`}
+                            className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
+                          >
+                            {release.title}
+                          </Link>
                           <p className="text-gray-400 text-sm truncate">{release.artist}</p>
-                          <p className="text-purple-400 text-sm">{formatCurrency(release.stats.totalBidAmount)}</p>
+                          <p className="text-purple-400 text-sm">{penceToPounds(release.stats.totalBidAmount)}</p>
                         </div>
                       </div>
                     ))}
@@ -591,11 +588,16 @@ const LabelProfile: React.FC = () => {
                           className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-white font-medium truncate">{media.title}</h4>
+                          <Link 
+                            to={`/tune/${media._id || media.uuid}`}
+                            className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
+                          >
+                            {media.title}
+                          </Link>
                           <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-purple-400 font-medium">{formatCurrency(media.stats.totalBidAmount)}</p>
+                          <p className="text-purple-400 font-medium">{penceToPounds(media.stats.totalBidAmount)}</p>
                           <p className="text-gray-400 text-sm">{media.stats.bidCount} bids</p>
                         </div>
                       </div>
@@ -660,11 +662,16 @@ const LabelProfile: React.FC = () => {
                         alt={release.title}
                         className="w-full h-48 rounded-lg object-cover mb-4"
                       />
-                      <h4 className="text-white font-medium truncate">{release.title}</h4>
+                      <Link 
+                        to={`/tune/${release._id || release.uuid}`}
+                        className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block mb-1"
+                      >
+                        {release.title}
+                      </Link>
                       <p className="text-gray-400 text-sm mb-2 truncate">{release.artist}</p>
                       <div className="flex justify-between items-center">
                         <span className="text-purple-400 font-medium">
-                          {formatCurrency(release.stats.totalBidAmount)}
+                          {penceToPounds(release.stats.totalBidAmount)}
                         </span>
                         <span className="text-gray-400 text-sm">
                           {release.stats.bidCount} bids

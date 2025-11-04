@@ -3,6 +3,7 @@ const router = express.Router();
 const Label = require('../models/Label');
 const User = require('../models/User');
 const Media = require('../models/Media');
+const Bid = require('../models/Bid');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelLogoUpload, getPublicUrl } = require('../utils/r2Upload');
@@ -97,25 +98,84 @@ router.get('/:slug', async (req, res) => {
     const updatedLabel = await Label.findById(label._id);
     const labelToReturn = updatedLabel || label;
 
+    // Prepare labelId for query (handle both ObjectId and string formats)
+    const labelIdString = label._id.toString();
+
     // Get recent releases
     const recentReleases = await Media.find({ 
-      'label.labelId': label._id,
-      isActive: true 
+      $or: [
+        { 'label.labelId': label._id }, // Match ObjectId format
+        { 'label.labelId': labelIdString } // Match string format
+      ]
     })
-    .select('title artist coverArt releaseDate globalMediaAggregate uuid')
+    .select('title artist coverArt releaseDate globalMediaAggregate uuid _id')
     .sort({ releaseDate: -1 })
     .limit(10)
     .lean();
 
     // Get top performing media
     const topMedia = await Media.find({ 
-      'label.labelId': label._id,
-      isActive: true 
+      $or: [
+        { 'label.labelId': label._id },
+        { 'label.labelId': labelIdString }
+      ]
     })
-    .select('title artist coverArt globalMediaAggregate uuid')
+    .select('title artist coverArt globalMediaAggregate uuid _id')
     .sort({ globalMediaAggregate: -1 })
     .limit(5)
     .lean();
+
+    // Get bid counts for recent releases
+    const recentReleaseIds = recentReleases.map(r => r._id);
+    let bidCounts = [];
+    if (recentReleaseIds.length > 0) {
+      bidCounts = await Bid.aggregate([
+        {
+          $match: {
+            mediaId: { $in: recentReleaseIds },
+            status: 'active'
+          }
+        },
+        {
+          $group: {
+            _id: '$mediaId',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+    }
+
+    // Create bid count lookup for recent releases
+    const bidCountLookup = {};
+    bidCounts.forEach(item => {
+      bidCountLookup[item._id.toString()] = item.count;
+    });
+
+    // Get bid counts for top media
+    const topMediaIds = topMedia.map(m => m._id);
+    let topBidCounts = [];
+    if (topMediaIds.length > 0) {
+      topBidCounts = await Bid.aggregate([
+        {
+          $match: {
+            mediaId: { $in: topMediaIds },
+            status: 'active'
+          }
+        },
+        {
+          $group: {
+            _id: '$mediaId',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+    }
+
+    // Create bid count lookup for top media
+    const topBidCountLookup = {};
+    topBidCounts.forEach(item => {
+      topBidCountLookup[item._id.toString()] = item.count;
+    });
 
     // Format media for response
     const formattedRecentReleases = recentReleases.map(m => ({
@@ -126,7 +186,8 @@ router.get('/:slug', async (req, res) => {
       coverArt: m.coverArt,
       releaseDate: m.releaseDate,
       stats: {
-        totalBidAmount: m.globalMediaAggregate || 0
+        totalBidAmount: m.globalMediaAggregate || 0,
+        bidCount: bidCountLookup[m._id.toString()] || 0
       }
     }));
 
@@ -138,7 +199,7 @@ router.get('/:slug', async (req, res) => {
       coverArt: m.coverArt,
       stats: {
         totalBidAmount: m.globalMediaAggregate || 0,
-        bidCount: 0 // Would need to aggregate from bids if needed
+        bidCount: topBidCountLookup[m._id.toString()] || 0
       }
     }));
 
