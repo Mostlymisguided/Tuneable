@@ -820,21 +820,36 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const changes = [];
     
     // Update allowed fields
+    // Note: 'sources' is handled separately below due to Map type
     const allowedUpdates = [
       'title', 'producer', 'featuring', 'album', 'genre',
       'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'description', 'sources'
+      'lyrics', 'description'
     ];
     
     allowedUpdates.forEach(field => {
-      if (req.body[field] !== undefined && media[field] !== req.body[field]) {
-        changes.push({
-          field,
-          oldValue: media[field],
-          newValue: req.body[field]
-        });
-        media[field] = req.body[field];
+      if (req.body[field] !== undefined) {
+        let value = req.body[field];
+        
+        // Convert numeric fields from string to number if needed
+        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate'];
+        if (numericFields.includes(field) && typeof value === 'string' && value.trim() !== '') {
+          const numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            value = numValue;
+          }
+        }
+        
+        // Check if value actually changed
+        if (media[field] !== value) {
+          changes.push({
+            field,
+            oldValue: media[field],
+            newValue: value
+          });
+          media[field] = value;
+        }
       }
     });
     
@@ -984,8 +999,63 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
     
+    // Special handling for sources field (Map type)
+    if (req.body.sources !== undefined) {
+      // Get old sources before modifying
+      const oldSources = media.sources instanceof Map 
+        ? Object.fromEntries(media.sources) 
+        : (media.sources || {});
+      
+      // Convert object to Map if needed
+      if (req.body.sources && typeof req.body.sources === 'object' && !(req.body.sources instanceof Map)) {
+        // Clear existing sources
+        if (media.sources instanceof Map) {
+          media.sources.clear();
+        } else {
+          media.sources = new Map();
+        }
+        
+        // Add new sources from object
+        Object.entries(req.body.sources).forEach(([key, value]) => {
+          if (value && typeof value === 'string' && value.trim()) {
+            media.sources.set(key, value.trim());
+          }
+        });
+        
+        // Track change
+        const newSources = Object.fromEntries(media.sources);
+        if (JSON.stringify(oldSources) !== JSON.stringify(newSources)) {
+          changes.push({
+            field: 'sources',
+            oldValue: oldSources,
+            newValue: newSources
+          });
+        }
+      } else if (req.body.sources === null || req.body.sources === '') {
+        // Clear sources
+        if (media.sources instanceof Map) {
+          media.sources.clear();
+        } else {
+          media.sources = new Map();
+        }
+        
+        // Track change if sources were cleared
+        if (Object.keys(oldSources).length > 0) {
+          changes.push({
+            field: 'sources',
+            oldValue: oldSources,
+            newValue: {}
+          });
+        }
+      }
+    }
+    
     // Add to edit history if there are changes
     if (changes.length > 0) {
+      // Ensure editHistory array exists
+      if (!media.editHistory) {
+        media.editHistory = [];
+      }
       media.editHistory.push({
         editedBy: userId,
         editedAt: new Date(),
@@ -1002,7 +1072,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating media:', error);
-    res.status(500).json({ error: 'Failed to update media' });
+    console.error('Error stack:', error.stack);
+    console.error('Request body:', req.body);
+    console.error('Media ID:', req.params.id);
+    res.status(500).json({ 
+      error: 'Failed to update media',
+      details: error.message 
+    });
   }
 });
 
