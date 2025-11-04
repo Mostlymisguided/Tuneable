@@ -909,29 +909,61 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       affiliationLabelMap[label._id.toString()] = label;
     });
 
+    // Get all media for admin labels to calculate bid totals
+    const adminLabelIds = labels.map(l => l._id);
+    const adminLabelMedia = await Media.find({
+      'label.labelId': { $in: adminLabelIds }
+    }).select('_id label').lean();
+    
+    // Create a map of mediaId -> labelIds for quick lookup
+    const mediaToLabelMap = {};
+    adminLabelMedia.forEach(media => {
+      const mediaIdStr = media._id.toString();
+      if (!mediaToLabelMap[mediaIdStr]) {
+        mediaToLabelMap[mediaIdStr] = [];
+      }
+      if (media.label && Array.isArray(media.label)) {
+        media.label.forEach(label => {
+          if (label.labelId && adminLabelIds.some(id => id.toString() === label.labelId.toString())) {
+            const labelIdStr = label.labelId.toString();
+            if (!mediaToLabelMap[mediaIdStr].includes(labelIdStr)) {
+              mediaToLabelMap[mediaIdStr].push(labelIdStr);
+            }
+          }
+        });
+      }
+    });
+    
+    const adminLabelMediaIds = adminLabelMedia.map(m => m._id);
+    
+    // Calculate total bid amounts for admin labels
+    let adminLabelBidTotals = {};
+    if (adminLabelMediaIds.length > 0) {
+      // Get all bids for these media
+      const bids = await Bid.find({
+        mediaId: { $in: adminLabelMediaIds },
+        status: 'active'
+      }).select('mediaId amount').lean();
+      
+      // Sum bids by label
+      bids.forEach(bid => {
+        const mediaIdStr = bid.mediaId.toString();
+        const labelIds = mediaToLabelMap[mediaIdStr] || [];
+        labelIds.forEach(labelIdStr => {
+          adminLabelBidTotals[labelIdStr] = (adminLabelBidTotals[labelIdStr] || 0) + (bid.amount || 0);
+        });
+      });
+    }
+
     // Format labels with role information
     const formattedAdminLabels = labels.map(label => {
       const adminEntry = label.admins.find(admin => 
         admin.userId.toString() === userId.toString()
       );
-      return {
-        _id: label._id,
-        name: label.name,
-        slug: label.slug,
-        logo: label.logo,
-        verificationStatus: label.verificationStatus,
-        totalBidAmount: label.stats?.totalBidAmount || 0,
-        artistCount: label.stats?.artistCount || 0,
-        releaseCount: label.stats?.releaseCount || 0,
-        role: adminEntry?.role || 'admin', // 'owner' or 'admin'
-        relationshipType: 'admin' // To distinguish from affiliations
-      };
-    });
-
-    // Format affiliation labels with role information
-    const formattedAffiliationLabels = activeAffiliations.map(affiliation => {
-      const label = affiliationLabelMap[affiliation.labelId.toString()];
-      if (!label) return null; // Skip if label not found
+      // Use calculated total from bids, fallback to stored stats
+      const calculatedTotal = adminLabelBidTotals[label._id.toString()] !== undefined
+        ? adminLabelBidTotals[label._id.toString()]
+        : (label.stats?.totalBidAmount || 0);
       
       return {
         _id: label._id,
@@ -939,7 +971,77 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         slug: label.slug,
         logo: label.logo,
         verificationStatus: label.verificationStatus,
-        totalBidAmount: label.stats?.totalBidAmount || 0,
+        totalBidAmount: calculatedTotal,
+        artistCount: label.stats?.artistCount || 0,
+        releaseCount: label.stats?.releaseCount || 0,
+        role: adminEntry?.role || 'admin', // 'owner' or 'admin'
+        relationshipType: 'admin' // To distinguish from affiliations
+      };
+    });
+
+    // Get all media for affiliation labels to calculate bid totals
+    // Note: affiliationLabelIds was already defined above, reuse it
+    const affiliationLabelMedia = await Media.find({
+      'label.labelId': { $in: affiliationLabelIds }
+    }).select('_id label').lean();
+    
+    // Create a map of mediaId -> labelIds for quick lookup
+    const affiliationMediaToLabelMap = {};
+    affiliationLabelMedia.forEach(media => {
+      const mediaIdStr = media._id.toString();
+      if (!affiliationMediaToLabelMap[mediaIdStr]) {
+        affiliationMediaToLabelMap[mediaIdStr] = [];
+      }
+      if (media.label && Array.isArray(media.label)) {
+        media.label.forEach(label => {
+          if (label.labelId && affiliationLabelIds.some(id => id.toString() === label.labelId.toString())) {
+            const labelIdStr = label.labelId.toString();
+            if (!affiliationMediaToLabelMap[mediaIdStr].includes(labelIdStr)) {
+              affiliationMediaToLabelMap[mediaIdStr].push(labelIdStr);
+            }
+          }
+        });
+      }
+    });
+    
+    const affiliationLabelMediaIds = affiliationLabelMedia.map(m => m._id);
+    
+    // Calculate total bid amounts for affiliation labels
+    let affiliationLabelBidTotals = {};
+    if (affiliationLabelMediaIds.length > 0) {
+      // Get all bids for these media
+      const bids = await Bid.find({
+        mediaId: { $in: affiliationLabelMediaIds },
+        status: 'active'
+      }).select('mediaId amount').lean();
+      
+      // Sum bids by label
+      bids.forEach(bid => {
+        const mediaIdStr = bid.mediaId.toString();
+        const labelIds = affiliationMediaToLabelMap[mediaIdStr] || [];
+        labelIds.forEach(labelIdStr => {
+          affiliationLabelBidTotals[labelIdStr] = (affiliationLabelBidTotals[labelIdStr] || 0) + (bid.amount || 0);
+        });
+      });
+    }
+
+    // Format affiliation labels with role information
+    const formattedAffiliationLabels = activeAffiliations.map(affiliation => {
+      const label = affiliationLabelMap[affiliation.labelId.toString()];
+      if (!label) return null; // Skip if label not found
+      
+      // Use calculated total from bids, fallback to stored stats
+      const calculatedTotal = affiliationLabelBidTotals[label._id.toString()] !== undefined
+        ? affiliationLabelBidTotals[label._id.toString()]
+        : (label.stats?.totalBidAmount || 0);
+      
+      return {
+        _id: label._id,
+        name: label.name,
+        slug: label.slug,
+        logo: label.logo,
+        verificationStatus: label.verificationStatus,
+        totalBidAmount: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
         releaseCount: label.stats?.releaseCount || 0,
         role: affiliation.role, // 'artist', 'producer', 'manager', 'staff'
@@ -1040,9 +1142,9 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
 
     const total = await Media.countDocuments(query);
 
-    // Get bid counts for each media
+    // Get bid counts and totals for each media
     const mediaIds = media.map(m => m._id);
-    const bidCounts = await Bid.aggregate([
+    const bidStats = await Bid.aggregate([
       {
         $match: {
           mediaId: { $in: mediaIds },
@@ -1052,14 +1154,18 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
       {
         $group: {
           _id: '$mediaId',
-          count: { $sum: 1 }
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
         }
       }
     ]);
 
     const bidCountMap = {};
-    bidCounts.forEach(item => {
-      bidCountMap[item._id.toString()] = item.count;
+    const bidTotalMap = {};
+    bidStats.forEach(item => {
+      const mediaIdStr = item._id.toString();
+      bidCountMap[mediaIdStr] = item.count;
+      bidTotalMap[mediaIdStr] = item.totalAmount;
     });
 
     // Format response with ownership info
@@ -1076,14 +1182,20 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
         artistName = m.artist;
       }
 
+      // Calculate total bid amount from actual bids (fallback to stored value if bids not found)
+      const mediaIdStr = m._id.toString();
+      const totalBidAmount = bidTotalMap[mediaIdStr] !== undefined 
+        ? bidTotalMap[mediaIdStr] 
+        : (m.globalMediaAggregate || 0);
+
       return {
         _id: m._id,
         uuid: m.uuid,
         title: m.title,
         artist: artistName,
         coverArt: m.coverArt,
-        globalMediaAggregate: m.globalMediaAggregate || 0,
-        bidCount: bidCountMap[m._id.toString()] || 0,
+        globalMediaAggregate: totalBidAmount, // Use calculated total from bids
+        bidCount: bidCountMap[mediaIdStr] || 0,
         createdAt: m.createdAt,
         uploadedAt: m.uploadedAt || m.createdAt,
         ownershipPercentage: ownerInfo?.percentage || 0,
