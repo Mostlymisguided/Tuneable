@@ -1061,19 +1061,6 @@ const TuneProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Top Bids */}
-        {media.bids && media.bids.length > 0 && (
-          <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
-              <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
-              Top Bids
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopBidders bids={media.bids} maxDisplay={5} />
-            </div>
-          </div>
-        )}
-
         {/* Top Supporters */}
         {media.bids && media.bids.length > 0 && (
           <div className="mb-8 px-2 md:px-0">
@@ -1083,6 +1070,19 @@ const TuneProfile: React.FC = () => {
             </h2>
             <div className="card bg-black/20 rounded-lg p-4 md:p-6">
               <TopSupporters bids={media.bids} maxDisplay={10} />
+            </div>
+          </div>
+        )}
+
+        {/* Top Bids */}
+        {media.bids && media.bids.length > 0 && (
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
+              Top Bids
+            </h2>
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <TopBidders bids={media.bids} maxDisplay={5} />
             </div>
           </div>
         )}
