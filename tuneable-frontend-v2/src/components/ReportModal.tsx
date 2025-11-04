@@ -1,66 +1,152 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle } from 'lucide-react';
-import { mediaAPI } from '../lib/api';
+import { reportAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mediaId: string;
-  mediaTitle: string;
+  reportType: 'media' | 'user' | 'label';
+  targetId: string;
+  targetTitle: string;
 }
 
-const reportCategories = [
-  {
-    value: 'copyright',
-    label: 'Copyright/Rights Issue',
-    description: 'I own the rights to this tune or represent the rights holder',
-    requiresEmail: true,
-    priority: true
-  },
-  {
-    value: 'incorrect_info',
-    label: 'Incorrect Information',
-    description: 'Artist name, title, or other metadata is wrong',
-    requiresEmail: false,
-    priority: false
-  },
-  {
-    value: 'incorrect_tags',
-    label: 'Incorrect Tags',
-    description: 'Genre or other tags are inaccurate',
-    requiresEmail: false,
-    priority: false
-  },
-  {
-    value: 'inappropriate',
-    label: 'Inappropriate Content',
-    description: 'Offensive, explicit, or otherwise inappropriate',
-    requiresEmail: false,
-    priority: false
-  },
-  {
-    value: 'duplicate',
-    label: 'Duplicate',
-    description: 'This tune already exists on the platform',
-    requiresEmail: false,
-    priority: false
-  },
-  {
-    value: 'other',
-    label: 'Other Issue',
-    description: 'Something else needs attention',
-    requiresEmail: false,
-    priority: false
-  }
-];
+// Report categories by type
+const reportCategoriesByType = {
+  media: [
+    {
+      value: 'copyright',
+      label: 'Copyright/Rights Issue',
+      description: 'I own the rights to this tune or represent the rights holder',
+      requiresEmail: true,
+      priority: true
+    },
+    {
+      value: 'incorrect_info',
+      label: 'Incorrect Information',
+      description: 'Artist name, title, or other metadata is wrong',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'incorrect_tags',
+      label: 'Incorrect Tags',
+      description: 'Genre or other tags are inaccurate',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'inappropriate',
+      label: 'Inappropriate Content',
+      description: 'Offensive, explicit, or otherwise inappropriate',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'duplicate',
+      label: 'Duplicate',
+      description: 'This tune already exists on the platform',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'other',
+      label: 'Other Issue',
+      description: 'Something else needs attention',
+      requiresEmail: false,
+      priority: false
+    }
+  ],
+  user: [
+    {
+      value: 'harassment',
+      label: 'Harassment/Bullying',
+      description: 'This user is harassing or bullying others',
+      requiresEmail: false,
+      priority: true
+    },
+    {
+      value: 'spam',
+      label: 'Spam/Scam',
+      description: 'This user is posting spam or running scams',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'impersonation',
+      label: 'Impersonation',
+      description: 'This user is impersonating someone else',
+      requiresEmail: false,
+      priority: true
+    },
+    {
+      value: 'inappropriate',
+      label: 'Inappropriate Content/Behavior',
+      description: 'This user is posting inappropriate content or behaving inappropriately',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'copyright',
+      label: 'Copyright Infringement',
+      description: 'This user is infringing on copyrights',
+      requiresEmail: true,
+      priority: false
+    },
+    {
+      value: 'other',
+      label: 'Other Issue',
+      description: 'Something else needs attention',
+      requiresEmail: false,
+      priority: false
+    }
+  ],
+  label: [
+    {
+      value: 'label_impersonation',
+      label: 'Impersonation',
+      description: 'This label is impersonating another label',
+      requiresEmail: false,
+      priority: true
+    },
+    {
+      value: 'label_incorrect_info',
+      label: 'Incorrect Information',
+      description: 'The label information is incorrect',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'label_spam',
+      label: 'Spam',
+      description: 'This label is posting spam content',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'inappropriate',
+      label: 'Inappropriate Content',
+      description: 'This label is posting inappropriate content',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'other',
+      label: 'Other Issue',
+      description: 'Something else needs attention',
+      requiresEmail: false,
+      priority: false
+    }
+  ]
+};
 
-const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, mediaId, mediaTitle }) => {
+const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, reportType, targetId, targetTitle }) => {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const reportCategories = reportCategoriesByType[reportType];
   const selectedCategory = reportCategories.find(c => c.value === category);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,18 +158,37 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, mediaId, med
     }
 
     if (selectedCategory?.requiresEmail && !contactEmail.trim()) {
-      toast.error('Contact email is required for copyright reports');
+      toast.error('Contact email is required for this report type');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await mediaAPI.reportMedia(mediaId, {
-        category,
-        description: description.trim(),
-        contactEmail: contactEmail.trim() || undefined
-      });
+      let response;
+      switch (reportType) {
+        case 'media':
+          response = await reportAPI.reportMedia(targetId, {
+            category,
+            description: description.trim(),
+            contactEmail: contactEmail.trim() || undefined
+          });
+          break;
+        case 'user':
+          response = await reportAPI.reportUser(targetId, {
+            category,
+            description: description.trim(),
+            contactEmail: contactEmail.trim() || undefined
+          });
+          break;
+        case 'label':
+          response = await reportAPI.reportLabel(targetId, {
+            category,
+            description: description.trim(),
+            contactEmail: contactEmail.trim() || undefined
+          });
+          break;
+      }
 
       toast.success('Report submitted successfully. We\'ll review it shortly.');
       onClose();
@@ -109,6 +214,40 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, mediaId, med
     }
   };
 
+  const getTypeLabel = () => {
+    switch (reportType) {
+      case 'media':
+        return 'Tune';
+      case 'user':
+        return 'User';
+      case 'label':
+        return 'Label';
+      default:
+        return 'Item';
+    }
+  };
+
+  const getCopyrightNotice = () => {
+    if (reportType === 'media' && category === 'copyright') {
+      return (
+        <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-200">
+              <p className="font-medium mb-1">Copyright Notice</p>
+              <p>
+                Please ensure you are the copyright holder or authorized representative. 
+                False claims may result in account suspension. We will contact you at 
+                the provided email for verification.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -131,10 +270,10 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, mediaId, med
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Tune Info */}
+          {/* Target Info */}
           <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
             <p className="text-sm text-gray-400">Reporting:</p>
-            <p className="text-white font-medium">{mediaTitle}</p>
+            <p className="text-white font-medium">{targetTitle}</p>
           </div>
 
           {/* Category Selection */}
@@ -216,21 +355,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, mediaId, med
           )}
 
           {/* Copyright Notice */}
-          {category === 'copyright' && (
-            <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-200">
-                  <p className="font-medium mb-1">Copyright Notice</p>
-                  <p>
-                    Please ensure you are the copyright holder or authorized representative. 
-                    False claims may result in account suspension. We will contact you at 
-                    the provided email for verification.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {getCopyrightNotice()}
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
@@ -258,4 +383,3 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, mediaId, med
 };
 
 export default ReportModal;
-

@@ -25,10 +25,12 @@ import {
   ChevronDown,
   ChevronUp,
   Building,
-  CheckCircle
+  CheckCircle,
+  Flag
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
+import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
@@ -177,6 +179,9 @@ const UserProfile: React.FC = () => {
     inApp: true // Always true
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+  
+  // Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
   const [editForm, setEditForm] = useState({
     username: '',
     givenName: '',
@@ -716,31 +721,41 @@ const UserProfile: React.FC = () => {
           >
             Back
           </button>
-            {/* Settings Button - Only show when viewing own profile and not in settings mode */}
-            {isOwnProfile && !isSettingsMode && (
-             <div className='inline rounded-full items-center absolute right-3 mb-4'>
-             <button
-                onClick={handleSettingsClick}
-                className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
-              >
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
-              </div>
-            )}
-            
-            {/* Exit Settings Button - Only show in settings mode */}
-            {isOwnProfile && isSettingsMode && (
-             <div className='inline rounded-full items-center absolute right-3 mb-4'>
-             <button
-                onClick={exitSettings}
-                className="px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
-              >
-                <X className="h-4 w-4" />
-                <span className="hidden sm:inline">Exit Settings</span>
-              </button>
-              </div>
-            )}
+            {/* Report & Settings Buttons */}
+            <div className='inline rounded-full items-center absolute right-3 mb-4 flex space-x-2'>
+              {/* Report Button - Always visible when viewing someone else's profile */}
+              {!isOwnProfile && (
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                >
+                  <Flag className="h-4 w-4" />
+                  <span className="hidden sm:inline">Report</span>
+                </button>
+              )}
+              
+              {/* Settings Button - Only show when viewing own profile and not in settings mode */}
+              {isOwnProfile && !isSettingsMode && (
+                <button
+                  onClick={handleSettingsClick}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </button>
+              )}
+              
+              {/* Exit Settings Button - Only show in settings mode */}
+              {isOwnProfile && isSettingsMode && (
+                <button
+                  onClick={exitSettings}
+                  className="px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exit Settings</span>
+                </button>
+              )}
+            </div>
           
           <div className="card flex items-start relative">
             <div className='absolute top-0 right-0'>
@@ -2030,6 +2045,17 @@ const UserProfile: React.FC = () => {
           platform={socialModal.platform}
           currentUrl={socialModal.currentUrl}
           onSave={handleSaveSocialMedia}
+        />
+      )}
+
+      {/* Report Modal */}
+      {user && !isOwnProfile && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reportType="user"
+          targetId={user.uuid || user._id || user.id}
+          targetTitle={`@${user.username}`}
         />
       )}
 

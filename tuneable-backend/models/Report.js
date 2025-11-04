@@ -1,16 +1,42 @@
 const mongoose = require('mongoose');
 
 const reportSchema = new mongoose.Schema({
-  // Media being reported
-  mediaId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Media', 
+  // Report type: media, user, or label
+  reportType: {
+    type: String,
+    enum: ['media', 'user', 'label'],
     required: true,
     index: true
   },
+  
+  // Media being reported (for media reports)
+  mediaId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Media',
+    index: true
+  },
   mediaUuid: { 
-    type: String, 
-    required: true 
+    type: String
+  },
+  
+  // User being reported (for user reports)
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true
+  },
+  userUuid: {
+    type: String
+  },
+  
+  // Label being reported (for label reports)
+  labelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Label',
+    index: true
+  },
+  labelUuid: {
+    type: String
   },
   
   // Reporter information
@@ -24,7 +50,17 @@ const reportSchema = new mongoose.Schema({
   // Report details
   category: {
     type: String,
-    enum: ['copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other'],
+    // Media categories: copyright, incorrect_info, incorrect_tags, inappropriate, duplicate, other
+    // User categories: harassment, spam, impersonation, inappropriate, copyright, other
+    // Label categories: impersonation, incorrect_info, spam, other
+    enum: [
+      // Media categories
+      'copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other',
+      // User categories
+      'harassment', 'spam', 'impersonation',
+      // Label categories (reuse some)
+      'label_impersonation', 'label_incorrect_info', 'label_spam'
+    ],
     required: true
   },
   description: { 
@@ -58,10 +94,28 @@ const reportSchema = new mongoose.Schema({
 
 // Index for efficient queries
 reportSchema.index({ status: 1, createdAt: -1 });
+reportSchema.index({ reportType: 1, status: 1 });
 reportSchema.index({ mediaId: 1, reportedBy: 1 });
+reportSchema.index({ userId: 1, reportedBy: 1 });
+reportSchema.index({ labelId: 1, reportedBy: 1 });
 
-// Prevent duplicate reports from same user for same media
-reportSchema.index({ mediaId: 1, reportedBy: 1 }, { unique: true });
+// Prevent duplicate reports from same user for same target
+// Compound indexes for uniqueness based on report type
+reportSchema.index({ reportType: 1, mediaId: 1, reportedBy: 1 }, { 
+  unique: true, 
+  sparse: true,
+  partialFilterExpression: { reportType: 'media' }
+});
+reportSchema.index({ reportType: 1, userId: 1, reportedBy: 1 }, { 
+  unique: true, 
+  sparse: true,
+  partialFilterExpression: { reportType: 'user' }
+});
+reportSchema.index({ reportType: 1, labelId: 1, reportedBy: 1 }, { 
+  unique: true, 
+  sparse: true,
+  partialFilterExpression: { reportType: 'label' }
+});
 
 module.exports = mongoose.model('Report', reportSchema);
 

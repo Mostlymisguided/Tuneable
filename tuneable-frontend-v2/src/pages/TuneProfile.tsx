@@ -2050,8 +2050,9 @@ const TuneProfile: React.FC = () => {
         <ReportModal
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
-          mediaId={media._id}
-          mediaTitle={`${media.title} by ${Array.isArray(media.artist) ? media.artist.map((a: any) => a.name).join(', ') : media.artist}`}
+          reportType="media"
+          targetId={media._id}
+          targetTitle={`${media.title} by ${Array.isArray(media.artist) ? media.artist.map((a: any) => a.name).join(', ') : media.artist}`}
         />
       )}
     </div>

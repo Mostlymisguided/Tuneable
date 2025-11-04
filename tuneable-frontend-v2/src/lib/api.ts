@@ -416,9 +416,9 @@ export const mediaAPI = {
     return response.data;
   },
 
-  // Report a media item
+  // Report a media item (legacy - use reportAPI.reportMedia instead)
   reportMedia: async (mediaId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
-    const response = await api.post(`/reports/${mediaId}/report`, reportData);
+    const response = await api.post(`/reports/media/${mediaId}/report`, reportData);
     return response.data;
   },
 };
@@ -778,13 +778,32 @@ export const creatorAPI = {
   },
 };
 
-// Report API (Admin)
+// Report API
 export const reportAPI = {
+  // Report a media item
+  reportMedia: async (mediaId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
+    const response = await api.post(`/reports/media/${mediaId}/report`, reportData);
+    return response.data;
+  },
+
+  // Report a user
+  reportUser: async (userId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
+    const response = await api.post(`/reports/users/${userId}/report`, reportData);
+    return response.data;
+  },
+
+  // Report a label
+  reportLabel: async (labelId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
+    const response = await api.post(`/reports/labels/${labelId}/report`, reportData);
+    return response.data;
+  },
+
   // Get all reports (admin only)
-  getReports: async (status?: string, category?: string, limit?: number, skip?: number) => {
+  getReports: async (status?: string, category?: string, reportType?: string, limit?: number, skip?: number) => {
     const params: any = {};
     if (status) params.status = status;
     if (category) params.category = category;
+    if (reportType) params.reportType = reportType;
     if (limit) params.limit = limit;
     if (skip) params.skip = skip;
     const response = await api.get('/reports/admin/reports', { params });

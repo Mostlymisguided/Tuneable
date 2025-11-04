@@ -1,17 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { Flag, ExternalLink, CheckCircle, XCircle, Clock, User as UserIcon, Music } from 'lucide-react';
+import { Flag, ExternalLink, CheckCircle, XCircle, Clock, User as UserIcon, Music, Building } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Report {
   _id: string;
-  mediaId: {
+  reportType: 'media' | 'user' | 'label';
+  mediaId?: {
     _id: string;
     uuid: string;
     title: string;
-    artist: string;
+    artist: string | any[];
     coverArt?: string;
+  };
+  userId?: {
+    _id: string;
+    uuid: string;
+    username: string;
+    profilePic?: string;
+  };
+  labelId?: {
+    _id: string;
+    uuid?: string;
+    slug?: string;
+    name: string;
+    logo?: string;
   };
   reportedBy: {
     _id: string;
@@ -32,13 +46,26 @@ interface Report {
   resolvedAt?: string;
 }
 
+interface ReportsAdminProps {
+  reportType?: 'media' | 'user' | 'label';
+}
+
 const categoryLabels: { [key: string]: string } = {
+  // Media categories
   copyright: 'Copyright/Rights Issue',
   incorrect_info: 'Incorrect Information',
   incorrect_tags: 'Incorrect Tags',
   inappropriate: 'Inappropriate Content',
   duplicate: 'Duplicate',
-  other: 'Other Issue'
+  other: 'Other Issue',
+  // User categories
+  harassment: 'Harassment/Bullying',
+  spam: 'Spam/Scam',
+  impersonation: 'Impersonation',
+  // Label categories
+  label_impersonation: 'Impersonation',
+  label_incorrect_info: 'Incorrect Information',
+  label_spam: 'Spam'
 };
 
 const statusColors: { [key: string]: string } = {
@@ -48,7 +75,7 @@ const statusColors: { [key: string]: string } = {
   dismissed: 'bg-gray-600'
 };
 
-const ReportsAdmin: React.FC = () => {
+const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media' }) => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,12 +86,12 @@ const ReportsAdmin: React.FC = () => {
 
   useEffect(() => {
     loadReports();
-  }, [statusFilter]);
+  }, [statusFilter, reportType]);
 
   const loadReports = async () => {
     try {
       setLoading(true);
-      const data = await reportAPI.getReports(statusFilter || undefined);
+      const data = await reportAPI.getReports(statusFilter || undefined, undefined, reportType);
       setReports(data.reports || []);
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -93,6 +120,56 @@ const ReportsAdmin: React.FC = () => {
     }
   };
 
+  const getTargetInfo = (report: Report) => {
+    if (report.reportType === 'media' && report.mediaId) {
+      return {
+        type: 'media',
+        icon: Music,
+        title: report.mediaId.title,
+        subtitle: Array.isArray(report.mediaId.artist) 
+          ? report.mediaId.artist.map((a: any) => a.name).join(', ')
+          : report.mediaId.artist,
+        id: report.mediaId.uuid,
+        link: `/tune/${report.mediaId.uuid}`,
+        coverArt: report.mediaId.coverArt
+      };
+    } else if (report.reportType === 'user' && report.userId) {
+      return {
+        type: 'user',
+        icon: UserIcon,
+        title: `@${report.userId.username}`,
+        subtitle: report.userId.username,
+        id: report.userId.uuid,
+        link: `/user/${report.userId.uuid}`,
+        profilePic: report.userId.profilePic
+      };
+    } else if (report.reportType === 'label' && report.labelId) {
+      return {
+        type: 'label',
+        icon: Building,
+        title: report.labelId.name,
+        subtitle: report.labelId.slug || report.labelId.uuid,
+        id: report.labelId.slug || report.labelId.uuid,
+        link: `/label/${report.labelId.slug || report.labelId.uuid}`,
+        logo: report.labelId.logo
+      };
+    }
+    return null;
+  };
+
+  const getTypeLabel = () => {
+    switch (reportType) {
+      case 'media':
+        return 'Tune Reports';
+      case 'user':
+        return 'User Reports';
+      case 'label':
+        return 'Label Reports';
+      default:
+        return 'Reports';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -107,7 +184,7 @@ const ReportsAdmin: React.FC = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
           <Flag className="w-6 h-6 text-purple-400" />
-          <span>Tune Reports</span>
+          <span>{getTypeLabel()}</span>
         </h2>
       </div>
 
@@ -137,126 +214,136 @@ const ReportsAdmin: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {reports.map((report) => (
-            <div
-              key={report._id}
-              className="card hover:bg-gray-800/50 transition-colors"
-            >
-              <div className="flex items-start justify-between">
-                {/* Report Info */}
-                <div className="flex-1 space-y-3">
-                  {/* Header */}
-                  <div className="flex items-center space-x-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium text-white ${statusColors[report.status]}`}>
-                      {report.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      report.category === 'copyright' ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300'
-                    }`}>
-                      {categoryLabels[report.category]}
-                    </span>
-                    <span className="text-gray-400 text-sm">
-                      {new Date(report.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
+          {reports.map((report) => {
+            const targetInfo = getTargetInfo(report);
+            if (!targetInfo) return null;
+            const TargetIcon = targetInfo.icon;
 
-                  {/* Tune Info */}
-                  <div className="flex items-center space-x-3">
-                    <Music className="w-5 h-5 text-purple-400" />
-                    <div>
-                      <button
-                        onClick={() => navigate(`/tune/${report.mediaId.uuid}`)}
-                        className="text-white font-medium hover:text-purple-300 transition-colors"
-                      >
-                        {report.mediaId.title}
-                      </button>
-                      <p className="text-gray-400 text-sm">
-                        by {Array.isArray(report.mediaId.artist) ? report.mediaId.artist.map((a: any) => a.name).join(', ') : report.mediaId.artist}
-                      </p>
+            return (
+              <div
+                key={report._id}
+                className="card hover:bg-gray-800/50 transition-colors"
+              >
+                <div className="flex items-start justify-between">
+                  {/* Report Info */}
+                  <div className="flex-1 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center space-x-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium text-white ${statusColors[report.status]}`}>
+                        {report.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        report.category === 'copyright' || report.category === 'harassment' || report.category === 'impersonation' || report.category === 'label_impersonation'
+                          ? 'bg-red-600 text-white' 
+                          : 'bg-gray-700 text-gray-300'
+                      }`}>
+                        {categoryLabels[report.category] || report.category}
+                      </span>
+                      <span className="text-gray-400 text-sm">
+                        {new Date(report.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
-                  </div>
 
-                  {/* Reporter Info */}
-                  <div className="flex items-center space-x-3">
-                    <UserIcon className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <button
-                        onClick={() => navigate(`/user/${report.reportedBy.uuid}`)}
-                        className="text-gray-300 hover:text-white transition-colors"
-                      >
-                        @{report.reportedBy.username}
-                      </button>
-                      {report.contactEmail && (
-                        <p className="text-gray-500 text-sm">Contact: {report.contactEmail}</p>
-                      )}
+                    {/* Target Info */}
+                    <div className="flex items-center space-x-3">
+                      <TargetIcon className="w-5 h-5 text-purple-400" />
+                      <div>
+                        <button
+                          onClick={() => navigate(targetInfo.link)}
+                          className="text-white font-medium hover:text-purple-300 transition-colors"
+                        >
+                          {targetInfo.title}
+                        </button>
+                        {targetInfo.subtitle && (
+                          <p className="text-gray-400 text-sm">
+                            {targetInfo.subtitle}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Description */}
-                  <div className="bg-gray-800/50 p-3 rounded-lg">
-                    <p className="text-gray-300 text-sm">{report.description}</p>
-                  </div>
-
-                  {/* Admin Notes */}
-                  {report.adminNotes && (
-                    <div className="bg-blue-900/20 p-3 rounded-lg border border-blue-500/30">
-                      <p className="text-blue-200 text-sm"><strong>Admin Notes:</strong> {report.adminNotes}</p>
-                      {report.resolvedBy && (
-                        <p className="text-blue-300 text-xs mt-1">
-                          Resolved by {report.resolvedBy.username} on {new Date(report.resolvedAt!).toLocaleDateString()}
-                        </p>
-                      )}
+                    {/* Reporter Info */}
+                    <div className="flex items-center space-x-3">
+                      <UserIcon className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <button
+                          onClick={() => navigate(`/user/${report.reportedBy.uuid}`)}
+                          className="text-gray-300 hover:text-white transition-colors"
+                        >
+                          @{report.reportedBy.username}
+                        </button>
+                        {report.contactEmail && (
+                          <p className="text-gray-500 text-sm">Contact: {report.contactEmail}</p>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Actions */}
-                <div className="ml-4 flex flex-col space-y-2">
-                  {report.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => setSelectedReport(report)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Review
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(report._id, 'dismissed')}
-                        disabled={updatingReport}
-                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      >
-                        Dismiss
-                      </button>
-                    </>
-                  )}
-                  {report.status === 'in_review' && (
-                    <>
-                      <button
-                        onClick={() => setSelectedReport(report)}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Resolve
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(report._id, 'dismissed')}
-                        disabled={updatingReport}
-                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      >
-                        Dismiss
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => navigate(`/tune/${report.mediaId.uuid}`)}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>View</span>
-                  </button>
+                    {/* Description */}
+                    <div className="bg-gray-800/50 p-3 rounded-lg">
+                      <p className="text-gray-300 text-sm">{report.description}</p>
+                    </div>
+
+                    {/* Admin Notes */}
+                    {report.adminNotes && (
+                      <div className="bg-blue-900/20 p-3 rounded-lg border border-blue-500/30">
+                        <p className="text-blue-200 text-sm"><strong>Admin Notes:</strong> {report.adminNotes}</p>
+                        {report.resolvedBy && (
+                          <p className="text-blue-300 text-xs mt-1">
+                            Resolved by {report.resolvedBy.username} on {new Date(report.resolvedAt!).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="ml-4 flex flex-col space-y-2">
+                    {report.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => setSelectedReport(report)}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Review
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(report._id, 'dismissed')}
+                          disabled={updatingReport}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                        >
+                          Dismiss
+                        </button>
+                      </>
+                    )}
+                    {report.status === 'in_review' && (
+                      <>
+                        <button
+                          onClick={() => setSelectedReport(report)}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(report._id, 'dismissed')}
+                          disabled={updatingReport}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                        >
+                          Dismiss
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => navigate(targetInfo.link)}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>View</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -325,4 +412,3 @@ const ReportsAdmin: React.FC = () => {
 };
 
 export default ReportsAdmin;
-

@@ -73,6 +73,7 @@ const Admin: React.FC = () => {
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
+  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label'>('media');
 
   useEffect(() => {
     checkAdminStatus();
@@ -455,7 +456,7 @@ const Admin: React.FC = () => {
     { id: 'vetoed-bids', name: 'Vetoed Bids', icon: XCircle },
     { id: 'creators', name: 'Creator Applications', icon: Award },
     { id: 'claims', name: 'Tune Claims', icon: Music },
-    { id: 'reports', name: 'Tune Reports', icon: AlertTriangle },
+    { id: 'reports', name: 'Reports', icon: AlertTriangle },
     { id: 'invites', name: 'Invite Requests', icon: Mail },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -1481,8 +1482,50 @@ const Admin: React.FC = () => {
         )}
 
         {activeTab === 'reports' && (
-          <div>
-            <ReportsAdmin />
+          <div className="space-y-6">
+            {/* Sub-tabs for Reports */}
+            <div className="bg-gray-800 border-b border-gray-700">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-8">
+                  <button
+                    onClick={() => setReportsSubTab('media')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'media'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Music className="h-4 w-4 mr-2" />
+                    <span>Tune Reports</span>
+                  </button>
+                  <button
+                    onClick={() => setReportsSubTab('user')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'user'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    <span>User Reports</span>
+                  </button>
+                  <button
+                    onClick={() => setReportsSubTab('label')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'label'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    <span>Label Reports</span>
+                  </button>
+                </nav>
+              </div>
+            </div>
+            
+            {/* Reports Content */}
+            <ReportsAdmin reportType={reportsSubTab} />
           </div>
         )}
 
