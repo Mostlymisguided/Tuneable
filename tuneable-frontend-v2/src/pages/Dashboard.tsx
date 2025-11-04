@@ -76,6 +76,11 @@ const Dashboard: React.FC = () => {
   const [labelsFilterVerification, setLabelsFilterVerification] = useState<string>('all'); // 'all', 'verified', 'pending', 'unverified'
   const [labelsSortField, setLabelsSortField] = useState<string>('name');
   const [labelsSortDirection, setLabelsSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [collapsedSections, setCollapsedSections] = useState<{
+    owned: boolean;
+    admin: boolean;
+    affiliated: boolean;
+  }>({ owned: false, admin: false, affiliated: false });
 
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
@@ -935,10 +940,21 @@ const Dashboard: React.FC = () => {
                             {/* Owned Labels Section */}
                             {ownedLabels.length > 0 && (
                               <div>
-                                <h4 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                                  <Building className="h-5 w-5 text-purple-400" />
-                                  Labels You Own ({ownedLabels.length})
-                                </h4>
+                                <button
+                                  onClick={() => setCollapsedSections(prev => ({ ...prev, owned: !prev.owned }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Building className="h-5 w-5 text-purple-400" />
+                                    Labels You Own ({ownedLabels.length})
+                                  </h4>
+                                  {collapsedSections.owned ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedSections.owned && (
                                 <div className="bg-gray-900 rounded-lg overflow-hidden">
                                   <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -1039,16 +1055,28 @@ const Dashboard: React.FC = () => {
                                     </table>
                                   </div>
                                 </div>
+                                )}
                               </div>
                             )}
 
                             {/* Admin Labels Section */}
                             {adminLabels.length > 0 && (
                               <div>
-                                <h4 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                                  <Users className="h-5 w-5 text-blue-400" />
-                                  Labels You Admin ({adminLabels.length})
-                                </h4>
+                                <button
+                                  onClick={() => setCollapsedSections(prev => ({ ...prev, admin: !prev.admin }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Users className="h-5 w-5 text-blue-400" />
+                                    Labels You Admin ({adminLabels.length})
+                                  </h4>
+                                  {collapsedSections.admin ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedSections.admin && (
                                 <div className="bg-gray-900 rounded-lg overflow-hidden">
                                   <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -1119,16 +1147,28 @@ const Dashboard: React.FC = () => {
                                     </table>
                                   </div>
                                 </div>
+                                )}
                               </div>
                             )}
 
                             {/* Affiliated Labels Section */}
                             {affiliatedLabels.length > 0 && (
                               <div>
-                                <h4 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
-                                  <Music className="h-5 w-5 text-gray-400" />
-                                  Labels You're Affiliated With ({affiliatedLabels.length})
-                                </h4>
+                                <button
+                                  onClick={() => setCollapsedSections(prev => ({ ...prev, affiliated: !prev.affiliated }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Music className="h-5 w-5 text-gray-400" />
+                                    Labels You're Affiliated With ({affiliatedLabels.length})
+                                  </h4>
+                                  {collapsedSections.affiliated ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedSections.affiliated && (
                                 <div className="bg-gray-900 rounded-lg overflow-hidden">
                                   <div className="overflow-x-auto">
                                     <table className="w-full">
