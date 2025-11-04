@@ -36,6 +36,7 @@ import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
+import { penceToPounds } from '../utils/currency';
 
 interface Media {
   _id: string;
@@ -908,7 +909,7 @@ const TuneProfile: React.FC = () => {
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
                   <div className="text-base md:text-2xl font-bold text-green-400">
-                    £{media.globalMediaAggregate?.toFixed(2) || '0.00'}
+                    {penceToPounds(media.globalMediaAggregate)}
                   </div>
                 </div>
                 
@@ -932,7 +933,7 @@ const TuneProfile: React.FC = () => {
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-purple-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
                   <div className="text-base md:text-2xl font-bold text-purple-400">
-                    £{media.globalMediaAggregateTop?.toFixed(2) || '0.00'}
+                    {penceToPounds(media.globalMediaAggregateTop)}
                   </div>
                 </div>
                 
@@ -940,7 +941,7 @@ const TuneProfile: React.FC = () => {
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
                   <div className="text-2xl font-bold text-yellow-400">
-                    £{media.globalMediaBidTop?.toFixed(2) || '0.00'}
+                    {penceToPounds(media.globalMediaBidTop)}
                   </div>
                 </div>
                 
@@ -948,7 +949,7 @@ const TuneProfile: React.FC = () => {
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
                   <div className="text-2xl font-bold text-blue-400">
-                    £{calculateGlobalMediaBidAvg(media).toFixed(2)}
+                    {penceToPounds(calculateGlobalMediaBidAvg(media))}
                   </div>
                 </div>
               </div>

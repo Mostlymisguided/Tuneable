@@ -50,20 +50,34 @@ async function migrateAmountsToPence() {
     const bids = await Bid.find({});
     console.log(`   Found ${bids.length} bids to migrate`);
     
+    let skippedBids = 0;
     for (const bid of bids) {
+      // Skip bids without required fields (invalid data)
+      if (!bid.mediaId) {
+        skippedBids++;
+        if (skippedBids <= 5) {
+          console.log(`   ⚠️  Skipping bid ${bid._id} - missing mediaId`);
+        }
+        continue;
+      }
+      
       if (bid.amount && typeof bid.amount === 'number') {
         // Only convert if amount is less than 1000 (likely already in pounds)
         // If it's already a large number, it might already be in pence
         if (bid.amount < 1000) {
           const oldAmount = bid.amount;
           bid.amount = Math.round(bid.amount * 100);
-          await bid.save();
+          // Use save with runValidators: false to skip validation during migration
+          await bid.save({ validateBeforeSave: false });
           totalBids++;
           if (totalBids % 100 === 0) {
             console.log(`   Migrated ${totalBids} bids...`);
           }
         }
       }
+    }
+    if (skippedBids > 0) {
+      console.log(`   ⚠️  Skipped ${skippedBids} invalid bids (missing mediaId)`);
     }
     console.log(`✅ Migrated ${totalBids} bid amounts`);
 
@@ -78,7 +92,7 @@ async function migrateAmountsToPence() {
         if (user.balance < 100000) {
           const oldBalance = user.balance;
           user.balance = Math.round(user.balance * 100);
-          await user.save();
+          await user.save({ validateBeforeSave: false });
           totalUsers++;
           if (totalUsers % 50 === 0) {
             console.log(`   Migrated ${totalUsers} user balances...`);
@@ -118,7 +132,7 @@ async function migrateAmountsToPence() {
       }
       
       if (updated) {
-        await m.save();
+        await m.save({ validateBeforeSave: false });
         totalMedia++;
         if (totalMedia % 50 === 0) {
           console.log(`   Migrated ${totalMedia} media items...`);
@@ -158,7 +172,7 @@ async function migrateAmountsToPence() {
         }
         
         if (updated) {
-          await label.save();
+          await label.save({ validateBeforeSave: false });
           totalLabels++;
           if (totalLabels % 10 === 0) {
             console.log(`   Migrated ${totalLabels} labels...`);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Trophy, ChevronDown, ChevronUp, Globe, Users, Coins, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { penceToPounds } from '../utils/currency';
 
 interface User {
   _id?: string;
@@ -149,7 +150,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
           </div>
         </div>
         <div className="text-sm font-bold text-white ml-2">
-          £{amount.toFixed(2)}
+          {penceToPounds(amount)}
         </div>
       </div>
     );
@@ -302,7 +303,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                       </div>
                     </div>
                     <div className="text-sm font-bold text-white">
-                      £{bid.amount.toFixed(2)}
+                      {penceToPounds(bid.amount)}
                     </div>
                   </div>
                 ))}

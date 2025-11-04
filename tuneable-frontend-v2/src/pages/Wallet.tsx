@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { ArrowLeft, Wallet as WalletIcon, Loader } from 'lucide-react';
+import { penceToPounds } from '../utils/currency';
 
 const Wallet: React.FC = () => {
   const navigate = useNavigate();
@@ -110,7 +111,7 @@ const Wallet: React.FC = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Current Balance</h3>
-            <p className="text-3xl font-bold text-green-500">£{user?.balance?.toFixed(2) || '0.00'}</p>
+            <p className="text-3xl font-bold text-green-500">{penceToPounds(user?.balance)}</p>
           </div>
         </div>
       </div>

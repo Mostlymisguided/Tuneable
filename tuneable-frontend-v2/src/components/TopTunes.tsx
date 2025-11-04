@@ -5,6 +5,7 @@ import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
+import { penceToPounds } from '../utils/currency';
 
 interface TopTunesSong {
   id: string;
@@ -68,9 +69,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return `£${amount.toFixed(2)}`;
-  };
+  // Removed formatCurrency - using penceToPounds directly
 
   // Commented out search functionality
   // const addSearchTerm = (term: string) => {
@@ -298,12 +297,12 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               <div className="flex-shrink-0 text-right">
                 <div className="flex items-center space-x-2 text-sm">
                   <span className="text-green-400 font-medium">
-                    {formatCurrency(song.globalMediaAggregate)}
+                    {penceToPounds(song.globalMediaAggregate)}
                   </span>
                 </div>
                 {song.globalMediaBidTop > 0 && (
                   <div className="text-xs text-gray-400">
-                    Top: {formatCurrency(song.globalMediaBidTop)}
+                    Top: {penceToPounds(song.globalMediaBidTop)}
                   </div>
                 )}
               </div>

@@ -6,6 +6,7 @@ import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucid
 import EpisodeCard from '../components/EpisodeCard';
 import TagInputModal from '../components/TagInputModal';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
+import { penceToPounds } from '../utils/currency';
 
 // Define types directly to avoid import issues
 interface SearchResult {
@@ -668,7 +669,7 @@ const SearchPage: React.FC = () => {
                             <>
                               <span className="text-xs text-gray-400">•</span>
                               <span className="text-xs text-green-600 font-medium">
-                                £{song.globalMediaAggregate.toFixed(2)} total (all parties)
+                                {penceToPounds(song.globalMediaAggregate)} total (all parties)
                               </span>
                             </>
                           )}

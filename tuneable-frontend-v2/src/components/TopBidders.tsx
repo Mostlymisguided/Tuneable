@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { penceToPounds } from '../utils/currency';
 
 interface Bid {
   userId: {
@@ -104,7 +105,7 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
           {/* Right: Bid Amount */}
           <div className="text-right flex-shrink-0">
             <div className="text-xl font-bold text-yellow-400">
-              £{(bid.amount || (bid._doc && bid._doc.amount) || 0).toFixed(2)}
+              {penceToPounds(bid.amount || (bid._doc && bid._doc.amount) || 0)}
             </div>
           </div>
         </div>

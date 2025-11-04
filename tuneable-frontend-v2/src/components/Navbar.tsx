@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
+import { penceToPounds } from '../utils/currency';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -91,7 +92,7 @@ const Navbar: React.FC = () => {
                     style={{ textDecoration: 'none' }}
                     title="Wallet"
                   >
-                    £{user.balance?.toFixed(2) || '0.00'}
+                    {penceToPounds(user.balance)}
                   </Link>
                   <Link
                     to={`/user/${user._id || user.uuid}`}

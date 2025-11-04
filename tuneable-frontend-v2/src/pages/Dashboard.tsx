@@ -1811,10 +1811,10 @@ const Dashboard: React.FC = () => {
                       <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">£{item.globalMediaAggregateAvg.toFixed(2)}</div>
+                      <div className="text-sm text-gray-300">{penceToPounds(item.globalMediaAggregateAvg)}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-green-400">£{item.globalUserMediaAggregate.toFixed(2)}</div>
+                      <div className="text-sm font-semibold text-green-400">{penceToPounds(item.globalUserMediaAggregate)}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>

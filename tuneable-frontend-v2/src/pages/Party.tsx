@@ -17,6 +17,7 @@ import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Coins, SkipForward, SkipBack, Loader2, Youtube, Tag } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
+import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -1188,10 +1189,10 @@ const Party: React.FC = () => {
                           ? 'bg-purple-600 text-white'
                           : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
                       }`}
-                      title={`£${total.toFixed(2)} total across queued tunes`}
+                      title={`${penceToPounds(total)} total across queued tunes`}
                     >
                       #{tag}
-                      <span className="ml-2 text-[10px] opacity-70">£{total.toFixed(2)}</span>
+                      <span className="ml-2 text-[10px] opacity-70">{penceToPounds(total)}</span>
                     </button>
                   );
                 })}
@@ -1923,8 +1924,8 @@ const Party: React.FC = () => {
         onConfirm={handleBidConfirm}
         songTitle={selectedMedia?.title || ''}
         songArtist={Array.isArray(selectedMedia?.artist) ? selectedMedia.artist[0]?.name || 'Unknown Artist' : selectedMedia?.artist || 'Unknown Artist'}
-        currentBid={selectedMedia?.partyMediaAggregate || 0}
-        userBalance={user?.balance || 0}
+        currentBid={penceToPoundsNumber(selectedMedia?.partyMediaAggregate || 0)}
+        userBalance={penceToPoundsNumber(user?.balance || 0)}
         isLoading={isBidding}
       />
 
