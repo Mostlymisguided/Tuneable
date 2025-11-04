@@ -815,8 +815,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
 
         // Note: For first bid on new media, the bidder is typically the owner, so no bid_received notification needed
 
-        // Update user balance
-        // Update balance (already in pence, no conversion needed)
+        // Update user balance (already in pence, no conversion needed)
         user.balance = user.balance - bidAmountPence;
         await user.save();
 
