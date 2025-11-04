@@ -911,8 +911,13 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
 
     // Get all media for admin labels to calculate bid totals and release counts
     const adminLabelIds = labels.map(l => l._id);
+    // Query handles both ObjectId and string formats for robustness
+    const adminLabelIdsStrings = adminLabelIds.map(id => id.toString());
     const adminLabelMedia = await Media.find({
-      'label.labelId': { $in: adminLabelIds }
+      $or: [
+        { 'label.labelId': { $in: adminLabelIds } }, // Match ObjectId format
+        { 'label.labelId': { $in: adminLabelIdsStrings } } // Match string format
+      ]
     }).select('_id label').lean();
     
     // Create a map of mediaId -> labelIds for quick lookup
@@ -962,14 +967,24 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         status: 'active'
       }).select('mediaId amount').lean();
       
+      console.log(`[Creator Stats] Found ${bids.length} bids for ${adminLabelMediaIds.length} admin label media`);
+      console.log(`[Creator Stats] Media to label map:`, Object.keys(mediaToLabelMap).length, 'media items');
+      
       // Sum bids by label
       bids.forEach(bid => {
         const mediaIdStr = bid.mediaId.toString();
         const labelIds = mediaToLabelMap[mediaIdStr] || [];
+        if (labelIds.length === 0) {
+          console.log(`[Creator Stats] Warning: No label mapping found for media ${mediaIdStr}, bid amount: ${bid.amount}`);
+        }
         labelIds.forEach(labelIdStr => {
-          adminLabelBidTotals[labelIdStr] = (adminLabelBidTotals[labelIdStr] || 0) + (bid.amount || 0);
+          const currentTotal = adminLabelBidTotals[labelIdStr] || 0;
+          adminLabelBidTotals[labelIdStr] = currentTotal + (bid.amount || 0);
+          console.log(`[Creator Stats] Adding bid ${bid.amount} to label ${labelIdStr}, new total: ${adminLabelBidTotals[labelIdStr]}`);
         });
       });
+      
+      console.log(`[Creator Stats] Final admin label bid totals:`, adminLabelBidTotals);
     }
 
     // Format labels with role information
@@ -1003,8 +1018,13 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
 
     // Get all media for affiliation labels to calculate bid totals and release counts
     // Note: affiliationLabelIds was already defined above, reuse it
+    // Query handles both ObjectId and string formats for robustness
+    const affiliationLabelIdsStrings = affiliationLabelIds.map(id => id.toString());
     const affiliationLabelMedia = await Media.find({
-      'label.labelId': { $in: affiliationLabelIds }
+      $or: [
+        { 'label.labelId': { $in: affiliationLabelIds } }, // Match ObjectId format
+        { 'label.labelId': { $in: affiliationLabelIdsStrings } } // Match string format
+      ]
     }).select('_id label').lean();
     
     // Create a map of mediaId -> labelIds for quick lookup
