@@ -829,9 +829,9 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     const userId = req.user._id;
 
     // Get media where user is owner
+    // Note: Media schema doesn't have isActive field, so we don't filter by it
     const ownedMedia = await Media.find({
-      'mediaOwners.userId': userId,
-      isActive: true
+      'mediaOwners.userId': userId
     }).select('_id title globalMediaAggregate createdAt');
 
     // Get media where user is verified creator (across all creator roles)
@@ -1014,9 +1014,9 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Build query for media where user is owner
+    // Note: Media schema doesn't have isActive field, so we don't filter by it
     const query = {
-      'mediaOwners.userId': userId,
-      isActive: true
+      'mediaOwners.userId': userId
     };
 
     // Build sort object
