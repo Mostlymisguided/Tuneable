@@ -1409,11 +1409,11 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
             actualMediaId = mediaDoc._id.toString();
         }
         
-        // Find all active/played bids for this media in this party
+        // Find all active bids for this media in this party
         const bidsToRefund = await Bid.find({
             mediaId: actualMediaId,
             partyId: partyId,
-            status: { $in: ['active', 'played'] }
+            status: 'active'
         }).populate('userId', 'balance uuid username');
         
         console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);
@@ -1710,11 +1710,11 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
             actualMediaId = mediaDoc._id.toString();
         }
         
-        // Find all active/played bids for this media in this party
+        // Find all active bids for this media in this party
         const bidsToRefund = await Bid.find({
             mediaId: actualMediaId,
             partyId: partyId,
-            status: { $in: ['active', 'played'] }
+            status: 'active'
         }).populate('userId', 'balance uuid username');
         
         console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);
@@ -1880,7 +1880,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
         if (isRequestingGlobalParty) {
             // For Global Party, get bids from ALL parties within the time period
             let bidQuery = { 
-                status: { $in: ['active', 'played'] } // Only count active and played bids
+                status: 'active' // Only count active bids
             };
 
             if (startDate) {
@@ -1911,7 +1911,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
             // Regular party logic - get bids for this specific party
             let bidQuery = { 
                 partyId: party._id,
-                status: { $in: ['active', 'played'] } // Only count active and played bids
+                status: 'active' // Only count active bids
             };
 
             if (startDate) {
@@ -2082,11 +2082,11 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
             actualMediaId = mediaDoc._id.toString();
         }
         
-        // Find all active/played bids for this media in this party
+        // Find all active bids for this media in this party
         const bidsToRefund = await Bid.find({
             mediaId: actualMediaId,
             partyId: partyId,
-            status: { $in: ['active', 'played'] }
+            status: 'active'
         }).populate('userId', 'balance uuid username');
         
         console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);

@@ -185,7 +185,7 @@ class BidMetricsEngine {
 
   async _computeAggregateMetric(metricName, params, config) {
     // Build aggregation pipeline based on metric requirements
-    const matchStage = { status: { $in: ['active', 'played'] } };
+    const matchStage = { status: 'active' };
     
     if (params.userId) matchStage.userId = mongoose.Types.ObjectId(params.userId);
     if (params.mediaId) matchStage.mediaId = mongoose.Types.ObjectId(params.mediaId);
@@ -243,7 +243,7 @@ class BidMetricsEngine {
 
   async _computeTopMetric(metricName, params, config) {
     // Build query based on metric requirements
-    const query = { status: { $in: ['active', 'played'] } };
+    const query = { status: 'active' };
     
     if (params.userId) query.userId = mongoose.Types.ObjectId(params.userId);
     if (params.mediaId) query.mediaId = mongoose.Types.ObjectId(params.mediaId);
@@ -314,7 +314,7 @@ class BidMetricsEngine {
     const config = BidMetricsSchema.getMetricConfig(metricName);
     
     // Build aggregation pipeline
-    const matchStage = { status: { $in: ['active', 'played'] } };
+    const matchStage = { status: 'active' };
     
     if (params.userId) matchStage.userId = mongoose.Types.ObjectId(params.userId);
     if (params.mediaId) matchStage.mediaId = mongoose.Types.ObjectId(params.mediaId);

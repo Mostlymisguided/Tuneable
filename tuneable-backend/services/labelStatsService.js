@@ -48,16 +48,14 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
 
     // 2. Calculate releaseCount - Media items with this label's labelId
     const releaseCount = await Media.countDocuments({
-      'label.labelId': actualLabelId,
-      isActive: true
+      'label.labelId': actualLabelId
     });
 
     console.log(`   Releases: ${releaseCount}`);
 
     // 3. Get all media for this label
     const labelMedia = await Media.find({
-      'label.labelId': actualLabelId,
-      isActive: true
+      'label.labelId': actualLabelId
     }).select('_id title artist globalMediaAggregate globalMediaBidTop');
 
     const mediaIds = labelMedia.map(m => m._id);

@@ -40,7 +40,7 @@ class TuneBytesService {
       // Get all bids on this media, sorted by creation time (earliest first)
       const allBids = await Bid.find({
         mediaId: media._id,
-        status: { $in: ['active', 'played'] }
+        status: 'active'
       }).sort({ createdAt: 1 }); // Earliest first
       
       // Find this bid's position in the sequence
@@ -209,7 +209,7 @@ class TuneBytesService {
     try {
       const bids = await Bid.find({ 
         mediaId: new mongoose.Types.ObjectId(mediaId),
-        status: { $in: ['active', 'played'] }
+        status: 'active'
       }).populate(['userId', 'mediaId']);
 
       let totalAwarded = 0;

@@ -235,7 +235,7 @@ export interface Bid {
   songId: string;
   amount: number;
   createdAt: string;
-  status: 'requested' | 'active' | 'played' | 'vetoed' | 'refunded';
+  status: 'requested' | 'active' | 'vetoed' | 'refunded';
   
   // User aggregate tracking
   partyAggregateBidValue?: number;

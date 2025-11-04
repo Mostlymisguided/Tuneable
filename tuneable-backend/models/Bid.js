@@ -110,7 +110,7 @@ const bidSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['requested', 'active', 'played', 'vetoed', 'refunded'],
+        enum: ['requested', 'active', 'vetoed', 'refunded'],
         default: 'active'
     },
     

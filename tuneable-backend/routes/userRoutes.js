@@ -601,10 +601,10 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
     const Media = require('../models/Media');
     const TuneBytesTransaction = require('../models/TuneBytesTransaction');
     
-    // Get all bids for this user (active/played only)
+    // Get all bids for this user (active only)
     const userBids = await Bid.find({ 
       userId: user._id,
-      status: { $in: ['active', 'played'] }
+      status: 'active'
     }).lean();
     
     if (userBids.length === 0) {
@@ -720,7 +720,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
         {
           $match: {
             mediaId: { $in: mediaIds },
-            status: { $in: ['active', 'played'] }
+            status: 'active'
           }
         },
         {
@@ -866,7 +866,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         {
           $match: {
             mediaId: { $in: allMediaIds.map(id => new mongoose.Types.ObjectId(id)) },
-            status: { $in: ['active', 'played'] }
+            status: 'active'
           }
         },
         {
@@ -1046,7 +1046,7 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
       {
         $match: {
           mediaId: { $in: mediaIds },
-          status: { $in: ['active', 'played'] }
+          status: 'active'
         }
       },
       {

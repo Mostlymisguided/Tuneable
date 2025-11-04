@@ -23,7 +23,7 @@ async function calculatePartyAggregateBidValue(userId, mediaId, partyId) {
                 userId: userObjectId,
                 mediaId: mediaObjectId,
                 partyId: partyObjectId,
-                status: { $in: ['active', 'played'] } // Only count active/played bids
+                status: 'active' // Only count active bids
             }
         },
         {
@@ -57,7 +57,7 @@ async function calculateGlobalAggregateBidValue(userId, mediaId) {
             $match: {
                 userId: userObjectId,
                 mediaId: mediaObjectId,
-                status: { $in: ['active', 'played'] } // Only count active/played bids
+                status: 'active' // Only count active bids
             }
         },
         {
@@ -85,7 +85,7 @@ async function findTopPartyAggregateBidUser(mediaId, partyId) {
             $match: {
                 mediaId: mediaId,
                 partyId: partyId,
-                status: { $in: ['active', 'played'] }
+                status: 'active'
             }
         },
         {
@@ -118,7 +118,7 @@ async function findTopGlobalAggregateBidUser(mediaId) {
         {
             $match: {
                 mediaId: mediaId,
-                status: { $in: ['active', 'played'] }
+                status: 'active'
             }
         },
         {
@@ -151,7 +151,7 @@ async function findTopPartyBidUser(mediaId, partyId) {
     const result = await Bid.findOne({
         mediaId: mediaId,
         partyId: partyId,
-        status: { $in: ['active', 'played'] }
+        status: 'active'
     }).sort({ amount: -1 }).select('userId amount');
     
     return result ? {
@@ -168,7 +168,7 @@ async function findTopPartyBidUser(mediaId, partyId) {
 async function findTopGlobalBidUser(mediaId) {
     const result = await Bid.findOne({
         mediaId: mediaId,
-        status: { $in: ['active', 'played'] }
+        status: 'active'
     }).sort({ amount: -1 }).select('userId amount');
     
     return result ? {

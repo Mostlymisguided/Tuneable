@@ -704,12 +704,12 @@ router.get('/:mediaId/profile', async (req, res) => {
     // Add comments to the response
     populatedMedia.comments = recentComments;
 
-    // Calculate accurate globalMediaAggregate from all active/played bids
+    // Calculate accurate globalMediaAggregate from all active bids
     // This ensures the displayed total matches the sum of all bids, even if stored value is stale
     const Bid = require('../models/Bid');
     const allBids = await Bid.find({
       mediaId: media._id,
-      status: { $in: ['active', 'played'] }
+      status: 'active'
     });
     
     const calculatedGlobalMediaAggregate = allBids.reduce((sum, bid) => sum + bid.amount, 0);
