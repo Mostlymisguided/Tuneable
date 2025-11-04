@@ -590,14 +590,15 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const userBalancePence = Math.round(user.balance * 100);
+        // Convert bid amount from pounds to pence (user input is in pounds)
         const bidAmountPence = Math.round(bidAmount * 100);
-
-        if (userBalancePence < bidAmountPence) {
+        
+        // Balance is already stored in pence
+        if (user.balance < bidAmountPence) {
             return res.status(400).json({ 
                 error: 'Insufficient balance',
                 required: bidAmount,
-                available: user.balance
+                available: user.balance / 100  // Convert to pounds for error message
             });
         }
 
@@ -938,14 +939,15 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const userBalancePence = Math.round(user.balance * 100);
+        // Convert bid amount from pounds to pence (user input is in pounds)
         const bidAmountPence = Math.round(bidAmount * 100);
-
-        if (userBalancePence < bidAmountPence) {
+        
+        // Balance is already stored in pence
+        if (user.balance < bidAmountPence) {
             return res.status(400).json({ 
                 error: 'Insufficient balance',
                 required: bidAmount,
-                available: user.balance
+                available: user.balance / 100  // Convert to pounds for error message
             });
         }
 
