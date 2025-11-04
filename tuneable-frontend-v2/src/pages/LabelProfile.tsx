@@ -5,13 +5,14 @@ import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook,
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface Label {
   _id: string;
   name: string;
   slug: string;
   description: string;
-  logo: string;
+  profilePicture: string;
   coverImage: string;
   email: string;
   website: string;
@@ -48,6 +49,7 @@ interface Label {
 
 interface Media {
   _id: string;
+  uuid?: string;
   title: string;
   artist: string;
   coverArt: string;
@@ -83,8 +85,8 @@ const LabelProfile: React.FC = () => {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   
-  // Logo upload state
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  // Profile picture upload state
+  const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -177,15 +179,15 @@ const LabelProfile: React.FC = () => {
     }
   };
 
-  // Handle logo click
-  const handleLogoClick = () => {
+  // Handle profile picture click
+  const handleProfilePictureClick = () => {
     if (canEditLabel() && fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // Handle logo upload
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle profile picture upload
+  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !label) return;
 
@@ -196,17 +198,17 @@ const LabelProfile: React.FC = () => {
     }
 
     try {
-      setIsUploadingLogo(true);
-      await labelAPI.uploadLogo(label._id, file);
-      toast.success('Label logo updated!');
+      setIsUploadingProfilePicture(true);
+      await labelAPI.uploadProfilePicture(label._id, file);
+      toast.success('Label profile picture updated!');
       
       // Refresh label data
       await fetchLabelData();
     } catch (err: any) {
-      console.error('Error uploading logo:', err);
-      toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to upload logo');
+      console.error('Error uploading profile picture:', err);
+      toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to upload profile picture');
     } finally {
-      setIsUploadingLogo(false);
+      setIsUploadingProfilePicture(false);
       // Reset file input to allow re-uploading the same file
       if (e.target) {
         e.target.value = '';
@@ -336,31 +338,31 @@ const LabelProfile: React.FC = () => {
               </div>
             )}
 
-            {/* Logo */}
+            {/* Profile Picture */}
             <div className="flex-shrink-0 relative">
-              {label.logo ? (
+              {label.profilePicture ? (
                 <img
-                  src={label.logo}
-                  alt={`${label.name} logo`}
+                  src={label.profilePicture}
+                  alt={`${label.name} profile picture`}
                   className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                   style={{ width: '200px', height: '200px' }}
-                  onClick={handleLogoClick}
-                  title={canEditLabel() ? 'Click to change logo' : ''}
+                  onClick={handleProfilePictureClick}
+                  title={canEditLabel() ? 'Click to change profile picture' : ''}
                   onError={(e) => {
-                    e.currentTarget.src = '/android-chrome-192x192.png';
+                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
                   }}
                 />
               ) : (
-                <div 
-                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 bg-purple-900/50 flex items-center justify-center text-white text-4xl font-bold ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                <img
+                  src={DEFAULT_PROFILE_PIC}
+                  alt={`${label.name} profile picture`}
+                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                   style={{ width: '200px', height: '200px' }}
-                  onClick={handleLogoClick}
-                  title={canEditLabel() ? 'Click to upload logo' : ''}
-                >
-                  {label.name.charAt(0).toUpperCase()}
-                </div>
+                  onClick={handleProfilePictureClick}
+                  title={canEditLabel() ? 'Click to upload profile picture' : ''}
+                />
               )}
-              {isUploadingLogo && (
+              {isUploadingProfilePicture && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
                 </div>
@@ -369,7 +371,7 @@ const LabelProfile: React.FC = () => {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleLogoUpload}
+                onChange={handleProfilePictureUpload}
                 className="hidden"
               />
             </div>

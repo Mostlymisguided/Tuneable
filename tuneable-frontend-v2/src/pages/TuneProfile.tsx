@@ -1234,24 +1234,21 @@ const TuneProfile: React.FC = () => {
                   
                   const labelName = typeof label === 'string' ? label : label.name;
                   const labelSlug = typeof label === 'object' ? label.slug : null;
-                  const labelLogo = typeof label === 'object' ? label.logo : null;
+                  const labelProfilePicture = typeof label === 'object' ? label.profilePicture : null;
                   const isVerified = typeof label === 'object' ? label.verificationStatus === 'verified' : false;
                   const catalogNumber = labelItem.catalogNumber;
                   const releaseDate = labelItem.releaseDate;
                   
                   return (
                     <div key={index} className="flex items-center space-x-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all">
-                      {labelLogo ? (
-                        <img
-                          src={labelLogo}
-                          alt={labelName}
-                          className="h-12 w-12 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-full bg-purple-600/20 flex items-center justify-center flex-shrink-0">
-                          <Building className="h-6 w-6 text-purple-400" />
-                        </div>
-                      )}
+                      <img
+                        src={labelProfilePicture || DEFAULT_PROFILE_PIC}
+                        alt={labelName}
+                        className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                        }}
+                      />
                       <div className="flex-1 min-w-0">
                         {labelSlug ? (
                           <a
@@ -1810,13 +1807,14 @@ const TuneProfile: React.FC = () => {
                             }}
                             className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
                           >
-                            {label.logo && (
-                              <img
-                                src={label.logo}
-                                alt={label.name}
-                                className="h-8 w-8 rounded object-cover flex-shrink-0"
-                              />
-                            )}
+                            <img
+                              src={label.profilePicture || DEFAULT_PROFILE_PIC}
+                              alt={label.name}
+                              className="h-8 w-8 rounded object-cover flex-shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                              }}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">{label.name}</div>
                               {label.description && (

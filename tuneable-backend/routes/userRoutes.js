@@ -1013,7 +1013,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         _id: label._id,
         name: label.name,
         slug: label.slug,
-        logo: label.logo,
+        profilePicture: label.profilePicture,
         verificationStatus: label.verificationStatus,
         totalBidAmount: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
@@ -1115,7 +1115,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         _id: label._id,
         name: label.name,
         slug: label.slug,
-        logo: label.logo,
+        profilePicture: label.profilePicture,
         verificationStatus: label.verificationStatus,
         totalBidAmount: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
@@ -2343,7 +2343,7 @@ router.get('/me/labels', authMiddleware, async (req, res) => {
         _id: affiliation.labelId._id,
         name: affiliation.labelId.name,
         slug: affiliation.labelId.slug,
-        logo: affiliation.labelId.logo,
+        profilePicture: affiliation.labelId.profilePicture,
         verificationStatus: affiliation.labelId.verificationStatus,
         stats: affiliation.labelId.stats
       } : null

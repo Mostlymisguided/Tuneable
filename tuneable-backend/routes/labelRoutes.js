@@ -6,10 +6,10 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
-const { createLabelLogoUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 
-// Configure upload for label logos
-const logoUpload = createLabelLogoUpload();
+// Configure upload for label profile pictures
+const profilePictureUpload = createLabelProfilePictureUpload();
 
 // ========================================
 // PUBLIC ROUTES
@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
     }
 
     const labels = await Label.find(query)
-      .select('name slug logo description genres stats.totalBidAmount stats.artistCount stats.releaseCount')
+      .select('name slug profilePicture description genres stats.totalBidAmount stats.artistCount stats.releaseCount')
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -301,8 +301,8 @@ router.get('/:slug/media', async (req, res) => {
 // AUTHENTICATED ROUTES
 // ========================================
 
-// Create label
-router.post('/', authMiddleware, async (req, res) => {
+// Create label (with optional profile picture upload)
+router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
     const { name, description, email, website, genres, foundedYear } = req.body;
 
@@ -335,6 +335,13 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'A label with a similar name already exists' });
     }
 
+    // Handle profile picture upload if provided
+    let profilePictureUrl = null;
+    if (req.file) {
+      profilePictureUrl = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`));
+      console.log(`📸 Saving label profile picture: ${profilePictureUrl} for label ${name}`);
+    }
+
     const label = new Label({
       name,
       slug, // Explicitly set slug
@@ -343,6 +350,7 @@ router.post('/', authMiddleware, async (req, res) => {
       website,
       genres: genres || [],
       foundedYear,
+      profilePicture: profilePictureUrl,
       admins: [{
         userId: req.user.id,
         role: 'owner',
@@ -385,8 +393,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Upload label logo (authenticated, label admin/owner only)
-router.put('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req, res) => {
+// Upload label profile picture (authenticated, label admin/owner only)
+router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -407,18 +415,18 @@ router.put('/:id/logo', authMiddleware, logoUpload.single('logo'), async (req, r
     }
 
     // Use custom domain URL via getPublicUrl
-    const logoPath = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`label-logos/${req.file.filename}`));
+    const profilePicturePath = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`));
 
-    console.log(`📸 Saving label logo: ${logoPath} for label ${label.name}`);
+    console.log(`📸 Saving label profile picture: ${profilePicturePath} for label ${label.name}`);
 
-    label.logo = logoPath;
+    label.profilePicture = profilePicturePath;
     await label.save();
 
-    console.log('✅ Label logo updated:', label.logo);
-    res.json({ message: 'Label logo updated successfully', label });
+    console.log('✅ Label profile picture updated:', label.profilePicture);
+    res.json({ message: 'Label profile picture updated successfully', label });
   } catch (error) {
-    console.error('Error updating label logo:', error.message);
-    res.status(500).json({ error: 'Error updating label logo', details: error.message });
+    console.error('Error updating label profile picture:', error.message);
+    res.status(500).json({ error: 'Error updating label profile picture', details: error.message });
   }
 });
 

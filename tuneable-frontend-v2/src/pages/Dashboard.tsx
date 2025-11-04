@@ -1004,13 +1004,14 @@ const Dashboard: React.FC = () => {
                                           <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-3">
-                                                {label.logo ? (
-                                                  <img src={label.logo} alt={label.name} className="h-10 w-10 rounded object-cover" />
-                                                ) : (
-                                                  <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
-                                                    <Building className="h-5 w-5 text-gray-500" />
-                                                  </div>
-                                                )}
+                                                <img 
+                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                  alt={label.name} 
+                                                  className="h-10 w-10 rounded object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                  }}
+                                                />
                                                 <button
                                                   onClick={() => navigate(`/label/${label.slug}`)}
                                                   className="text-white font-medium hover:text-purple-400 transition-colors text-left"
@@ -1171,13 +1172,14 @@ const Dashboard: React.FC = () => {
                                           <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-3">
-                                                {label.logo ? (
-                                                  <img src={label.logo} alt={label.name} className="h-10 w-10 rounded object-cover" />
-                                                ) : (
-                                                  <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
-                                                    <Building className="h-5 w-5 text-gray-500" />
-                                                  </div>
-                                                )}
+                                                <img 
+                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                  alt={label.name} 
+                                                  className="h-10 w-10 rounded object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                  }}
+                                                />
                                                 <button
                                                   onClick={() => navigate(`/label/${label.slug}`)}
                                                   className="text-white font-medium hover:text-purple-400 transition-colors text-left"
@@ -1339,13 +1341,14 @@ const Dashboard: React.FC = () => {
                                           <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-3">
-                                                {label.logo ? (
-                                                  <img src={label.logo} alt={label.name} className="h-10 w-10 rounded object-cover" />
-                                                ) : (
-                                                  <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
-                                                    <Building className="h-5 w-5 text-gray-500" />
-                                                  </div>
-                                                )}
+                                                <img 
+                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                  alt={label.name} 
+                                                  className="h-10 w-10 rounded object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                  }}
+                                                />
                                                 <button
                                                   onClick={() => navigate(`/label/${label.slug}`)}
                                                   className="text-white font-medium hover:text-purple-400 transition-colors text-left"

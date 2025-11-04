@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Image } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,6 +15,9 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -35,8 +38,37 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
         genres: [],
         foundedYear: ''
       });
+      setProfilePicture(null);
+      setProfilePicturePreview(null);
     }
   }, [isOpen, user]);
+
+  // Handle profile picture selection
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be smaller than 5MB');
+      return;
+    }
+
+    setProfilePicture(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePicturePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleCreateLabel = async () => {
     if (!formData.name || !formData.email) {
@@ -47,14 +79,19 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
     try {
       setIsLoading(true);
       
-      const response = await labelAPI.createLabel({
-        name: formData.name,
-        description: formData.description || undefined,
-        email: formData.email,
-        website: formData.website || undefined,
-        genres: formData.genres.length > 0 ? formData.genres : undefined,
-        foundedYear: formData.foundedYear ? parseInt(formData.foundedYear) : undefined
-      });
+      // Create FormData for file upload
+      const createData = new FormData();
+      createData.append('name', formData.name);
+      createData.append('email', formData.email);
+      if (formData.description) createData.append('description', formData.description);
+      if (formData.website) createData.append('website', formData.website);
+      if (formData.genres.length > 0) {
+        formData.genres.forEach(genre => createData.append('genres', genre));
+      }
+      if (formData.foundedYear) createData.append('foundedYear', formData.foundedYear);
+      if (profilePicture) createData.append('profilePicture', profilePicture);
+      
+      const response = await labelAPI.createLabel(createData);
       
       toast.success('Label created successfully!');
       
@@ -149,6 +186,42 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
               min="1900"
               max={new Date().getFullYear()}
             />
+          </div>
+
+          <div>
+            <label className="block text-white font-medium mb-2">Profile Picture</label>
+            <div className="flex items-center space-x-4">
+              {profilePicturePreview ? (
+                <img
+                  src={profilePicturePreview}
+                  alt="Profile preview"
+                  className="w-20 h-20 rounded-lg object-cover border border-gray-600"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-lg bg-gray-700 border border-gray-600 flex items-center justify-center">
+                  <Image className="w-8 h-8 text-gray-400" />
+                </div>
+              )}
+              <div className="flex-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white text-sm transition-colors"
+                >
+                  {profilePicture ? 'Change Picture' : 'Upload Picture'}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
+                />
+                {profilePicture && (
+                  <p className="text-xs text-gray-400 mt-1">{profilePicture.name}</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
         

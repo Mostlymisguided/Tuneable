@@ -25,7 +25,7 @@ interface Report {
     uuid?: string;
     slug?: string;
     name: string;
-    logo?: string;
+    profilePicture?: string;
   };
   reportedBy: {
     _id: string;
@@ -151,7 +151,7 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media' }) => 
         subtitle: report.labelId.slug || report.labelId.uuid,
         id: report.labelId.slug || report.labelId.uuid,
         link: `/label/${report.labelId.slug || report.labelId.uuid}`,
-        logo: report.labelId.logo
+        profilePicture: report.labelId.profilePicture
       };
     }
     return null;

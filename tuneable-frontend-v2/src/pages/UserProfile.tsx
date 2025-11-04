@@ -873,15 +873,14 @@ const UserProfile: React.FC = () => {
                           href={`/label/${affiliation.label.slug}`}
                           className={`flex items-center space-x-2 px-3 py-2 bg-black/20 border rounded-lg transition-all hover:bg-black/30 ${roleColor}`}
                         >
-                          {affiliation.label.logo ? (
-                            <img
-                              src={affiliation.label.logo}
-                              alt={affiliation.label.name}
-                              className="h-6 w-6 rounded-full object-cover"
-                            />
-                          ) : (
-                            <Building className="h-4 w-4" />
-                          )}
+                          <img
+                            src={affiliation.label.profilePicture || DEFAULT_PROFILE_PIC}
+                            alt={affiliation.label.name}
+                            className="h-6 w-6 rounded-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                            }}
+                          />
                           <div className="flex flex-col">
                             <span className="text-sm font-medium">{affiliation.label.name}</span>
                             <span className="text-xs opacity-75 capitalize">{affiliation.role}</span>

@@ -8,7 +8,7 @@ const labelSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
   slug: { type: String, required: true, unique: true }, // URL-friendly version
   description: { type: String, maxlength: 1000 },
-  logo: { type: String }, // URL to logo image
+  profilePicture: { type: String }, // URL to profile picture image
   coverImage: { type: String }, // URL to cover image
   
   // Contact & Location
@@ -186,7 +186,7 @@ labelSchema.statics.getTopByBidAmount = function(limit = 10) {
   return this.find({ isActive: true, 'stats.totalBidAmount': { $gt: 0 } })
     .sort({ 'stats.totalBidAmount': -1 })
     .limit(limit)
-    .select('name slug logo stats.totalBidAmount stats.artistCount stats.releaseCount');
+    .select('name slug profilePicture stats.totalBidAmount stats.artistCount stats.releaseCount');
 };
 
 // Static method to get labels by genre

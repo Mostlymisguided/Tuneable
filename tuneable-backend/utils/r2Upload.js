@@ -333,10 +333,10 @@ const createCoverArtUpload = () => {
   }
 };
 
-// Create multer upload for label logos
-const createLabelLogoUpload = () => {
+// Create multer upload for label profile pictures
+const createLabelProfilePictureUpload = () => {
   if (!isR2Configured()) {
-    throw new Error('R2 storage is required for label logo uploads');
+    throw new Error('R2 storage is required for label profile picture uploads');
   }
 
   return multer({
@@ -348,7 +348,7 @@ const createLabelLogoUpload = () => {
       key: function (req, file, cb) {
         const labelId = req.params?.id || req.params?.labelId || req.body?.labelId || 'label';
         const timestamp = Date.now();
-        const filename = `label-logos/${labelId}-${timestamp}${path.extname(file.originalname)}`;
+        const filename = `profile-pictures/${labelId}-${timestamp}${path.extname(file.originalname)}`;
         cb(null, filename);
       }
     }),
@@ -370,6 +370,6 @@ module.exports = {
   createProfilePictureUpload,
   createMediaUpload,
   createCoverArtUpload,
-  createLabelLogoUpload
+  createLabelProfilePictureUpload
 };
 

@@ -25,6 +25,7 @@ import ReportsAdmin from '../components/ReportsAdmin';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface User {
   _id: string;
@@ -951,13 +952,14 @@ const Admin: React.FC = () => {
                         <tr key={label._id} className="hover:bg-gray-700/50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              {label.logo && (
-                                <img
-                                  src={label.logo}
-                                  alt={label.name}
-                                  className="h-10 w-10 rounded-full object-cover mr-3"
-                                />
-                              )}
+                              <img
+                                src={label.profilePicture || DEFAULT_PROFILE_PIC}
+                                alt={label.name}
+                                className="h-10 w-10 rounded-full object-cover mr-3"
+                                onError={(e) => {
+                                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                }}
+                              />
                               <div>
                                 <div className="text-sm font-medium text-white">{label.name}</div>
                                 <div className="text-xs text-gray-400">{label.email}</div>

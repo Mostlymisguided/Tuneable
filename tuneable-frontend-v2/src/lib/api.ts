@@ -621,7 +621,7 @@ export const labelAPI = {
   },
 
   // Create label (authenticated)
-  createLabel: async (labelData: {
+  createLabel: async (labelData: FormData | {
     name: string;
     description?: string;
     email: string;
@@ -629,7 +629,14 @@ export const labelAPI = {
     genres?: string[];
     foundedYear?: number;
   }) => {
-    const response = await api.post('/labels', labelData);
+    // Handle both FormData (with file upload) and plain object
+    const response = labelData instanceof FormData
+      ? await api.post('/labels', labelData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+      : await api.post('/labels', labelData);
     return response.data;
   },
 
@@ -641,7 +648,7 @@ export const labelAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    logo?: string;
+    profilePicture?: string;
     coverImage?: string;
     location?: {
       city?: string;
@@ -703,11 +710,11 @@ export const labelAPI = {
     return response.data;
   },
 
-  // Upload label logo (authenticated, label admin/owner only)
-  uploadLogo: async (labelId: string, file: File) => {
+  // Upload label profile picture (authenticated, label admin/owner only)
+  uploadProfilePicture: async (labelId: string, file: File) => {
     const formData = new FormData();
-    formData.append('logo', file);
-    const response = await api.put(`/labels/${labelId}/logo`, formData);
+    formData.append('profilePicture', file);
+    const response = await api.put(`/labels/${labelId}/profile-picture`, formData);
     return response.data;
   },
 };
