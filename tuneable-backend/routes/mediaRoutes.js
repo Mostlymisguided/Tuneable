@@ -1251,12 +1251,19 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       });
     }
 
-    // Use ObjectId directly (no resolution needed)
-    if (!isValidObjectId(mediaId)) {
+    // Find media by ObjectId (preferred) or UUID (fallback)
+    // Note: ObjectId is preferred for consistency with other routes, UUID is fallback for compatibility
+    let media;
+    if (isValidObjectId(mediaId)) {
+      // ObjectId format (preferred)
+      media = await Media.findById(mediaId);
+    } else if (mediaId.includes('-')) {
+      // UUID format (fallback)
+      media = await Media.findOne({ uuid: mediaId });
+    } else {
       return res.status(400).json({ error: 'Invalid media ID format' });
     }
 
-    const media = await Media.findById(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }

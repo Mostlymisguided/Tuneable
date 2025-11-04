@@ -587,7 +587,7 @@ const Dashboard: React.FC = () => {
                             {creatorStats.recentMedia.map((media: any) => (
                               <div
                                 key={media._id}
-                                onClick={() => navigate(`/tune/${media.uuid || media._id}`)}
+                                onClick={() => navigate(`/tune/${media._id || media.uuid}`)}
                                 className="flex items-center gap-3 p-3 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
                               >
                                 {media.coverArt && (
@@ -742,7 +742,7 @@ const Dashboard: React.FC = () => {
                                           </div>
                                         )}
                                         <button
-                                          onClick={() => navigate(`/tune/${item.uuid || item._id}`)}
+                                          onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
                                           className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                         >
                                           {item.title}
@@ -773,7 +773,7 @@ const Dashboard: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3">
                                       <button
-                                        onClick={() => navigate(`/tune/${item.uuid || item._id}`)}
+                                        onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
                                         className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                       >
                                         View
@@ -1797,7 +1797,7 @@ const Dashboard: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
-                        onClick={() => navigate(`/tune/${item.mediaUuid || item.mediaId}`)}
+                        onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
                         className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
                       >
                         {item.title}
