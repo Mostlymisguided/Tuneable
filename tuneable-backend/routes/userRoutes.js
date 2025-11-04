@@ -909,7 +909,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       affiliationLabelMap[label._id.toString()] = label;
     });
 
-    // Get all media for admin labels to calculate bid totals
+    // Get all media for admin labels to calculate bid totals and release counts
     const adminLabelIds = labels.map(l => l._id);
     const adminLabelMedia = await Media.find({
       'label.labelId': { $in: adminLabelIds }
@@ -936,8 +936,25 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     
     const adminLabelMediaIds = adminLabelMedia.map(m => m._id);
     
-    // Calculate total bid amounts for admin labels
+    // Calculate total bid amounts and release counts for admin labels
     let adminLabelBidTotals = {};
+    let adminLabelReleaseCounts = {};
+    
+    // Count releases per label
+    adminLabelMedia.forEach(media => {
+      if (media.label && Array.isArray(media.label)) {
+        media.label.forEach(label => {
+          if (label.labelId) {
+            const labelIdStr = label.labelId.toString();
+            // Check if this labelId matches any of our admin labels
+            if (adminLabelIds.some(id => id.toString() === labelIdStr)) {
+              adminLabelReleaseCounts[labelIdStr] = (adminLabelReleaseCounts[labelIdStr] || 0) + 1;
+            }
+          }
+        });
+      }
+    });
+    
     if (adminLabelMediaIds.length > 0) {
       // Get all bids for these media
       const bids = await Bid.find({
@@ -965,6 +982,11 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         ? adminLabelBidTotals[label._id.toString()]
         : (label.stats?.totalBidAmount || 0);
       
+      // Calculate release count from actual media (fallback to stored stats)
+      const calculatedReleaseCount = adminLabelReleaseCounts[label._id.toString()] !== undefined
+        ? adminLabelReleaseCounts[label._id.toString()]
+        : (label.stats?.releaseCount || 0);
+      
       return {
         _id: label._id,
         name: label.name,
@@ -973,13 +995,13 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         verificationStatus: label.verificationStatus,
         totalBidAmount: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
-        releaseCount: label.stats?.releaseCount || 0,
+        releaseCount: calculatedReleaseCount,
         role: adminEntry?.role || 'admin', // 'owner' or 'admin'
         relationshipType: 'admin' // To distinguish from affiliations
       };
     });
 
-    // Get all media for affiliation labels to calculate bid totals
+    // Get all media for affiliation labels to calculate bid totals and release counts
     // Note: affiliationLabelIds was already defined above, reuse it
     const affiliationLabelMedia = await Media.find({
       'label.labelId': { $in: affiliationLabelIds }
@@ -1006,8 +1028,25 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     
     const affiliationLabelMediaIds = affiliationLabelMedia.map(m => m._id);
     
-    // Calculate total bid amounts for affiliation labels
+    // Calculate total bid amounts and release counts for affiliation labels
     let affiliationLabelBidTotals = {};
+    let affiliationLabelReleaseCounts = {};
+    
+    // Count releases per label
+    affiliationLabelMedia.forEach(media => {
+      if (media.label && Array.isArray(media.label)) {
+        media.label.forEach(label => {
+          if (label.labelId) {
+            const labelIdStr = label.labelId.toString();
+            // Check if this labelId matches any of our affiliation labels
+            if (affiliationLabelIds.some(id => id.toString() === labelIdStr)) {
+              affiliationLabelReleaseCounts[labelIdStr] = (affiliationLabelReleaseCounts[labelIdStr] || 0) + 1;
+            }
+          }
+        });
+      }
+    });
+    
     if (affiliationLabelMediaIds.length > 0) {
       // Get all bids for these media
       const bids = await Bid.find({
@@ -1035,6 +1074,11 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         ? affiliationLabelBidTotals[label._id.toString()]
         : (label.stats?.totalBidAmount || 0);
       
+      // Calculate release count from actual media (fallback to stored stats)
+      const calculatedReleaseCount = affiliationLabelReleaseCounts[label._id.toString()] !== undefined
+        ? affiliationLabelReleaseCounts[label._id.toString()]
+        : (label.stats?.releaseCount || 0);
+      
       return {
         _id: label._id,
         name: label.name,
@@ -1043,7 +1087,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         verificationStatus: label.verificationStatus,
         totalBidAmount: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
-        releaseCount: label.stats?.releaseCount || 0,
+        releaseCount: calculatedReleaseCount,
         role: affiliation.role, // 'artist', 'producer', 'manager', 'staff'
         relationshipType: 'affiliation' // To distinguish from admin roles
       };

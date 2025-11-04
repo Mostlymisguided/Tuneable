@@ -47,15 +47,25 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
     console.log(`   Artists: ${artistCount}`);
 
     // 2. Calculate releaseCount - Media items with this label's labelId
+    // Query handles both ObjectId and string formats for robustness
     const releaseCount = await Media.countDocuments({
-      'label.labelId': actualLabelId
+      $or: [
+        { 'label.labelId': actualLabelId }, // Match ObjectId
+        { 'label.labelId': actualLabelId.toString() }, // Match string format
+        { 'label.labelId': new mongoose.Types.ObjectId(actualLabelId) } // Match if stored as ObjectId
+      ]
     });
 
     console.log(`   Releases: ${releaseCount}`);
 
     // 3. Get all media for this label
+    // Query handles both ObjectId and string formats for robustness
     const labelMedia = await Media.find({
-      'label.labelId': actualLabelId
+      $or: [
+        { 'label.labelId': actualLabelId }, // Match ObjectId
+        { 'label.labelId': actualLabelId.toString() }, // Match string format
+        { 'label.labelId': new mongoose.Types.ObjectId(actualLabelId) } // Match if stored as ObjectId
+      ]
     }).select('_id title artist globalMediaAggregate globalMediaBidTop');
 
     const mediaIds = labelMedia.map(m => m._id);
