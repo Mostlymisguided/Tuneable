@@ -1329,7 +1329,7 @@ const Party: React.FC = () => {
                               
                               <div className="text-right">
                                 <p className="text-sm font-medium text-white">
-                                  £{typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate.toFixed(2) : '0.00'}
+                                  {penceToPounds(typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate : 0)}
                                 </p>
                                 <p className="text-xs text-gray-400">
                                   {Array.isArray(mediaData.bids) ? mediaData.bids.length : 0} bids
@@ -1691,13 +1691,13 @@ const Party: React.FC = () => {
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
-                                      £{(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate.toFixed(2) : '0.00')}
+                                      {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
                                     </div>
                                   </div>
                                   <div className="text-center p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Avg Bid</div>
                                     <div className="text-xs md:text-lg text-gray-300">
-                                      £{calculateAverageBid(mediaData).toFixed(2)}
+                                      {penceToPounds(calculateAverageBid(mediaData))}
                                     </div>
                                   </div>
                                 </div>
@@ -1851,7 +1851,7 @@ const Party: React.FC = () => {
                           </div>
                           <div className="text-right">
                             <p className="text-xs font-medium text-gray-400">
-                              £{typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate.toFixed(2) : '0.00'}
+                              {penceToPounds(typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate : 0)}
                             </p>
                           </div>
                         </div>

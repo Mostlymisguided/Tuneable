@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { penceToPounds } from '../utils/currency';
 
 interface Bid {
   userId: {
@@ -141,10 +142,10 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
           {/* Right: Totals */}
           <div className="text-right flex-shrink-0 ml-4">
             <div className="text-2xl font-bold text-green-400">
-              £{supporter.totalAmount.toFixed(2)}
+              {penceToPounds(supporter.totalAmount)}
             </div>
             <div className="text-xs text-gray-400">
-              avg £{(supporter.totalAmount / supporter.bidCount).toFixed(2)}
+              avg {penceToPounds(supporter.totalAmount / supporter.bidCount)}
             </div>
             {userStatsMap && (supporter.user.uuid || supporter.user._id) && (
               <div className="text-xs text-purple-300 mt-1">

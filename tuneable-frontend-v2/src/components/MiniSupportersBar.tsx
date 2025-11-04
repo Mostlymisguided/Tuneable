@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { penceToPounds } from '../utils/currency';
 
 interface Bid {
   userId?: {
@@ -59,7 +60,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
               key={id}
               onClick={() => navigate(`/user/${id}`)}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/25 border border-white/10 hover:border-purple-400 transition-colors flex-shrink-0"
-              title={`£${s.total.toFixed(2)} (${s.count} bids)`}
+              title={`${penceToPounds(s.total)} (${s.count} bids)`}
             >
               <img
                 src={s.user.profilePic || DEFAULT_PROFILE_PIC}
@@ -70,7 +71,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
                 }}
               />
               <span className="text-sm text-white whitespace-nowrap">{s.user.username}</span>
-              <span className="text-xs text-green-300 flex-shrink-0">£{s.total.toFixed(2)}</span>
+              <span className="text-xs text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
             </button>
           );
         })}
