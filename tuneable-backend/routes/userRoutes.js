@@ -1220,6 +1220,20 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
 
     // Get bid counts and totals for each media
     const mediaIds = media.map(m => m._id);
+    console.log(`[My Media] Querying bids for ${mediaIds.length} media items`);
+    console.log(`[My Media] Media IDs:`, mediaIds.map(id => id.toString()));
+    
+    // First, let's check if bids exist for these media
+    const allBids = await Bid.find({
+      mediaId: { $in: mediaIds },
+      status: 'active'
+    }).select('mediaId amount').lean();
+    
+    console.log(`[My Media] Found ${allBids.length} total bids for these media`);
+    allBids.forEach(bid => {
+      console.log(`[My Media] Bid: mediaId=${bid.mediaId.toString()}, amount=${bid.amount}`);
+    });
+    
     const bidStats = await Bid.aggregate([
       {
         $match: {
@@ -1236,12 +1250,15 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
       }
     ]);
 
+    console.log(`[My Media] Found ${bidStats.length} media with bids for ${mediaIds.length} media items`);
+    
     const bidCountMap = {};
     const bidTotalMap = {};
     bidStats.forEach(item => {
       const mediaIdStr = item._id.toString();
       bidCountMap[mediaIdStr] = item.count;
       bidTotalMap[mediaIdStr] = item.totalAmount;
+      console.log(`[My Media] Media ${mediaIdStr}: ${item.count} bids, total: ${item.totalAmount}`);
     });
 
     // Format response with ownership info
@@ -1260,9 +1277,17 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
 
       // Calculate total bid amount from actual bids (fallback to stored value if bids not found)
       const mediaIdStr = m._id.toString();
-      const totalBidAmount = bidTotalMap[mediaIdStr] !== undefined 
-        ? bidTotalMap[mediaIdStr] 
-        : (m.globalMediaAggregate || 0);
+      const calculatedTotal = bidTotalMap[mediaIdStr];
+      const storedTotal = m.globalMediaAggregate || 0;
+      const totalBidAmount = calculatedTotal !== undefined 
+        ? calculatedTotal 
+        : storedTotal;
+      
+      if (calculatedTotal === undefined) {
+        console.log(`[My Media] Warning: No bid stats found for media ${mediaIdStr} (${m.title}), using stored value: ${storedTotal}`);
+      } else {
+        console.log(`[My Media] Media ${mediaIdStr} (${m.title}): calculated=${calculatedTotal}, stored=${storedTotal}, using=${totalBidAmount}`);
+      }
 
       return {
         _id: m._id,
