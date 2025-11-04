@@ -1143,7 +1143,7 @@ const Party: React.FC = () => {
             <div className="flex items-center space-x-3 sm:space-x-4">
               <Coins className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-400" />
               <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">£{calculateTotalBids().toFixed(2)}</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(calculateTotalBids())}</div>
                 <div className="text-xs sm:text-sm text-gray-300">Total Bids</div>
               </div>
             </div>
