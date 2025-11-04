@@ -824,6 +824,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     const Media = require('../models/Media');
     const Label = require('../models/Label');
     const Bid = require('../models/Bid');
+    const User = require('../models/User');
 
     const userId = req.user._id;
 
@@ -880,7 +881,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     // Get labels where user is owner or admin
     const labels = await Label.find({
       'admins.userId': userId
-    }).select('_id name slug logo verificationStatus stats');
+    }).select('_id name slug logo verificationStatus stats admins');
 
     const labelsOwned = labels.filter(label => 
       label.admins.some(admin => 
@@ -889,6 +890,79 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     ).length;
 
     const labelsAdmin = labels.length - labelsOwned;
+
+    // Get user's label affiliations (artists/producers/etc. affiliated with labels)
+    const user = await User.findById(userId).select('labelAffiliations');
+    const activeAffiliations = (user?.labelAffiliations || []).filter(
+      affiliation => affiliation.status === 'active'
+    );
+
+    // Get label details for affiliations
+    const affiliationLabelIds = activeAffiliations.map(aff => aff.labelId);
+    const affiliationLabels = await Label.find({
+      _id: { $in: affiliationLabelIds }
+    }).select('_id name slug logo verificationStatus stats').lean();
+
+    // Create a map of affiliation labels to avoid duplicates
+    const affiliationLabelMap = {};
+    affiliationLabels.forEach(label => {
+      affiliationLabelMap[label._id.toString()] = label;
+    });
+
+    // Format labels with role information
+    const formattedAdminLabels = labels.map(label => {
+      const adminEntry = label.admins.find(admin => 
+        admin.userId.toString() === userId.toString()
+      );
+      return {
+        _id: label._id,
+        name: label.name,
+        slug: label.slug,
+        logo: label.logo,
+        verificationStatus: label.verificationStatus,
+        totalBidAmount: label.stats?.totalBidAmount || 0,
+        artistCount: label.stats?.artistCount || 0,
+        releaseCount: label.stats?.releaseCount || 0,
+        role: adminEntry?.role || 'admin', // 'owner' or 'admin'
+        relationshipType: 'admin' // To distinguish from affiliations
+      };
+    });
+
+    // Format affiliation labels with role information
+    const formattedAffiliationLabels = activeAffiliations.map(affiliation => {
+      const label = affiliationLabelMap[affiliation.labelId.toString()];
+      if (!label) return null; // Skip if label not found
+      
+      return {
+        _id: label._id,
+        name: label.name,
+        slug: label.slug,
+        logo: label.logo,
+        verificationStatus: label.verificationStatus,
+        totalBidAmount: label.stats?.totalBidAmount || 0,
+        artistCount: label.stats?.artistCount || 0,
+        releaseCount: label.stats?.releaseCount || 0,
+        role: affiliation.role, // 'artist', 'producer', 'manager', 'staff'
+        relationshipType: 'affiliation' // To distinguish from admin roles
+      };
+    }).filter(Boolean); // Remove null entries
+
+    // Combine and deduplicate (if user is both admin and affiliate, show admin role)
+    const allLabelsMap = new Map();
+    
+    // Add admin labels first (they take precedence)
+    formattedAdminLabels.forEach(label => {
+      allLabelsMap.set(label._id.toString(), label);
+    });
+    
+    // Add affiliation labels (only if not already in map)
+    formattedAffiliationLabels.forEach(label => {
+      if (!allLabelsMap.has(label._id.toString())) {
+        allLabelsMap.set(label._id.toString(), label);
+      }
+    });
+
+    const allLabels = Array.from(allLabelsMap.values());
 
     // Get recent media (last 5)
     const recentMedia = await Media.find({
@@ -910,17 +984,11 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         totalBidAmount: totalBidAmount[0]?.total || 0,
         labelsOwned,
         labelsAdmin,
-        totalLabels: labels.length
+        labelsAffiliated: activeAffiliations.length,
+        totalLabels: allLabels.length
       },
       recentMedia,
-      labels: labels.map(label => ({
-        _id: label._id,
-        name: label.name,
-        slug: label.slug,
-        logo: label.logo,
-        verificationStatus: label.verificationStatus,
-        totalBidAmount: label.stats?.totalBidAmount || 0
-      }))
+      labels: allLabels
     });
   } catch (error) {
     console.error('Error fetching creator stats:', error);

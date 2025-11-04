@@ -259,7 +259,7 @@ const Dashboard: React.FC = () => {
 
       setQueue([formattedMedia]);
       setCurrentMedia(formattedMedia, 0, true);
-      setGlobalPlayerActive(true);
+    setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
     } catch (error) {
       console.error('Error loading media for playback:', error);
@@ -409,15 +409,15 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl text-center font-bold text-gray-300">
-            Welcome back, {user?.username}!
-          </h1>
-          <p className="text-center text-gray-400 mt-2">
-            Ready to create some amazing music experiences?
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl text-center font-bold text-gray-300">
+          Welcome back, {user?.username}!
+        </h1>
+        <p className="text-center text-gray-400 mt-2">
+          Ready to create some amazing music experiences?
+        </p>
+      </div>
 
         {/* Creator Dashboard */}
         {showCreatorDashboard(user) && (
@@ -529,8 +529,8 @@ const Dashboard: React.FC = () => {
                           </div>
                         </div>
                         <div className="bg-gray-900 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
+        <div className="flex items-center justify-between">
+          <div>
                               <p className="text-sm text-gray-400">Labels Admin</p>
                               <p className="text-2xl font-bold text-white mt-1">
                                 {creatorStats.stats?.labelsAdmin || 0}
@@ -811,46 +811,180 @@ const Dashboard: React.FC = () => {
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-white">My Labels</h3>
                         <button
-                          onClick={() => navigate('/labels/create')}
+                          onClick={() => setIsLabelModalOpen(true)}
                           className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Create Label
                         </button>
                       </div>
+
                       {creatorStats.labels && creatorStats.labels.length > 0 ? (
-                        <div className="space-y-3">
-                          {creatorStats.labels.map((label: any) => (
-                            <div
-                              key={label._id}
-                              onClick={() => navigate(`/label/${label.slug}`)}
-                              className="flex items-center gap-3 p-4 bg-gray-900 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                            >
-                              {label.logo && (
-                                <img
-                                  src={label.logo}
-                                  alt={label.name}
-                                  className="h-12 w-12 rounded object-cover"
-                                />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-white font-medium">{label.name}</p>
-                                  {label.verificationStatus === 'verified' && (
-                                    <span className="px-2 py-0.5 bg-green-600 text-green-100 text-xs rounded">
-                                      Verified
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-gray-400 text-sm">
-                                  £{((label.totalBidAmount || 0) / 100).toFixed(2)} total bids
-                                </p>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="bg-gray-900 rounded-lg overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-800">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        // Sort by name
+                                        const sorted = [...creatorStats.labels].sort((a: any, b: any) => {
+                                          if (myMediaSortField === 'name' && myMediaSortDirection === 'asc') {
+                                            return a.name.localeCompare(b.name);
+                                          }
+                                          return b.name.localeCompare(a.name);
+                                        });
+                                        setCreatorStats({ ...creatorStats, labels: sorted });
+                                        setMyMediaSortField(myMediaSortField === 'name' ? '' : 'name');
+                                        setMyMediaSortDirection(myMediaSortField === 'name' && myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Label
+                                      {myMediaSortField === 'name' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Role
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Artists
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Releases
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        // Sort by total bids
+                                        const sorted = [...creatorStats.labels].sort((a: any, b: any) => {
+                                          const aBids = a.totalBidAmount || 0;
+                                          const bBids = b.totalBidAmount || 0;
+                                          if (myMediaSortField === 'totalBids' && myMediaSortDirection === 'asc') {
+                                            return aBids - bBids;
+                                          }
+                                          return bBids - aBids;
+                                        });
+                                        setCreatorStats({ ...creatorStats, labels: sorted });
+                                        setMyMediaSortField(myMediaSortField === 'totalBids' ? '' : 'totalBids');
+                                        setMyMediaSortDirection(myMediaSortField === 'totalBids' && myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Total Bids
+                                      {myMediaSortField === 'totalBids' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Status
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Actions
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-800">
+                                {creatorStats.labels.map((label: any) => {
+                                  const getRoleBadgeColor = (role: string, relationshipType: string) => {
+                                    if (relationshipType === 'admin') {
+                                      return role === 'owner' ? 'bg-purple-600' : 'bg-blue-600';
+                                    }
+                                    return 'bg-gray-600';
+                                  };
+
+                                  const getRoleLabel = (role: string, relationshipType: string) => {
+                                    if (relationshipType === 'admin') {
+                                      return role === 'owner' ? 'Owner' : 'Admin';
+                                    }
+                                    return role.charAt(0).toUpperCase() + role.slice(1);
+                                  };
+
+                                  return (
+                                    <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                      <td className="px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                          {label.logo ? (
+                                            <img
+                                              src={label.logo}
+                                              alt={label.name}
+                                              className="h-10 w-10 rounded object-cover"
+                                            />
+                                          ) : (
+                                            <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+                                              <Building className="h-5 w-5 text-gray-500" />
+                                            </div>
+                                          )}
+                                          <button
+                                            onClick={() => navigate(`/label/${label.slug}`)}
+                                            className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                          >
+                                            {label.name}
+                                          </button>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span className={`px-2 py-1 ${getRoleBadgeColor(label.role || 'admin', label.relationshipType || 'admin')} text-white text-xs rounded capitalize`}>
+                                          {getRoleLabel(label.role || 'admin', label.relationshipType || 'admin')}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-300">
+                                        {label.artistCount || 0}
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-300">
+                                        {label.releaseCount || 0}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="text-white font-medium">
+                                          £{((label.totalBidAmount || 0) / 100).toFixed(2)}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        {label.verificationStatus === 'verified' ? (
+                                          <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">
+                                            Verified
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                            {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <button
+                                          onClick={() => navigate(`/label/${label.slug}`)}
+                                          className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                        >
+                                          View
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       ) : (
-                        <p className="text-gray-400">No labels yet. Create your first label to get started!</p>
+                        <div className="text-center py-8 bg-gray-900 rounded-lg">
+                          <Building className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                          <p className="text-gray-400 mb-2">No labels found</p>
+                          <p className="text-gray-500 text-sm mb-4">Create your first label or join an existing one!</p>
+                          <button
+                            onClick={() => setIsLabelModalOpen(true)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          >
+                            Create Label
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -894,7 +1028,7 @@ const Dashboard: React.FC = () => {
             {isSearchingTune ? 'Searching...' : 'Search'}
           </button>
         </div>
-        
+
         {addTuneQuery && (
           <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
             <LinkIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
@@ -906,7 +1040,7 @@ const Dashboard: React.FC = () => {
         
         {/* Search Results */}
         {addTuneResults.length > 0 && (
-          <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2">
             {addTuneResults.map((result) => (
               <div key={result._id || result.id} className="flex items-center justify-between bg-black/20 rounded px-4 py-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -927,7 +1061,7 @@ const Dashboard: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-gray-400 text-xs">Bid Amount</div>
                     <input
@@ -953,9 +1087,9 @@ const Dashboard: React.FC = () => {
                     {isAddingTune ? 'Adding...' : 'Add'}
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
         )}
       </div>
 
@@ -1282,7 +1416,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
         )}
-      </div>
+        </div>
       </div>
 
       {/* Create Label Modal */}
