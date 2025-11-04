@@ -557,7 +557,7 @@ const Dashboard: React.FC = () => {
                         <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <button
-                            onClick={() => navigate('/upload')}
+                            onClick={() => navigate('/creator/upload')}
                             className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
                           >
                             <div className="flex items-center">
@@ -623,7 +623,7 @@ const Dashboard: React.FC = () => {
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-white">My Media</h3>
                         <button
-                          onClick={() => navigate('/upload')}
+                          onClick={() => navigate('/creator/upload')}
                           className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                         >
                           <Upload className="h-4 w-4 mr-2" />
@@ -642,7 +642,7 @@ const Dashboard: React.FC = () => {
                           <p className="text-gray-400 mb-2">No media found</p>
                           <p className="text-gray-500 text-sm mb-4">Upload your first track to get started!</p>
                           <button
-                            onClick={() => navigate('/upload')}
+                            onClick={() => navigate('/creator/upload')}
                             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                           >
                             Upload Media
