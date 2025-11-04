@@ -742,7 +742,7 @@ const Dashboard: React.FC = () => {
                                           </div>
                                         )}
                                         <button
-                                          onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
+                                          onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
                                           className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                         >
                                           {item.title}
@@ -773,7 +773,7 @@ const Dashboard: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3">
                                       <button
-                                        onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
+                                        onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
                                         className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                       >
                                         View
