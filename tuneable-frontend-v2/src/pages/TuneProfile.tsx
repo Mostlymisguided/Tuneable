@@ -437,6 +437,11 @@ const TuneProfile: React.FC = () => {
     // Add links from sources
     if (media?.sources) {
       Object.entries(media.sources).forEach(([platform, url]) => {
+        // Skip 'upload' source - it's internal file storage, not an external platform link
+        if (platform.toLowerCase() === 'upload') {
+          return;
+        }
+        
         const { icon, color, bgColor } = getPlatformIcon(platform);
         links.push({
           platform,
