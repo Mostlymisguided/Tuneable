@@ -934,8 +934,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
             }
           } else {
             // Label ID provided but not found - just use name
-            const labelName = req.body.label || '';
-            if (labelName.trim()) {
+            let labelName = '';
+            if (Array.isArray(req.body.label)) {
+              labelName = req.body.label.length > 0 && typeof req.body.label[0] === 'string' 
+                ? req.body.label[0] 
+                : '';
+            } else if (typeof req.body.label === 'string') {
+              labelName = req.body.label;
+            }
+            
+            if (labelName && labelName.trim()) {
               media.label = [{
                 name: labelName.trim(),
                 userId: null,
@@ -949,8 +957,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
         } catch (error) {
           console.error('Error finding label:', error);
           // Fallback to just name
-          const labelName = req.body.label || '';
-          if (labelName.trim()) {
+          let labelName = '';
+          if (Array.isArray(req.body.label)) {
+            labelName = req.body.label.length > 0 && typeof req.body.label[0] === 'string' 
+              ? req.body.label[0] 
+              : '';
+          } else if (typeof req.body.label === 'string') {
+            labelName = req.body.label;
+          }
+          
+          if (labelName && labelName.trim()) {
             media.label = [{
               name: labelName.trim(),
               userId: null,
@@ -963,7 +979,17 @@ router.put('/:id', authMiddleware, async (req, res) => {
         }
       } else if (req.body.label !== undefined) {
         // Just label name provided (no labelId)
-        const labelName = req.body.label;
+        // Handle both string and array formats
+        let labelName = '';
+        if (Array.isArray(req.body.label)) {
+          // If it's an array, use the first element if it's a string, otherwise ignore
+          labelName = req.body.label.length > 0 && typeof req.body.label[0] === 'string' 
+            ? req.body.label[0] 
+            : '';
+        } else if (typeof req.body.label === 'string') {
+          labelName = req.body.label;
+        }
+        
         if (labelName && labelName.trim()) {
           // Try to find label by name
           const labelByName = await Label.findOne({ name: labelName.trim() });
