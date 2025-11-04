@@ -39,7 +39,6 @@
     "stripe": "^14.7.0",
     "uuid": "^9.0.1",
     "uuidv7": "^0.1.8",
-    "ws": "^8.14.2",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

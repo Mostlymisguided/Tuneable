@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI, searchAPI } from '../lib/api';
@@ -39,18 +39,19 @@ interface PartyMedia {
 }
 
 
-interface WebSocketMessage {
-  type: 'JOIN' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'TRANSITION_MEDIA' | 'SET_HOST' | 'PLAY_NEXT' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED';
+interface PartyUpdateMessage {
+  type: 'PARTY_CREATED' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'PLAY_NEXT';
   partyId?: string;
-  userId?: string;
-  queue?: PartyMedia[];
-  media?: PartyMedia;
   mediaId?: string;
   playedAt?: string;
   completedAt?: string;
   vetoedAt?: string;
   vetoedBy?: string;
-  endedAt?: string;
+  vetoedBy_uuid?: string;
+  reason?: string;
+  queue?: PartyMedia[];
+  media?: PartyMedia;
+  party?: any;
 }
 
 const Party: React.FC = () => {
@@ -116,27 +117,22 @@ const Party: React.FC = () => {
     currentMedia,
   } = useWebPlayerStore();
 
-  // Only use WebSocket for live parties
-  // NOTE: WebSocket functionality is for future live jukebox feature
-  // MVP focuses on remote parties only, so this is disabled (shouldUseWebSocket = false)
-  const shouldUseWebSocket = party?.type === 'live';
-  
-  const { sendMessage } = useWebSocket({
+  // Use Socket.IO for real-time party updates
+  const { sendMessage } = useSocketIOParty({
     partyId: partyId || '',
-    userId: user?.id,
-    enabled: shouldUseWebSocket,
-    onMessage: (message: WebSocketMessage) => {
-      console.log('WebSocket message received:', message);
+    enabled: !!partyId,
+    onMessage: (message: PartyUpdateMessage) => {
+      console.log('Party update received:', message);
       
       switch (message.type) {
         case 'UPDATE_QUEUE':
           if (message.queue) {
             setParty((prev: any) => prev ? { ...prev, media: message.queue! } : null);
             
-            // Note: WebSocket UPDATE_QUEUE messages don't contain media status information,
+            // Note: Socket.IO UPDATE_QUEUE messages don't contain media status information,
             // so we don't update the global player queue here. The queue is managed
             // by the party data from the API calls which include proper status information.
-            console.log('WebSocket UPDATE_QUEUE received but not updating global queue (no status info)');
+            console.log('Socket.IO UPDATE_QUEUE received but not updating global queue (no status info)');
           }
           break;
         case 'PLAY':
@@ -147,7 +143,7 @@ const Party: React.FC = () => {
           break;
           
         case 'MEDIA_STARTED':
-          console.log('WebSocket MEDIA_STARTED received');
+          console.log('Socket.IO MEDIA_STARTED received');
           if (message.mediaId) {
             setParty((prev: any) => {
               if (!prev) return null;
@@ -174,7 +170,7 @@ const Party: React.FC = () => {
           break;
           
         case 'MEDIA_COMPLETED':
-          console.log('WebSocket MEDIA_COMPLETED received for mediaId:', message.mediaId);
+          console.log('Socket.IO MEDIA_COMPLETED received for mediaId:', message.mediaId);
           if (message.mediaId) {
             setParty((prev: any) => {
               if (!prev) return null;
@@ -199,7 +195,7 @@ const Party: React.FC = () => {
           break;
           
         case 'MEDIA_VETOED':
-          console.log('WebSocket MEDIA_VETOED received');
+          console.log('Socket.IO MEDIA_VETOED received');
           if (message.mediaId) {
             setParty((prev: any) => {
               if (!prev) return null;
@@ -223,7 +219,7 @@ const Party: React.FC = () => {
           break;
           
         case 'PARTY_ENDED':
-          console.log('WebSocket PARTY_ENDED received');
+          console.log('Socket.IO PARTY_ENDED received');
           toast.info('This party has been ended by the host');
           // Redirect to parties list after a short delay
           setTimeout(() => {
@@ -233,12 +229,12 @@ const Party: React.FC = () => {
       }
     },
     onConnect: () => {
-      console.log('WebSocket connected');
-      // Set up WebSocket sender in global store
+      console.log('Socket.IO connected for party updates');
+      // Set up Socket.IO sender in global store
       setWebSocketSender(sendMessage);
     },
     onDisconnect: () => {
-      console.log('WebSocket disconnected');
+      console.log('Socket.IO disconnected from party updates');
     }
   });
 

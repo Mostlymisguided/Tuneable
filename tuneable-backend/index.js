@@ -1,7 +1,6 @@
 const express = require('express');
 const db = require('./db'); // Import the database connection module
-const { setWebSocketServer, broadcast } = require('./utils/broadcast'); // Import WebSocket setup and broadcast
-const { initializeSocketIO } = require('./utils/socketIO'); // Import Socket.IO setup for notifications
+const { initializeSocketIO } = require('./utils/socketIO'); // Import Socket.IO setup for notifications and party updates
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 require('dotenv').config({ path: envFile });
 
@@ -192,17 +191,11 @@ if (require.main === module) {
   server = app.listen(PORT, () => {
     console.log(`Server running on PORT ${PORT}`);
     
-    // Set up WebSocket server after the HTTP server is ready
-    // NOTE: WebSocket is for future live party (jukebox) feature
-    // Currently only used if party.type === 'live' (MVP uses remote parties only)
-    setWebSocketServer(server);
-    console.log('✅ WebSocket server initialized (for future live parties).');
-    
-    // Set up Socket.IO server for real-time notifications
+    // Set up Socket.IO server for real-time notifications and party updates
     initializeSocketIO(server);
-    console.log('✅ Socket.IO server initialized (for notifications).');
+    console.log('✅ Socket.IO server initialized (for notifications and party updates).');
   });
 }
 
-// Export app and broadcast function from utils
-module.exports = { app, broadcast };
+// Export app
+module.exports = { app };

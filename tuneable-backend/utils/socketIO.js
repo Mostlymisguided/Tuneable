@@ -104,6 +104,40 @@ const initializeSocketIO = (server) => {
       }
     });
 
+    // Handle party room joining
+    socket.on('join-party', (data) => {
+      try {
+        const { partyId } = data;
+        if (!partyId) {
+          socket.emit('error', { message: 'Party ID is required' });
+          return;
+        }
+
+        // Join party room
+        socket.join(`party:${partyId}`);
+        console.log(`🎉 Socket ${socket.id} joined party room: party:${partyId}`);
+        
+        // Emit confirmation
+        socket.emit('party-joined', { partyId, success: true });
+      } catch (error) {
+        console.error('Error joining party room:', error);
+        socket.emit('error', { message: 'Failed to join party room', details: error.message });
+      }
+    });
+
+    // Handle party room leaving
+    socket.on('leave-party', (data) => {
+      try {
+        const { partyId } = data;
+        if (partyId) {
+          socket.leave(`party:${partyId}`);
+          console.log(`👋 Socket ${socket.id} left party room: party:${partyId}`);
+        }
+      } catch (error) {
+        console.error('Error leaving party room:', error);
+      }
+    });
+
     // Handle disconnection
     socket.on('disconnect', () => {
       console.log('❌ Socket.IO client disconnected:', socket.id);
@@ -174,11 +208,27 @@ const sendUnreadCount = (userId, count) => {
   console.log(`📊 Unread count update sent to user ${userId}: ${count}`);
 };
 
+/**
+ * Broadcast update to all users in a party room
+ * @param {string} partyId - Party ID
+ * @param {object} data - Data to broadcast
+ */
+const broadcastToParty = (partyId, data) => {
+  if (!io) {
+    console.error('❌ Socket.IO server not initialized');
+    return;
+  }
+
+  io.to(`party:${partyId}`).emit('party-update', { partyId, ...data });
+  console.log(`📢 Party update broadcasted to party:${partyId}`, data.type || 'update');
+};
+
 module.exports = {
   initializeSocketIO,
   sendNotification,
   broadcastNotification,
   sendUnreadCount,
+  broadcastToParty,
   getIO: () => io
 };
 

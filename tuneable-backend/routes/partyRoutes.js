@@ -11,7 +11,7 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
-const { broadcast } = require('../utils/broadcast');
+const { broadcastToParty } = require('../utils/socketIO');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolvePartyId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
@@ -97,7 +97,7 @@ router.post('/', adminMiddleware, async (req, res) => {
         // Don't fail the request if email fails
       }
   
-      broadcast(party._id, { message: 'New party created', party });
+      broadcastToParty(party._id.toString(), { type: 'PARTY_CREATED', party });
       res.status(201).json({ message: 'Party created successfully', party });
   
     } catch (err) {
@@ -1213,9 +1213,8 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
 
         await party.save();
 
-        // Broadcast play event via WebSocket
-        const { broadcastToParty } = require('../utils/broadcast');
-        broadcastToParty(partyId, {
+        // Broadcast play event via Socket.IO
+        broadcastToParty(partyId.toString(), {
             type: 'MEDIA_STARTED',
             mediaId: mediaId,
             playedAt: songEntry.playedAt
@@ -1314,10 +1313,9 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
 
         await party.save();
 
-        // Broadcast completion event via WebSocket
-        const { broadcastToParty } = require('../utils/broadcast');
+        // Broadcast completion event via Socket.IO
         console.log(`Broadcasting MEDIA_COMPLETED for media ${mediaId} in party ${partyId}`);
-        broadcastToParty(partyId, {
+        broadcastToParty(partyId.toString(), {
             type: 'MEDIA_COMPLETED',
             mediaId: mediaId,
             completedAt: mediaEntry.completedAt
@@ -1482,9 +1480,8 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
 
         await party.save();
 
-        // Broadcast veto via WebSocket
-        const { broadcastToParty } = require('../utils/broadcast');
-        broadcastToParty(partyId, {
+        // Broadcast veto via Socket.IO
+        broadcastToParty(partyId.toString(), {
             type: 'MEDIA_VETOED',
             mediaId: mediaId,
             vetoedBy: req.user._id,

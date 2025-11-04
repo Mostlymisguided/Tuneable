@@ -4,7 +4,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { type YouTubePlayerRef } from './YouTubePlayer';
 
 // Helper function to format time (seconds to MM:SS)
@@ -150,15 +150,16 @@ const PersistentWebPlayer: React.FC = () => {
 
   // Simple approach - PersistentWebPlayer only handles YouTube media
 
-  // WebSocket connection for real-time updates
-  useWebSocket({
+  // Socket.IO connection for real-time updates
+  useSocketIOParty({
     partyId: currentPartyId || '',
+    enabled: !!currentPartyId,
     onMessage: (message) => {
-      console.log('PersistentWebPlayer received WebSocket message:', message);
+      console.log('PersistentWebPlayer received party update:', message);
       
       switch (message.type) {
         case 'MEDIA_COMPLETED':
-          console.log('Media completed via WebSocket, refreshing queue');
+          console.log('Media completed via Socket.IO, refreshing queue');
           if (currentPartyId) {
             partyAPI.getPartyDetails(currentPartyId)
               .then(response => {
@@ -194,7 +195,7 @@ const PersistentWebPlayer: React.FC = () => {
           break;
           
         case 'UPDATE_QUEUE':
-          console.log('Queue updated via WebSocket');
+          console.log('Queue updated via Socket.IO');
           if (message.queue) {
             const queuedMedia = message.queue.filter((item: any) => item.status === 'queued');
             setQueue(queuedMedia);

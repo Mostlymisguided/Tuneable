@@ -1,33 +1,27 @@
-jest.mock('./utils/broadcast', () => {
-  // Mock WebSocket Server
-  const mockClients = [];
-  const wss = {
-    clients: mockClients,
-    on: jest.fn((event, handler) => {
-      if (event === 'connection') {
-        const mockClient = {
-          readyState: 1, // OPEN state
-          send: jest.fn(),
-          on: jest.fn(),
-        };
-        mockClients.push(mockClient);
-        handler(mockClient); // Simulate a connection
-      }
-    }),
-  };
-
+jest.mock('./utils/socketIO', () => {
   return {
-    setWebSocketServer: jest.fn((server) => {
-      console.log('Mock WebSocket server initialized');
+    initializeSocketIO: jest.fn((server) => {
+      console.log('Mock Socket.IO server initialized');
+      return {
+        on: jest.fn(),
+        to: jest.fn(() => ({
+          emit: jest.fn(),
+        })),
+        emit: jest.fn(),
+      };
     }),
-    broadcast: jest.fn((partyId, data) => {
-      console.log(`Mock broadcast to ${partyId}:`, data);
-      wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-          client.send(JSON.stringify({ partyId, ...data }));
-        }
-      });
+    sendNotification: jest.fn(),
+    broadcastNotification: jest.fn(),
+    sendUnreadCount: jest.fn(),
+    broadcastToParty: jest.fn((partyId, data) => {
+      console.log(`Mock broadcast to party ${partyId}:`, data);
     }),
+    getIO: jest.fn(() => ({
+      to: jest.fn(() => ({
+        emit: jest.fn(),
+      })),
+      emit: jest.fn(),
+    })),
   };
 });
 
@@ -43,7 +37,7 @@ jest.mock('./db', () => ({
 
 // Debugging Path Resolution
 const path = require('path');
-console.log('Resolved path to broadcast:', path.resolve(__dirname, './utils/broadcast'));
+console.log('Resolved path to socketIO:', path.resolve(__dirname, './utils/socketIO'));
 
 // Ensure proper cleanup of database connections after tests
 const mongoose = require('mongoose');
