@@ -843,9 +843,9 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       'author.userId', 'label.userId'
     ];
 
+    // Note: Media schema doesn't have isActive field, so we don't filter by it
     const creatorMediaQuery = {
-      $or: creatorRoles.map(role => ({ [role]: userId })),
-      isActive: true
+      $or: creatorRoles.map(role => ({ [role]: userId }))
     };
 
     const creatorMedia = await Media.find(creatorMediaQuery)
@@ -965,12 +965,12 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     const allLabels = Array.from(allLabelsMap.values());
 
     // Get recent media (last 5)
+    // Note: Media schema doesn't have isActive field, so we don't filter by it
     const recentMedia = await Media.find({
       $or: [
         { 'mediaOwners.userId': userId },
         ...creatorRoles.map(role => ({ [role]: userId }))
-      ],
-      isActive: true
+      ]
     })
     .sort({ createdAt: -1 })
     .limit(5)
