@@ -165,24 +165,23 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, reportType, 
     setIsSubmitting(true);
 
     try {
-      let response;
       switch (reportType) {
         case 'media':
-          response = await reportAPI.reportMedia(targetId, {
+          await reportAPI.reportMedia(targetId, {
             category,
             description: description.trim(),
             contactEmail: contactEmail.trim() || undefined
           });
           break;
         case 'user':
-          response = await reportAPI.reportUser(targetId, {
+          await reportAPI.reportUser(targetId, {
             category,
             description: description.trim(),
             contactEmail: contactEmail.trim() || undefined
           });
           break;
         case 'label':
-          response = await reportAPI.reportLabel(targetId, {
+          await reportAPI.reportLabel(targetId, {
             category,
             description: description.trim(),
             contactEmail: contactEmail.trim() || undefined
@@ -211,19 +210,6 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, reportType, 
       setDescription('');
       setContactEmail('');
       onClose();
-    }
-  };
-
-  const getTypeLabel = () => {
-    switch (reportType) {
-      case 'media':
-        return 'Tune';
-      case 'user':
-        return 'User';
-      case 'label':
-        return 'Label';
-      default:
-        return 'Item';
     }
   };
 
