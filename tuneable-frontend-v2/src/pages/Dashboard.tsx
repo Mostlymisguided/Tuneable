@@ -522,7 +522,7 @@ const Dashboard: React.FC = () => {
                             <div>
                               <p className="text-sm text-gray-400">Total Bid Amount</p>
                               <p className="text-2xl font-bold text-white mt-1">
-                                £{((creatorStats.stats?.totalBidAmount || 0) / 100).toFixed(2)}
+                                £{((creatorStats.stats?.totalBidAmount || 0)).toFixed(2)}
                               </p>
                             </div>
                             <Coins className="h-8 w-8 text-green-400 opacity-50" />
@@ -607,7 +607,7 @@ const Dashboard: React.FC = () => {
                                 </div>
                                 <div className="text-right">
                                   <p className="text-purple-400 font-medium">
-                                    £{((media.globalMediaAggregate || 0) / 100).toFixed(2)}
+                                    £{((media.globalMediaAggregate || 0)).toFixed(2)}
                                   </p>
                                 </div>
                               </div>
@@ -754,7 +754,7 @@ const Dashboard: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3">
                                       <div className="text-white font-medium">
-                                        £{((item.globalMediaAggregate || 0) / 100).toFixed(2)}
+                                        £{((item.globalMediaAggregate || 0)).toFixed(2)}
                                       </div>
                                       <div className="text-xs text-gray-400">
                                         {item.bidCount || 0} bids
@@ -1021,7 +1021,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0) / 100).toFixed(2)}</div>
+                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0)).toFixed(2)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1188,7 +1188,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0) / 100).toFixed(2)}</div>
+                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0)).toFixed(2)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1361,7 +1361,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0) / 100).toFixed(2)}</div>
+                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0)).toFixed(2)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
