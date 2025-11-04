@@ -4,6 +4,7 @@ import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { DEFAULT_COVER_ART } from '../constants';
 
 interface TopTunesSong {
   id: string;
@@ -230,7 +231,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               {/* Cover Art with Play Button Overlay */}
               <div className="flex-shrink-0 relative w-12 h-12">
                 <img
-                  src={song.coverArt || '/default-cover.jpg'}
+                  src={song.coverArt || DEFAULT_COVER_ART}
                   alt={song.title}
                   className="w-full h-full rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={() => {

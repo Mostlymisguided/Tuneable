@@ -307,6 +307,13 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       }
     }
     
+    // Set default cover art if none was provided or extracted
+    if (!media.coverArt) {
+      media.coverArt = '/default-cover.jpg';
+      await media.save();
+      console.log('✅ Set default cover art for media');
+    }
+    
     console.log(`✅ Creator ${user.username} uploaded: ${title} (${media.uuid})`);
     
     res.status(201).json({

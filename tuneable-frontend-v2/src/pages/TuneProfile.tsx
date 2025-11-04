@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
   Music, 
   User, 
@@ -882,7 +882,7 @@ const TuneProfile: React.FC = () => {
             {/* Album Art with Play Button Overlay */}
             <div className="w-full md:w-auto flex justify-center md:justify-start mb-6 md:mb-0 md:mr-6 relative group">
               <img
-                src={media.coverArt || '/android-chrome-192x192.png'}
+                src={media.coverArt || DEFAULT_COVER_ART}
                 alt={`${media.title} cover`}
                 className="w-48 h-48 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />

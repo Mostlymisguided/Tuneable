@@ -16,6 +16,7 @@ import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Plus, Coins, SkipForward, SkipBack, Loader2, Youtube, Tag } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
+import { DEFAULT_COVER_ART } from '../constants';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -1258,7 +1259,7 @@ const Party: React.FC = () => {
                               {/* Album Artwork with Play Icon Overlay */}
                               <div className="relative w-16 h-16 flex-shrink-0">
                                 <img
-                                  src={mediaData.coverArt || '/default-cover.jpg'}
+                                  src={mediaData.coverArt || DEFAULT_COVER_ART}
                                   alt={mediaData.title || 'Unknown Media'}
                                   className="w-full h-full rounded object-cover"
                                   width="64"
@@ -1450,7 +1451,7 @@ const Party: React.FC = () => {
                                 <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
-                                      src={media.coverArt || '/default-cover.jpg'}
+                                      src={media.coverArt || DEFAULT_COVER_ART}
                                       alt={media.title}
                                       className="h-12 w-12 rounded object-cover flex-shrink-0"
                                     />
@@ -1508,7 +1509,7 @@ const Party: React.FC = () => {
                                 <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
-                                      src={media.coverArt || '/default-cover.jpg'}
+                                      src={media.coverArt || DEFAULT_COVER_ART}
                                       alt={media.title}
                                       className="h-12 w-12 rounded object-cover flex-shrink-0"
                                     />
@@ -1623,7 +1624,7 @@ const Party: React.FC = () => {
                               onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                             >
                               <img
-                                src={mediaData.coverArt || '/default-cover.jpg'}
+                                src={mediaData.coverArt || DEFAULT_COVER_ART}
                                 alt={mediaData.title || 'Unknown Media'}
                                 className="w-full h-full rounded object-cover"
                                 width="192"
@@ -1750,7 +1751,7 @@ const Party: React.FC = () => {
                               className="bg-red-900/20 border border-red-800/30 p-4 rounded-lg flex items-center space-x-4"
                             >
                               <img
-                                src={mediaData.coverArt || '/default-cover.jpg'}
+                                src={mediaData.coverArt || DEFAULT_COVER_ART}
                                 alt={mediaData.title || 'Unknown Media'}
                                 className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                                 width="128"

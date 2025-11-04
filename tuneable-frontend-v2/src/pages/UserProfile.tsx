@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
   Coins, 
   Music, 
@@ -989,7 +989,7 @@ const UserProfile: React.FC = () => {
                     {/* Album Artwork with Play Icon Overlay */}
                     <div className="relative w-16 h-16 flex-shrink-0">
                       <img
-                        src={mediaData.media?.coverArt || '/android-chrome-192x192.png'}
+                        src={mediaData.media?.coverArt || DEFAULT_COVER_ART}
                         alt={`${mediaData.media?.title || 'Unknown Song'} cover`}
                         className="w-full h-full rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => {
