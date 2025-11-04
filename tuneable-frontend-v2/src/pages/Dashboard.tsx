@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -70,6 +70,12 @@ const Dashboard: React.FC = () => {
   const [myMediaSortDirection, setMyMediaSortDirection] = useState<'asc' | 'desc'>('desc');
   const [myMediaPage, setMyMediaPage] = useState(1);
   const [myMediaTotal, setMyMediaTotal] = useState(0);
+
+  // Labels tab state
+  const [labelsFilterRole, setLabelsFilterRole] = useState<string>('all'); // 'all', 'owner', 'admin', 'affiliation'
+  const [labelsFilterVerification, setLabelsFilterVerification] = useState<string>('all'); // 'all', 'verified', 'pending', 'unverified'
+  const [labelsSortField, setLabelsSortField] = useState<string>('name');
+  const [labelsSortDirection, setLabelsSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
@@ -806,188 +812,424 @@ const Dashboard: React.FC = () => {
                     </div>
                   )}
 
-                  {creatorActiveTab === 'labels' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-white">My Labels</h3>
-                        <button
-                          onClick={() => setIsLabelModalOpen(true)}
-                          className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Label
-                        </button>
-                      </div>
+                  {creatorActiveTab === 'labels' && (() => {
+                    // Helper functions
+                    const getRoleBadgeColor = (role: string, relationshipType: string) => {
+                      if (relationshipType === 'admin') {
+                        return role === 'owner' ? 'bg-purple-600' : 'bg-blue-600';
+                      }
+                      return 'bg-gray-600';
+                    };
 
-                      {creatorStats.labels && creatorStats.labels.length > 0 ? (
-                        <div className="bg-gray-900 rounded-lg overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <table className="w-full">
-                              <thead className="bg-gray-800">
-                                <tr>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    <button
-                                      onClick={() => {
-                                        // Sort by name
-                                        const sorted = [...creatorStats.labels].sort((a: any, b: any) => {
-                                          if (myMediaSortField === 'name' && myMediaSortDirection === 'asc') {
-                                            return a.name.localeCompare(b.name);
-                                          }
-                                          return b.name.localeCompare(a.name);
-                                        });
-                                        setCreatorStats({ ...creatorStats, labels: sorted });
-                                        setMyMediaSortField(myMediaSortField === 'name' ? '' : 'name');
-                                        setMyMediaSortDirection(myMediaSortField === 'name' && myMediaSortDirection === 'asc' ? 'desc' : 'asc');
-                                      }}
-                                      className="flex items-center hover:text-purple-400 transition-colors"
-                                    >
-                                      Label
-                                      {myMediaSortField === 'name' ? (
-                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                      ) : (
-                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                      )}
-                                    </button>
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    Role
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    Artists
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    Releases
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    <button
-                                      onClick={() => {
-                                        // Sort by total bids
-                                        const sorted = [...creatorStats.labels].sort((a: any, b: any) => {
-                                          const aBids = a.totalBidAmount || 0;
-                                          const bBids = b.totalBidAmount || 0;
-                                          if (myMediaSortField === 'totalBids' && myMediaSortDirection === 'asc') {
-                                            return aBids - bBids;
-                                          }
-                                          return bBids - aBids;
-                                        });
-                                        setCreatorStats({ ...creatorStats, labels: sorted });
-                                        setMyMediaSortField(myMediaSortField === 'totalBids' ? '' : 'totalBids');
-                                        setMyMediaSortDirection(myMediaSortField === 'totalBids' && myMediaSortDirection === 'asc' ? 'desc' : 'asc');
-                                      }}
-                                      className="flex items-center hover:text-purple-400 transition-colors"
-                                    >
-                                      Total Bids
-                                      {myMediaSortField === 'totalBids' ? (
-                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                      ) : (
-                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                      )}
-                                    </button>
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    Status
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-800">
-                                {creatorStats.labels.map((label: any) => {
-                                  const getRoleBadgeColor = (role: string, relationshipType: string) => {
-                                    if (relationshipType === 'admin') {
-                                      return role === 'owner' ? 'bg-purple-600' : 'bg-blue-600';
-                                    }
-                                    return 'bg-gray-600';
-                                  };
+                    const getRoleLabel = (role: string, relationshipType: string) => {
+                      if (relationshipType === 'admin') {
+                        return role === 'owner' ? 'Owner' : 'Admin';
+                      }
+                      return role.charAt(0).toUpperCase() + role.slice(1);
+                    };
 
-                                  const getRoleLabel = (role: string, relationshipType: string) => {
-                                    if (relationshipType === 'admin') {
-                                      return role === 'owner' ? 'Owner' : 'Admin';
-                                    }
-                                    return role.charAt(0).toUpperCase() + role.slice(1);
-                                  };
+                    // Filter and sort labels
+                    const filteredLabels = (creatorStats.labels || []).filter((label: any) => {
+                      // Filter by role
+                      if (labelsFilterRole !== 'all') {
+                        if (labelsFilterRole === 'owner' && !(label.relationshipType === 'admin' && label.role === 'owner')) {
+                          return false;
+                        }
+                        if (labelsFilterRole === 'admin' && !(label.relationshipType === 'admin' && label.role === 'admin')) {
+                          return false;
+                        }
+                        if (labelsFilterRole === 'affiliation' && label.relationshipType !== 'affiliation') {
+                          return false;
+                        }
+                      }
 
-                                  return (
-                                    <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
-                                      <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                          {label.logo ? (
-                                            <img
-                                              src={label.logo}
-                                              alt={label.name}
-                                              className="h-10 w-10 rounded object-cover"
-                                            />
-                                          ) : (
-                                            <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
-                                              <Building className="h-5 w-5 text-gray-500" />
-                                            </div>
-                                          )}
-                                          <button
-                                            onClick={() => navigate(`/label/${label.slug}`)}
-                                            className="text-white font-medium hover:text-purple-400 transition-colors text-left"
-                                          >
-                                            {label.name}
-                                          </button>
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 ${getRoleBadgeColor(label.role || 'admin', label.relationshipType || 'admin')} text-white text-xs rounded capitalize`}>
-                                          {getRoleLabel(label.role || 'admin', label.relationshipType || 'admin')}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3 text-gray-300">
-                                        {label.artistCount || 0}
-                                      </td>
-                                      <td className="px-4 py-3 text-gray-300">
-                                        {label.releaseCount || 0}
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <div className="text-white font-medium">
-                                          £{((label.totalBidAmount || 0) / 100).toFixed(2)}
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        {label.verificationStatus === 'verified' ? (
-                                          <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">
-                                            Verified
-                                          </span>
-                                        ) : (
-                                          <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                            {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <button
-                                          onClick={() => navigate(`/label/${label.slug}`)}
-                                          className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                                        >
-                                          View
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 bg-gray-900 rounded-lg">
-                          <Building className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-                          <p className="text-gray-400 mb-2">No labels found</p>
-                          <p className="text-gray-500 text-sm mb-4">Create your first label or join an existing one!</p>
+                      // Filter by verification status
+                      if (labelsFilterVerification !== 'all') {
+                        if (labelsFilterVerification === 'verified' && label.verificationStatus !== 'verified') {
+                          return false;
+                        }
+                        if (labelsFilterVerification === 'pending' && label.verificationStatus !== 'pending') {
+                          return false;
+                        }
+                        if (labelsFilterVerification === 'unverified' && label.verificationStatus === 'verified') {
+                          return false;
+                        }
+                      }
+
+                      return true;
+                    });
+
+                    // Sort labels
+                    const sortedLabels = [...filteredLabels].sort((a: any, b: any) => {
+                      let comparison = 0;
+                      
+                      if (labelsSortField === 'name') {
+                        comparison = a.name.localeCompare(b.name);
+                      } else if (labelsSortField === 'totalBids') {
+                        comparison = (a.totalBidAmount || 0) - (b.totalBidAmount || 0);
+                      } else if (labelsSortField === 'artistCount') {
+                        comparison = (a.artistCount || 0) - (b.artistCount || 0);
+                      } else if (labelsSortField === 'releaseCount') {
+                        comparison = (a.releaseCount || 0) - (b.releaseCount || 0);
+                      } else if (labelsSortField === 'verificationStatus') {
+                        comparison = (a.verificationStatus || 'unverified').localeCompare(b.verificationStatus || 'unverified');
+                      }
+
+                      return labelsSortDirection === 'asc' ? comparison : -comparison;
+                    });
+
+                    // Group labels by role
+                    const ownedLabels = sortedLabels.filter((label: any) => 
+                      label.relationshipType === 'admin' && label.role === 'owner'
+                    );
+                    const adminLabels = sortedLabels.filter((label: any) => 
+                      label.relationshipType === 'admin' && label.role === 'admin'
+                    );
+                    const affiliatedLabels = sortedLabels.filter((label: any) => 
+                      label.relationshipType === 'affiliation'
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white">My Labels</h3>
                           <button
                             onClick={() => setIsLabelModalOpen(true)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                           >
+                            <Plus className="h-4 w-4 mr-2" />
                             Create Label
                           </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-4 items-center bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-400">Filter by:</span>
+                          </div>
+                          <select
+                            value={labelsFilterRole}
+                            onChange={(e) => setLabelsFilterRole(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Roles</option>
+                            <option value="owner">Owner</option>
+                            <option value="admin">Admin</option>
+                            <option value="affiliation">Affiliated</option>
+                          </select>
+                          <select
+                            value={labelsFilterVerification}
+                            onChange={(e) => setLabelsFilterVerification(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Status</option>
+                            <option value="verified">Verified</option>
+                            <option value="pending">Pending</option>
+                            <option value="unverified">Unverified</option>
+                          </select>
+                        </div>
+
+                        {sortedLabels.length > 0 ? (
+                          <div className="space-y-6">
+                            {/* Owned Labels Section */}
+                            {ownedLabels.length > 0 && (
+                              <div>
+                                <h4 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
+                                  <Building className="h-5 w-5 text-purple-400" />
+                                  Labels You Own ({ownedLabels.length})
+                                </h4>
+                                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-gray-800">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
+                                                setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Label
+                                              {labelsSortField === 'name' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
+                                                setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Total Bids
+                                              {labelsSortField === 'totalBids' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-800">
+                                        {ownedLabels.map((label: any) => (
+                                          <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-3">
+                                                {label.logo ? (
+                                                  <img src={label.logo} alt={label.name} className="h-10 w-10 rounded object-cover" />
+                                                ) : (
+                                                  <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+                                                    <Building className="h-5 w-5 text-gray-500" />
+                                                  </div>
+                                                )}
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                >
+                                                  {label.name}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
+                                            <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0) / 100).toFixed(2)}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {label.verificationStatus === 'verified' ? (
+                                                <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                              ) : (
+                                                <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                  {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                >
+                                                  View
+                                                </button>
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                >
+                                                  <Settings className="h-3 w-3" />
+                                                  Manage
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Admin Labels Section */}
+                            {adminLabels.length > 0 && (
+                              <div>
+                                <h4 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
+                                  <Users className="h-5 w-5 text-blue-400" />
+                                  Labels You Admin ({adminLabels.length})
+                                </h4>
+                                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-gray-800">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Label</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-800">
+                                        {adminLabels.map((label: any) => (
+                                          <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-3">
+                                                {label.logo ? (
+                                                  <img src={label.logo} alt={label.name} className="h-10 w-10 rounded object-cover" />
+                                                ) : (
+                                                  <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+                                                    <Building className="h-5 w-5 text-gray-500" />
+                                                  </div>
+                                                )}
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                >
+                                                  {label.name}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
+                                            <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0) / 100).toFixed(2)}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {label.verificationStatus === 'verified' ? (
+                                                <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                              ) : (
+                                                <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                  {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                >
+                                                  View
+                                                </button>
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                >
+                                                  <Settings className="h-3 w-3" />
+                                                  Manage
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Affiliated Labels Section */}
+                            {affiliatedLabels.length > 0 && (
+                              <div>
+                                <h4 className="text-md font-semibold text-white mb-3 flex items-center gap-2">
+                                  <Music className="h-5 w-5 text-gray-400" />
+                                  Labels You're Affiliated With ({affiliatedLabels.length})
+                                </h4>
+                                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-gray-800">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Label</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Your Role</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-800">
+                                        {affiliatedLabels.map((label: any) => (
+                                          <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-3">
+                                                {label.logo ? (
+                                                  <img src={label.logo} alt={label.name} className="h-10 w-10 rounded object-cover" />
+                                                ) : (
+                                                  <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+                                                    <Building className="h-5 w-5 text-gray-500" />
+                                                  </div>
+                                                )}
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                >
+                                                  {label.name}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <span className={`px-2 py-1 ${getRoleBadgeColor(label.role || 'artist', label.relationshipType || 'affiliation')} text-white text-xs rounded capitalize`}>
+                                                {getRoleLabel(label.role || 'artist', label.relationshipType || 'affiliation')}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
+                                            <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0) / 100).toFixed(2)}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {label.verificationStatus === 'verified' ? (
+                                                <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                              ) : (
+                                                <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                  {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <button
+                                                onClick={() => navigate(`/label/${label.slug}`)}
+                                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                              >
+                                                View
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-gray-900 rounded-lg">
+                            <Building className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                            <p className="text-gray-400 mb-2">No labels found</p>
+                            <p className="text-gray-500 text-sm mb-4">
+                              {labelsFilterRole !== 'all' || labelsFilterVerification !== 'all' 
+                                ? 'Try adjusting your filters' 
+                                : 'Create your first label or join an existing one!'}
+                            </p>
+                            {(labelsFilterRole !== 'all' || labelsFilterVerification !== 'all') && (
+                              <button
+                                onClick={() => {
+                                  setLabelsFilterRole('all');
+                                  setLabelsFilterVerification('all');
+                                }}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors mr-2"
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setIsLabelModalOpen(true)}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            >
+                              Create Label
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </>
               ) : null}
             </div>
