@@ -117,6 +117,17 @@ const bidSchema = new mongoose.Schema({
     },
     
     // ========================================
+    // VETO TRACKING
+    // ========================================
+    vetoedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }, // User who vetoed the bid (admin)
+    vetoedBy_uuid: { type: String }, // UUID reference for vetoedBy
+    vetoedReason: { type: String }, // Reason for vetoing the bid
+    vetoedAt: { type: Date }, // Timestamp when bid was vetoed
+    
+    // ========================================
     // DYNAMIC METRICS (computed via BidMetricsEngine)
     // ========================================
     // Note: Aggregate values are now computed dynamically using the

@@ -1462,7 +1462,11 @@ router.post('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) =>
                     { _id: { $in: refund.bidIds } },
                     { 
                         $set: { 
-                            status: 'vetoed'
+                            status: 'vetoed',
+                            vetoedBy: req.user._id,
+                            vetoedBy_uuid: req.user.uuid,
+                            vetoedReason: reason || null,
+                            vetoedAt: new Date()
                         } 
                     }
                 )
@@ -1763,7 +1767,11 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
                     { _id: { $in: refund.bidIds } },
                     { 
                         $set: { 
-                            status: 'vetoed'
+                            status: 'vetoed',
+                            vetoedBy: req.user._id,
+                            vetoedBy_uuid: req.user.uuid,
+                            vetoedReason: reason || null,
+                            vetoedAt: new Date()
                         } 
                     }
                 )
@@ -2135,7 +2143,11 @@ router.put('/:partyId/media/:mediaId/veto', authMiddleware, async (req, res) => 
                     { _id: { $in: refund.bidIds } },
                     { 
                         $set: { 
-                            status: 'vetoed'
+                            status: 'vetoed',
+                            vetoedBy: req.user._id,
+                            vetoedBy_uuid: req.user.uuid,
+                            vetoedReason: reason || null,
+                            vetoedAt: new Date()
                         } 
                     }
                 )

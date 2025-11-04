@@ -569,6 +569,17 @@ export const userAPI = {
     const response = await api.get('/users/me/labels');
     return response.data;
   },
+
+  // Admin: Get vetoed bids
+  getVetoedBids: async (params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'vetoedAt' | 'createdAt' | 'amount';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/users/admin/bids/vetoed', { params });
+    return response.data;
+  },
 };
 
 export const labelAPI = {

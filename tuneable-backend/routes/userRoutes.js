@@ -2359,4 +2359,88 @@ router.get('/me/labels', authMiddleware, async (req, res) => {
   }
 });
 
+// Admin: Get all vetoed bids
+router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const Bid = require('../models/Bid');
+    const { page = 1, limit = 50, sortBy = 'vetoedAt', sortOrder = 'desc' } = req.query;
+
+    // Build query
+    const query = { status: 'vetoed' };
+
+    // Build sort object
+    const sort = {};
+    if (sortBy === 'vetoedAt') {
+      sort.vetoedAt = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'createdAt') {
+      sort.createdAt = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'amount') {
+      sort.amount = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sort.vetoedAt = -1; // Default sort
+    }
+
+    // Fetch vetoed bids with populated references
+    const bids = await Bid.find(query)
+      .populate('userId', 'username profilePic uuid')
+      .populate('mediaId', 'title artist coverArt _id')
+      .populate('partyId', 'name type')
+      .populate('vetoedBy', 'username uuid')
+      .sort(sort)
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Bid.countDocuments(query);
+
+    // Format response
+    const formattedBids = bids.map(bid => ({
+      _id: bid._id,
+      uuid: bid.uuid,
+      amount: bid.amount, // In pence
+      createdAt: bid.createdAt,
+      vetoedAt: bid.vetoedAt,
+      vetoedReason: bid.vetoedReason,
+      user: {
+        _id: bid.userId?._id || bid.userId,
+        username: bid.username || bid.userId?.username || 'Unknown',
+        profilePic: bid.userId?.profilePic,
+        uuid: bid.userId?.uuid || bid.user_uuid
+      },
+      media: {
+        _id: bid.mediaId?._id || bid.mediaId,
+        title: bid.mediaTitle || bid.mediaId?.title || 'Unknown',
+        artist: bid.mediaArtist || (Array.isArray(bid.mediaId?.artist) ? bid.mediaId.artist[0]?.name : bid.mediaId?.artist) || 'Unknown',
+        coverArt: bid.mediaCoverArt || bid.mediaId?.coverArt
+      },
+      party: {
+        _id: bid.partyId?._id || bid.partyId,
+        name: bid.partyName || bid.partyId?.name || 'Unknown',
+        type: bid.partyType || bid.partyId?.type || 'unknown'
+      },
+      vetoedBy: bid.vetoedBy ? {
+        _id: bid.vetoedBy._id,
+        username: bid.vetoedBy.username,
+        uuid: bid.vetoedBy.uuid
+      } : null,
+      bidScope: bid.bidScope || 'party'
+    }));
+
+    res.json({
+      bids: formattedBids,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error fetching vetoed bids:', error);
+    res.status(500).json({ error: 'Failed to fetch vetoed bids', details: error.message });
+  }
+});
+
 module.exports = router;

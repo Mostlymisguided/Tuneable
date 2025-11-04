@@ -24,6 +24,7 @@ import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI } from '../lib/api';
 import { toast } from 'react-toastify';
+import { penceToPounds } from '../utils/currency';
 
 interface User {
   _id: string;
@@ -66,6 +67,12 @@ const Admin: React.FC = () => {
   const [labelSortDirection, setLabelSortDirection] = useState<'asc' | 'desc'>('desc');
   const [labelFilterStatus, setLabelFilterStatus] = useState<string>('');
   const [labelSearchQuery, setLabelSearchQuery] = useState<string>('');
+  const [vetoedBids, setVetoedBids] = useState<any[]>([]);
+  const [isLoadingVetoedBids, setIsLoadingVetoedBids] = useState(false);
+  const [vetoedBidsSortField, setVetoedBidsSortField] = useState<string>('vetoedAt');
+  const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
+  const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
 
   useEffect(() => {
     checkAdminStatus();
@@ -339,6 +346,50 @@ const Admin: React.FC = () => {
     }
   }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab]);
 
+  const loadVetoedBids = async () => {
+    try {
+      setIsLoadingVetoedBids(true);
+      const params: any = {
+        page: vetoedBidsPage,
+        limit: 50,
+        sortBy: vetoedBidsSortField,
+        sortOrder: vetoedBidsSortDirection
+      };
+      const data = await userAPI.getVetoedBids(params);
+      setVetoedBids(data.bids || []);
+      setVetoedBidsTotal(data.total || 0);
+    } catch (error) {
+      console.error('Error loading vetoed bids:', error);
+      toast.error('Failed to load vetoed bids');
+    } finally {
+      setIsLoadingVetoedBids(false);
+    }
+  };
+
+  const handleVetoedBidsSort = (field: string) => {
+    if (vetoedBidsSortField === field) {
+      setVetoedBidsSortDirection(vetoedBidsSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setVetoedBidsSortField(field);
+      setVetoedBidsSortDirection('desc');
+    }
+  };
+
+  const getVetoedBidsSortIcon = (field: string) => {
+    if (vetoedBidsSortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return vetoedBidsSortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 text-purple-400" />;
+  };
+
+  useEffect(() => {
+    if (activeTab === 'vetoed-bids' && isAdmin) {
+      loadVetoedBids();
+    }
+  }, [vetoedBidsSortField, vetoedBidsSortDirection, vetoedBidsPage, activeTab]);
+
   const getLabelSortIcon = (field: string) => {
     if (labelSortField !== field) {
       return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
@@ -401,6 +452,7 @@ const Admin: React.FC = () => {
     { id: 'overview', name: 'Overview', icon: BarChart3 },
     { id: 'users', name: 'Users', icon: Users },
     { id: 'labels', name: 'Labels', icon: Building },
+    { id: 'vetoed-bids', name: 'Vetoed Bids', icon: XCircle },
     { id: 'creators', name: 'Creator Applications', icon: Award },
     { id: 'claims', name: 'Tune Claims', icon: Music },
     { id: 'reports', name: 'Tune Reports', icon: AlertTriangle },
@@ -704,7 +756,7 @@ const Admin: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-300">£{user.balance.toFixed(2)}</div>
+                          <div className="text-sm text-gray-300">{penceToPounds(user.balance)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -938,7 +990,7 @@ const Admin: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              £{(label.stats?.totalBidAmount || 0).toFixed(2)}
+                              {penceToPounds(label.stats?.totalBidAmount || 0)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -986,6 +1038,182 @@ const Admin: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'vetoed-bids' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Vetoed Bids</h2>
+              <button
+                onClick={loadVetoedBids}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {isLoadingVetoedBids ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : vetoedBids.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <XCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No vetoed bids found</p>
+              </div>
+            ) : (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Media
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          User
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleVetoedBidsSort('amount')}
+                        >
+                          <div className="flex items-center">
+                            Bid Amount
+                            {getVetoedBidsSortIcon('amount')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleVetoedBidsSort('createdAt')}
+                        >
+                          <div className="flex items-center">
+                            Date Placed
+                            {getVetoedBidsSortIcon('createdAt')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleVetoedBidsSort('vetoedAt')}
+                        >
+                          <div className="flex items-center">
+                            Date Vetoed
+                            {getVetoedBidsSortIcon('vetoedAt')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Vetoed By
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Reason
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Party
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Scope
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                      {vetoedBids.map((bid) => (
+                        <tr key={bid._id} className="hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {bid.media?.coverArt && (
+                                <img
+                                  src={bid.media.coverArt}
+                                  alt={bid.media.title}
+                                  className="h-10 w-10 rounded object-cover mr-3"
+                                />
+                              )}
+                              <div>
+                                <button
+                                  onClick={() => navigate(`/tune/${bid.media._id}`)}
+                                  className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                                >
+                                  {bid.media?.title || 'Unknown'}
+                                </button>
+                                <div className="text-xs text-gray-400">{bid.media?.artist || 'Unknown Artist'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => bid.user?.uuid && navigate(`/user/${bid.user.uuid}`)}
+                              className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                            >
+                              {bid.user?.username || 'Unknown'}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-green-400">
+                              {penceToPounds(bid.amount)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {bid.createdAt ? new Date(bid.createdAt).toLocaleString() : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {bid.vetoedAt ? new Date(bid.vetoedAt).toLocaleString() : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {bid.vetoedBy?.username || 'Unknown'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-300 max-w-xs truncate" title={bid.vetoedReason || ''}>
+                              {bid.vetoedReason || 'No reason provided'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {bid.party?.name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {bid.party?.type || 'unknown'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-xs text-gray-400 uppercase">
+                              {bid.bidScope || 'party'}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {vetoedBidsTotal > 50 && (
+                  <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
+                    <div className="text-sm text-gray-300">
+                      Showing {((vetoedBidsPage - 1) * 50) + 1} - {Math.min(vetoedBidsPage * 50, vetoedBidsTotal)} of {vetoedBidsTotal}
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setVetoedBidsPage(p => Math.max(1, p - 1))}
+                        disabled={vetoedBidsPage === 1}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setVetoedBidsPage(p => p + 1)}
+                        disabled={vetoedBidsPage * 50 >= vetoedBidsTotal}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
