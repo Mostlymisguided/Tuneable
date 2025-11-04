@@ -409,10 +409,10 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const handleBidAmountChange = (songId: string, amount: number) => {
+  const handleBidAmountChange = (mediaId: string, amount: number) => {
     setBidAmounts(prev => ({
       ...prev,
-      [songId]: amount
+      [mediaId]: amount
     }));
   };
 

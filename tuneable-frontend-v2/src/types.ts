@@ -228,19 +228,6 @@ export interface SearchResult {
   sources: Record<string, string>;
 }
 
-export interface Bid {
-  id: string;
-  userId: string;
-  partyId: string;
-  songId: string;
-  amount: number;
-  createdAt: string;
-  status: 'requested' | 'active' | 'vetoed' | 'refunded';
-  
-  // User aggregate tracking
-  partyAggregateBidValue?: number;
-  globalAggregateBidValue?: number;
-}
 
 export interface PartyMedia {
   mediaId: string;

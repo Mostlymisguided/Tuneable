@@ -99,7 +99,7 @@ interface UserProfile {
 
 interface Bid {
   _id: string;
-  songId: {
+  mediaId: {
     _id: string;
     title: string;
     artist: string;
