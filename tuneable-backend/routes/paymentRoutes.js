@@ -110,7 +110,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           
           // Send email notification to admin
           try {
-            await sendPaymentNotification(user, amount);
+            await sendPaymentNotification(user, amountPounds);
           } catch (emailError) {
             console.error('Failed to send payment notification email:', emailError);
             // Don't fail the request if email fails
