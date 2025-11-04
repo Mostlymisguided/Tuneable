@@ -15,6 +15,13 @@ export default defineConfig({
       }
     }
   },
+  // Optimize dependencies - include music-metadata for proper handling
+  optimizeDeps: {
+    include: ['music-metadata'],
+    esbuildOptions: {
+      target: 'es2020'
+    }
+  },
   build: {
     rollupOptions: {
       output: {
@@ -31,13 +38,6 @@ export default defineConfig({
             }
           }
         }
-      }
-    },
-    // Optimize dependencies - include music-metadata for proper handling
-    optimizeDeps: {
-      include: ['music-metadata'],
-      esbuildOptions: {
-        target: 'es2020'
       }
     },
     // CommonJS compatibility

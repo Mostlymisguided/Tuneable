@@ -27,7 +27,7 @@ import {
   Building,
   CheckCircle
 } from 'lucide-react';
-import { userAPI, authAPI, labelAPI } from '../lib/api';
+import { userAPI, authAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -595,7 +595,7 @@ const UserProfile: React.FC = () => {
     setIsLabelModalOpen(true);
   };
 
-  const handleLabelCreated = async (label: any) => {
+  const handleLabelCreated = async () => {
     // Refresh user profile to show updated data
     await fetchUserProfile();
     // Modal will close automatically via onClose
