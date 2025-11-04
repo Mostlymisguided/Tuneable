@@ -62,6 +62,14 @@ const Dashboard: React.FC = () => {
   const [isLoadingCreatorStats, setIsLoadingCreatorStats] = useState(false);
   const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels'>('overview');
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  
+  // My Media state
+  const [myMedia, setMyMedia] = useState<any[]>([]);
+  const [isLoadingMyMedia, setIsLoadingMyMedia] = useState(false);
+  const [myMediaSortField, setMyMediaSortField] = useState<string>('createdAt');
+  const [myMediaSortDirection, setMyMediaSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [myMediaPage, setMyMediaPage] = useState(1);
+  const [myMediaTotal, setMyMediaTotal] = useState(0);
 
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
@@ -121,6 +129,30 @@ const Dashboard: React.FC = () => {
     };
     loadCreatorStats();
   }, [user]);
+
+  useEffect(() => {
+    const loadMyMedia = async () => {
+      if (!showCreatorDashboard(user) || creatorActiveTab !== 'media') return;
+      
+      try {
+        setIsLoadingMyMedia(true);
+        const data = await userAPI.getMyMedia({
+          page: myMediaPage,
+          limit: 20,
+          sortBy: myMediaSortField,
+          sortOrder: myMediaSortDirection
+        });
+        setMyMedia(data.media || []);
+        setMyMediaTotal(data.pagination?.total || 0);
+      } catch (error) {
+        console.error('Failed to load my media:', error);
+        toast.error('Failed to load your media');
+      } finally {
+        setIsLoadingMyMedia(false);
+      }
+    };
+    loadMyMedia();
+  }, [user, creatorActiveTab, myMediaPage, myMediaSortField, myMediaSortDirection]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -587,7 +619,190 @@ const Dashboard: React.FC = () => {
                           Upload Media
                         </button>
                       </div>
-                      <p className="text-gray-400">Media management coming soon...</p>
+
+                      {isLoadingMyMedia ? (
+                        <div className="text-center py-8">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                          <p className="text-gray-400 mt-2">Loading your media...</p>
+                        </div>
+                      ) : myMedia.length === 0 ? (
+                        <div className="text-center py-8 bg-gray-900 rounded-lg">
+                          <Music className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                          <p className="text-gray-400 mb-2">No media found</p>
+                          <p className="text-gray-500 text-sm mb-4">Upload your first track to get started!</p>
+                          <button
+                            onClick={() => navigate('/upload')}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                          >
+                            Upload Media
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-900 rounded-lg overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-800">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        if (myMediaSortField === 'title') {
+                                          setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                        } else {
+                                          setMyMediaSortField('title');
+                                          setMyMediaSortDirection('asc');
+                                        }
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Title
+                                      {myMediaSortField === 'title' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Artist
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        if (myMediaSortField === 'globalMediaAggregate') {
+                                          setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                        } else {
+                                          setMyMediaSortField('globalMediaAggregate');
+                                          setMyMediaSortDirection('desc');
+                                        }
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Total Bids
+                                      {myMediaSortField === 'globalMediaAggregate' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Ownership
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        if (myMediaSortField === 'createdAt') {
+                                          setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                        } else {
+                                          setMyMediaSortField('createdAt');
+                                          setMyMediaSortDirection('desc');
+                                        }
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Uploaded
+                                      {myMediaSortField === 'createdAt' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Actions
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-800">
+                                {myMedia.map((item: any) => (
+                                  <tr key={item._id} className="hover:bg-gray-800/50 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-3">
+                                        {item.coverArt ? (
+                                          <img
+                                            src={item.coverArt}
+                                            alt={item.title}
+                                            className="h-10 w-10 rounded object-cover"
+                                          />
+                                        ) : (
+                                          <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+                                            <Music className="h-5 w-5 text-gray-500" />
+                                          </div>
+                                        )}
+                                        <button
+                                          onClick={() => navigate(`/tune/${item.uuid || item._id}`)}
+                                          className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                        >
+                                          {item.title}
+                                        </button>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-300">
+                                      {item.artist}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-white font-medium">
+                                        £{((item.globalMediaAggregate || 0) / 100).toFixed(2)}
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        {item.bidCount || 0} bids
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-white font-medium">
+                                        {item.ownershipPercentage}%
+                                      </div>
+                                      <div className="text-xs text-gray-400 capitalize">
+                                        {item.ownershipRole}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-400 text-sm">
+                                      {new Date(item.uploadedAt || item.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <button
+                                        onClick={() => navigate(`/tune/${item.uuid || item._id}`)}
+                                        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                      >
+                                        View
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          
+                          {/* Pagination */}
+                          {myMediaTotal > 20 && (
+                            <div className="px-4 py-3 bg-gray-800 border-t border-gray-700 flex items-center justify-between">
+                              <div className="text-sm text-gray-400">
+                                Showing {(myMediaPage - 1) * 20 + 1} to {Math.min(myMediaPage * 20, myMediaTotal)} of {myMediaTotal} media
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setMyMediaPage(prev => Math.max(1, prev - 1))}
+                                  disabled={myMediaPage === 1}
+                                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                >
+                                  Previous
+                                </button>
+                                <span className="text-sm text-gray-400">
+                                  Page {myMediaPage} of {Math.ceil(myMediaTotal / 20)}
+                                </span>
+                                <button
+                                  onClick={() => setMyMediaPage(prev => prev + 1)}
+                                  disabled={myMediaPage >= Math.ceil(myMediaTotal / 20)}
+                                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

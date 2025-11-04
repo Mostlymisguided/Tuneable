@@ -554,6 +554,17 @@ export const userAPI = {
     return response.data;
   },
 
+  // Get user's owned media (media where user is mediaOwner)
+  getMyMedia: async (params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/users/me/my-media', { params });
+    return response.data;
+  },
+
   getLabelAffiliations: async () => {
     const response = await api.get('/users/me/labels');
     return response.data;

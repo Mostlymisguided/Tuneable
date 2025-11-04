@@ -931,6 +931,117 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
   }
 });
 
+// Get user's owned media (media where user is mediaOwner)
+// @route   GET /api/users/me/my-media
+// @desc    Get media where current user is a media owner
+// @access  Private
+router.get('/me/my-media', authMiddleware, async (req, res) => {
+  try {
+    const Media = require('../models/Media');
+    const Bid = require('../models/Bid');
+
+    const userId = req.user._id;
+    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query for media where user is owner
+    const query = {
+      'mediaOwners.userId': userId,
+      isActive: true
+    };
+
+    // Build sort object
+    const sortObj = {};
+    if (sortBy === 'globalMediaAggregate' || sortBy === 'totalBidAmount') {
+      sortObj.globalMediaAggregate = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'title') {
+      sortObj.title = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'createdAt' || sortBy === 'uploadedAt') {
+      sortObj.createdAt = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sortObj.createdAt = -1; // Default
+    }
+
+    // Fetch media with pagination
+    const media = await Media.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('_id uuid title artist coverArt globalMediaAggregate createdAt uploadedAt mediaOwners');
+
+    const total = await Media.countDocuments(query);
+
+    // Get bid counts for each media
+    const mediaIds = media.map(m => m._id);
+    const bidCounts = await Bid.aggregate([
+      {
+        $match: {
+          mediaId: { $in: mediaIds },
+          status: { $in: ['active', 'played'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$mediaId',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const bidCountMap = {};
+    bidCounts.forEach(item => {
+      bidCountMap[item._id.toString()] = item.count;
+    });
+
+    // Format response with ownership info
+    const formattedMedia = media.map(m => {
+      const ownerInfo = m.mediaOwners.find(owner => 
+        owner.userId.toString() === userId.toString()
+      );
+
+      // Extract artist name
+      let artistName = 'Unknown Artist';
+      if (Array.isArray(m.artist) && m.artist.length > 0) {
+        artistName = m.artist[0].name || m.artist[0] || 'Unknown Artist';
+      } else if (typeof m.artist === 'string') {
+        artistName = m.artist;
+      }
+
+      return {
+        _id: m._id,
+        uuid: m.uuid,
+        title: m.title,
+        artist: artistName,
+        coverArt: m.coverArt,
+        globalMediaAggregate: m.globalMediaAggregate || 0,
+        bidCount: bidCountMap[m._id.toString()] || 0,
+        createdAt: m.createdAt,
+        uploadedAt: m.uploadedAt || m.createdAt,
+        ownershipPercentage: ownerInfo?.percentage || 0,
+        ownershipRole: ownerInfo?.role || 'primary',
+        isVerifiedOwner: ownerInfo?.verified || false
+      };
+    });
+
+    res.json({
+      media: formattedMedia,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user owned media:', error);
+    res.status(500).json({
+      error: 'Error fetching owned media',
+      details: error.message
+    });
+  }
+});
+
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
