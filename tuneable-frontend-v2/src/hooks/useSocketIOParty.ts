@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuth } from '../contexts/AuthContext';
 
 interface PartyUpdateMessage {
   type: 'PARTY_CREATED' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'PLAY_NEXT';
@@ -32,7 +31,6 @@ export const useSocketIOParty = ({
   onConnect,
   onDisconnect,
 }: UseSocketIOPartyOptions) => {
-  const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
