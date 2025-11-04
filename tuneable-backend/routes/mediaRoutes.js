@@ -885,6 +885,98 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
     
+    // Label field (handle label linking)
+    if (req.body.label !== undefined || req.body.labelId !== undefined) {
+      const Label = require('../models/Label');
+      const oldLabel = media.label && media.label.length > 0 ? media.label[0] : null;
+      
+      // If labelId is provided, link to existing label
+      if (req.body.labelId && req.body.labelId !== null && req.body.labelId !== '') {
+        try {
+          const labelToLink = await Label.findById(req.body.labelId);
+          if (labelToLink) {
+            media.label = [{
+              name: labelToLink.name,
+              labelId: labelToLink._id,
+              verified: false, // Leave false for MVP as per user request
+              catalogNumber: req.body.catalogNumber || null,
+              releaseDate: req.body.labelReleaseDate ? new Date(req.body.labelReleaseDate) : null
+            }];
+            
+            if (JSON.stringify(oldLabel) !== JSON.stringify(media.label[0])) {
+              changes.push({
+                field: 'label',
+                oldValue: oldLabel,
+                newValue: media.label[0]
+              });
+            }
+          } else {
+            // Label ID provided but not found - just use name
+            const labelName = req.body.label || '';
+            if (labelName.trim()) {
+              media.label = [{
+                name: labelName.trim(),
+                userId: null,
+                labelId: null,
+                verified: false
+              }];
+            } else {
+              media.label = [];
+            }
+          }
+        } catch (error) {
+          console.error('Error finding label:', error);
+          // Fallback to just name
+          const labelName = req.body.label || '';
+          if (labelName.trim()) {
+            media.label = [{
+              name: labelName.trim(),
+              userId: null,
+              labelId: null,
+              verified: false
+            }];
+          } else {
+            media.label = [];
+          }
+        }
+      } else if (req.body.label !== undefined) {
+        // Just label name provided (no labelId)
+        const labelName = req.body.label;
+        if (labelName && labelName.trim()) {
+          // Try to find label by name
+          const labelByName = await Label.findOne({ name: labelName.trim() });
+          if (labelByName) {
+            media.label = [{
+              name: labelByName.name,
+              labelId: labelByName._id,
+              verified: false,
+              catalogNumber: req.body.catalogNumber || null,
+              releaseDate: req.body.labelReleaseDate ? new Date(req.body.labelReleaseDate) : null
+            }];
+          } else {
+            // Label not found - just store name
+            media.label = [{
+              name: labelName.trim(),
+              userId: null,
+              labelId: null,
+              verified: false
+            }];
+          }
+        } else {
+          // Empty label - remove it
+          media.label = [];
+        }
+        
+        if (JSON.stringify(oldLabel) !== JSON.stringify(media.label.length > 0 ? media.label[0] : null)) {
+          changes.push({
+            field: 'label',
+            oldValue: oldLabel,
+            newValue: media.label.length > 0 ? media.label[0] : null
+          });
+        }
+      }
+    }
+    
     // Add to edit history if there are changes
     if (changes.length > 0) {
       media.editHistory.push({

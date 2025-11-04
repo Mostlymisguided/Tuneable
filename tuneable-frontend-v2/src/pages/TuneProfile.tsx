@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
@@ -29,7 +29,7 @@ import {
   Building,
   CheckCircle
 } from 'lucide-react';
-import { mediaAPI, claimAPI } from '../lib/api';
+import { mediaAPI, claimAPI, labelAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
@@ -153,6 +153,12 @@ const TuneProfile: React.FC = () => {
   // Edit tune state
   const [isEditingTune, setIsEditingTune] = useState(false);
   const [tagInput, setTagInput] = useState(''); // Separate state for tag input
+  const [selectedLabel, setSelectedLabel] = useState<{ _id: string; name: string; slug?: string } | null>(null);
+  const [labelSearchResults, setLabelSearchResults] = useState<any[]>([]);
+  const [isSearchingLabels, setIsSearchingLabels] = useState(false);
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  const [labelSearchQuery, setLabelSearchQuery] = useState('');
+  const editFormRef = useRef<HTMLDivElement>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     artist: '',
@@ -248,6 +254,54 @@ const TuneProfile: React.FC = () => {
     return canEditMedia(user, media);
   };
 
+  // Label search function with debounce
+  const searchLabels = async (query: string) => {
+    if (query.length < 2) {
+      setLabelSearchResults([]);
+      setShowLabelDropdown(false);
+      return;
+    }
+    setIsSearchingLabels(true);
+    try {
+      const response = await labelAPI.getLabels({ search: query, limit: 10 });
+      setLabelSearchResults(response.labels || []);
+      setShowLabelDropdown(true);
+    } catch (error) {
+      console.error('Error searching labels:', error);
+      setLabelSearchResults([]);
+    } finally {
+      setIsSearchingLabels(false);
+    }
+  };
+
+  // Debounce label search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (labelSearchQuery) {
+        searchLabels(labelSearchQuery);
+      } else {
+        setLabelSearchResults([]);
+        setShowLabelDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [labelSearchQuery]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (editFormRef.current && !editFormRef.current.contains(event.target as Node)) {
+        setShowLabelDropdown(false);
+      }
+    };
+
+    if (showLabelDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showLabelDropdown]);
+
   // Populate edit form when media loads
   useEffect(() => {
     if (media && canEditTune()) {
@@ -302,6 +356,23 @@ const TuneProfile: React.FC = () => {
       });
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
+      
+      // Set selected label if label has labelId
+      const existingLabel = (media as any).label?.[0];
+      if (existingLabel && existingLabel.labelId) {
+        setSelectedLabel({
+          _id: existingLabel.labelId._id || existingLabel.labelId,
+          name: existingLabel.name || '',
+          slug: existingLabel.labelId.slug
+        });
+        setLabelSearchQuery(existingLabel.name || '');
+      } else if (existingLabel && existingLabel.name) {
+        setSelectedLabel(null);
+        setLabelSearchQuery(existingLabel.name || '');
+      } else {
+        setSelectedLabel(null);
+        setLabelSearchQuery('');
+      }
     }
   }, [media, user]);
 
@@ -310,7 +381,12 @@ const TuneProfile: React.FC = () => {
     if (!mediaId) return;
     
     try {
-      await mediaAPI.updateMedia(media?._id || mediaId, editForm);
+      const updateData = {
+        ...editForm,
+        labelId: selectedLabel?._id || null // Send labelId if selected
+      };
+      
+      await mediaAPI.updateMedia(media?._id || mediaId, updateData);
       toast.success('Media updated successfully!');
       setIsEditingTune(false);
       // Refresh media data
@@ -1675,15 +1751,87 @@ const TuneProfile: React.FC = () => {
 
                 {/* Label */}
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
-                  <div>
+                  <div className="relative" ref={editFormRef}>
                     <label className="block text-white font-medium mb-2">Label</label>
-                    <input
-                      type="text"
-                      value={editForm.label}
-                      onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
-                      className="input"
-                      placeholder="Record label"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={labelSearchQuery}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setLabelSearchQuery(value);
+                          setEditForm({ ...editForm, label: value });
+                          if (!value) {
+                            setSelectedLabel(null);
+                            setShowLabelDropdown(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (labelSearchQuery && labelSearchResults.length > 0) {
+                            setShowLabelDropdown(true);
+                          }
+                        }}
+                        className="input"
+                        placeholder="Search for a label..."
+                      />
+                      {selectedLabel && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedLabel(null);
+                            setLabelSearchQuery('');
+                            setEditForm({ ...editForm, label: '' });
+                            setShowLabelDropdown(false);
+                          }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                          title="Clear label"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    {showLabelDropdown && labelSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {labelSearchResults.map((label) => (
+                          <button
+                            key={label._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLabel(label);
+                              setLabelSearchQuery(label.name);
+                              setEditForm({ ...editForm, label: label.name });
+                              setShowLabelDropdown(false);
+                            }}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
+                          >
+                            {label.logo && (
+                              <img
+                                src={label.logo}
+                                alt={label.name}
+                                className="h-8 w-8 rounded object-cover flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{label.name}</div>
+                              {label.description && (
+                                <div className="text-sm text-gray-400 truncate">{label.description}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {isSearchingLabels && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      </div>
+                    )}
+                    {selectedLabel && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
+                        <CheckCircle className="h-4 w-4 text-green-400" />
+                        <span>Linked to: {selectedLabel.name}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 </div>

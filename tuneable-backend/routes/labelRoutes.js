@@ -33,9 +33,12 @@ router.get('/', async (req, res) => {
       query.genres = genre;
     }
     
-    // Search by name
+    // Search by name or slug
     if (search) {
-      query.name = { $regex: search, $options: 'i' };
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { slug: { $regex: search, $options: 'i' } }
+      ];
     }
 
     // Build sort object

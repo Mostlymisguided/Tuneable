@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
+import LabelCreateModal from '../components/LabelCreateModal';
 
 interface LibraryItem {
   mediaId: string;
@@ -60,6 +61,7 @@ const Dashboard: React.FC = () => {
   const [creatorStats, setCreatorStats] = useState<any>(null);
   const [isLoadingCreatorStats, setIsLoadingCreatorStats] = useState(false);
   const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels'>('overview');
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
 
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
@@ -391,9 +393,18 @@ const Dashboard: React.FC = () => {
             {/* Header */}
             <div className="bg-gray-800 border-b border-gray-700 rounded-t-lg">
               <div className="px-4 sm:px-6 lg:px-8 py-4">
-                <div className="flex items-center">
-                  <Award className="h-6 w-6 text-purple-400 mr-3" />
-                  <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Award className="h-6 w-6 text-purple-400 mr-3" />
+                    <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
+                  </div>
+                  <button
+                    onClick={() => setIsLabelModalOpen(true)}
+                    className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    Create Label
+                  </button>
                 </div>
               </div>
             </div>
@@ -1058,6 +1069,12 @@ const Dashboard: React.FC = () => {
         )}
       </div>
       </div>
+
+      {/* Create Label Modal */}
+      <LabelCreateModal
+        isOpen={isLabelModalOpen}
+        onClose={() => setIsLabelModalOpen(false)}
+      />
     </div>
   );
 };
