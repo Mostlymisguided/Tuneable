@@ -922,6 +922,8 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     
     // Create a map of mediaId -> labelIds for quick lookup
     const mediaToLabelMap = {};
+    const adminLabelIdsSet = new Set(adminLabelIds.map(id => id.toString()));
+    
     adminLabelMedia.forEach(media => {
       const mediaIdStr = media._id.toString();
       if (!mediaToLabelMap[mediaIdStr]) {
@@ -929,15 +931,20 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       }
       if (media.label && Array.isArray(media.label)) {
         media.label.forEach(label => {
-          if (label.labelId && adminLabelIds.some(id => id.toString() === label.labelId.toString())) {
+          if (label.labelId) {
+            // Compare as strings to handle both ObjectId and string formats
             const labelIdStr = label.labelId.toString();
-            if (!mediaToLabelMap[mediaIdStr].includes(labelIdStr)) {
-              mediaToLabelMap[mediaIdStr].push(labelIdStr);
+            if (adminLabelIdsSet.has(labelIdStr)) {
+              if (!mediaToLabelMap[mediaIdStr].includes(labelIdStr)) {
+                mediaToLabelMap[mediaIdStr].push(labelIdStr);
+              }
             }
           }
         });
       }
     });
+    
+    console.log(`[Creator Stats] Built media to label map:`, Object.keys(mediaToLabelMap).length, 'media items mapped to labels');
     
     const adminLabelMediaIds = adminLabelMedia.map(m => m._id);
     
@@ -1029,6 +1036,8 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
     
     // Create a map of mediaId -> labelIds for quick lookup
     const affiliationMediaToLabelMap = {};
+    const affiliationLabelIdsSet = new Set(affiliationLabelIds.map(id => id.toString()));
+    
     affiliationLabelMedia.forEach(media => {
       const mediaIdStr = media._id.toString();
       if (!affiliationMediaToLabelMap[mediaIdStr]) {
@@ -1036,10 +1045,13 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       }
       if (media.label && Array.isArray(media.label)) {
         media.label.forEach(label => {
-          if (label.labelId && affiliationLabelIds.some(id => id.toString() === label.labelId.toString())) {
+          if (label.labelId) {
+            // Compare as strings to handle both ObjectId and string formats
             const labelIdStr = label.labelId.toString();
-            if (!affiliationMediaToLabelMap[mediaIdStr].includes(labelIdStr)) {
-              affiliationMediaToLabelMap[mediaIdStr].push(labelIdStr);
+            if (affiliationLabelIdsSet.has(labelIdStr)) {
+              if (!affiliationMediaToLabelMap[mediaIdStr].includes(labelIdStr)) {
+                affiliationMediaToLabelMap[mediaIdStr].push(labelIdStr);
+              }
             }
           }
         });
