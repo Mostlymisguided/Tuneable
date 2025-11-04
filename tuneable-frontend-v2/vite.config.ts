@@ -14,5 +14,39 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Proper chunking for dynamic imports
+        manualChunks(id) {
+          // Keep music-metadata and its dependencies in separate chunks
+          if (id.includes('music-metadata') || id.includes('node_modules')) {
+            if (id.includes('music-metadata')) {
+              return 'music-metadata';
+            }
+            // Split large vendor chunks
+            if (id.includes('node_modules')) {
+              return 'vendor';
+            }
+          }
+        }
+      }
+    },
+    // Optimize dependencies - include music-metadata for proper handling
+    optimizeDeps: {
+      include: ['music-metadata'],
+      esbuildOptions: {
+        target: 'es2020'
+      }
+    },
+    // CommonJS compatibility
+    commonjsOptions: {
+      include: [/music-metadata/, /node_modules/]
+    },
+    // Ensure proper asset handling
+    assetsInlineLimit: 4096,
+    // Target modern browsers that support dynamic imports
+    target: 'es2020'
   }
 })

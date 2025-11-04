@@ -173,15 +173,29 @@ export const useMetadataExtraction = () => {
 
       return extractedData;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Metadata extraction failed:', error);
       
-      setState(prev => ({
-        ...prev,
-        isExtracting: false,
-        error: error instanceof Error ? error.message : 'Failed to extract metadata',
-        extractedMetadata: null
-      }));
+      // Handle specific dynamic import errors gracefully
+      if (error?.message?.includes('Failed to fetch dynamically imported module') || 
+          error?.message?.includes('MIME type') ||
+          error?.code === 'ERR_MODULE_NOT_FOUND') {
+        console.warn('⚠️ Frontend metadata extraction unavailable - backend will extract metadata on upload');
+        setState(prev => ({
+          ...prev,
+          isExtracting: false,
+          error: 'Frontend extraction unavailable - metadata will be extracted on upload',
+          extractedMetadata: null,
+          warnings: ['Frontend metadata extraction is not available in this environment. Metadata will be automatically extracted by the server when you upload the file.']
+        }));
+      } else {
+        setState(prev => ({
+          ...prev,
+          isExtracting: false,
+          error: error instanceof Error ? error.message : 'Failed to extract metadata',
+          extractedMetadata: null
+        }));
+      }
 
       return null;
     }
