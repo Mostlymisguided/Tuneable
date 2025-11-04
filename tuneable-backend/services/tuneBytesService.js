@@ -51,6 +51,7 @@ class TuneBytesService {
       }
       
       // Calculate total value at time of this bid (sum of all earlier bids)
+      // Amounts are already stored in pence
       const bidTimeTotalValue = allBids
         .slice(0, bidIndex)
         .reduce((sum, b) => sum + b.amount, 0);
@@ -62,7 +63,8 @@ class TuneBytesService {
       const discoveryRank = bidIndex + 1;
       
       // Apply refined formula with cubed root and exponential discovery bonus
-      const userBidPence = Math.round(bid.amount * 100);
+      // Amount is already in pence
+      const userBidPence = bid.amount;
       const discoveryBonus = this.getDiscoveryBonus(discoveryRank);
       
       const tuneBytes = (currentTotalValue - bidTimeTotalValue) * 
@@ -74,10 +76,10 @@ class TuneBytesService {
       return {
         tuneBytesEarned: finalTuneBytes,
         calculation: {
-          currentTotalValue,
-          bidTimeTotalValue,
-          userBidAmount: bid.amount,
-          userBidPence,
+          currentTotalValue,  // In pence
+          bidTimeTotalValue,  // In pence
+          userBidAmount: bid.amount / 100,  // Convert to pounds for display
+          userBidPence,  // Already in pence
           discoveryRank,
           discoveryBonus,
           timeElapsed: this.getTimeElapsed(bid.createdAt),

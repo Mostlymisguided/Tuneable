@@ -65,9 +65,10 @@ const labelSchema = new mongoose.Schema({
     releaseCount: { type: Number, default: 0 },
     
     // Bid Metrics (from bidMetricsSchema)
-    totalBidAmount: { type: Number, default: 0 }, // GlobalAggregate for label's media
-    averageBidAmount: { type: Number, default: 0 }, // GlobalBidAvg for label's media
-    topBidAmount: { type: Number, default: 0 }, // GlobalBidTop for label's media
+    // NOTE: All amounts stored in PENCE (integer), not pounds
+    totalBidAmount: { type: Number, default: 0 }, // GlobalAggregate for label's media (in pence)
+    averageBidAmount: { type: Number, default: 0 }, // GlobalBidAvg for label's media (in pence)
+    topBidAmount: { type: Number, default: 0 }, // GlobalBidTop for label's media (in pence)
     totalBidCount: { type: Number, default: 0 }, // Count of all bids on label's media
     
     // Media Performance (bid-centric)

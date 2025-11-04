@@ -92,17 +92,21 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     if (session.metadata.type === 'wallet_topup') {
       try {
         const userId = session.metadata.userId;  // This is now a UUID string
-        const amount = parseFloat(session.metadata.amount);
+        const amountPounds = parseFloat(session.metadata.amount);
+        
+        // Convert pounds to pence for storage
+        const amountPence = Math.round(amountPounds * 100);
 
         // Update user balance - find by UUID instead of _id
+        // Balance is stored in pence
         const user = await User.findOneAndUpdate(
           { uuid: userId },  // Find by UUID instead of _id
-          { $inc: { balance: amount } },
+          { $inc: { balance: amountPence } },  // Store in pence
           { new: true }
         );
 
         if (user) {
-          console.log(`Wallet top-up successful: User ${userId} added £${amount}, new balance: £${user.balance}`);
+          console.log(`Wallet top-up successful: User ${userId} added £${amountPounds}, new balance: £${(user.balance / 100).toFixed(2)}`);
           
           // Send email notification to admin
           try {

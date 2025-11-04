@@ -683,15 +683,17 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         else if (userAgent.includes('Mozilla') || userAgent.includes('Chrome')) detectedPlatform = 'web';
 
         // For initial bids, user aggregates are just the bid amount (no previous bids)
-        const userPartyAggregate = bidAmount; // First bid in this party
-        const userGlobalAggregate = bidAmount; // First bid globally
+        // Store in pence
+        const userPartyAggregate = bidAmountPence; // First bid in this party
+        const userGlobalAggregate = bidAmountPence; // First bid globally
         
         // Create bid record with denormalized fields and aggregate tracking
+        // Store amount in pence (convert from pounds input)
         const bid = new Bid({
             userId,
             partyId,
             mediaId: media._id, // Use mediaId instead of songId
-            amount: bidAmount,
+            amount: bidAmountPence, // Store in pence
             status: 'active',
             bidScope: party.type === 'global' ? 'global' : 'party', // Set bidScope based on party type
             
@@ -804,7 +806,8 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         await party.save();
 
         // Update global bid tracking (first bid is automatically the top bid) - schema grammar
-        media.globalMediaBidTop = bidAmount;
+        // Store in pence
+        media.globalMediaBidTop = bidAmountPence;
         media.globalMediaBidTopUser = userId;
         media.globalMediaAggregateTop = userGlobalAggregate;
         media.globalMediaAggregateTopUser = userId;
@@ -813,7 +816,8 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         // Note: For first bid on new media, the bidder is typically the owner, so no bid_received notification needed
 
         // Update user balance
-        user.balance = (userBalancePence - bidAmountPence) / 100;
+        // Update balance (already in pence, no conversion needed)
+        user.balance = user.balance - bidAmountPence;
         await user.save();
 
         // Populate the response
@@ -1136,7 +1140,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         // via the Bid model's post('save') hook - no need to call manually
 
         // Update user balance
-        user.balance = (userBalancePence - bidAmountPence) / 100;
+        // Update balance (already in pence, no conversion needed)
+        user.balance = user.balance - bidAmountPence;
         await user.save();
 
         // Get updated media with bids

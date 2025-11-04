@@ -209,9 +209,10 @@ const mediaSchema = new mongoose.Schema({
   // ========================================
   
   // Global scope metrics (stored for performance)
-  globalMediaAggregate: { type: Number, default: 0 }, // GlobalMediaAggregate - Total bid value across all parties/users
-  globalMediaBidTop: { type: Number, default: 0 }, // GlobalMediaBidTop - Highest individual bid amount
-  globalMediaAggregateTop: { type: Number, default: 0 }, // GlobalMediaAggregateTop - Highest user aggregate total
+  // NOTE: All amounts stored in PENCE (integer), not pounds
+  globalMediaAggregate: { type: Number, default: 0 }, // GlobalMediaAggregate - Total bid value across all parties/users (in pence)
+  globalMediaBidTop: { type: Number, default: 0 }, // GlobalMediaBidTop - Highest individual bid amount (in pence)
+  globalMediaAggregateTop: { type: Number, default: 0 }, // GlobalMediaAggregateTop - Highest user aggregate total (in pence)
   
   // Essential user references for gamification (stored for performance)
   globalMediaBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User who made the top bid

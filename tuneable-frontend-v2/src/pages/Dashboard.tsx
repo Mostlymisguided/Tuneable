@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { penceToPounds } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
@@ -522,7 +523,7 @@ const Dashboard: React.FC = () => {
                             <div>
                               <p className="text-sm text-gray-400">Total Bid Amount</p>
                               <p className="text-2xl font-bold text-white mt-1">
-                                £{((creatorStats.stats?.totalBidAmount || 0)).toFixed(2)}
+                                {penceToPounds(creatorStats.stats?.totalBidAmount || 0)}
                               </p>
                             </div>
                             <Coins className="h-8 w-8 text-green-400 opacity-50" />
@@ -607,7 +608,7 @@ const Dashboard: React.FC = () => {
                                 </div>
                                 <div className="text-right">
                                   <p className="text-purple-400 font-medium">
-                                    £{((media.globalMediaAggregate || 0)).toFixed(2)}
+                                    {penceToPounds(media.globalMediaAggregate || 0)}
                                   </p>
                                 </div>
                               </div>
@@ -754,7 +755,7 @@ const Dashboard: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3">
                                       <div className="text-white font-medium">
-                                        £{((item.globalMediaAggregate || 0)).toFixed(2)}
+                                        {penceToPounds(item.globalMediaAggregate || 0)}
                                       </div>
                                       <div className="text-xs text-gray-400">
                                         {item.bidCount || 0} bids
@@ -1021,7 +1022,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0)).toFixed(2)}</div>
+                                              <div className="text-white font-medium">{penceToPounds(label.totalBidAmount || 0)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1188,7 +1189,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0)).toFixed(2)}</div>
+                                              <div className="text-white font-medium">{penceToPounds(label.totalBidAmount || 0)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1361,7 +1362,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">£{((label.totalBidAmount || 0)).toFixed(2)}</div>
+                                              <div className="text-white font-medium">{penceToPounds(label.totalBidAmount || 0)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1536,7 +1537,7 @@ const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Balance</p>
               <p className="text-2xl font-semibold text-white">
-                £{user?.balance?.toFixed(2) || '0.00'}
+                {penceToPounds(user?.balance || 0)}
               </p>
             </div>
           </div>
@@ -1578,7 +1579,7 @@ const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Avg Bid</p>
               <p className="text-2xl font-semibold text-white">
-                £{user?.globalUserBidAvg?.toFixed(2) || '0.00'}
+                {penceToPounds(user?.globalUserBidAvg || 0)}
               </p>
             </div>
           </div>

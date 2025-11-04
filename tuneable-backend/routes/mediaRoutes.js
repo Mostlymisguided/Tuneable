@@ -1247,14 +1247,15 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const userBalancePence = Math.round(user.balance * 100);
+    // Convert bid amount from pounds to pence (user input is in pounds)
     const bidAmountPence = Math.round(amount * 100);
-
-    if (userBalancePence < bidAmountPence) {
+    
+    // Balance is already stored in pence
+    if (user.balance < bidAmountPence) {
       return res.status(400).json({ 
         error: 'Insufficient balance',
         required: amount,
-        available: user.balance
+        available: user.balance / 100  // Convert to pounds for error message
       });
     }
 
@@ -1288,11 +1289,12 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     
     // Create bid using standard party bid flow
     const Bid = require('../models/Bid');
+    // Store amount in pence (convert from pounds input)
     const bid = new Bid({
       userId,
       partyId: globalParty._id,
       mediaId: media._id,
-      amount,
+      amount: bidAmountPence, // Store in pence
       status: 'active',
       bidScope: 'global', // Mark as global bid
       username: user.username,
@@ -1431,8 +1433,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up notifications:', error);
     }
 
-    // Update user balance
-    user.balance = (userBalancePence - bidAmountPence) / 100;
+    // Update user balance (already in pence, no conversion needed)
+    user.balance = user.balance - bidAmountPence;
     await user.save();
 
     // Send high-value bid notification

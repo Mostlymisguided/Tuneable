@@ -106,7 +106,9 @@ const bidSchema = new mongoose.Schema({
     amount: { 
         type: Number, 
         required: true, 
-        min: [0, 'Bid amount cannot be negative'] 
+        min: [0, 'Bid amount cannot be negative']
+        // NOTE: Amount is stored in PENCE (integer), not pounds
+        // Example: 33 represents £0.33, 150 represents £1.50
     },
     status: {
         type: String,
