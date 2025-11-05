@@ -134,6 +134,9 @@ export interface Media {
   // Auto-generated creator names
   creatorNames: string[];
   
+  // Display field for creator/artist names (parsed from artist/featuring or manually set)
+  creatorDisplay?: string; // Format: "Artist ft. Featured" or "Artist & Featured"
+  
   // Metadata
   duration?: number;
   fileSize?: number;

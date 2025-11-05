@@ -37,6 +37,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
 import { penceToPounds } from '../utils/currency';
+import { getCreatorDisplay } from '../utils/creatorDisplay';
 
 interface Media {
   _id: string;
@@ -901,7 +902,9 @@ const TuneProfile: React.FC = () => {
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
               <h1 className="text-2xl md:text-4xl font-bold mb-2 text-center md:text-left px-2 md:px-4">{media.title}</h1>
-              <p className="text-lg md:text-3xl text-purple-300 mb-4 text-center md:text-left px-2 md:px-4">{media.artist}</p>
+              <p className="text-lg md:text-3xl text-purple-300 mb-4 text-center md:text-left px-2 md:px-4">
+                {getCreatorDisplay(media)}
+              </p>
               
               {/* Bid Metrics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 px-2 md:px-0">

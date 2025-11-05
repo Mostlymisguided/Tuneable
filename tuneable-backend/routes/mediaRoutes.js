@@ -11,6 +11,7 @@ const { isValidObjectId } = require('../utils/validators');
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
+const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const MetadataExtractor = require('../utils/metadataExtractor');
 
 // Default cover art URL for media without cover art (matches frontend constant)
@@ -174,6 +175,25 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     const mappedMetadata = extractedMetadata ? 
       MetadataExtractor.mapToMediaModel(extractedMetadata, userId) : {};
     
+    // Parse artist string if it contains "ft.", "feat.", "&", "and", etc.
+    const parsedArtist = parseArtistString(finalArtistName);
+    
+    // Build artist and featuring arrays from parsed data
+    const artistArray = parsedArtist.artists.map(name => ({
+      name: name.trim(),
+      userId: name.trim() === user.creatorProfile?.artistName || name.trim() === user.username ? userId : null,
+      verified: name.trim() === user.creatorProfile?.artistName || name.trim() === user.username
+    }));
+    
+    const featuringArray = parsedArtist.featuring.map(name => ({
+      name: name.trim(),
+      userId: null,
+      verified: false
+    }));
+    
+    // Generate creatorDisplay from parsed arrays
+    const creatorDisplay = formatCreatorDisplay(artistArray, featuringArray);
+    
     // Create Media entry with extracted and manual metadata
     const media = new Media({
       // Basic information (user input takes priority)
@@ -181,22 +201,22 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       album: finalAlbum,
       releaseDate: releaseDate || mappedMetadata.releaseDate || undefined,
       
-      // Creators (use extracted if no user input)
-      artist: artistName ? toCreatorSubdocs([{
-        name: finalArtistName,
-        userId: userId,
-        verified: true
-      }]) : (mappedMetadata.artist || toCreatorSubdocs([{
+      // Creators (parsed from artist string or use extracted metadata)
+      artist: artistArray.length > 0 ? artistArray : (mappedMetadata.artist || toCreatorSubdocs([{
         name: finalArtistName,
         userId: userId,
         verified: true
       }])),
+      featuring: featuringArray.length > 0 ? featuringArray : (mappedMetadata.featuring || []),
       
       // Additional creators from metadata
       producer: mappedMetadata.producer || [],
       songwriter: mappedMetadata.songwriter || [],
       composer: mappedMetadata.composer || [],
       label: mappedMetadata.label || [],
+      
+      // Display field for UI
+      creatorDisplay: creatorDisplay,
       
       // Technical metadata
       duration: finalDuration,
@@ -617,9 +637,10 @@ router.get('/top-tunes', async (req, res) => {
       id: item._id || item.uuid,
       uuid: item.uuid,
       title: item.title,
-      artist: item.artist && item.artist.length > 0 ? item.artist[0].name : 'Unknown Artist', // Primary artist name
+      artist: item.artist && item.artist.length > 0 ? item.artist[0].name : 'Unknown Artist', // Primary artist name (backward compatibility)
       artists: item.artist || [], // Full artist array with subdocuments
       creators: item.creatorNames || [], // All creator names
+      creatorDisplay: item.creatorDisplay || formatCreatorDisplay(item.artist || [], item.featuring || []), // Display string for UI
       producer: item.producer || [],
       featuring: item.featuring || [],
       duration: item.duration,
@@ -771,9 +792,10 @@ router.get('/:mediaId/profile', async (req, res) => {
       ...mediaObj,
       sources: sourcesObj, // Use pre-converted sources
       artist: populatedMedia.artist && populatedMedia.artist.length > 0 ? 
-              populatedMedia.artist[0].name : 'Unknown Artist', // Primary artist name
+              populatedMedia.artist[0].name : 'Unknown Artist', // Primary artist name (backward compatibility)
       artists: populatedMedia.artist || [], // Full artist subdocuments
       creators: populatedMedia.creatorNames || [], // All creator names
+      creatorDisplay: populatedMedia.creatorDisplay || formatCreatorDisplay(populatedMedia.artist || [], populatedMedia.featuring || []), // Display string for UI
       globalMediaAggregateTopRank: rank, // Add computed rank
       globalMediaAggregate: calculatedGlobalMediaAggregate, // Override with calculated value from all bids
     };
@@ -859,13 +881,39 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Special handling for creator fields (convert strings/arrays to subdocument format)
     
     // Artist field (string -> array of subdocuments)
+    // Parse artist string to extract primary artists and featuring artists
     if (req.body.artist !== undefined) {
       if (typeof req.body.artist === 'string' && req.body.artist.trim()) {
-        media.artist = [{
-          name: req.body.artist.trim(),
+        const parsedArtist = parseArtistString(req.body.artist.trim());
+        
+        // Build artist array from parsed primary artists
+        media.artist = parsedArtist.artists.map(name => ({
+          name: name.trim(),
           userId: null,
           verified: false
-        }];
+        }));
+        
+        // Build featuring array from parsed featuring artists
+        // Merge with existing featuring if it exists
+        const newFeaturing = parsedArtist.featuring.map(name => ({
+          name: name.trim(),
+          userId: null,
+          verified: false
+        }));
+        
+        if (req.body.featuring !== undefined && Array.isArray(req.body.featuring)) {
+          // Merge parsed featuring with existing featuring array
+          const existingFeaturing = req.body.featuring
+            .filter(name => name && typeof name === 'string' && name.trim())
+            .map(name => ({
+              name: typeof name === 'string' ? name.trim() : name.name,
+              userId: null,
+              verified: false
+            }));
+          media.featuring = [...newFeaturing, ...existingFeaturing];
+        } else {
+          media.featuring = newFeaturing;
+        }
       } else if (req.body.artist === '') {
         media.artist = [];
       }
@@ -885,7 +933,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     
     // Featuring field (array of strings -> array of subdocuments)
-    if (req.body.featuring !== undefined) {
+    // Only process if artist wasn't a string (already handled above)
+    if (req.body.featuring !== undefined && typeof req.body.artist !== 'string') {
       if (Array.isArray(req.body.featuring)) {
         media.featuring = req.body.featuring
           .filter(name => name && typeof name === 'string' && name.trim())
@@ -895,6 +944,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
             verified: false
           }));
       }
+    }
+    
+    // Generate creatorDisplay from artist and featuring arrays after updates
+    if (media.artist || media.featuring) {
+      media.creatorDisplay = formatCreatorDisplay(media.artist || [], media.featuring || []);
     }
     
     // Genre field (singular -> genres array)

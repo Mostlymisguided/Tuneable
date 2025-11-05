@@ -230,6 +230,10 @@ const mediaSchema = new mongoose.Schema({
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   uploadedAt: { type: Date, default: Date.now }, // Keep for backward compatibility (maps to createdAt)
   
+  // Display field for creator/artist names (parsed from artist/featuring or manually set)
+  // Format: "Artist ft. Featured" or "Artist & Featured" or "Artist 1 & Artist 2 ft. Featured"
+  creatorDisplay: { type: String, default: null }, // Optional display string for UI
+  
   // Rights confirmation fields
   rightsCleared: { type: Boolean, default: false },
   rightsConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -293,6 +297,13 @@ mediaSchema.pre('save', function (next) {
   });
   
   this.creatorNames = Array.from(names);
+  
+  // Auto-generate creatorDisplay if not set and we have artist/featuring data
+  if (!this.creatorDisplay && (this.artist || this.featuring)) {
+    const { formatCreatorDisplay } = require('../utils/artistParser');
+    this.creatorDisplay = formatCreatorDisplay(this.artist || [], this.featuring || []);
+  }
+  
   next();
 });
 

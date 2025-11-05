@@ -600,7 +600,13 @@ const PersistentWebPlayer: React.FC = () => {
                   </h4>
                 </Link>
                 <p className="text-sm text-gray-300 leading-tight mt-1">
-                  {Array.isArray(currentMedia.artist) ? currentMedia.artist.join(', ') : currentMedia.artist}
+                  {currentMedia.creatorDisplay || 
+                   (Array.isArray(currentMedia.artist) 
+                     ? currentMedia.artist.map((a: any) => a.name || a).join(' & ') + 
+                       (currentMedia.featuring && currentMedia.featuring.length > 0 
+                         ? ' ft. ' + currentMedia.featuring.map((f: any) => f.name || f).join(', ') 
+                         : '')
+                     : currentMedia.artist || 'Unknown Artist')}
                 </p>
               </div>
             ) : (
