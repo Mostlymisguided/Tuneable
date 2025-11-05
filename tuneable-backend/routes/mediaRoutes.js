@@ -1467,7 +1467,6 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         mediaId: media._id,
         media_uuid: media.uuid,
         addedBy: userId,
-        addedBy_uuid: user.uuid,
         partyMediaAggregate: amount,
         partyBids: [bid._id],
         status: 'queued',

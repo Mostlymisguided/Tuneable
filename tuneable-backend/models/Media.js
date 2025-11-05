@@ -228,7 +228,6 @@ const mediaSchema = new mongoose.Schema({
   
   // Universal metadata
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  addedBy_uuid: { type: String },
   uploadedAt: { type: Date, default: Date.now }, // Keep for backward compatibility (maps to createdAt)
   
   // Rights confirmation fields
@@ -246,7 +245,7 @@ const mediaSchema = new mongoose.Schema({
       enum: ['remix_of', 'cover_of', 'sampled_in', 'uses_sample', 'same_series', 'inspired_by', 'references', 'other'], 
       required: true 
     },
-    target_uuid: { type: String, required: true }, // UUID of related Media item
+    targetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', required: true }, // ObjectId of related Media item
     description: { type: String, default: '' }, // Optional notes
     _id: false
   }],
@@ -326,7 +325,7 @@ mediaSchema.index({ "externalIds.taddy": 1 }); // Index for Taddy UUID lookups
 mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
 mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
-mediaSchema.index({ "relationships.target_uuid": 1 }); // Index for finding relationships to specific media
+mediaSchema.index({ "relationships.targetId": 1 }); // Index for finding relationships to specific media
 mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by owner
 mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
 mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user

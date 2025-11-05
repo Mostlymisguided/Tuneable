@@ -373,13 +373,13 @@ class PodcastAdapter {
       }
       
       const hasRelationship = episode.relationships.some(
-        r => r.type === 'same_series' && r.target_uuid === series.uuid
+        r => r.type === 'same_series' && r.targetId && r.targetId.toString() === series._id.toString()
       );
       
       if (!hasRelationship) {
         episode.relationships.push({
           type: 'same_series',
-          target_uuid: series.uuid,
+          targetId: series._id,
           description: `Part of ${series.title}`
         });
       }

@@ -222,8 +222,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             party.media = allMediaWithBids.map(media => ({
                 mediaId: media,
                 media_uuid: media.uuid,
-                addedBy: media.addedBy,
-                addedBy_uuid: media.addedBy?.uuid,
+                addedBy: media.addedBy?._id || media.addedBy,
                 partyMediaAggregate: media.globalMediaAggregate || 0,
                 partyBids: media.bids || [],
                 status: 'queued',
@@ -791,7 +790,6 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             mediaId: media._id,
             media_uuid: media.uuid,
             addedBy: userId,
-            addedBy_uuid: user.uuid,
             partyMediaAggregate: bidAmount, // First bid becomes the aggregate
             partyBids: [bid._id],
             status: 'queued',

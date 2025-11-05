@@ -9,7 +9,7 @@ The Media model now supports **relationships between media items**, enabling you
 ```javascript
 relationships: [{
   type: String,        // Type of relationship
-  target_uuid: String, // UUID of related Media item
+  targetId: ObjectId,  // ObjectId of related Media item (ref: 'Media')
   description: String, // Optional notes
   _id: false
 }]
@@ -46,7 +46,7 @@ const remix = new Media({
   producer: [{ name: "Tiesto", userId: null, verified: false }],
   relationships: [{
     type: 'remix_of',
-    target_uuid: original.uuid,
+    targetId: original._id,
     description: 'Tiesto remix of the original'
   }],
   // ... other fields
@@ -62,7 +62,7 @@ const coverSong = new Media({
   artist: [{ name: "Johnny Cash", userId: null, verified: false }],
   relationships: [{
     type: 'cover_of',
-    target_uuid: nineInchNailsOriginalUuid,
+    targetId: nineInchNailsOriginalId,
     description: 'Johnny Cash cover of Nine Inch Nails original'
   }],
   // ... other fields
@@ -77,7 +77,7 @@ const hipHopTrack = new Media({
   artist: [{ name: "MC Hammer", userId: null, verified: false }],
   relationships: [{
     type: 'uses_sample',
-    target_uuid: superFreakUuid,
+    targetId: superFreakId,
     description: 'Uses the bass line from "Super Freak"'
   }],
   // ... other fields
@@ -93,7 +93,7 @@ const episode2 = new Media({
   episodeNumber: 2,
   relationships: [{
     type: 'same_series',
-    target_uuid: episode1Uuid,
+    targetId: episode1Id,
     description: 'Previous episode'
   }],
   // ... other fields
@@ -109,17 +109,17 @@ const complexTrack = new Media({
   relationships: [
     {
       type: 'remix_of',
-      target_uuid: originalTrackUuid,
+      targetId: originalTrackId,
       description: 'Remix of the original'
     },
     {
       type: 'uses_sample',
-      target_uuid: sampleSourceUuid,
+      targetId: sampleSourceId,
       description: 'Uses vocal sample'
     },
     {
       type: 'inspired_by',
-      target_uuid: inspirationUuid,
+      targetId: inspirationId,
       description: 'Musically inspired by'
     }
   ],
@@ -132,11 +132,11 @@ const complexTrack = new Media({
 ### **Find All Remixes of a Track**
 
 ```javascript
-const originalUuid = '068e145c-7618-7c96-8b00-71cdc2f5995a';
+const originalId = '507f1f77bcf86cd799439011'; // MongoDB ObjectId
 
 const remixes = await Media.find({
   'relationships.type': 'remix_of',
-  'relationships.target_uuid': originalUuid
+  'relationships.targetId': originalId
 });
 ```
 
@@ -151,23 +151,23 @@ const covers = await Media.find({
 ### **Find All Related Content for a Media Item**
 
 ```javascript
-const mediaUuid = '068e145c-7618-7c96-8b00-71cdc2f5995a';
+const mediaId = '507f1f77bcf86cd799439011'; // MongoDB ObjectId
 
 // Find all media that references this one
 const referencingMedia = await Media.find({
-  'relationships.target_uuid': mediaUuid
+  'relationships.targetId': mediaId
 });
 ```
 
 ### **Get Specific Relationship**
 
 ```javascript
-const media = await Media.findOne({ uuid: mediaUuid });
+const media = await Media.findById(mediaId);
 const remixRelationship = media.relationships.find(r => r.type === 'remix_of');
 
 if (remixRelationship) {
-  // Fetch the original track
-  const original = await Media.findOne({ uuid: remixRelationship.target_uuid });
+  // Fetch the original track (targetId is an ObjectId reference)
+  const original = await Media.findById(remixRelationship.targetId);
   console.log(`This is a remix of: ${original.title}`);
 }
 ```
@@ -188,7 +188,7 @@ const RelationshipInfo: React.FC<{ media: Media }> = ({ media }) => {
       {media.relationships.map((rel, idx) => (
         <div key={idx} className="relationship">
           <span className="type">{rel.type.replace('_', ' ')}</span>
-          <Link to={`/tune/${rel.target_uuid}`}>
+          <Link to={`/tune/${rel.targetId}`}>
             View Related
           </Link>
           {rel.description && (
@@ -234,16 +234,16 @@ const RemixedBySection: React.FC<{ songUuid: string }> = ({ songUuid }) => {
 ### **Add Relationship**
 
 ```javascript
-async function addRelationship(mediaId, type, targetUuid, description = '') {
+async function addRelationship(mediaId, type, targetId, description = '') {
   const media = await Media.findById(mediaId);
   
   // Check if relationship already exists
   const exists = media.relationships.some(
-    r => r.type === type && r.target_uuid === targetUuid
+    r => r.type === type && r.targetId && r.targetId.toString() === targetId.toString()
   );
   
   if (!exists) {
-    media.relationships.push({ type, target_uuid: targetUuid, description });
+    media.relationships.push({ type, targetId: targetId, description });
     await media.save();
   }
   
@@ -254,10 +254,10 @@ async function addRelationship(mediaId, type, targetUuid, description = '') {
 ### **Remove Relationship**
 
 ```javascript
-async function removeRelationship(mediaId, targetUuid) {
+async function removeRelationship(mediaId, targetId) {
   const media = await Media.findById(mediaId);
   media.relationships = media.relationships.filter(
-    r => r.target_uuid !== targetUuid
+    r => r.targetId && r.targetId.toString() !== targetId.toString()
   );
   await media.save();
   return media;
@@ -284,13 +284,13 @@ async function getRelationshipGraph(mediaUuid, depth = 1) {
       relationships: media.relationships
     };
     
-    // Traverse related media
+    // Traverse related media (targetId is an ObjectId)
     for (const rel of media.relationships) {
-      await traverse(rel.target_uuid, currentDepth + 1);
+      await traverse(rel.targetId, currentDepth + 1);
     }
   }
   
-  await traverse(mediaUuid, 0);
+  await traverse(mediaId, 0);
   return graph;
 }
 ```
@@ -300,22 +300,22 @@ async function getRelationshipGraph(mediaUuid, depth = 1) {
 ### **Get Related Media**
 
 ```javascript
-// GET /api/media/:uuid/related
-router.get('/:uuid/related', async (req, res) => {
-  const { uuid } = req.params;
+// GET /api/media/:id/related
+router.get('/:id/related', async (req, res) => {
+  const { id } = req.params;
   
-  const media = await Media.findOne({ uuid });
+  const media = await Media.findById(id);
   if (!media) return res.status(404).json({ error: 'Media not found' });
   
-  // Fetch all related media
-  const relatedUuids = media.relationships.map(r => r.target_uuid);
-  const relatedMedia = await Media.find({ uuid: { $in: relatedUuids } });
+  // Fetch all related media (targetId is an ObjectId)
+  const relatedIds = media.relationships.map(r => r.targetId);
+  const relatedMedia = await Media.find({ _id: { $in: relatedIds } });
   
   // Build response with relationship context
   const related = media.relationships.map(rel => ({
     type: rel.type,
     description: rel.description,
-    media: relatedMedia.find(m => m.uuid === rel.target_uuid)
+    media: relatedMedia.find(m => m._id.toString() === rel.targetId.toString())
   }));
   
   res.json({ related });
@@ -325,13 +325,13 @@ router.get('/:uuid/related', async (req, res) => {
 ### **Get Reverse Relationships**
 
 ```javascript
-// GET /api/media/:uuid/referenced-by
-router.get('/:uuid/referenced-by', async (req, res) => {
-  const { uuid } = req.params;
+// GET /api/media/:id/referenced-by
+router.get('/:id/referenced-by', async (req, res) => {
+  const { id } = req.params;
   
-  // Find all media that references this one
+  // Find all media that references this one (targetId is an ObjectId)
   const referencingMedia = await Media.find({
-    'relationships.target_uuid': uuid
+    'relationships.targetId': id
   });
   
   res.json({ referencingMedia });
@@ -367,7 +367,7 @@ router.get('/:uuid/referenced-by', async (req, res) => {
 
 ## ⚡ Performance Tips
 
-1. **Use Indexes**: The indexes on `relationships.type` and `relationships.target_uuid` make queries fast
+1. **Use Indexes**: The indexes on `relationships.type` and `relationships.targetId` make queries fast
 2. **Limit Depth**: When traversing relationships, limit recursion depth
 3. **Cache Results**: Cache relationship graphs for frequently accessed content
 4. **Batch Queries**: Use `$in` to fetch multiple related items at once
@@ -375,12 +375,12 @@ router.get('/:uuid/referenced-by', async (req, res) => {
 ## 🔐 Validation
 
 ```javascript
-// Validate that target_uuid exists
+// Validate that targetId exists
 mediaSchema.pre('save', async function(next) {
   for (const rel of this.relationships) {
-    const exists = await Media.exists({ uuid: rel.target_uuid });
+    const exists = await Media.exists({ _id: rel.targetId });
     if (!exists) {
-      return next(new Error(`Related media ${rel.target_uuid} not found`));
+      return next(new Error(`Related media ${rel.targetId} not found`));
     }
   }
   next();

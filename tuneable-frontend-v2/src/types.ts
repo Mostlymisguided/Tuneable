@@ -101,7 +101,7 @@ export type Song = Media;
 // Media relationship interface
 export interface MediaRelationship {
   type: 'remix_of' | 'cover_of' | 'sampled_in' | 'uses_sample' | 'same_series' | 'inspired_by' | 'references' | 'other';
-  target_uuid: string;
+  targetId: string; // ObjectId of related Media item
   description?: string;
 }
 
@@ -233,7 +233,6 @@ export interface PartyMedia {
   mediaId: string;
   media_uuid?: string;
   addedBy: string;
-  addedBy_uuid?: string;
   
   // Party-media scope metrics (aligned with schema grammar)
   partyMediaAggregate: number; // Total bid value for this media in party
