@@ -11,6 +11,7 @@ const mediaSchema = new mongoose.Schema({
   artist: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -44,6 +45,7 @@ const mediaSchema = new mongoose.Schema({
   producer: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -51,6 +53,7 @@ const mediaSchema = new mongoose.Schema({
   featuring: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -58,6 +61,7 @@ const mediaSchema = new mongoose.Schema({
   songwriter: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -65,6 +69,7 @@ const mediaSchema = new mongoose.Schema({
   composer: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -73,6 +78,7 @@ const mediaSchema = new mongoose.Schema({
   host: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -80,6 +86,7 @@ const mediaSchema = new mongoose.Schema({
   guest: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -87,6 +94,7 @@ const mediaSchema = new mongoose.Schema({
   narrator: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -95,6 +103,7 @@ const mediaSchema = new mongoose.Schema({
   director: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -102,6 +111,7 @@ const mediaSchema = new mongoose.Schema({
   cinematographer: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -109,6 +119,7 @@ const mediaSchema = new mongoose.Schema({
   editor: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -117,6 +128,7 @@ const mediaSchema = new mongoose.Schema({
   author: [{
     name: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
     _id: false
   }],
@@ -325,6 +337,10 @@ mediaSchema.index({ "producer.verified": 1 }); // Index for verified producer qu
 mediaSchema.index({ "author.verified": 1 }); // Index for verified author queries
 mediaSchema.index({ "label.name": 1 }); // Index for label searches
 mediaSchema.index({ "label.labelId": 1 }); // Index for Label model references
+mediaSchema.index({ "artist.collectiveId": 1 }); // Index for Collective references in artist
+mediaSchema.index({ "producer.collectiveId": 1 }); // Index for Collective references in producer
+mediaSchema.index({ "featuring.collectiveId": 1 }); // Index for Collective references in featuring
+// Note: Other creator roles (songwriter, composer, host, guest, etc.) also support collectiveId but indexes are optional for now
 mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
 mediaSchema.index({ tags: 1, globalMediaAggregate: -1 }); // Compound index for tag rankings

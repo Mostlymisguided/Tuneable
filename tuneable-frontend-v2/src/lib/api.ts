@@ -719,6 +719,120 @@ export const labelAPI = {
   },
 };
 
+export const collectiveAPI = {
+  // Get all collectives (public)
+  getCollectives: async (params?: {
+    page?: number;
+    limit?: number;
+    genre?: string;
+    type?: 'band' | 'collective' | 'production_company' | 'other';
+    sortBy?: 'totalBidAmount' | 'memberCount' | 'name';
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+  }) => {
+    const response = await api.get('/collectives', { params });
+    return response.data;
+  },
+
+  // Get collective by slug (public)
+  getCollectiveBySlug: async (slug: string, refresh?: boolean) => {
+    const params = refresh ? { refresh: true } : {};
+    const response = await api.get(`/collectives/${slug}`, { params });
+    return response.data;
+  },
+
+  // Get collective's members (public)
+  getCollectiveMembers: async (slug: string) => {
+    const response = await api.get(`/collectives/${slug}/members`);
+    return response.data;
+  },
+
+  // Get collective's media (public)
+  getCollectiveMedia: async (slug: string, params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'releaseDate' | 'totalBidAmount';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get(`/collectives/${slug}/media`, { params });
+    return response.data;
+  },
+
+  // Create collective (authenticated)
+  createCollective: async (collectiveData: FormData | {
+    name: string;
+    description?: string;
+    email: string;
+    website?: string;
+    genres?: string[];
+    foundedYear?: number;
+    type?: 'band' | 'collective' | 'production_company' | 'other';
+  }) => {
+    // Handle both FormData (with file upload) and plain object
+    const response = collectiveData instanceof FormData
+      ? await api.post('/collectives', collectiveData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+      : await api.post('/collectives', collectiveData);
+    return response.data;
+  },
+
+  // Update collective (authenticated, admin/founder only)
+  updateCollective: async (collectiveId: string, updates: {
+    name?: string;
+    description?: string;
+    email?: string;
+    website?: string;
+    genres?: string[];
+    foundedYear?: number;
+    type?: 'band' | 'collective' | 'production_company' | 'other';
+    profilePicture?: string;
+    coverImage?: string;
+    location?: {
+      city?: string;
+      country?: string;
+      coordinates?: {
+        lat: number;
+        lng: number;
+      };
+    };
+    socialMedia?: {
+      instagram?: string;
+      facebook?: string;
+      soundcloud?: string;
+      spotify?: string;
+      youtube?: string;
+      twitter?: string;
+      tiktok?: string;
+    };
+  }) => {
+    const response = await api.put(`/collectives/${collectiveId}`, updates);
+    return response.data;
+  },
+
+  // Add member to collective (authenticated, admin/founder only)
+  addMember: async (collectiveId: string, userId: string, role: 'founder' | 'member' | 'admin', instrument?: string) => {
+    const response = await api.post(`/collectives/${collectiveId}/members`, { userId, role, instrument });
+    return response.data;
+  },
+
+  // Remove member from collective (authenticated, admin/founder only)
+  removeMember: async (collectiveId: string, userId: string) => {
+    const response = await api.delete(`/collectives/${collectiveId}/members/${userId}`);
+    return response.data;
+  },
+
+  // Upload collective profile picture (authenticated, collective admin/founder only)
+  uploadProfilePicture: async (collectiveId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+    const response = await api.put(`/collectives/${collectiveId}/profile-picture`, formData);
+    return response.data;
+  },
+};
+
 export const claimAPI = {
   submitClaim: async (formData: FormData) => {
     const response = await api.post('/claims/submit', formData, {

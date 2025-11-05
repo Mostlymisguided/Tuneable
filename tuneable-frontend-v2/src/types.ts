@@ -92,6 +92,7 @@ export interface RegisterData {
 export interface Creator {
   name: string;
   userId?: string | null;
+  collectiveId?: string | null; // Reference to Collective model
   verified: boolean;
 }
 
