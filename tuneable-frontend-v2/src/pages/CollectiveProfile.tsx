@@ -639,7 +639,7 @@ const CollectiveProfile: React.FC = () => {
           {activeTab === 'members' && (
             <div>
               <h3 className="text-2xl font-bold text-white mb-4">Members</h3>
-              {members.length > 0 ? (
+              {members && members.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {members.map((member, index) => {
                     const memberUser = typeof member.userId === 'string' 
