@@ -64,10 +64,10 @@ const initializeSocketIO = (server) => {
     // Handle user authentication and join their user room
     socket.on('authenticate', async (data) => {
       try {
-        const { token } = data;
+        const { token } = data || {};
         
+        // If no token provided, silently ignore (client may connect without auth)
         if (!token) {
-          socket.emit('error', { message: 'Token is required' });
           return;
         }
 
@@ -75,6 +75,7 @@ const initializeSocketIO = (server) => {
         const user = await verifyTokenAndGetUser(token);
         
         if (!user) {
+          // Only emit error if token was provided but invalid
           socket.emit('error', { message: 'Invalid or expired token' });
           return;
         }
@@ -99,8 +100,12 @@ const initializeSocketIO = (server) => {
         // Emit confirmation
         socket.emit('authenticated', { success: true, userId, username: user.username });
       } catch (error) {
-        console.error('Socket.IO authentication error:', error);
-        socket.emit('error', { message: 'Authentication failed', details: error.message });
+        // Only log/emit errors if token was provided (don't log for missing tokens)
+        if (data && data.token) {
+          console.error('Socket.IO authentication error:', error);
+          socket.emit('error', { message: 'Authentication failed', details: error.message });
+        }
+        // Otherwise silently ignore (no token provided - client may connect without auth)
       }
     });
 

@@ -720,6 +720,21 @@ router.get('/:mediaId/profile', async (req, res) => {
         path: 'label.labelId',
         model: 'Label',
         select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.totalBidAmount'
+      })
+      .populate({
+        path: 'artist.collectiveId',
+        model: 'Collective',
+        select: 'name slug profilePicture verificationStatus'
+      })
+      .populate({
+        path: 'producer.collectiveId',
+        model: 'Collective',
+        select: 'name slug profilePicture verificationStatus'
+      })
+      .populate({
+        path: 'featuring.collectiveId',
+        model: 'Collective',
+        select: 'name slug profilePicture verificationStatus'
       });
 
     // Fetch recent comments
@@ -887,9 +902,12 @@ router.put('/:id', authMiddleware, async (req, res) => {
         const parsedArtist = parseArtistString(req.body.artist.trim());
         
         // Build artist array from parsed primary artists
+        // Check if artistCollectiveId is provided
+        const artistCollectiveId = req.body.artistCollectiveId || null;
         media.artist = parsedArtist.artists.map(name => ({
           name: name.trim(),
           userId: null,
+          collectiveId: artistCollectiveId,
           verified: false
         }));
         
@@ -898,6 +916,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         const newFeaturing = parsedArtist.featuring.map(name => ({
           name: name.trim(),
           userId: null,
+          collectiveId: null, // Featuring collectiveId handled separately if needed
           verified: false
         }));
         
@@ -908,6 +927,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             .map(name => ({
               name: typeof name === 'string' ? name.trim() : name.name,
               userId: null,
+              collectiveId: null,
               verified: false
             }));
           media.featuring = [...newFeaturing, ...existingFeaturing];
@@ -916,6 +936,33 @@ router.put('/:id', authMiddleware, async (req, res) => {
         }
       } else if (req.body.artist === '') {
         media.artist = [];
+      }
+    }
+    
+    // Handle collectiveId for artist if artistCollectiveId is provided separately
+    if (req.body.artistCollectiveId !== undefined && media.artist && media.artist.length > 0) {
+      const Collective = require('../models/Collective');
+      const collectiveId = req.body.artistCollectiveId;
+      
+      if (collectiveId && collectiveId !== null && collectiveId !== '') {
+        try {
+          const collective = await Collective.findById(collectiveId);
+          if (collective) {
+            // Update collectiveId for all artist entries
+            media.artist = media.artist.map(artist => ({
+              ...artist,
+              collectiveId: collective._id
+            }));
+          }
+        } catch (error) {
+          console.error('Error finding collective:', error);
+        }
+      } else {
+        // Clear collectiveId if null/empty
+        media.artist = media.artist.map(artist => ({
+          ...artist,
+          collectiveId: null
+        }));
       }
     }
     

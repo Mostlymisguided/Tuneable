@@ -511,9 +511,30 @@ router.post(
   ],
   async (req, res) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: 'Invalid email or password format', details: errors.array() });
+      }
+
       const { email, password } = req.body;
+      
+      // Find user by email
       const user = await User.findOne({ email });
-      if (!user || !(await bcrypt.compare(password, user.password))) {
+      if (!user) {
+        console.log(`Login attempt failed: User not found for email: ${email}`);
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        console.log(`Login attempt failed: Inactive user: ${email}`);
+        return res.status(401).json({ error: 'Account is inactive. Please contact support.' });
+      }
+
+      // Compare password
+      const isPasswordValid = await user.comparePassword(password);
+      if (!isPasswordValid) {
+        console.log(`Login attempt failed: Invalid password for email: ${email}`);
         return res.status(401).json({ error: 'Invalid email or password' });
       }
       
@@ -528,9 +549,11 @@ router.post(
         username: user.username 
       }, SECRET_KEY, { expiresIn: '24h' });
 
+      console.log(`✅ Login successful for user: ${user.username} (${user.email})`);
       res.json({ message: 'Login successful!', token, user });
     } catch (error) {
-      res.status(500).json({ error: 'Error logging in', details: error.message });
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'An error occurred during login. Please try again.', details: error.message });
     }
   }
 );
@@ -2311,6 +2334,53 @@ router.post('/:userId/tunebytes/recalculate', authMiddleware, async (req, res) =
   } catch (error) {
     console.error('Error recalculating TuneBytes:', error);
     res.status(500).json({ error: 'Failed to recalculate TuneBytes' });
+  }
+});
+
+// Get user's collective memberships
+// @route   GET /api/users/me/collective-memberships
+// @desc    Get collectives where user is a member
+// @access  Private
+router.get('/me/collective-memberships', authMiddleware, async (req, res) => {
+  try {
+    const Collective = require('../models/Collective');
+    const userId = req.user._id;
+    
+    // Find collectives where user is a member (and hasn't left)
+    const collectives = await Collective.find({
+      'members.userId': userId,
+      'members.leftAt': { $exists: false } // Only active members
+    })
+    .select('name slug profilePicture verificationStatus stats members')
+    .lean();
+    
+    // Format collectives with member role information
+    const formattedCollectives = collectives.map(collective => {
+      const memberInfo = collective.members.find(
+        m => m.userId.toString() === userId.toString() && !m.leftAt
+      );
+      return {
+        _id: collective._id,
+        name: collective.name,
+        slug: collective.slug,
+        profilePicture: collective.profilePicture,
+        verificationStatus: collective.verificationStatus,
+        role: memberInfo?.role || 'member', // 'founder', 'member', 'admin'
+        instrument: memberInfo?.instrument || null,
+        joinedAt: memberInfo?.joinedAt || null,
+        verified: memberInfo?.verified || false
+      };
+    });
+    
+    res.json({
+      collectives: formattedCollectives
+    });
+  } catch (error) {
+    console.error('Error fetching collective memberships:', error);
+    res.status(500).json({
+      error: 'Error fetching collective memberships',
+      details: error.message
+    });
   }
 });
 

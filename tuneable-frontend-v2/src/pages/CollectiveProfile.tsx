@@ -6,6 +6,7 @@ import { collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import ReportModal from '../components/ReportModal';
 
 interface Collective {
   _id: string;
@@ -949,6 +950,17 @@ const CollectiveProfile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && collective && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reportType="label"
+          targetId={collective._id}
+          targetTitle={collective.name}
+        />
       )}
     </div>
   );

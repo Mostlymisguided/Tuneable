@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { useAuth } from '../contexts/AuthContext';
 import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
@@ -70,6 +71,13 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 };
 
 const PersistentWebPlayer: React.FC = () => {
+  const { user } = useAuth(); // Check if user is authenticated
+  
+  // Early return if user is not authenticated - prevents hooks from running
+  if (!user) {
+    return null;
+  }
+  
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -146,14 +154,24 @@ const PersistentWebPlayer: React.FC = () => {
     setCurrentTime,
     setDuration,
     setQueue,
+    setCurrentMedia,
+    setGlobalPlayerActive,
   } = useWebPlayerStore();
+
+  // Clear player state if user is not authenticated
+  useEffect(() => {
+    if (!user) {
+      setCurrentMedia(null);
+      setGlobalPlayerActive(false);
+    }
+  }, [user, setCurrentMedia, setGlobalPlayerActive]);
 
   // Simple approach - PersistentWebPlayer only handles YouTube media
 
-  // Socket.IO connection for real-time updates
+  // Socket.IO connection for real-time updates - only when authenticated and party exists
   useSocketIOParty({
     partyId: currentPartyId || '',
-    enabled: !!currentPartyId,
+    enabled: !!(user && currentPartyId),
     onMessage: (message) => {
       console.log('PersistentWebPlayer received party update:', message);
       
@@ -531,6 +549,11 @@ const PersistentWebPlayer: React.FC = () => {
     handleSeek(newTime);
   };
 
+
+  // Don't render if user is not authenticated
+  if (!user) {
+    return null;
+  }
 
   // Don't render if player is not globally active
   if (!isGlobalPlayerActive) {

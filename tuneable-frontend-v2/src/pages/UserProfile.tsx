@@ -26,10 +26,12 @@ import {
   ChevronUp,
   Building,
   CheckCircle,
-  Flag
+  Flag,
+  Users
 } from 'lucide-react';
 import { userAPI, authAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
+import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -217,9 +219,13 @@ const UserProfile: React.FC = () => {
 
   // Label creation modal state
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [isCollectiveModalOpen, setIsCollectiveModalOpen] = useState(false);
 
   // Label affiliations state
   const [labelAffiliations, setLabelAffiliations] = useState<any[]>([]);
+  
+  // Collective memberships state
+  const [collectiveMemberships, setCollectiveMemberships] = useState<any[]>([]);
 
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
@@ -346,9 +352,10 @@ const UserProfile: React.FC = () => {
       setUser(response.user);
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
-      // Also load tag rankings and label affiliations
+      // Also load tag rankings, label affiliations, and collective memberships
       loadTagRankings();
       loadLabelAffiliations();
+      loadCollectiveMemberships();
     } catch (err: any) {
       console.error('Error fetching user profile:', err);
       setError(err.response?.data?.error || 'Failed to load user profile');
@@ -370,6 +377,22 @@ const UserProfile: React.FC = () => {
       // For now, we'll skip this - can be added later
     } catch (err: any) {
       console.error('Error loading label affiliations:', err);
+      // Silent fail - not critical
+    }
+  };
+
+  const loadCollectiveMemberships = async () => {
+    try {
+      // Only load if viewing own profile
+      const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
+      if (ownProfile && currentUser) {
+        const response = await userAPI.getCollectiveMemberships();
+        setCollectiveMemberships(response.collectives || []);
+      }
+      // If viewing another user's profile, we'd need an endpoint to get their collectives
+      // For now, we'll skip this - can be added later
+    } catch (err: any) {
+      console.error('Error loading collective memberships:', err);
       // Silent fail - not critical
     }
   };
@@ -839,9 +862,16 @@ const UserProfile: React.FC = () => {
               
               <div className="mb-6"></div>
 
-              {/* Add Label Button - Only for creators/admins viewing own profile */}
+              {/* Add Label & Collective Buttons - Only for creators/admins viewing own profile */}
               {isOwnProfile && currentUser && (currentUser.role?.includes('creator') || currentUser.role?.includes('admin')) && (
-                <div className="mb-4">
+                <div className="mb-4 flex items-center space-x-2">
+                  <button
+                    onClick={() => setIsCollectiveModalOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Add Collective</span>
+                  </button>
                   <button
                     onClick={handleAddLabelClick}
                     className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
@@ -849,6 +879,48 @@ const UserProfile: React.FC = () => {
                     <Building className="w-4 h-4" />
                     <span>Add Label</span>
                   </button>
+                </div>
+              )}
+
+              {/* Collective Memberships - Above label affiliations */}
+              {collectiveMemberships.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-2">Collective Memberships</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {collectiveMemberships.map((collective) => {
+                      if (!collective) return null;
+                      const roleColors: Record<string, string> = {
+                        founder: 'bg-purple-600/20 text-purple-300 border-purple-500/30',
+                        admin: 'bg-blue-600/20 text-blue-300 border-blue-500/30',
+                        member: 'bg-green-600/20 text-green-300 border-green-500/30'
+                      };
+                      const roleColor = roleColors[collective.role] || 'bg-gray-600/20 text-gray-300 border-gray-500/30';
+                      
+                      return (
+                        <a
+                          key={collective._id}
+                          href={`/collective/${collective.slug}`}
+                          className={`flex items-center space-x-2 px-3 py-2 bg-black/20 border rounded-lg transition-all hover:bg-black/30 ${roleColor}`}
+                        >
+                          <img
+                            src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                            alt={collective.name}
+                            className="h-6 w-6 rounded-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                            }}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{collective.name}</span>
+                            <span className="text-xs opacity-75 capitalize">{collective.role}</span>
+                          </div>
+                          {collective.verificationStatus === 'verified' && (
+                            <CheckCircle className="h-3 w-3 text-green-400" />
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -2064,6 +2136,13 @@ const UserProfile: React.FC = () => {
         isOpen={isLabelModalOpen}
         onClose={() => setIsLabelModalOpen(false)}
         onSuccess={handleLabelCreated}
+      />
+      
+      {/* Create Collective Modal */}
+      <CollectiveCreateModal
+        isOpen={isCollectiveModalOpen}
+        onClose={() => setIsCollectiveModalOpen(false)}
+        onSuccess={handleLabelCreated} // Reuse same handler for now
       />
     </div>
   );

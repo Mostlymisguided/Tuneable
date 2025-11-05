@@ -10,6 +10,7 @@ import { penceToPounds } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
+import CollectiveCreateModal from '../components/CollectiveCreateModal';
 
 interface LibraryItem {
   mediaId: string;
@@ -63,6 +64,7 @@ const Dashboard: React.FC = () => {
   const [isLoadingCreatorStats, setIsLoadingCreatorStats] = useState(false);
   const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels'>('overview');
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [isCollectiveModalOpen, setIsCollectiveModalOpen] = useState(false);
   
   // My Media state
   const [myMedia, setMyMedia] = useState<any[]>([]);
@@ -442,13 +444,22 @@ const Dashboard: React.FC = () => {
                     <Award className="h-6 w-6 text-purple-400 mr-3" />
                     <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
                   </div>
-                  <button
-                    onClick={() => setIsLabelModalOpen(true)}
-                    className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  >
-                    <Building className="h-4 w-4 mr-2" />
-                    Create Label
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setIsCollectiveModalOpen(true)}
+                      className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Create Collective
+                    </button>
+                    <button
+                      onClick={() => setIsLabelModalOpen(true)}
+                      className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <Building className="h-4 w-4 mr-2" />
+                      Create Label
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1860,6 +1871,12 @@ const Dashboard: React.FC = () => {
       <LabelCreateModal
         isOpen={isLabelModalOpen}
         onClose={() => setIsLabelModalOpen(false)}
+      />
+      
+      {/* Create Collective Modal */}
+      <CollectiveCreateModal
+        isOpen={isCollectiveModalOpen}
+        onClose={() => setIsCollectiveModalOpen(false)}
       />
     </div>
   );

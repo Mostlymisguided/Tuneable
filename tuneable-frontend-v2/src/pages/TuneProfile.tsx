@@ -27,16 +27,17 @@ import {
   Loader2,
   Flag,
   Building,
-  CheckCircle
+  CheckCircle,
+  Users
 } from 'lucide-react';
-import { mediaAPI, claimAPI, labelAPI } from '../lib/api';
+import { mediaAPI, claimAPI, labelAPI, collectiveAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
-import { penceToPounds } from '../utils/currency';
+import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 
 interface Media {
@@ -160,6 +161,15 @@ const TuneProfile: React.FC = () => {
   const [isSearchingLabels, setIsSearchingLabels] = useState(false);
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
   const [labelSearchQuery, setLabelSearchQuery] = useState('');
+  
+  // Collective search state (for artist, producer, featuring)
+  const [selectedCollective, setSelectedCollective] = useState<{ _id: string; name: string; slug?: string } | null>(null);
+  const [collectiveSearchResults, setCollectiveSearchResults] = useState<any[]>([]);
+  const [isSearchingCollectives, setIsSearchingCollectives] = useState(false);
+  const [showCollectiveDropdown, setShowCollectiveDropdown] = useState(false);
+  const [collectiveSearchQuery, setCollectiveSearchQuery] = useState('');
+  const [collectiveSearchField, setCollectiveSearchField] = useState<'artist' | 'producer' | 'featuring' | null>(null);
+  
   const editFormRef = useRef<HTMLDivElement>(null);
   const [editForm, setEditForm] = useState({
     title: '',
@@ -290,19 +300,54 @@ const TuneProfile: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [labelSearchQuery]);
 
+  // Search collectives
+  const searchCollectives = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setCollectiveSearchResults([]);
+      setShowCollectiveDropdown(false);
+      return;
+    }
+    setIsSearchingCollectives(true);
+    try {
+      const response = await collectiveAPI.getCollectives({ search: query, limit: 10 });
+      setCollectiveSearchResults(response.collectives || []);
+      setShowCollectiveDropdown(true);
+    } catch (error) {
+      console.error('Error searching collectives:', error);
+      setCollectiveSearchResults([]);
+    } finally {
+      setIsSearchingCollectives(false);
+    }
+  };
+
+  // Debounce collective search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (collectiveSearchQuery && collectiveSearchField) {
+        searchCollectives(collectiveSearchQuery);
+      } else {
+        setCollectiveSearchResults([]);
+        setShowCollectiveDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [collectiveSearchQuery, collectiveSearchField]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (editFormRef.current && !editFormRef.current.contains(event.target as Node)) {
         setShowLabelDropdown(false);
+        setShowCollectiveDropdown(false);
       }
     };
 
-    if (showLabelDropdown) {
+    if (showLabelDropdown || showCollectiveDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showLabelDropdown]);
+  }, [showLabelDropdown, showCollectiveDropdown]);
 
   // Populate edit form when media loads
   useEffect(() => {
@@ -375,6 +420,27 @@ const TuneProfile: React.FC = () => {
         setSelectedLabel(null);
         setLabelSearchQuery('');
       }
+      
+      // Set selected collective if artist has collectiveId
+      const existingArtist = (media as any).artist?.[0];
+      if (existingArtist && existingArtist.collectiveId) {
+        // If collectiveId is an object (populated), use it directly
+        const collective = existingArtist.collectiveId;
+        if (typeof collective === 'object' && collective._id) {
+          setSelectedCollective({
+            _id: collective._id,
+            name: collective.name || editForm.artist,
+            slug: collective.slug
+          });
+          setCollectiveSearchField('artist');
+        } else if (typeof collective === 'string') {
+          // If it's just an ID, we'd need to fetch it, but for now just set the field
+          setCollectiveSearchField('artist');
+        }
+      } else {
+        setSelectedCollective(null);
+        setCollectiveSearchField(null);
+      }
     }
   }, [media, user]);
 
@@ -383,10 +449,17 @@ const TuneProfile: React.FC = () => {
     if (!mediaId) return;
     
     try {
-      const updateData = {
+      const updateData: any = {
         ...editForm,
         labelId: selectedLabel?._id || null // Send labelId if selected
       };
+      
+      // Add collectiveId for artist if collective is selected
+      if (collectiveSearchField === 'artist' && selectedCollective) {
+        updateData.artistCollectiveId = selectedCollective._id;
+      } else {
+        updateData.artistCollectiveId = null;
+      }
       
       await mediaAPI.updateMedia(media?._id || mediaId, updateData);
       toast.success('Media updated successfully!');
@@ -765,7 +838,9 @@ const TuneProfile: React.FC = () => {
       return;
     }
 
-    if ((user as any)?.balance < globalBidAmount) {
+    // Convert balance from pence to pounds for comparison
+    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+    if (balanceInPounds < globalBidAmount) {
       toast.error('Insufficient balance. Please top up your wallet.');
       navigate('/wallet');
       return;
@@ -1057,7 +1132,7 @@ const TuneProfile: React.FC = () => {
                 </div>
                 
                 <p className="text-xs md:text-sm text-gray-400">
-                  Your balance: £{(user as any)?.balance?.toFixed(2) || '0.00'}
+                  Your balance: {penceToPounds((user as any)?.balance)}
                 </p>
               </div>
             </div>
@@ -1221,6 +1296,94 @@ const TuneProfile: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Collectives Section - Above label, below metrics */}
+        {(() => {
+          const collectives: any[] = [];
+          // Extract collectives from artist, producer, featuring
+          if (media.artist && Array.isArray(media.artist)) {
+            media.artist.forEach((artist: any) => {
+              if (artist.collectiveId && typeof artist.collectiveId === 'object' && artist.collectiveId._id) {
+                collectives.push({ ...artist.collectiveId, role: 'artist' });
+              }
+            });
+          }
+          if (media.producer && Array.isArray(media.producer)) {
+            media.producer.forEach((producer: any) => {
+              if (producer.collectiveId && typeof producer.collectiveId === 'object' && producer.collectiveId._id) {
+                collectives.push({ ...producer.collectiveId, role: 'producer' });
+              }
+            });
+          }
+          if (media.featuring && Array.isArray(media.featuring)) {
+            media.featuring.forEach((featuring: any) => {
+              if (featuring.collectiveId && typeof featuring.collectiveId === 'object' && featuring.collectiveId._id) {
+                collectives.push({ ...featuring.collectiveId, role: 'featuring' });
+              }
+            });
+          }
+          
+          // Remove duplicates by _id
+          const uniqueCollectives = collectives.filter((collective, index, self) =>
+            index === self.findIndex(c => c._id.toString() === collective._id.toString())
+          );
+          
+          return uniqueCollectives.length > 0 ? (
+            <div className="mb-8 px-2 md:px-0">
+              <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+                <Users className="h-5 w-5 md:h-6 md:h-6 mr-2 text-purple-400" />
+                Collectives
+              </h2>
+              <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+                <div className="space-y-3">
+                  {uniqueCollectives.map((collective: any, index: number) => {
+                    const collectiveName = collective.name;
+                    const collectiveSlug = collective.slug;
+                    const collectiveProfilePicture = collective.profilePicture;
+                    const isVerified = collective.verificationStatus === 'verified';
+                    const role = collective.role;
+                    
+                    return (
+                      <div key={index} className="flex items-center space-x-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all">
+                        <img
+                          src={collectiveProfilePicture || DEFAULT_PROFILE_PIC}
+                          alt={collectiveName}
+                          className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          {collectiveSlug ? (
+                            <a
+                              href={`/collective/${collectiveSlug}`}
+                              className="text-lg font-semibold text-white hover:text-purple-400 transition-colors block truncate"
+                            >
+                              {collectiveName}
+                            </a>
+                          ) : (
+                            <div className="text-lg font-semibold text-white truncate">{collectiveName}</div>
+                          )}
+                          <div className="flex items-center space-x-3 mt-1">
+                            <span className="text-sm text-gray-400 capitalize">{role}</span>
+                          </div>
+                        </div>
+                        {isVerified && (
+                          <div className="flex-shrink-0">
+                            <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium flex items-center space-x-1">
+                              <CheckCircle className="h-3 w-3" />
+                              <span>Verified</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null;
+        })()}
 
         {/* Label Section - Above external links, below metrics */}
         {media.label && Array.isArray(media.label) && media.label.length > 0 && (
@@ -1563,13 +1726,95 @@ const TuneProfile: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-white font-medium mb-2">Artist *</label>
-                  <input
-                    type="text"
-                    value={editForm.artist}
-                    onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })}
-                    className="input"
-                    placeholder="Artist name"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={editForm.artist}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditForm({ ...editForm, artist: value });
+                        // If user types, clear collective selection for artist
+                        if (collectiveSearchField === 'artist') {
+                          setSelectedCollective(null);
+                          setCollectiveSearchQuery('');
+                          setShowCollectiveDropdown(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        // Optionally show collective search if query exists
+                        if (collectiveSearchField === 'artist' && collectiveSearchQuery) {
+                          setShowCollectiveDropdown(true);
+                        }
+                      }}
+                      className="input pr-10"
+                      placeholder="Artist name or search for collective"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (collectiveSearchField === 'artist') {
+                          // Toggle off
+                          setCollectiveSearchField(null);
+                          setCollectiveSearchQuery('');
+                          setShowCollectiveDropdown(false);
+                        } else {
+                          // Toggle on for artist
+                          setCollectiveSearchField('artist');
+                          setCollectiveSearchQuery(editForm.artist);
+                          if (editForm.artist && editForm.artist.length >= 2) {
+                            searchCollectives(editForm.artist);
+                          }
+                        }
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-400 transition-colors"
+                      title={collectiveSearchField === 'artist' ? 'Clear collective link' : 'Link to collective'}
+                    >
+                      <Users className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {collectiveSearchField === 'artist' && showCollectiveDropdown && collectiveSearchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ top: '100%', left: 0 }}>
+                      {collectiveSearchResults.map((collective) => (
+                        <button
+                          key={collective._id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCollective(collective);
+                            setEditForm({ ...editForm, artist: collective.name });
+                            setCollectiveSearchQuery(collective.name);
+                            setShowCollectiveDropdown(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
+                        >
+                          <img
+                            src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                            alt={collective.name}
+                            className="h-8 w-8 rounded object-cover flex-shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{collective.name}</div>
+                            {collective.description && (
+                              <div className="text-sm text-gray-400 truncate">{collective.description}</div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {isSearchingCollectives && collectiveSearchField === 'artist' && (
+                    <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    </div>
+                  )}
+                  {selectedCollective && collectiveSearchField === 'artist' && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <span>Linked to: {selectedCollective.name}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

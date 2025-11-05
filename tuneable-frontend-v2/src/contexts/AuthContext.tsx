@@ -155,6 +155,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Clear web player state on logout
+    const { useWebPlayerStore } = require('../stores/webPlayerStore');
+    useWebPlayerStore.getState().setCurrentMedia(null);
+    useWebPlayerStore.getState().setGlobalPlayerActive(false);
+    useWebPlayerStore.getState().setQueue([]);
   };
 
   const handleOAuthCallback = async (token: string) => {

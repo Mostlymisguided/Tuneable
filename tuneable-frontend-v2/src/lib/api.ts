@@ -565,6 +565,11 @@ export const userAPI = {
     return response.data;
   },
 
+  getCollectiveMemberships: async () => {
+    const response = await api.get('/users/me/collective-memberships');
+    return response.data;
+  },
+
   getLabelAffiliations: async () => {
     const response = await api.get('/users/me/labels');
     return response.data;

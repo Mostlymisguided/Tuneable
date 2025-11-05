@@ -199,7 +199,16 @@ const AuthPage: React.FC = () => {
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Login failed');
+      // Log full error for debugging
+      console.error('Login error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error message:', error.response?.data?.error || error.message);
+      
+      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      toast.error(errorMessage, {
+        autoClose: 7000, // Show errors for 7 seconds
+        pauseOnHover: true,
+      });
     } finally {
       setIsLoading(false);
     }

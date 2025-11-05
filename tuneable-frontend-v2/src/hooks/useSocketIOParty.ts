@@ -42,12 +42,19 @@ export const useSocketIOParty = ({
   };
 
   useEffect(() => {
-    if (!partyId || !enabled) {
+    // Don't connect if no partyId, not enabled, or no token (user not authenticated)
+    const token = localStorage.getItem('token');
+    if (!partyId || !enabled || !token) {
+      // Disconnect if already connected but conditions no longer met
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setIsConnected(false);
+      }
       return;
     }
 
     const socketUrl = getSocketIOUrl();
-    const token = localStorage.getItem('token');
 
     // Connect to Socket.IO server
     try {
@@ -57,7 +64,10 @@ export const useSocketIOParty = ({
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 5,
-        timeout: 5000
+        timeout: 5000,
+        auth: {
+          token: token // Send token in auth for initial connection
+        }
       });
 
       socketRef.current.on('connect', () => {
@@ -65,12 +75,10 @@ export const useSocketIOParty = ({
         setIsConnected(true);
         setConnectionError(null);
 
-        // Authenticate with JWT token if available
-        if (token) {
-          socketRef.current?.emit('authenticate', { token });
-        }
+        // Authenticate with JWT token (we already checked token exists before connecting)
+        socketRef.current?.emit('authenticate', { token });
 
-        // Join party room
+        // Join party room (will be authenticated by now)
         socketRef.current?.emit('join-party', { partyId });
         onConnect?.();
       });
