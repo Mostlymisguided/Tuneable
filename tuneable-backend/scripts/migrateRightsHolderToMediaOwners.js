@@ -40,7 +40,7 @@ async function migrateRightsHolderToMediaOwners() {
         const mediaOwner = {
           userId: media.rightsHolder,
           percentage: 100, // Full ownership
-          role: 'primary',
+          role: 'creator',
           verified: true, // Assume existing rightsHolder was verified
           addedBy: media.addedBy, // Use the original addedBy as the person who added this ownership
           addedAt: media.createdAt || new Date()

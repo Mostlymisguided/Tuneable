@@ -840,7 +840,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       'songwriter.userId', 'composer.userId',
       'host.userId', 'guest.userId', 'narrator.userId',
       'director.userId', 'cinematographer.userId', 'editor.userId',
-      'author.userId', 'label.userId'
+      'author.userId'
     ];
 
     // Note: Media schema doesn't have isActive field, so we don't filter by it
@@ -1300,7 +1300,7 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
         createdAt: m.createdAt,
         uploadedAt: m.uploadedAt || m.createdAt,
         ownershipPercentage: ownerInfo?.percentage || 0,
-        ownershipRole: ownerInfo?.role || 'primary',
+        ownershipRole: ownerInfo?.role || 'creator',
         isVerifiedOwner: ownerInfo?.verified || false
       };
     });

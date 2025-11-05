@@ -49,7 +49,7 @@ async function migrateVerifiedCreatorsToMediaOwners() {
           const finalPercentage = isLastCreator ? 100 - (ownershipPercentage * (media.verifiedCreators.length - 1)) : ownershipPercentage;
           
           try {
-            media.addMediaOwner(creatorId, finalPercentage, 'primary', media.addedBy);
+            media.addMediaOwner(creatorId, finalPercentage, 'creator', media.addedBy);
             console.log(`   ✅ Added ${creatorUser?.username || creatorId} as ${finalPercentage}% owner`);
           } catch (error) {
             if (error.message.includes('already a media owner')) {

@@ -242,7 +242,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       mediaOwners: [{
         userId: userId,
         percentage: 100,
-        role: 'primary',
+        role: 'creator',
         verified: true,
         addedBy: userId,
         addedAt: new Date()

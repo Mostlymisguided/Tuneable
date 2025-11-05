@@ -15,8 +15,8 @@ mediaOwners: [{
   percentage: { type: Number, min: 0, max: 100, required: true },
   role: { 
     type: String, 
-    enum: ['primary', 'secondary', 'label', 'distributor'],
-    default: 'primary'
+    enum: ['creator', 'aux'],
+    default: 'creator'
   },
   verified: { type: Boolean, default: false },
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -110,7 +110,7 @@ node scripts/testMediaOwners.js
 ### **Revenue Distribution**
 - **Percentage-based ownership** for fair revenue splitting
 - **Multiple owners** supported per media item
-- **Role-based ownership** (primary, secondary, label, distributor)
+- **Role-based ownership** (creator, aux)
 
 ### **Permission Management**
 - **Media owners** can edit any media information

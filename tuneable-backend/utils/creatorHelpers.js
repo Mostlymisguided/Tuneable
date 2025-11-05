@@ -135,7 +135,7 @@ async function getMediaByUser(userId, Media) {
     'songwriter.userId', 'composer.userId',
     'host.userId', 'guest.userId', 'narrator.userId',
     'director.userId', 'cinematographer.userId', 'editor.userId',
-    'author.userId', 'label.userId'
+    'author.userId'
   ];
   
   const query = {

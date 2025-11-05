@@ -131,8 +131,8 @@ const mediaSchema = new mongoose.Schema({
     percentage: { type: Number, min: 0, max: 100, required: true },
     role: { 
       type: String, 
-      enum: ['primary', 'secondary', 'label', 'distributor'],
-      default: 'primary'
+      enum: ['creator', 'aux'],
+      default: 'creator'
     },
     verified: { type: Boolean, default: false },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who added this ownership claim
@@ -177,7 +177,6 @@ const mediaSchema = new mongoose.Schema({
   // Label/Publisher (hybrid subdocument)
   label: [{
     name: { type: String, required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     labelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Label', default: null }, // Reference to Label model
     verified: { type: Boolean, default: false },
     catalogNumber: { type: String }, // Label's internal catalog number
@@ -315,7 +314,6 @@ mediaSchema.index({ "producer.userId": 1 });
 mediaSchema.index({ "producer.verified": 1 }); // Index for verified producer queries
 mediaSchema.index({ "author.verified": 1 }); // Index for verified author queries
 mediaSchema.index({ "label.name": 1 }); // Index for label searches
-mediaSchema.index({ "label.userId": 1 }); // Index for verified labels
 mediaSchema.index({ "label.labelId": 1 }); // Index for Label model references
 mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
@@ -483,7 +481,7 @@ mediaSchema.methods.getPendingCreators = function() {
 };
 
 // Schema method: Add a media owner
-mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'primary', addedBy) {
+mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator', addedBy) {
   // Check if user is already an owner
   const existingOwner = this.mediaOwners.find(owner => 
     owner.userId.toString() === userId.toString()

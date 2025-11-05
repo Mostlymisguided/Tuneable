@@ -54,14 +54,14 @@ async function testMediaOwners() {
     
     // Test 1: Add first media owner
     console.log('\n📝 Test 1: Adding first media owner (60%)');
-    testMedia.addMediaOwner(user1._id, 60, 'primary', user1._id);
+    testMedia.addMediaOwner(user1._id, 60, 'creator', user1._id);
     await testMedia.save();
     console.log(`✅ Added owner: ${user1.username} - 60%`);
     console.log(`📊 Total ownership: ${testMedia.getTotalOwnershipPercentage()}%`);
     
     // Test 2: Add second media owner
     console.log('\n📝 Test 2: Adding second media owner (40%)');
-    testMedia.addMediaOwner(user2._id, 40, 'secondary', user1._id);
+    testMedia.addMediaOwner(user2._id, 40, 'creator', user1._id);
     await testMedia.save();
     console.log(`✅ Added owner: ${user2.username} - 40%`);
     console.log(`📊 Total ownership: ${testMedia.getTotalOwnershipPercentage()}%`);
@@ -96,7 +96,7 @@ async function testMediaOwners() {
     // Test 6: Test error handling - try to exceed 100%
     console.log('\n📝 Test 6: Testing error handling (exceeding 100%)');
     try {
-      testMedia.addMediaOwner(user1._id, 50, 'primary', user1._id);
+      testMedia.addMediaOwner(user1._id, 50, 'creator', user1._id);
     } catch (error) {
       console.log(`✅ Correctly caught error: ${error.message}`);
     }
