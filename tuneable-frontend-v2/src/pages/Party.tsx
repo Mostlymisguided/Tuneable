@@ -1419,7 +1419,7 @@ const Party: React.FC = () => {
                                 handleAddMediaSearch();
                               }
                             }}
-                            placeholder="Search for Tunes in our library or paste a YouTube URL..."
+                            placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
                             className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                           />
                          
@@ -1464,7 +1464,7 @@ const Party: React.FC = () => {
                                       </p>
                                       <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                                       {media.duration && (
-                                        <div className="flex items-center space-x-1 mt-1">
+                                        <div className="flex justify-center items-center space-x-1 mt-1">
                                           <Clock className="h-3 w-3 text-gray-500" />
                                           <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
                                         </div>
@@ -1516,7 +1516,7 @@ const Party: React.FC = () => {
                                       <p className="text-white font-medium truncate">{media.title}</p>
                                       <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                                       {media.duration && (
-                                        <div className="flex items-center space-x-1 mt-1">
+                                        <div className="flex justify-center items-center space-x-1 mt-1">
                                           <Clock className="h-3 w-3 text-gray-500" />
                                           <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
                                         </div>

@@ -119,24 +119,41 @@ const getVideoDetails = async (videoId) => {
     // Check if API key is available
     if (!apiKey) {
         console.error('YouTube API key not found in environment variables');
-        return { tags: [], category: 'Unknown', categoryId: null };
+        return { 
+            title: 'Unknown Title',
+            channelTitle: 'Unknown Artist',
+            thumbnail: null,
+            duration: 0,
+            tags: [], 
+            category: 'Unknown', 
+            categoryId: null 
+        };
     }
     
     try {
+        // Fetch both snippet (title, channel, thumbnail) and contentDetails (duration)
         const response = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
             params: {
-                part: 'snippet',
+                part: 'snippet,contentDetails',
                 id: videoId,
                 key: apiKey,
             },
         });
 
-        // Track quota usage for videos.list with snippet (1 unit per video, but minimum 1 for call)
-        recordQuotaUsage(QUOTA_COSTS.VIDEOS_LIST_SNIPPET, 'getVideoDetails', { videoId });
+        // Track quota usage for videos.list with snippet and contentDetails
+        // snippet = 2 units per 50 videos (minimum 1), contentDetails = 1 unit per 50 videos (minimum 1)
+        // For a single video: Math.ceil(1/50) = 1, so 1*2 + 1*1 = 3 units total
+        const videoCount = 1;
+        const snippetCost = Math.ceil(videoCount / 50) * QUOTA_COSTS.VIDEOS_LIST_SNIPPET;
+        const contentDetailsCost = Math.ceil(videoCount / 50) * QUOTA_COSTS.VIDEOS_LIST_CONTENT_DETAILS;
+        const quotaCost = snippetCost + contentDetailsCost;
+        recordQuotaUsage(quotaCost, 'getVideoDetails', { videoId });
 
         if (response.data.items && response.data.items.length > 0) {
             const video = response.data.items[0];
-            const categoryId = video.snippet.categoryId;
+            const snippet = video.snippet;
+            const contentDetails = video.contentDetails;
+            const categoryId = snippet.categoryId;
             
             // Get category name with error handling (this also tracks quota)
             let categoryName = 'Unknown';
@@ -146,17 +163,49 @@ const getVideoDetails = async (videoId) => {
                 console.error('Error fetching category name:', categoryError);
             }
             
+            // Parse duration from ISO 8601 format (e.g., "PT3M45S") to seconds
+            const parseDuration = (duration) => {
+                const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+                if (!match) return 0;
+                const hours = parseInt(match[1] || "0", 10);
+                const minutes = parseInt(match[2] || "0", 10);
+                const seconds = parseInt(match[3] || "0", 10);
+                return hours * 3600 + minutes * 60 + seconds;
+            };
+            
+            const durationInSeconds = contentDetails?.duration ? parseDuration(contentDetails.duration) : 0;
+            
             return {
-                tags: video.snippet.tags || [],
+                title: snippet.title || 'Unknown Title',
+                channelTitle: snippet.channelTitle || 'Unknown Artist',
+                thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || null,
+                duration: durationInSeconds,
+                tags: snippet.tags || [],
                 category: categoryName,
                 categoryId: categoryId
             };
         }
         
-        return { tags: [], category: 'Unknown', categoryId: null };
+        return { 
+            title: 'Unknown Title',
+            channelTitle: 'Unknown Artist',
+            thumbnail: null,
+            duration: 0,
+            tags: [], 
+            category: 'Unknown', 
+            categoryId: null 
+        };
     } catch (error) {
         console.error('Error fetching video details:', error);
-        return { tags: [], category: 'Unknown', categoryId: null };
+        return { 
+            title: 'Unknown Title',
+            channelTitle: 'Unknown Artist',
+            thumbnail: null,
+            duration: 0,
+            tags: [], 
+            category: 'Unknown', 
+            categoryId: null 
+        };
     }
 };
 
