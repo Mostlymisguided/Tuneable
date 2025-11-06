@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
@@ -23,6 +23,16 @@ const AuthPage: React.FC = () => {
   const [isValidatingCode, setIsValidatingCode] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showInviteCodeError, setShowInviteCodeError] = useState(false);
+  
+  // Field-specific error messages
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    username: ''
+  });
+  
+  // Refs for error fields
+  const usernameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   
   // Location detection state
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -266,7 +276,61 @@ const AuthPage: React.FC = () => {
       toast.success('Registration successful!');
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Registration failed');
+      console.error('Error registering user:', error);
+      const errorResponse = error.response?.data || {};
+      const errorMessage = errorResponse.error || error.message || 'Registration failed';
+      const errorField = errorResponse.field; // 'email' or 'username'
+      
+      console.log('Error response:', { errorMessage, errorField, errorResponse });
+      
+      // Clear previous errors
+      setFieldErrors({ email: '', username: '' });
+      
+      // Set field-specific errors - check field first, then message
+      if (errorField === 'email') {
+        setFieldErrors(prev => ({ 
+          ...prev, 
+          email: 'This email is already registered.' 
+        }));
+        // Scroll to and focus email field
+        setTimeout(() => {
+          emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          emailInputRef.current?.focus();
+        }, 100);
+      } else if (errorField === 'username') {
+        setFieldErrors(prev => ({ 
+          ...prev, 
+          username: 'This username is already taken. Please choose another. You can change your display name after signing up.' 
+        }));
+        // Scroll to and focus username field
+        setTimeout(() => {
+          usernameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          usernameInputRef.current?.focus();
+        }, 100);
+      } else if (errorMessage.toLowerCase().includes('email')) {
+        setFieldErrors(prev => ({ 
+          ...prev, 
+          email: 'This email is already registered.' 
+        }));
+        // Scroll to and focus email field
+        setTimeout(() => {
+          emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          emailInputRef.current?.focus();
+        }, 100);
+      } else if (errorMessage.toLowerCase().includes('username')) {
+        setFieldErrors(prev => ({ 
+          ...prev, 
+          username: 'This username is already taken. Please choose another. You can change your display name after signing up.' 
+        }));
+        // Scroll to and focus username field
+        setTimeout(() => {
+          usernameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          usernameInputRef.current?.focus();
+        }, 100);
+      } else {
+        // Fallback to toast for other errors
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -479,15 +543,29 @@ const AuthPage: React.FC = () => {
             Username
           </label> */}
           <input
+            ref={usernameInputRef}
             id="username"
             name="username"
             type="text"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+            className={`block w-full rounded-lg border px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 transition-all ${
+              fieldErrors.username
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-black focus:ring-offset-1'
+            }`}
             placeholder="Choose a username"
             value={formData.username}
-            onChange={handleChange}
+            onChange={(e) => {
+              handleChange(e);
+              // Clear error when user starts typing
+              if (fieldErrors.username) {
+                setFieldErrors(prev => ({ ...prev, username: '' }));
+              }
+            }}
           />
+          {fieldErrors.username && (
+            <p className="text-xs text-red-500 mt-1 w-full text-left">{fieldErrors.username}</p>
+          )}
         </div>
 
         <div className="flex flex-col flex items-center justify-center">
@@ -495,15 +573,29 @@ const AuthPage: React.FC = () => {
             Email Address
           </label> */}
           <input
+            ref={emailInputRef}
             name="email"
             type="email"
             autoComplete="email"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+            className={`block w-full rounded-lg border px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 transition-all ${
+              fieldErrors.email
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-black focus:ring-offset-1'
+            }`}
             placeholder="Email Address"
             value={formData.email}
-            onChange={handleChange}
+            onChange={(e) => {
+              handleChange(e);
+              // Clear error when user starts typing
+              if (fieldErrors.email) {
+                setFieldErrors(prev => ({ ...prev, email: '' }));
+              }
+            }}
           />
+          {fieldErrors.email && (
+            <p className="text-xs text-red-500 mt-1 w-full text-left">{fieldErrors.email}</p>
+          )}
         </div>
 
         <div className="flex flex-col flex items-center justify-center">       

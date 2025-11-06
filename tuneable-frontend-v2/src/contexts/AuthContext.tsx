@@ -49,6 +49,7 @@ interface RegisterData {
   username: string;
   email: string;
   password: string;
+  parentInviteCode?: string;
   cellPhone?: string;
   givenName?: string;
   familyName?: string;

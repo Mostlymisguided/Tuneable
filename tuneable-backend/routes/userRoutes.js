@@ -393,9 +393,31 @@ router.post(
         };
       }
       
-      const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+      // Case-insensitive check for existing email or username
+      // Escape special regex characters to prevent regex injection
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existingUser = await User.findOne({ 
+        $or: [
+          { email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') } },
+          { username: { $regex: new RegExp(`^${escapeRegex(username)}$`, 'i') } }
+        ] 
+      });
       if (existingUser) {
         console.error('Email or username already in use:', { email, username });
+        // Return field-specific error (case-insensitive comparison)
+        if (existingUser.email && existingUser.email.toLowerCase() === email.toLowerCase()) {
+          return res.status(400).json({ 
+            error: 'Email already in use',
+            field: 'email' 
+          });
+        }
+        if (existingUser.username && existingUser.username.toLowerCase() === username.toLowerCase()) {
+          return res.status(400).json({ 
+            error: 'Username already in use',
+            field: 'username' 
+          });
+        }
+        // Fallback for edge cases
         return res.status(400).json({ error: 'Email or username already in use' });
       }
       

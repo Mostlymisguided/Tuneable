@@ -27,8 +27,8 @@ router.post('/apply', authMiddleware, upload.array('proofFiles', 5), async (req,
     } = req.body;
 
     // Validate required fields
-    if (!artistName || !bio) {
-      return res.status(400).json({ error: 'Artist name and bio are required' });
+    if (!artistName) {
+      return res.status(400).json({ error: 'Artist name is required' });
     }
 
     // Get user

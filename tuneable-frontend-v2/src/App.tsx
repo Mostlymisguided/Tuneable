@@ -208,11 +208,7 @@ const AppContent = () => {
             />
             <Route 
               path="/creator/register" 
-              element={
-                <ProtectedRoute>
-                  <CreatorRegister />
-                </ProtectedRoute>
-              } 
+              element={<CreatorRegister />} 
             />
             <Route 
               path="/creator/upload" 

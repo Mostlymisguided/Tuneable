@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { creatorAPI } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import {
   User,
   Music,
@@ -12,13 +13,23 @@ import {
   CheckCircle,
   ArrowLeft,
   ArrowRight,
-  Loader2
+  Loader2,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const CreatorRegister: React.FC = () => {
   const navigate = useNavigate();
+  const { user, register: registerUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Check if user is authenticated
+  const isAuthenticated = !!user;
 
   // Form state
   const [formData, setFormData] = useState({
@@ -39,6 +50,24 @@ const CreatorRegister: React.FC = () => {
     distributor: '',
     verificationMethod: 'manual'
   });
+
+  // Account creation fields (only used if not authenticated)
+  const [accountData, setAccountData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    username: ''
+  });
+
+  // Field-specific error messages
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    username: ''
+  });
+
+  // Refs for error fields
+  const usernameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   const [genreInput, setGenreInput] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
@@ -64,23 +93,116 @@ const CreatorRegister: React.FC = () => {
   // Validation
   const isStep1Valid = () => {
     return formData.artistName.trim().length > 0 && 
-           formData.bio.trim().length >= 50 &&
            formData.roles.length > 0;
   };
 
   const isStep2Valid = () => {
-    return formData.genres.length > 0;
+    if (!isAuthenticated) {
+      // Account creation validation
+      return accountData.email.trim().length > 0 &&
+             accountData.password.length >= 6 &&
+             accountData.password === accountData.confirmPassword &&
+             accountData.username.trim().length > 0;
+    } else {
+      // Music details validation
+      return formData.genres.length > 0;
+    }
+  };
+
+  const isStep3Valid = () => {
+    if (!isAuthenticated) {
+      // Music details validation (step 3 when not authenticated)
+      return formData.genres.length > 0;
+    }
+    return true; // Social media step is optional
+  };
+
+  // Handle next step with account creation
+  const handleNextStep = async () => {
+    // If on step 2 and not authenticated, create account first
+    if (step === 2 && !isAuthenticated) {
+      // Validate fields first
+      if (!isStep2Valid()) {
+        toast.error('Please complete all account creation fields');
+        return;
+      }
+      
+      // Create the account
+      try {
+        await registerUser({
+          email: accountData.email,
+          password: accountData.password,
+          username: accountData.username,
+          parentInviteCode: 'MAKER'
+        });
+        
+        toast.success('Account created successfully!');
+        // User is now authenticated, adjust step to show Music details
+        // For authenticated users: step 2 = Music details (was step 3 for unauthenticated)
+        setStep(2);
+      } catch (error: any) {
+        console.error('Error registering user:', error);
+        const errorResponse = error.response?.data || {};
+        const errorMessage = errorResponse.error || error.message || 'Failed to create account';
+        const errorField = errorResponse.field; // 'email' or 'username'
+        
+        // Clear previous errors
+        setFieldErrors({ email: '', username: '' });
+        
+        // Set field-specific errors
+        if (errorField === 'email' || errorMessage.toLowerCase().includes('email already')) {
+          setFieldErrors(prev => ({ 
+            ...prev, 
+            email: 'This email is already registered.' 
+          }));
+          setTimeout(() => {
+            emailInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            emailInputRef.current?.focus();
+          }, 100);
+        } else if (errorField === 'username' || errorMessage.toLowerCase().includes('username already')) {
+          setFieldErrors(prev => ({ 
+            ...prev, 
+            username: 'This username is already taken. Please choose another. You can change your display name after signing up.' 
+          }));
+          setTimeout(() => {
+            usernameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            usernameInputRef.current?.focus();
+          }, 100);
+        } else {
+          toast.error(errorMessage);
+        }
+        // Don't proceed if account creation fails
+        return;
+      }
+    } else {
+      // For other steps, just proceed
+      setStep(step + 1);
+    }
   };
 
   const handleSubmit = async () => {
-    if (!isStep1Valid() || !isStep2Valid()) {
-      toast.error('Please fill in all required fields');
+    // Validate all required steps
+    if (!isStep1Valid()) {
+      toast.error('Please complete all required fields in step 1');
+      return;
+    }
+    
+    // User should already be authenticated at this point (account created at step 2)
+    // Just validate the creator application fields
+    if (!isStep2Valid()) {
+      toast.error('Please add at least one genre');
+      return;
+    }
+    
+    if (!isStep3Valid()) {
+      toast.error('Please add at least one genre');
       return;
     }
 
     setIsSubmitting(true);
     
     try {
+      // User is already authenticated, just submit creator application
       const submitData = new FormData();
       submitData.append('artistName', formData.artistName);
       submitData.append('bio', formData.bio);
@@ -169,7 +291,7 @@ const CreatorRegister: React.FC = () => {
           {/* Bio */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Artist Bio * (min 50 characters)
+              Artist Bio
             </label>
             <textarea
               value={formData.bio}
@@ -179,7 +301,7 @@ const CreatorRegister: React.FC = () => {
               maxLength={500}
             />
             <div className="text-xs text-gray-400 mt-1">
-              {formData.bio.length}/500 characters {formData.bio.length < 50 && `(${50 - formData.bio.length} more needed)`}
+              {formData.bio.length}/500 characters
             </div>
           </div>
 
@@ -203,6 +325,137 @@ const CreatorRegister: React.FC = () => {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep2Account = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+          <User className="h-6 w-6 mr-2 text-purple-400" />
+          Create Your Account
+        </h3>
+
+        <div className="space-y-4">
+          {/* Email */}
+          <div>
+            <label className="block text-white font-medium mb-2">
+              Email Address *
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                ref={emailInputRef}
+                type="email"
+                value={accountData.email}
+                onChange={(e) => {
+                  setAccountData({ ...accountData, email: e.target.value });
+                  // Clear error when user starts typing
+                  if (fieldErrors.email) {
+                    setFieldErrors(prev => ({ ...prev, email: '' }));
+                  }
+                }}
+                className={`w-full pl-10 pr-4 py-3 bg-gray-800 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
+                  fieldErrors.email
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-600 focus:border-purple-500 focus:ring-purple-500'
+                }`}
+                placeholder="your@email.com"
+                required
+              />
+            </div>
+            {fieldErrors.email && (
+              <p className="text-xs text-red-400 mt-1">{fieldErrors.email}</p>
+            )}
+          </div>
+
+          {/* Username */}
+          <div>
+            <label className="block text-white font-medium mb-2">
+              Username *
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                ref={usernameInputRef}
+                type="text"
+                value={accountData.username}
+                onChange={(e) => {
+                  setAccountData({ ...accountData, username: e.target.value });
+                  // Clear error when user starts typing
+                  if (fieldErrors.username) {
+                    setFieldErrors(prev => ({ ...prev, username: '' }));
+                  }
+                }}
+                className={`w-full pl-10 pr-4 py-3 bg-gray-800 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
+                  fieldErrors.username
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-600 focus:border-purple-500 focus:ring-purple-500'
+                }`}
+                placeholder="Choose a username"
+                required
+              />
+            </div>
+            {fieldErrors.username && (
+              <p className="text-xs text-red-400 mt-1">{fieldErrors.username}</p>
+            )}
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-white font-medium mb-2">
+              Password *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={accountData.password}
+                onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
+                className="w-full pl-10 pr-10 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                placeholder="Password (min 6 characters)"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-white font-medium mb-2">
+              Confirm Password *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={accountData.confirmPassword}
+                onChange={(e) => setAccountData({ ...accountData, confirmPassword: e.target.value })}
+                className="w-full pl-10 pr-10 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                placeholder="Confirm your password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+              >
+                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            {accountData.password && accountData.confirmPassword && accountData.password !== accountData.confirmPassword && (
+              <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+            )}
           </div>
         </div>
       </div>
@@ -445,7 +698,7 @@ const CreatorRegister: React.FC = () => {
 
           <div className="p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
             <p className="text-yellow-200 text-sm">
-              <strong>Note:</strong> Your application will be reviewed by our team within 24-48 hours. 
+              <strong>Note:</strong> Your application will be reviewed within 24-48 hours. 
               Providing verification documents will help speed up the process.
             </p>
           </div>
@@ -455,13 +708,39 @@ const CreatorRegister: React.FC = () => {
   );
 
   const renderStepContent = () => {
-    switch (step) {
-      case 1: return renderStep1();
-      case 2: return renderStep2();
-      case 3: return renderStep3();
-      case 4: return renderStep4();
-      case 5: return renderStep5();
-      default: return null;
+    if (!isAuthenticated) {
+      // Steps when not authenticated: 1=Basic, 2=Account, 3=Music, 4=Social, 5=Pro, 6=Verify
+      switch (step) {
+        case 1: return renderStep1();
+        case 2: return renderStep2Account();
+        case 3: return renderStep2(); // Music details
+        case 4: return renderStep3(); // Social media
+        case 5: return renderStep4(); // Professional details
+        case 6: return renderStep5(); // Verification
+        default: return null;
+      }
+    } else {
+      // Steps when authenticated: 1=Basic, 2=Music, 3=Social, 4=Pro, 5=Verify
+      switch (step) {
+        case 1: return renderStep1();
+        case 2: return renderStep2(); // Music details
+        case 3: return renderStep3(); // Social media
+        case 4: return renderStep4(); // Professional details
+        case 5: return renderStep5(); // Verification
+        default: return null;
+      }
+    }
+  };
+
+  const getTotalSteps = () => {
+    return isAuthenticated ? 5 : 6;
+  };
+
+  const getStepLabels = () => {
+    if (!isAuthenticated) {
+      return ['Basic', 'Account', 'Music', 'Social', 'Pro', 'Verify'];
+    } else {
+      return ['Basic', 'Music', 'Social', 'Pro', 'Verify'];
     }
   };
 
@@ -479,7 +758,7 @@ const CreatorRegister: React.FC = () => {
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            {[1, 2, 3, 4, 5].map((stepNum) => (
+            {Array.from({ length: getTotalSteps() }, (_, i) => i + 1).map((stepNum) => (
               <React.Fragment key={stepNum}>
                 <div className="flex flex-col items-center">
                   <div
@@ -494,10 +773,10 @@ const CreatorRegister: React.FC = () => {
                     {stepNum < step ? <CheckCircle className="h-6 w-6" /> : stepNum}
                   </div>
                   <span className="text-xs text-gray-400 mt-1 hidden sm:block">
-                    {['Basic', 'Music', 'Social', 'Pro', 'Verify'][stepNum - 1]}
+                    {getStepLabels()[stepNum - 1]}
                   </span>
                 </div>
-                {stepNum < 5 && (
+                {stepNum < getTotalSteps() && (
                   <div
                     className={`flex-1 h-1 mx-2 transition-colors ${
                       stepNum < step ? 'bg-green-600' : 'bg-gray-700'
@@ -523,10 +802,18 @@ const CreatorRegister: React.FC = () => {
               {step === 1 ? 'Cancel' : 'Back'}
             </button>
 
-            {step < 5 ? (
+            {step < getTotalSteps() ? (
               <button
-                onClick={() => setStep(step + 1)}
-                disabled={step === 1 ? !isStep1Valid() : step === 2 ? !isStep2Valid() : false}
+                onClick={handleNextStep}
+                disabled={
+                  step === 1 
+                    ? !isStep1Valid() 
+                    : step === 2 
+                    ? !isStep2Valid() 
+                    : !isAuthenticated && step === 3
+                    ? !isStep3Valid()
+                    : false
+                }
                 className="flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
                 Next

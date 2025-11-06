@@ -535,6 +535,11 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             user.soundcloudUsername = profile.username;
           }
           
+          // Update email if user doesn't have one
+          if (profile.emails && profile.emails.length > 0 && !user.email) {
+            user.email = profile.emails[0].value;
+          }
+          
           // Update profile picture if user doesn't have one
           if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
             user.profilePic = profile.photos[0].value;
@@ -560,6 +565,11 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             user.soundcloudAccessToken = accessToken;
             user.oauthVerified = user.oauthVerified || {};
             user.oauthVerified.soundcloud = true; // Mark SoundCloud OAuth as verified
+            
+            // Update email if user doesn't have one
+            if (profile.emails && profile.emails.length > 0 && !user.email) {
+              user.email = profile.emails[0].value;
+            }
             
             // Update profile picture if user doesn't have one or is linking SoundCloud for first time
             if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstSoundCloudLink)) {
@@ -602,6 +612,9 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         
         const usernameValue = profile.username || `soundcloud_${profile.id}`;
         
+        // Extract email from profile
+        const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
+        
         // Ensure username is unique
         let finalUsername = usernameValue;
         let counter = 1;
@@ -612,6 +625,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         
         console.log('Creating new user with:', {
           soundcloudId: profile.id,
+          email: emailValue,
           username: finalUsername,
           soundcloudUsername: profile.username
         });
@@ -626,6 +640,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           soundcloudId: profile.id,
           soundcloudUsername: profile.username,
           soundcloudAccessToken: accessToken,
+          email: emailValue,
           username: finalUsername,
           givenName: profile.name ? profile.name.givenName : null,
           familyName: profile.name ? profile.name.familyName : null,

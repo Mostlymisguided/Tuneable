@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Mail, User, MessageSquare, Send, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Mail, User, Send, CheckCircle, ArrowLeft, Smile } from 'lucide-react';
 import axios from 'axios';
 
 const RequestInvite: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [userType, setUserType] = useState<'user' | 'creator' | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,16 +24,33 @@ const RequestInvite: React.FC = () => {
     }));
   };
 
+  const handleUserTypeSelect = (type: 'user' | 'creator') => {
+    setUserType(type);
+    
+    if (type === 'creator') {
+      // Navigate to creator register page
+      navigate('/creator/register');
+      return;
+    }
+    
+    // If user type, the joke field will appear below
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email || !formData.reason) {
+    if (!formData.name || !formData.email) {
       toast.error('Please fill in all fields');
       return;
     }
 
-    if (formData.reason.length < 20) {
-      toast.error('Please tell us a bit more about why you want to join (at least 20 characters)');
+    if (userType !== 'user') {
+      toast.error('Please select how you want to use Tuneable');
+      return;
+    }
+
+    if (!formData.reason || formData.reason.trim().length === 0) {
+      toast.error('Please tell us a joke');
       return;
     }
 
@@ -89,6 +107,7 @@ const RequestInvite: React.FC = () => {
               <button
                 onClick={() => {
                   setSubmitted(false);
+                  setUserType(null);
                   setFormData({ name: '', email: '', reason: '' });
                 }}
                 className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all"
@@ -125,8 +144,8 @@ const RequestInvite: React.FC = () => {
           <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6">
             <h3 className="text-white font-semibold mb-2">Why invite-only?</h3>
             <p className="text-gray-300 text-sm">
-              Tuneable is currently in Beta Testing with a carefully curated community of music lovers & creators.
-              Tell us why you'd be a great fit, and we'll review your request!
+              Tuneable is currently in Beta Testing with a small community of music lovers & creators.
+              
             </p>
           </div>
 
@@ -172,47 +191,80 @@ const RequestInvite: React.FC = () => {
               </div>
             </div>
 
-            {/* Reason */}
+            {/* How do you want to use Tuneable? */}
             <div>
-              <label htmlFor="reason" className="block text-sm font-medium text-gray-300 mb-2">
-                Why do you want to join Tuneable? *
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                How do you want to use Tuneable? *
               </label>
-              <div className="relative">
-                <MessageSquare className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <textarea
-                  id="reason"
-                  name="reason"
-                  required
-                  rows={5}
-                  value={formData.reason}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                  placeholder="Do you see yourself using Tuneable as a User or Creator? If as a Creator please include some links to your music or social media..."
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleUserTypeSelect('user')}
+                  className={`px-6 py-4 border-2 rounded-lg font-semibold transition-all ${
+                    userType === 'user'
+                      ? 'border-purple-500 bg-purple-500/20 text-white'
+                      : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                  }`}
+                >
+                  As a User
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUserTypeSelect('creator')}
+                  className={`px-6 py-4 border-2 rounded-lg font-semibold transition-all ${
+                    userType === 'creator'
+                      ? 'border-purple-500 bg-purple-500/20 text-white'
+                      : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                  }`}
+                >
+                  As a Creator
+                </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">
-                {formData.reason.length} / 20 characters minimum
-              </p>
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2"
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                  <span>Submitting...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="h-5 w-5" />
-                  <span>Submit Request</span>
-                </>
-              )}
-            </button>
+            {/* Joke field - only show if "as a user" is selected */}
+            {userType === 'user' && (
+              <div>
+                <label htmlFor="reason" className="block text-sm font-medium text-gray-300 mb-2">
+                  Please tell us a joke so that we know you might be human *
+                </label>
+                <div className="relative">
+                  <Smile className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <textarea
+                    id="reason"
+                    name="reason"
+                    required
+                    rows={3}
+                    value={formData.reason}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                    placeholder="Any joke will do..."
+                  />
+                </div>
+              
+              </div>
+            )}
+
+            {/* Submit Button - only show if user type is selected */}
+            {userType === 'user' && (
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    <span>Submit Request</span>
+                  </>
+                )}
+              </button>
+            )}
           </form>
 
           {/* Footer */}
