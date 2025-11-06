@@ -37,6 +37,7 @@ import BetaWarningBanner from '../components/BetaWarningBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
+import { penceToPounds } from '../utils/currency';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -1053,12 +1054,12 @@ const UserProfile: React.FC = () => {
               </div>
               <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">£{(stats.totalAmountBid || 0).toFixed(2)}</div>
+                <div className="text-2xl font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
                 <div className="text-sm text-gray-300">Total Spent</div>
               </div>
               <div className="card bg-black/20 rounded-lg p-6 text-center">
                 <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">£{(stats.averageBidAmount || 0).toFixed(2)}</div>
+                <div className="text-2xl font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
                 <div className="text-sm text-gray-300">Avg Bid</div>
               </div>
               <div className="card bg-black/20 rounded-lg p-6 text-center">
@@ -1151,7 +1152,7 @@ const UserProfile: React.FC = () => {
                       )}
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-green-400">£{(mediaData.totalAmount || 0).toFixed(2)}</div>
+                      <div className="text-xl font-bold text-green-400">{penceToPounds(mediaData.totalAmount || 0)}</div>
                       <div className="text-sm text-gray-400">Total Bid</div>
                     </div>
                   </div>
@@ -1195,7 +1196,7 @@ const UserProfile: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">Total Bid</span>
-                      <span className="text-xl font-bold text-white">£{ranking.aggregate.toFixed(2)}</span>
+                      <span className="text-xl font-bold text-white">{penceToPounds(ranking.aggregate || 0)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">Rank</span>
