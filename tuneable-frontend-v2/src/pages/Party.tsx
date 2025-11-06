@@ -1596,7 +1596,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex items-center hover:border-white relative"
+                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-3 md:p-4"
                           >
                             {/* Admin Veto Button - Top Right */}
                             {isAdmin && (
@@ -1605,21 +1605,21 @@ const Party: React.FC = () => {
                                   e.stopPropagation();
                                   handleVetoClick(item);
                                 }}
-                                className="absolute top-2 right-2 z-20 p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
+                                className="absolute top-2 right-2 z-20 p-1 md:p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
                                 title="Veto this tune (Admin Only)"
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-3 w-3 md:h-4 md:w-4" />
                               </button>
                             )}
                             
-                            {/* Queue Number Badge - In Left Gutter */}
-                            <div className="absolute -left-8 md:-left-12 top-1/2 -translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
+                            {/* Queue Number Badge - Top Left on mobile, Left Gutter on desktop */}
+                            <div className="absolute -left-4 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
                               <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
                             </div>
                             
                             {/* Media Thumbnail with Overlays */}
                             <div 
-                              className="relative w-8 h-8 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
+                              className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0 mb-3 md:mb-0"
                               onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                             >
                               <img
@@ -1645,25 +1645,27 @@ const Party: React.FC = () => {
                             </div>
                             
                             {/* Media Details */}
-                            <div className="ml-4 flex-1 min-w-0">
-                              <div className="flex items-center space-x-2">
+                            <div className="ml-0 md:ml-4 flex-1 min-w-0 mb-3 md:mb-0">
+                              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 md:space-x-2">
                                 <h4 
-                                  className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                  className="font-medium text-white text-sm md:text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
                                   onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                                 >
                                   {mediaData.title || 'Unknown Media'}
                                 </h4>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-gray-300 text-lg truncate font-light">
+                                <span className="hidden md:inline text-gray-400">•</span>
+                                <span className="text-gray-300 text-sm md:text-lg truncate font-light">
                                   {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
                                 </span>
-                                <div className="flex items-center space-x-1 ml-2">
-                                  <Clock className="h-4 w-4 text-gray-400" />
-                                  <span className="p-2 text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
+                                <div className="flex items-center space-x-1 md:ml-2">
+                                  <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
+                                  <span className="text-xs md:text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
                                 </div>
                               </div>
                             {/* Mini Supporters Bar - shows top supporters for this media */}
-                            <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
+                            <div className="mt-2 md:mt-0">
+                              <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
+                            </div>
                                   {/* Tags Display */}
                                   {mediaData.tags && mediaData.tags.length > 0 && (
                                 <div className="mt-2 flex">
@@ -1682,17 +1684,17 @@ const Party: React.FC = () => {
                               )}               
                             </div>
                             {/* Action Buttons */}
-                            <div className="flex flex-col space-y-2">
+                            <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2 mt-3 md:mt-0">
                               <div className="flex items-center space-x-2">
                                 {/* Metrics Display */}
-                                <div className="flex flex-col-2 items-end space-y-1 bg-slate-900/20 mx-4 px-2 py-2 rounded-lg">
-                                  <div className="text-center p-2">
+                                <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
+                                  <div className="text-center p-1 md:p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Total</div>
                                     <div className="text-xs md:text-lg text-gray-300">
                                       {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
                                     </div>
                                   </div>
-                                  <div className="text-center p-2">
+                                  <div className="text-center p-1 md:p-2">
                                     <div className="text-xs text-gray-300 tracking-wide">Avg Bid</div>
                                     <div className="text-xs md:text-lg text-gray-300">
                                       {penceToPounds(calculateAverageBid(mediaData))}
@@ -1700,7 +1702,7 @@ const Party: React.FC = () => {
                                   </div>
                                 </div>
                                 {/* Inline Bidding */}
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-1 md:space-x-2">
                                   <input
                                     type="number"
                                     step="0.01"
@@ -1710,13 +1712,13 @@ const Party: React.FC = () => {
                                       ...queueBidAmounts,
                                       [mediaData._id || mediaData.id]: parseFloat(e.target.value) || Math.max(0.33, party?.minimumBid || 0.01)
                                     })}
-                                    className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-2 text-gray text-sm"
+                                    className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                   <button
                                     onClick={() => handleInlineBid(item)}
                                     disabled={isBidding}
-                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm"
+                                    className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                   >
                                     Bid £{(queueBidAmounts[mediaData._id || mediaData.id] || Math.max(0.33, party?.minimumBid || 0.01)).toFixed(2)}
                                   </button>
