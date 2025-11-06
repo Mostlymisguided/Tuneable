@@ -23,6 +23,7 @@ interface MP3PlayerProps {
 
 const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const isSeekingRef = useRef(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -227,7 +228,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     if (!audioRef.current || !isPlayerReady) return;
 
     const updateTime = () => {
-      if (audioRef.current) {
+      if (audioRef.current && !isSeekingRef.current) {
         setCurrentTime(audioRef.current.currentTime);
       }
     };
@@ -236,7 +237,35 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     return () => clearInterval(interval);
   }, [isPlayerReady]);
 
+  // Handle seeking
+  const handleSeek = (newTime: number) => {
+    if (!audioRef.current || !duration) return;
+    
+    isSeekingRef.current = true;
+    const clampedTime = Math.max(0, Math.min(newTime, duration));
+    setCurrentTime(clampedTime);
+    
+    try {
+      if (audioRef.current) {
+        audioRef.current.currentTime = clampedTime;
+      }
+    } catch (error) {
+      console.error('MP3Player: Error seeking:', error);
+    }
+    
+    // Re-enable time updates after a short delay
+    setTimeout(() => {
+      isSeekingRef.current = false;
+    }, 100);
+  };
+
+  const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = parseFloat(e.target.value);
+    handleSeek(newTime);
+  };
+
   const formatTime = (seconds: number): string => {
+    if (!seconds || isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -253,6 +282,27 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       
       {/* MP3 Player UI - positioned above PersistentWebPlayer */}
       <div className="bg-gray-800/95 backdrop-blur-xl border border-gray-600/50 shadow-2xl rounded-t-lg">
+        {/* Progress Bar Row */}
+        <div 
+          className="w-full bg-gray-800/50 h-1 group cursor-pointer" 
+          onClick={(e) => {
+            if (duration && isPlayerReady) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const percentage = x / rect.width;
+              const newTime = percentage * duration;
+              handleSeek(newTime);
+            }
+          }}
+        >
+          <div 
+            className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-100 relative"
+            style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+          >
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
+          </div>
+        </div>
+
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center space-x-4">
             {/* Album Art */}
@@ -275,6 +325,34 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
               <p className="text-xs text-gray-400 truncate">
                 {media.artist}
               </p>
+            </div>
+
+            {/* Elapsed Time */}
+            <div className="text-xs text-gray-400 font-mono w-12 text-right">
+              {formatTime(currentTime)}
+            </div>
+
+            {/* Scrubber Bar */}
+            <div className="flex-1 max-w-md">
+              <input
+                type="range"
+                min="0"
+                max={duration || 100}
+                value={currentTime}
+                onChange={handleScrubberChange}
+                disabled={!isPlayerReady}
+                className="w-full h-2 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: duration && isPlayerReady
+                    ? `linear-gradient(to right, #9333ea 0%, #9333ea ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) 100%)`
+                    : 'rgba(75, 85, 99, 0.5)'
+                }}
+              />
+            </div>
+
+            {/* Duration */}
+            <div className="text-xs text-gray-400 font-mono w-12 text-left">
+              {formatTime(duration)}
             </div>
 
             {/* Controls */}
@@ -335,11 +413,6 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
                   onChange={(e) => setVolume(parseInt(e.target.value))}
                   className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
                 />
-              </div>
-
-              {/* Time Display */}
-              <div className="text-xs text-gray-400 font-mono">
-                {formatTime(currentTime)} / {formatTime(duration)}
               </div>
             </div>
           </div>
