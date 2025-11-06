@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { ArrowLeft, Wallet as WalletIcon, Loader } from 'lucide-react';
+import { ArrowLeft, Wallet as WalletIcon, Loader, AlertTriangle, Copy, Check } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
+import BetaWarningBanner from '../components/BetaWarningBanner';
 
 const Wallet: React.FC = () => {
   const navigate = useNavigate();
   const { user, refreshUser, updateBalance } = useAuth();
   const [customAmount, setCustomAmount] = useState('0.30');
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedCard, setCopiedCard] = useState<string | null>(null);
 
   const quickTopUpAmounts = [5, 10, 20, 50];
 
@@ -86,9 +88,137 @@ const Wallet: React.FC = () => {
     handleTopUp(amount);
   };
 
+  const copyToClipboard = async (text: string, cardType: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedCard(cardType);
+      toast.success('Card number copied to clipboard!');
+      setTimeout(() => setCopiedCard(null), 2000);
+    } catch (err) {
+      toast.error('Failed to copy card number');
+    }
+  };
+
+
+  // Check if beta mode is enabled
+  const isBetaMode = import.meta.env.VITE_BETA_MODE === 'true' || import.meta.env.VITE_BETA_MODE === true;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Beta Warning Banner */}
+      <BetaWarningBanner variant="full" className="mb-6" />
+
+      {/* Test Card Instructions - Beta Mode Only */}
+      {isBetaMode && (
+        <div className="card mb-6 border-2 border-yellow-500/50 bg-yellow-500/5">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-yellow-200 mb-2">
+                Using Stripe Test Cards
+              </h3>
+              <p className="text-sm text-yellow-100/90 mb-4">
+                When you click "Top Up", you'll be redirected to Stripe Checkout. Use these test card details:
+              </p>
+              
+              <div className="space-y-3">
+                {/* Success Card */}
+                <div className="bg-black/30 rounded-lg p-4 border border-green-500/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-green-300">✓ Successful Payment</span>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard('4242 4242 4242 4242', 'success')}
+                      className="flex items-center space-x-1 text-xs text-yellow-300 hover:text-yellow-100 transition-colors"
+                    >
+                      {copiedCard === 'success' ? (
+                        <>
+                          <Check className="h-3 w-3" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="font-mono text-base text-white bg-black/50 p-3 rounded mb-2 select-all">
+                    4242 4242 4242 4242
+                  </div>
+                  <p className="text-xs text-gray-300">
+                    Use any future expiry date (e.g., <span className="font-mono">12/34</span>) and any 3-digit CVC (e.g., <span className="font-mono">123</span>)
+                  </p>
+                </div>
+
+                {/* Other test scenarios */}
+                <details className="bg-black/20 rounded-lg p-3 border border-yellow-500/20">
+                  <summary className="text-sm font-medium text-yellow-200 cursor-pointer hover:text-yellow-100 transition-colors">
+                    Other Test Scenarios
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    <div className="bg-black/30 rounded p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-red-300">✗ Payment Declined</span>
+                        <button
+                          onClick={() => copyToClipboard('4000 0000 0000 0002', 'decline')}
+                          className="flex items-center space-x-1 text-xs text-yellow-300 hover:text-yellow-100 transition-colors"
+                        >
+                          {copiedCard === 'decline' ? (
+                            <>
+                              <Check className="h-3 w-3" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="font-mono text-sm text-white bg-black/50 p-2 rounded select-all">
+                        4000 0000 0000 0002
+                      </div>
+                    </div>
+                    
+                    <div className="bg-black/30 rounded p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-blue-300">🔒 3D Secure Authentication</span>
+                        <button
+                          onClick={() => copyToClipboard('4000 0025 0000 3155', '3ds')}
+                          className="flex items-center space-x-1 text-xs text-yellow-300 hover:text-yellow-100 transition-colors"
+                        >
+                          {copiedCard === '3ds' ? (
+                            <>
+                              <Check className="h-3 w-3" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="font-mono text-sm text-white bg-black/50 p-2 rounded select-all">
+                        4000 0025 0000 3155
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Requires additional authentication step
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center mb-8">
         <button 
@@ -111,7 +241,14 @@ const Wallet: React.FC = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Current Balance</h3>
-            <p className="text-3xl font-bold text-green-500">{penceToPounds(user?.balance)}</p>
+            <div className="flex items-center space-x-2">
+              <p className="text-3xl font-bold text-green-500">{penceToPounds(user?.balance)}</p>
+              {isBetaMode && (
+                <span className="px-2 py-1 text-xs font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded">
+                  BETA
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

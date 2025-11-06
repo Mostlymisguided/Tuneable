@@ -531,6 +531,12 @@ export const userAPI = {
     return response.data;
   },
 
+  // Update migration preference (beta mode)
+  updateMigrationPreference: async (preference: 'transfer' | 'fresh') => {
+    const response = await api.put('/users/migration-preference', { migrationPreference: preference });
+    return response.data;
+  },
+
   // Get list of users invited by current user
   getInvitedUsers: async () => {
     const response = await api.get('/users/invited');

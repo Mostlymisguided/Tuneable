@@ -33,6 +33,7 @@ import { userAPI, authAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import ReportModal from '../components/ReportModal';
+import BetaWarningBanner from '../components/BetaWarningBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
@@ -181,6 +182,8 @@ const UserProfile: React.FC = () => {
     inApp: true // Always true
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+
+  const isBetaMode = import.meta.env.VITE_BETA_MODE === 'true' || import.meta.env.VITE_BETA_MODE === true;
   
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -319,8 +322,9 @@ const UserProfile: React.FC = () => {
           inApp: true // Always true
         });
       }
+      
     }
-  }, [user, isOwnProfile]);
+  }, [user, isOwnProfile, isBetaMode]);
 
   // Save notification preferences
   const handleSaveNotificationPrefs = async () => {
@@ -335,6 +339,7 @@ const UserProfile: React.FC = () => {
       setIsSavingPrefs(false);
     }
   };
+
 
   const fetchUserProfile = async () => {
     try {
@@ -736,6 +741,11 @@ const UserProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-4 py-8">
+        {/* Beta Warning Banner */}
+        {isBetaMode && isOwnProfile && (
+          <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
+        )}
+
         {/* Header */}
         <div className="mb-8 relative">
           <button

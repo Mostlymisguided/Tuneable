@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, PoundSterling, AlertCircle } from 'lucide-react';
+import BetaWarningBanner from './BetaWarningBanner';
 
 interface BidModalProps {
   isOpen: boolean;
@@ -78,6 +79,9 @@ const BidModal: React.FC<BidModalProps> = ({
             Current bid: <span className="font-medium">£{currentBid.toFixed(2)}</span>
           </p>
         </div>
+
+        {/* Beta Warning */}
+        <BetaWarningBanner variant="compact" className="mb-4" />
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
