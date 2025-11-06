@@ -104,6 +104,14 @@ const TermsOfService: React.FC = () => {
                   <li>Do not engage in harassment, hate speech, or discriminatory behavior</li>
                   <li>Respect other users' privacy and personal information</li>
                 </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">5.3 Platform Moderation Rights</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Tuneable reserves the right to remove, veto, or block any media content from the platform at its sole discretion</li>
+                  <li>Media may be removed for reasons including but not limited to: copyright infringement, inappropriate content, technical issues, platform policy violations, or user reports</li>
+                  <li>Removed media may result in refunded bids at Tuneable's discretion</li>
+                  <li>Tuneable is not obligated to provide notice before removing content, though reasonable efforts will be made to notify affected users when possible</li>
+                </ul>
               </div>
             </section>
 
@@ -274,17 +282,25 @@ const TermsOfService: React.FC = () => {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">13. Termination</h2>
               <div className="space-y-4 text-gray-700">
-                <p>
-                  We reserve the right to suspend or terminate your account at any time for:
+                <h3 className="text-xl font-medium text-gray-900">13.1 Account Suspension and Removal</h3>
+                <p className="mb-2">
+                  Tuneable reserves the right to remove users from parties, suspend accounts, or permanently ban users from the platform at its sole discretion. Users may be removed for:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Violation of these Terms</li>
                   <li>Fraudulent or illegal activity</li>
                   <li>Abuse of the Service or other users</li>
+                  <li>Inappropriate behavior, harassment, or spam</li>
+                  <li>Any activity that disrupts the platform or other users' experience</li>
                   <li>Non-payment or chargebacks</li>
                   <li>Extended periods of inactivity</li>
                 </ul>
                 <p className="mt-4">
+                  Tuneable is not obligated to provide notice before removing users, though reasonable efforts will be made to notify affected users when possible. Removed users may forfeit wallet balances and bid history at Tuneable's discretion.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">13.2 User-Initiated Termination</h3>
+                <p>
                   You may terminate your account at any time by contacting us. Upon termination, your right to use the Service 
                   will immediately cease, and any remaining wallet balance may be forfeited.
                 </p>
