@@ -184,6 +184,8 @@ const NotificationBell: React.FC = () => {
       await notificationAPI.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
+      // Refetch unread count to ensure it's in sync with backend
+      await fetchUnreadCount();
     } catch (error) {
       console.error('Error marking all as read:', error);
     }

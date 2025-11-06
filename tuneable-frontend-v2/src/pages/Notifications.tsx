@@ -153,6 +153,8 @@ const Notifications: React.FC = () => {
       await notificationAPI.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
+      // Refetch notifications to ensure count is accurate
+      await fetchNotifications(1, false);
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
