@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings } from 'lucide-react';
-import { userAPI, mediaAPI, searchAPI } from '../lib/api';
+import { userAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { toast } from 'react-toastify';
@@ -58,6 +58,7 @@ const Dashboard: React.FC = () => {
   const [isSearchingTune, setIsSearchingTune] = useState(false);
   const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, number>>({});
   const [isAddingTune, setIsAddingTune] = useState(false);
+  const [minimumBid, setMinimumBid] = useState<number>(0.01);
 
   // Creator Dashboard state
   const [creatorStats, setCreatorStats] = useState<any>(null);
@@ -94,6 +95,23 @@ const Dashboard: React.FC = () => {
     ];
     return youtubePatterns.some(pattern => pattern.test(query));
   };
+
+  // Fetch global party minimum bid
+  useEffect(() => {
+    const fetchGlobalPartyMinimumBid = async () => {
+      try {
+        const response = await partyAPI.getParties();
+        const globalParty = response.parties.find((p: any) => p.type === 'global');
+        if (globalParty && globalParty.minimumBid) {
+          setMinimumBid(globalParty.minimumBid);
+        }
+      } catch (error) {
+        console.error('Error fetching global party minimum bid:', error);
+        // Keep default 0.01 if fetch fails
+      }
+    };
+    fetchGlobalPartyMinimumBid();
+  }, []);
 
   useEffect(() => {
     const loadInvitedUsers = async () => {
@@ -288,12 +306,12 @@ const Dashboard: React.FC = () => {
       return;
     }
 
-    const amountStr = prompt(`Enter bid amount for "${item.title}" (minimum £0.33):`);
+    const amountStr = prompt(`Enter bid amount for "${item.title}" (minimum £${minimumBid.toFixed(2)}):`);
     if (!amountStr) return;
 
     const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount < 0.33) {
-      toast.error('Minimum bid is £0.33');
+    if (isNaN(amount) || amount < minimumBid) {
+      toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
       return;
     }
 
@@ -343,11 +361,11 @@ const Dashboard: React.FC = () => {
         
         setAddTuneResults(results);
         
-        // Initialize bid amounts
-        const minBid = 0.33;
+        // Initialize bid amounts (default to 0.33 to encourage higher bids)
+        const defaultBid = 0.33;
         const newBidAmounts: Record<string, number> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = minBid;
+          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid);
         });
         setAddTuneBidAmounts(newBidAmounts);
       } else {
@@ -364,11 +382,11 @@ const Dashboard: React.FC = () => {
         
         setAddTuneResults(results);
         
-        // Initialize bid amounts
-        const minBid = 0.33;
+        // Initialize bid amounts (default to 0.33 to encourage higher bids)
+        const defaultBid = 0.33;
         const newBidAmounts: Record<string, number> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = minBid;
+          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid);
         });
         setAddTuneBidAmounts(newBidAmounts);
       }
@@ -393,7 +411,7 @@ const Dashboard: React.FC = () => {
       return;
     }
 
-    const bidAmount = addTuneBidAmounts[mediaId] || 0.33;
+    const bidAmount = addTuneBidAmounts[mediaId] || Math.max(0.33, minimumBid);
     
     if ((user as any)?.balance < bidAmount) {
       toast.error('Insufficient balance');
@@ -1514,14 +1532,14 @@ const Dashboard: React.FC = () => {
                     <div className="text-gray-400 text-xs">Bid Amount</div>
                     <input
                       type="number"
-                      min="0.33"
+                      min={minimumBid}
                       step="0.01"
-                      value={addTuneBidAmounts[result._id || result.id || ''] || 0.33}
+                      value={addTuneBidAmounts[result._id || result.id || ''] || Math.max(0.33, minimumBid)}
                       onChange={(e) => {
                         const amount = parseFloat(e.target.value);
                         setAddTuneBidAmounts(prev => ({
                           ...prev,
-                          [result._id || result.id || '']: amount || 0.33
+                          [result._id || result.id || '']: amount || Math.max(0.33, minimumBid)
                         }));
                       }}
                       className="w-20 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-purple-500"

@@ -59,6 +59,7 @@ interface Party {
   type: 'remote' | 'live' | 'global';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
+  minimumBid?: number;
   createdAt: string;
   updatedAt: string;
   host_uuid?: string; // UUID reference for host

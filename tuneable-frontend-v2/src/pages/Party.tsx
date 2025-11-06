@@ -485,11 +485,12 @@ const Party: React.FC = () => {
           youtube: youtubeResults
         });
         
-        // Initialize bid amounts for results
-        const minBid = party?.minimumBid || 0.33;
+        // Initialize bid amounts for results (default to 0.33 to encourage higher bids)
+        const defaultBid = 0.33;
+        const minBid = party?.minimumBid || 0.01;
         const newBidAmounts: Record<string, number> = {};
         [...databaseResults, ...youtubeResults].forEach(media => {
-          newBidAmounts[media._id || media.id] = minBid;
+          newBidAmounts[media._id || media.id] = Math.max(defaultBid, minBid);
         });
         setNewMediaBidAmounts(newBidAmounts);
         
@@ -537,10 +538,11 @@ const Party: React.FC = () => {
       setAddMediaResults({ database: databaseResults, youtube: youtubeResults });
       
       // Initialize bid amounts for results
-      const minBid = party?.minimumBid || 0.33;
+      const defaultBid = 0.33;
+      const minBid = party?.minimumBid || 0.01;
       const newBidAmounts: Record<string, number> = {};
       [...databaseResults, ...youtubeResults].forEach(media => {
-        newBidAmounts[media._id || media.id] = minBid;
+        newBidAmounts[media._id || media.id] = Math.max(defaultBid, minBid);
       });
       setNewMediaBidAmounts(newBidAmounts);
       }
@@ -571,7 +573,7 @@ const Party: React.FC = () => {
         setYoutubeNextPageToken(response.nextPageToken || null);
         
         // Initialize bid amounts for new results
-        const minBid = party?.minimumBid || 0.33;
+        const minBid = party?.minimumBid || 0.01;
         const newBidAmounts: Record<string, number> = { ...newMediaBidAmounts };
         response.videos.forEach((media: any) => {
           if (!newBidAmounts[media._id || media.id]) {
@@ -601,7 +603,7 @@ const Party: React.FC = () => {
   const handleTagSubmit = async (tags: string[]) => {
     if (!partyId || !pendingMedia) return;
     
-    const bidAmount = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] || party?.minimumBid || 0.33;
+    const bidAmount = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] || Math.max(0.33, party?.minimumBid || 0.01);
     
     try {
       // Get the appropriate URL based on media source
@@ -800,7 +802,7 @@ const Party: React.FC = () => {
     
     const mediaData = media.mediaId || media;
     const mediaId = mediaData._id || mediaData.id;
-    const bidAmount = queueBidAmounts[mediaId] || party?.minimumBid || 0.33;
+    const bidAmount = queueBidAmounts[mediaId] || Math.max(0.33, party?.minimumBid || 0.01);
     
     setIsBidding(true);
     try {
@@ -813,7 +815,7 @@ const Party: React.FC = () => {
       // Reset bid amount for this media back to minimum
       setQueueBidAmounts(prev => ({
         ...prev,
-        [mediaId]: party?.minimumBid || 0.33
+        [mediaId]: Math.max(0.33, party?.minimumBid || 0.01)
       }));
       
     } catch (error: any) {
@@ -1473,11 +1475,11 @@ const Party: React.FC = () => {
                                     <input
                                       type="number"
                                       step="0.01"
-                                      min={party?.minimumBid || 0.33}
-                                      value={newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33}
+                                      min={party?.minimumBid || 0.01}
+                                      value={newMediaBidAmounts[media._id || media.id] || Math.max(0.33, party?.minimumBid || 0.01)}
                                       onChange={(e) => setNewMediaBidAmounts({
                                         ...newMediaBidAmounts,
-                                        [media._id || media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                        [media._id || media.id]: parseFloat(e.target.value) || Math.max(0.33, party?.minimumBid || 0.01)
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
@@ -1485,7 +1487,7 @@ const Party: React.FC = () => {
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
                                     >
-                                      Add £{(newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[media._id || media.id] || Math.max(0.33, party?.minimumBid || 0.01)).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1525,11 +1527,11 @@ const Party: React.FC = () => {
                                     <input
                                       type="number"
                                       step="0.01"
-                                      min={party?.minimumBid || 0.33}
-                                      value={newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33}
+                                      min={party?.minimumBid || 0.01}
+                                      value={newMediaBidAmounts[media._id || media.id] || Math.max(0.33, party?.minimumBid || 0.01)}
                                       onChange={(e) => setNewMediaBidAmounts({
                                         ...newMediaBidAmounts,
-                                        [media._id || media.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                        [media._id || media.id]: parseFloat(e.target.value) || Math.max(0.33, party?.minimumBid || 0.01)
                                       })}
                                       className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
@@ -1537,7 +1539,7 @@ const Party: React.FC = () => {
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                                     >
-                                      Add £{(newMediaBidAmounts[media._id || media.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                      Add £{(newMediaBidAmounts[media._id || media.id] || Math.max(0.33, party?.minimumBid || 0.01)).toFixed(2)}
                                     </button>
                                   </div>
                                 </div>
@@ -1702,11 +1704,11 @@ const Party: React.FC = () => {
                                   <input
                                     type="number"
                                     step="0.01"
-                                    min={party?.minimumBid || 0.33}
-                                    value={queueBidAmounts[mediaData._id || mediaData.id] || party?.minimumBid || 0.33}
+                                    min={party?.minimumBid || 0.01}
+                                    value={queueBidAmounts[mediaData._id || mediaData.id] || Math.max(0.33, party?.minimumBid || 0.01)}
                                     onChange={(e) => setQueueBidAmounts({
                                       ...queueBidAmounts,
-                                      [mediaData._id || mediaData.id]: parseFloat(e.target.value) || party?.minimumBid || 0.33
+                                      [mediaData._id || mediaData.id]: parseFloat(e.target.value) || Math.max(0.33, party?.minimumBid || 0.01)
                                     })}
                                     className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-2 text-gray text-sm"
                                     onClick={(e) => e.stopPropagation()}
@@ -1716,7 +1718,7 @@ const Party: React.FC = () => {
                                     disabled={isBidding}
                                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm"
                                   >
-                                    Bid £{(queueBidAmounts[mediaData._id || mediaData.id] || party?.minimumBid || 0.33).toFixed(2)}
+                                    Bid £{(queueBidAmounts[mediaData._id || mediaData.id] || Math.max(0.33, party?.minimumBid || 0.01)).toFixed(2)}
                                   </button>
                                 </div>
                               </div>

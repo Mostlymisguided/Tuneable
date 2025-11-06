@@ -30,7 +30,7 @@ import {
   CheckCircle,
   Users
 } from 'lucide-react';
-import { mediaAPI, claimAPI, labelAPI, collectiveAPI } from '../lib/api';
+import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
@@ -210,6 +210,7 @@ const TuneProfile: React.FC = () => {
 
   // Global bidding state
   const [globalBidAmount, setGlobalBidAmount] = useState<number>(0.33);
+  const [minimumBid, setMinimumBid] = useState<number>(0.01);
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [topParties, setTopParties] = useState<any[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
@@ -233,6 +234,25 @@ const TuneProfile: React.FC = () => {
       console.log('❌ No mediaId provided');
     }
   }, [mediaId]);
+
+  // Fetch global party minimum bid
+  useEffect(() => {
+    const fetchGlobalPartyMinimumBid = async () => {
+      try {
+        const response = await partyAPI.getParties();
+        const globalParty = response.parties.find((p: any) => p.type === 'global');
+        if (globalParty && globalParty.minimumBid) {
+          setMinimumBid(globalParty.minimumBid);
+          // Keep default bid at 0.33 to encourage higher bids, but respect minimum
+          setGlobalBidAmount(Math.max(0.33, globalParty.minimumBid));
+        }
+      } catch (error) {
+        console.error('Error fetching global party minimum bid:', error);
+        // Keep default 0.01 if fetch fails
+      }
+    };
+    fetchGlobalPartyMinimumBid();
+  }, []);
 
   const fetchMediaProfile = async () => {
     try {
@@ -833,8 +853,8 @@ const TuneProfile: React.FC = () => {
       return;
     }
 
-    if (globalBidAmount < 0.33) {
-      toast.error('Minimum bid is £0.33');
+    if (globalBidAmount < minimumBid) {
+      toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
       return;
     }
 
@@ -1093,15 +1113,15 @@ const TuneProfile: React.FC = () => {
                     <input
                       type="number"
                       step="0.01"
-                      min="0.33"
+                      min={minimumBid}
                       value={globalBidAmount}
-                      onChange={(e) => setGlobalBidAmount(parseFloat(e.target.value) || 0.33)}
+                      onChange={(e) => setGlobalBidAmount(parseFloat(e.target.value) || minimumBid)}
                       className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
                     />
                   </div>
                   <button
                     onClick={handleGlobalBid}
-                    disabled={isPlacingGlobalBid || globalBidAmount < 0.33}
+                    disabled={isPlacingGlobalBid || globalBidAmount < minimumBid}
                     className="w-full md:w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
                   >
                     {isPlacingGlobalBid ? (
@@ -1120,7 +1140,7 @@ const TuneProfile: React.FC = () => {
                 
                 {/* Quick amounts */}
                 <div className="flex flex-wrap justify-center gap-2 mb-4">
-                  {[0.33, 1.00, 5.00, 10.00, 20.00].map(amount => (
+                  {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
                     <button
                       key={amount}
                       onClick={() => setGlobalBidAmount(amount)}
