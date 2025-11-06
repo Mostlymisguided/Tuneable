@@ -1596,7 +1596,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-3 md:p-4"
+                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-3 md:p-4 pt-8 md:pt-4"
                           >
                             {/* Admin Veto Button - Top Right */}
                             {isAdmin && (
@@ -1612,76 +1612,81 @@ const Party: React.FC = () => {
                               </button>
                             )}
                             
-                            {/* Queue Number Badge - Top Left on mobile, Left Gutter on desktop */}
-                            <div className="absolute -left-4 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
+                            {/* Queue Number Badge - Centered at top on mobile, Left Gutter on desktop */}
+                            <div className="absolute left-1/2 -translate-x-1/2 md:-left-12 md:translate-x-0 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
                               <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
                             </div>
                             
-                            {/* Media Thumbnail with Overlays */}
-                            <div 
-                              className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0 mb-3 md:mb-0"
-                              onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-                            >
-                              <img
-                                src={mediaData.coverArt || DEFAULT_COVER_ART}
-                                alt={mediaData.title || 'Unknown Media'}
-                                className="w-full h-full rounded object-cover"
-                                width="192"
-                                height="192"
-                              />
-                              
-                              {/* Play Icon Overlay */}
+                            {/* Mobile-only wrapper for thumbnail + details side by side */}
+                            <div className="flex flex-row md:contents items-start gap-3 mb-3 md:mb-0">
+                              {/* Media Thumbnail with Overlays */}
                               <div 
-                                className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handlePlayMedia(item, index);
-                                }}
+                                className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
+                                onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                               >
-                                <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
-                                  <Play className="h-4 w-4 md:h-6 md:w-6 text-white" fill="currentColor" />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Media Details */}
-                            <div className="ml-0 md:ml-4 flex-1 min-w-0 mb-3 md:mb-0">
-                              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 md:space-x-2">
-                                <h4 
-                                  className="font-medium text-white text-sm md:text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
-                                  onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
+                                <img
+                                  src={mediaData.coverArt || DEFAULT_COVER_ART}
+                                  alt={mediaData.title || 'Unknown Media'}
+                                  className="w-full h-full rounded object-cover"
+                                  width="192"
+                                  height="192"
+                                />
+                                
+                                {/* Play Icon Overlay */}
+                                <div 
+                                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePlayMedia(item, index);
+                                  }}
                                 >
-                                  {mediaData.title || 'Unknown Media'}
-                                </h4>
-                                <span className="hidden md:inline text-gray-400">•</span>
-                                <span className="text-gray-300 text-sm md:text-lg truncate font-light">
-                                  {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
-                                </span>
-                                <div className="flex items-center space-x-1 md:ml-2">
-                                  <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
-                                  <span className="text-xs md:text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
-                                </div>
-                              </div>
-                            {/* Mini Supporters Bar - shows top supporters for this media */}
-                            <div className="mt-2 md:mt-0">
-                              <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
-                            </div>
-                                  {/* Tags Display */}
-                                  {mediaData.tags && mediaData.tags.length > 0 && (
-                                <div className="mt-2 flex">
-                                  <div className="flex flex-wrap gap-1">
-                                    {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
-                                      <Link
-                                        key={tagIndex}
-                                        to={`/tune/${mediaData._id || mediaData.id}`}
-                                        className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
-                                      >
-                                        #{tag}
-                                      </Link>
-                                    ))}
+                                  <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
+                                    <Play className="h-4 w-4 md:h-6 md:w-6 text-white" fill="currentColor" />
                                   </div>
                                 </div>
-                              )}               
+                              </div>
+                              
+                              {/* Media Details */}
+                              <div className="flex-1 min-w-0 md:ml-4">
+                                <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 md:space-x-2">
+                                  <h4 
+                                    className="font-medium text-white text-sm md:text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                    onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
+                                  >
+                                    {mediaData.title || 'Unknown Media'}
+                                  </h4>
+                                  <span className="hidden md:inline text-gray-400">•</span>
+                                  <span className="text-gray-300 text-sm md:text-lg truncate font-light">
+                                    {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
+                                  </span>
+                                  <div className="flex items-center space-x-1 md:ml-2">
+                                    <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
+                                    <span className="text-xs md:text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
+                                  </div>
+                                </div>
+                                
+                                {/* Mini Supporters Bar - shows top supporters for this media */}
+                                <div className="mt-2 md:mt-0">
+                                  <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
+                                </div>
+                                
+                                {/* Tags Display */}
+                                {mediaData.tags && mediaData.tags.length > 0 && (
+                                  <div className="mt-2 flex">
+                                    <div className="flex flex-wrap gap-1">
+                                      {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
+                                        <Link
+                                          key={tagIndex}
+                                          to={`/tune/${mediaData._id || mediaData.id}`}
+                                          className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
+                                        >
+                                          #{tag}
+                                        </Link>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             {/* Action Buttons */}
                             <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2 mt-3 md:mt-0">
