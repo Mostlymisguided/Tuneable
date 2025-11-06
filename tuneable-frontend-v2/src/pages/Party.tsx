@@ -1200,15 +1200,15 @@ const Party: React.FC = () => {
 
           {/* Top Supporters */}
           <div className="card">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-white">Top Supporters</h3>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3 gap-2 md:gap-0">
+              <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
               {selectedTagFilters.length > 0 ? (
                 <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
               ) : (
                 <span className="text-xs text-gray-400">Showing global support</span>
               )}
             </div>
-            <div className="max-h-64 overflow-y-auto pr-1">
+            <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
               <TopSupporters bids={topSupporterBids} maxDisplay={10} />
             </div>
           </div>

@@ -89,22 +89,22 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 md:space-y-3">
       {topSupporters.map((supporter: any, index: number) => (
         <div
           key={supporter.user._id || supporter.user.uuid || index}
-          className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
+          className="flex flex-col md:flex-row md:items-center md:justify-between p-2 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
           onClick={() => (supporter.user._id || supporter.user.uuid) && navigate(`/user/${supporter.user._id || supporter.user.uuid}`)}
         >
           {/* Left: Rank + Profile + Info */}
-          <div className="flex items-center space-x-4 flex-1 min-w-0">
+          <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0 mb-2 md:mb-0">
             {/* Rank Badge */}
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">#{index + 1}</span>
+            <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-xs md:text-sm">#{index + 1}</span>
             </div>
             
             {/* Profile Picture */}
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
               <img
                 src={supporter.user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={supporter.user.username}
@@ -117,38 +117,40 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
             
             {/* User Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2">
-                <h4 className="text-white font-semibold text-lg truncate">
+              <div className="flex items-center space-x-1 md:space-x-2">
+                <h4 className="text-white font-semibold text-sm md:text-lg truncate">
                   {supporter.user.username}
                 </h4>
-                <TrendingUp className="h-4 w-4 text-green-400 flex-shrink-0" />
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-green-400 flex-shrink-0" />
               </div>
               
-              <div className="flex items-center space-x-3 text-sm text-gray-400">
+              <div className="flex flex-wrap items-center gap-x-1.5 md:gap-x-3 text-xs md:text-sm text-gray-400 mt-0.5 md:mt-0">
                 {supporter.user.location && (
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="h-3 w-3" />
-                    <span className="truncate">{supporter.user.location}</span>
-                  </div>
+                  <>
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                      <span className="truncate">{supporter.user.location}</span>
+                    </div>
+                    <span className="hidden md:inline">•</span>
+                  </>
                 )}
-                <span>•</span>
                 <span>{supporter.bidCount} {supporter.bidCount === 1 ? 'bid' : 'bids'}</span>
-                <span>•</span>
+                <span className="hidden md:inline">•</span>
                 <span className="truncate">Since {getRelativeTime(supporter.firstBidDate)}</span>
               </div>
             </div>
           </div>
           
           {/* Right: Totals */}
-          <div className="text-right flex-shrink-0 ml-4">
-            <div className="text-2xl font-bold text-green-400">
+          <div className="text-left md:text-right flex-shrink-0 md:ml-4 flex items-center md:block justify-between md:justify-end">
+            <div className="text-xl md:text-2xl font-bold text-green-400">
               {penceToPounds(supporter.totalAmount)}
             </div>
             <div className="text-xs text-gray-400">
               avg {penceToPounds(supporter.totalAmount / supporter.bidCount)}
             </div>
             {userStatsMap && (supporter.user.uuid || supporter.user._id) && (
-              <div className="text-xs text-purple-300 mt-1">
+              <div className="text-xs text-purple-300 mt-1 hidden md:block">
                 TuneBytes: {userStatsMap[supporter.user.uuid || supporter.user._id]?.tuneBytes ?? '—'}
               </div>
             )}
