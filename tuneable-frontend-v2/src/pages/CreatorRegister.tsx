@@ -81,8 +81,8 @@ const CreatorRegister: React.FC = () => {
   ];
 
   const availableRoles = [
-    'artist', 'producer', 'songwriter', 'composer', 'host', 
-    'narrator', 'director', 'editor', 'author', 'DJ', 'vocalist', 'instrumentalist'
+    'artist', 'producer', 'songwriter', 'composer', 'DJ', 'vocalist', 'instrumentalist',
+    /*'host', 'narrator', 'director', 'editor', 'author'*/
   ];
 
   const distributors = [
@@ -308,7 +308,7 @@ const CreatorRegister: React.FC = () => {
           {/* Roles */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Your Roles * (select all that apply)
+              Your Roles * (Select All That Apply)
             </label>
             <div className="flex flex-wrap gap-2">
               {availableRoles.map((role) => (

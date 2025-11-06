@@ -9,7 +9,8 @@ import {
   CheckCircle,
   XCircle,
   X,
-  Mail
+  Mail,
+  UserPlus
 } from 'lucide-react';
 import axios from 'axios';
 import { userAPI } from '../lib/api';
@@ -470,6 +471,15 @@ const AuthPage: React.FC = () => {
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.568 17.548c-.188.363-.578.594-1.01.594-.062 0-.125-.006-.188-.02l-7.423-1.36c-.51-.094-.868-.518-.868-1.04V7.298c0-.394.216-.76.568-.95.35-.19.78-.179 1.113.04l6.774 4.18c.356.22.577.615.577 1.037v5.044c0 .387-.216.748-.565.94zm-1.673-6.25l-5.46-3.37v6.74l5.46-1.002v-2.368z"/>
           </svg>
           Sign up with SoundCloud
+        </button>
+        
+        <button 
+          onClick={() => navigate('/creator/register')} 
+          type="button" 
+          className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-purple-600 hover:bg-purple-700 focus:ring-purple-500 focus:ring-offset-purple-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
+        >
+          <UserPlus className="w-5 h-5 mr-2" />
+          Sign up as a Creator
         </button>
       </div>
 
