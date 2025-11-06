@@ -9,7 +9,7 @@ import {
   CheckCircle,
   XCircle,
   X,
-  ArrowLeft
+  Mail
 } from 'lucide-react';
 import axios from 'axios';
 import { userAPI } from '../lib/api';
@@ -21,6 +21,8 @@ const AuthPage: React.FC = () => {
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
   const [inviterUsername, setInviterUsername] = useState<string>('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showInviteCodeError, setShowInviteCodeError] = useState(false);
   
   // Location detection state
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -84,6 +86,9 @@ const AuthPage: React.FC = () => {
         setInviteCodeValid(true);
         setInviterUsername(response.data.inviterUsername || '');
         
+        // Automatically show email form when invite code is validated
+        setShowEmailForm(true);
+        
         // Trigger location detection after successful invite code validation
         detectUserLocation();
       } else {
@@ -129,10 +134,25 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  // Trigger visual error on invite code input
+  const triggerInviteCodeError = () => {
+    setShowInviteCodeError(true);
+    // Focus on the invite code input and scroll into view
+    setTimeout(() => {
+      const inviteInput = document.getElementById('parentInviteCode');
+      if (inviteInput) {
+        inviteInput.focus();
+        inviteInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+    // Reset error state after animation
+    setTimeout(() => setShowInviteCodeError(false), 3000);
+  };
+
   const handleSocialAuth = (provider: 'facebook' | 'google' | 'instagram' | 'soundcloud') => {
     // Check if invite code is required for registration
     if (isRegisterPage && !inviteCodeValid) {
-      toast.error('Please enter a valid invite code to sign up');
+      triggerInviteCodeError();
       return;
     }
 
@@ -174,6 +194,11 @@ const AuthPage: React.FC = () => {
         ...formData,
         [name]: upperCode,
       });
+      
+      // Reset error state when user starts typing
+      if (showInviteCodeError) {
+        setShowInviteCodeError(false);
+      }
       
       // Validate invite code if 5 characters
       if (upperCode.length === 5) {
@@ -248,9 +273,9 @@ const AuthPage: React.FC = () => {
   };
 
   const renderLoginForm = () => (
-    <div className="p-5">
-      <div className="text-center p-4">
-        <p className="mb-3 text-2xl font-semibold leading-5 text-slate-900">
+    <div className="">
+      <div className="text-center pb-6">
+        <p className="text-2xl font-semibold leading-5 text-slate-900">
           Login to your account
         </p>
       </div>
@@ -325,7 +350,7 @@ const AuthPage: React.FC = () => {
             Reset your password?
           </Link>
         </p>
-      <div className="mt-6 text-center text-sm text-slate-600">
+      <div className="mt-2 text-center text-sm text-slate-600">
         Don't have an account?{' '}
         <Link to="/register" className="font-medium underline">
           Sign up
@@ -335,17 +360,30 @@ const AuthPage: React.FC = () => {
   );
 
   const renderRegisterForm = () => (
-    <div className="p-6">
-      <div className="text-center p-6">
-        <p className="mb-3 text-2xl font-semibold leading-5 text-slate-900">
-          Create your account
-        </p>
-        <p className="mt-2 text-sm leading-4 text-slate-600">
+    <div className="">
+      <div className="text-center p-4">
+      
+        <p className="text-sm leading-4 text-slate-600">
           Join Tuneable To Start Sharing Music
         </p>
       </div>
 
-      <div className="mt-7 flex flex-col p-4 flex items-center justify-center gap-2 items-center">
+      <div className="flex flex-col p-4 flex items-center justify-center gap-3 items-center">
+        <button 
+          onClick={() => {
+            if (!inviteCodeValid) {
+              triggerInviteCodeError();
+              return;
+            }
+            setShowEmailForm(!showEmailForm);
+          }} 
+          type="button" 
+          className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-gray-600 hover:bg-gray-700 focus:ring-gray-500 focus:ring-offset-gray-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
+        >
+          <Mail className="w-5 h-5 mr-2" />
+          Sign up with Email
+        </button>
+        
         <button onClick={() => handleSocialAuth('google')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-white hover:bg-gray-50 focus:ring-gray-500 focus:ring-offset-gray-200 text-gray-700 border border-gray-300 transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
           <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -371,57 +409,71 @@ const AuthPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex w-full items-center gap-2 p-4 text-sm text-slate-600">
-        <div className="h-px w-full bg-slate-200"></div>
-        OR
-        <div className="h-px w-full bg-slate-200"></div>
+      {/* Invite Code Field */}
+      <div className="flex flex-col flex items-center justify-center px-6 pb-4">
+        <div className="relative w-full">
+          <input
+            id="parentInviteCode"
+            name="parentInviteCode"
+            type="text"
+            required
+            maxLength={5}
+            className={`block w-full rounded-lg border-2 px-3 py-2 pr-10 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 transition-all duration-300 ${
+              showInviteCodeError
+                ? 'border-red-500 focus:border-red-500 focus:ring-0 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
+                : inviteCodeValid === true
+                ? 'border-green-500 focus:ring-green-500 focus:ring-offset-1'
+                : inviteCodeValid === false
+                ? 'border-red-500 focus:ring-red-500 focus:ring-offset-1'
+                : 'border-gray-300 focus:ring-black focus:ring-offset-1'
+            }`}
+            placeholder="Invite Code (Required)"
+            value={formData.parentInviteCode}
+            onChange={handleChange}
+          />
+          {isValidatingCode ? (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin h-5 w-5 border-2 border-gray-300 border-t-purple-600 rounded-full"></div>
+            </div>
+          ) : inviteCodeValid === true ? (
+            <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
+          ) : inviteCodeValid === false ? (
+            <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
+          ) : null}
+        </div>
+        {inviterUsername && inviteCodeValid && (
+          <div className="flex items-center mt-2 text-sm text-green-600">
+            <Gift className="h-4 w-4 mr-1" />
+            <span>Invited by <strong>@{inviterUsername}</strong></span>
+          </div>
+        )}
+        {inviteCodeValid === false && formData.parentInviteCode.length === 5 && (
+          <p className="text-xs text-red-500 mt-1">Invalid invite code</p>
+        )}
+        <p className={`text-xs mt-1 text-center transition-all duration-300 ${
+          showInviteCodeError
+            ? 'text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]'
+            : 'text-gray-500'
+        }`}>
+          Don't have a code? <Link 
+            to="/request-invite" 
+            className={`hover:underline transition-all duration-300 ${
+              showInviteCodeError
+                ? 'text-green-400 drop-shadow-[0_0_10px_rgba(34,197,94,1)] font-semibold'
+                : 'text-purple-600'
+            }`}
+          >
+            Request an invite
+          </Link>
+        </p>
       </div>
 
-      <form className="w-full space-y-4" onSubmit={handleRegister}>
-        {/* Invite Code Field */}
-        <div className="flex flex-col flex items-center justify-center">
-          <div className="relative w-full">
-            <input
-              id="parentInviteCode"
-              name="parentInviteCode"
-              type="text"
-              required
-              maxLength={5}
-              className={`block w-full rounded-lg border px-3 py-2 pr-10 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-offset-1 ${
-                inviteCodeValid === true
-                  ? 'border-green-500 focus:ring-green-500'
-                  : inviteCodeValid === false
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300 focus:ring-black'
-              }`}
-              placeholder="Invite Code (Required)"
-              value={formData.parentInviteCode}
-              onChange={handleChange}
-            />
-            {isValidatingCode ? (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="animate-spin h-5 w-5 border-2 border-gray-300 border-t-purple-600 rounded-full"></div>
-              </div>
-            ) : inviteCodeValid === true ? (
-              <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
-            ) : inviteCodeValid === false ? (
-              <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
-            ) : null}
-          </div>
-          {inviterUsername && inviteCodeValid && (
-            <div className="flex items-center mt-2 text-sm text-green-600">
-              <Gift className="h-4 w-4 mr-1" />
-              <span>Invited by <strong>@{inviterUsername}</strong></span>
-            </div>
-          )}
-          {inviteCodeValid === false && formData.parentInviteCode.length === 5 && (
-            <p className="text-xs text-red-500 mt-1">Invalid invite code</p>
-          )}
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            Don't have a code? <Link to="/request-invite" className="text-purple-600 hover:underline">Request an invite</Link>
-          </p>
-        </div>
+      {/* Conditionally show OR divider and email form */}
+      {showEmailForm && (
+        <>
+          
 
+          <form className="w-full space-y-4" onSubmit={handleRegister}>
         <div className="flex flex-col flex items-center justify-center">
           {/* <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
             Username
@@ -631,10 +683,12 @@ const AuthPage: React.FC = () => {
         </button>
         </div>
       </form>
+        </>
+      )}
 
       <div className="mt-6 text-center text-sm text-slate-600">
         Already have an account?{' '}
-        <Link to="/login" className="font-medium">
+        <Link to="/login" className="font-medium text-blue-700 hover:text-blue-500 hover:underline">
           Sign in
         </Link>
       </div>
@@ -658,7 +712,6 @@ const AuthPage: React.FC = () => {
             onClick={handleClose}
             className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 mr-2" />
             <span>Back</span>
           </button>
           <h2 className="text-xl font-semibold text-gray-900">
