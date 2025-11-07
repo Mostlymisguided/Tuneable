@@ -879,14 +879,76 @@ const CreatorUpload: React.FC = () => {
                   <label className="block text-white font-medium mb-2">
                     Language
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="language"
                     value={formData.language}
                     onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder="en"
-                  />
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">Select language (optional)</option>
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="ru">Russian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese</option>
+                    <option value="ar">Arabic</option>
+                    <option value="hi">Hindi</option>
+                    <option value="tr">Turkish</option>
+                    <option value="pl">Polish</option>
+                    <option value="nl">Dutch</option>
+                    <option value="sv">Swedish</option>
+                    <option value="no">Norwegian</option>
+                    <option value="da">Danish</option>
+                    <option value="fi">Finnish</option>
+                    <option value="el">Greek</option>
+                    <option value="he">Hebrew</option>
+                    <option value="th">Thai</option>
+                    <option value="vi">Vietnamese</option>
+                    <option value="id">Indonesian</option>
+                    <option value="ms">Malay</option>
+                    <option value="cs">Czech</option>
+                    <option value="hu">Hungarian</option>
+                    <option value="ro">Romanian</option>
+                    <option value="uk">Ukrainian</option>
+                    <option value="bg">Bulgarian</option>
+                    <option value="hr">Croatian</option>
+                    <option value="sr">Serbian</option>
+                    <option value="sk">Slovak</option>
+                    <option value="sl">Slovenian</option>
+                    <option value="et">Estonian</option>
+                    <option value="lv">Latvian</option>
+                    <option value="lt">Lithuanian</option>
+                    <option value="ga">Irish</option>
+                    <option value="cy">Welsh</option>
+                    <option value="mt">Maltese</option>
+                    <option value="sw">Swahili</option>
+                    <option value="af">Afrikaans</option>
+                    <option value="sq">Albanian</option>
+                    <option value="az">Azerbaijani</option>
+                    <option value="be">Belarusian</option>
+                    <option value="bn">Bengali</option>
+                    <option value="bs">Bosnian</option>
+                    <option value="ca">Catalan</option>
+                    <option value="eu">Basque</option>
+                    <option value="fa">Persian</option>
+                    <option value="gl">Galician</option>
+                    <option value="is">Icelandic</option>
+                    <option value="mk">Macedonian</option>
+                    <option value="ml">Malayalam</option>
+                    <option value="mr">Marathi</option>
+                    <option value="ne">Nepali</option>
+                    <option value="pa">Punjabi</option>
+                    <option value="si">Sinhala</option>
+                    <option value="ta">Tamil</option>
+                    <option value="te">Telugu</option>
+                    <option value="ur">Urdu</option>
+                    <option value="zu">Zulu</option>
+                  </select>
                 </div>
               </div>
 
