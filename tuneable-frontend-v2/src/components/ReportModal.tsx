@@ -103,30 +103,30 @@ const reportCategoriesByType = {
   ],
   label: [
     {
-      value: 'label_impersonation',
-      label: 'Impersonation',
-      description: 'This label is impersonating another label',
+      value: 'copyright',
+      label: 'Copyright/Rights Infringement',
+      description: 'This label is claiming rights to music they don\'t own or represent',
+      requiresEmail: true,
+      priority: true
+    },
+    {
+      value: 'unauthorized_claim',
+      label: 'Unauthorized Use/False Claim',
+      description: 'Someone is claiming to represent a label they\'re not authorized to represent',
       requiresEmail: false,
       priority: true
     },
     {
       value: 'label_incorrect_info',
       label: 'Incorrect Information',
-      description: 'The label information is incorrect',
-      requiresEmail: false,
-      priority: false
-    },
-    {
-      value: 'label_spam',
-      label: 'Spam',
-      description: 'This label is posting spam content',
+      description: 'Label name, location, contact info, or other details are incorrect',
       requiresEmail: false,
       priority: false
     },
     {
       value: 'inappropriate',
       label: 'Inappropriate Content',
-      description: 'This label is posting inappropriate content',
+      description: 'This label is posting inappropriate, offensive, or harmful content',
       requiresEmail: false,
       priority: false
     },
@@ -214,7 +214,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, reportType, 
   };
 
   const getCopyrightNotice = () => {
-    if (reportType === 'media' && category === 'copyright') {
+    if ((reportType === 'media' || reportType === 'label') && category === 'copyright') {
       return (
         <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-4">
           <div className="flex items-start space-x-3">

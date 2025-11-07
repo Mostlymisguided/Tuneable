@@ -6,6 +6,7 @@ import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import ReportModal from '../components/ReportModal';
 
 interface Label {
   _id: string;
@@ -1049,71 +1050,14 @@ const LabelProfile: React.FC = () => {
       </div>
 
       {/* Report Modal */}
-      {showReportModal && label && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-purple-500/20">
-            {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-br from-gray-900 to-gray-800 border-b border-gray-700 p-6 flex items-center justify-between z-10">
-              <div className="flex items-center space-x-3">
-                <Flag className="w-6 h-6 text-purple-400" />
-                <h2 className="text-2xl font-bold text-white">Report Label</h2>
-              </div>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              toast.info('Report functionality coming soon. Please contact support directly.');
-              setShowReportModal(false);
-            }} className="p-6 space-y-6">
-              {/* Label Info */}
-              <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400">Reporting:</p>
-                <p className="text-white font-medium">{label.name}</p>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-white font-medium mb-2">
-                  Description *
-                </label>
-                <textarea
-                  placeholder="Please provide details about the issue..."
-                  rows={5}
-                  maxLength={2000}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Maximum 2000 characters
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
-                <button
-                  type="button"
-                  onClick={() => setShowReportModal(false)}
-                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-                >
-                  <Flag className="w-4 h-4" />
-                  <span>Submit Report</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {label && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reportType="label"
+          targetId={label._id}
+          targetTitle={label.name}
+        />
       )}
     </div>
   );

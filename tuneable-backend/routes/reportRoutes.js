@@ -360,7 +360,7 @@ router.post('/labels/:labelId/report', authMiddleware, async (req, res) => {
     }
 
     // Validate category (label categories)
-    const validCategories = ['label_impersonation', 'label_incorrect_info', 'label_spam', 'inappropriate', 'other'];
+    const validCategories = ['copyright', 'unauthorized_claim', 'label_incorrect_info', 'inappropriate', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -411,17 +411,20 @@ router.post('/labels/:labelId/report', authMiddleware, async (req, res) => {
     // Send email notification to admin
     try {
       const categoryLabels = {
-        label_impersonation: 'Impersonation',
+        copyright: 'Copyright/Rights Infringement',
+        unauthorized_claim: 'Unauthorized Use/False Claim',
         label_incorrect_info: 'Incorrect Information',
-        label_spam: 'Spam',
         inappropriate: 'Inappropriate Content',
         other: 'Other Issue'
       };
 
+      // Determine priority (copyright and unauthorized_claim are high priority)
+      const isPriority = ['copyright', 'unauthorized_claim'].includes(category);
+
       const emailHtml = `
         <h2>New Label Report Submitted</h2>
-        <p><strong>Priority:</strong> ${category === 'label_impersonation' ? '🔴 HIGH' : '🟡 NORMAL'}</p>
-        <p><strong>Category:</strong> ${categoryLabels[category]}</p>
+        <p><strong>Priority:</strong> ${isPriority ? '🔴 HIGH' : '🟡 NORMAL'}</p>
+        <p><strong>Category:</strong> ${categoryLabels[category] || category}</p>
         <p><strong>Reported Label:</strong> ${targetLabel.name} (${targetLabel.slug || targetLabel.uuid})</p>
         <p><strong>Reported By:</strong> @${report.reportedBy.username} (${report.reportedBy.uuid})</p>
         ${contactEmail ? `<p><strong>Contact Email:</strong> ${contactEmail}</p>` : ''}
@@ -432,7 +435,7 @@ router.post('/labels/:labelId/report', authMiddleware, async (req, res) => {
 
       await sendEmail({
         to: process.env.ADMIN_EMAIL || 'mostlymisguided@icloud.com',
-        subject: `${category === 'label_impersonation' ? '🔴 URGENT: ' : ''}Label Report - ${categoryLabels[category]}`,
+        subject: `${isPriority ? '🔴 URGENT: ' : ''}Label Report - ${categoryLabels[category] || category}`,
         html: emailHtml
       });
     } catch (emailError) {

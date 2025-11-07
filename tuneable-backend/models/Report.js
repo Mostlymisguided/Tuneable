@@ -52,14 +52,15 @@ const reportSchema = new mongoose.Schema({
     type: String,
     // Media categories: copyright, incorrect_info, incorrect_tags, inappropriate, duplicate, other
     // User categories: harassment, spam, impersonation, inappropriate, copyright, other
-    // Label categories: impersonation, incorrect_info, spam, other
+    // Label categories: copyright, label_impersonation, unauthorized_claim, label_incorrect_info, scam_fraud, inappropriate, other
     enum: [
       // Media categories
       'copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other',
       // User categories
       'harassment', 'spam', 'impersonation',
-      // Label categories (reuse some)
-      'label_impersonation', 'label_incorrect_info', 'label_spam'
+      // Label categories (reuse some, add new ones)
+      'label_impersonation', 'label_incorrect_info', 'label_spam', 'unauthorized_claim', 'scam_fraud'
+      // Note: 'copyright' and 'inappropriate' are reused from media/user categories, 'label_spam' kept for backward compatibility
     ],
     required: true
   },
