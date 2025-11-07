@@ -30,10 +30,28 @@ if (isR2Configured()) {
 
 // Get public URL for uploaded file
 const getPublicUrl = (key) => {
-  if (process.env.R2_PUBLIC_URL) {
-    return `${process.env.R2_PUBLIC_URL}/${key}`;
+  if (!key) {
+    console.error('❌ getPublicUrl called with empty/null key');
+    throw new Error('File key is required to generate public URL');
   }
-  // Fallback to local path if R2 not configured
+  
+  // If R2 is configured, we must have R2_PUBLIC_URL set
+  if (isR2Configured()) {
+    if (!process.env.R2_PUBLIC_URL) {
+      console.error('❌ R2_PUBLIC_URL is not set but R2 is configured!');
+      throw new Error('R2_PUBLIC_URL environment variable is required when using R2 storage');
+    }
+    // Remove leading slash from key if present to avoid double slashes
+    const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+    // Remove trailing slash from R2_PUBLIC_URL if present
+    const baseUrl = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
+    const fullUrl = `${baseUrl}/${cleanKey}`;
+    console.log(`🔗 Generated public URL: ${fullUrl} (from key: ${key})`);
+    return fullUrl;
+  }
+  
+  // Fallback to local path if R2 not configured (development only)
+  console.warn('⚠️ R2 not configured - using local path fallback');
   return `/uploads/${key}`;
 };
 

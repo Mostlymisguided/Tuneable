@@ -373,9 +373,16 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
         return res.status(500).json({ error: 'File upload error: key not found' });
       }
       uploadedFileKey = req.file.key;
-      profilePictureUrl = getPublicUrl(uploadedFileKey);
-      console.log(`📸 Uploaded label profile picture: ${profilePictureUrl}`);
-      console.log(`📸 File key: ${uploadedFileKey}`);
+      // Always use getPublicUrl to get full URL - it will throw error if R2_PUBLIC_URL not set
+      try {
+        profilePictureUrl = getPublicUrl(uploadedFileKey);
+        console.log(`📸 Uploaded label profile picture: ${profilePictureUrl}`);
+        console.log(`📸 File key: ${uploadedFileKey}`);
+        console.log(`📸 R2_PUBLIC_URL: ${process.env.R2_PUBLIC_URL}`);
+      } catch (error) {
+        console.error('❌ Error generating public URL:', error.message);
+        return res.status(500).json({ error: 'Failed to generate profile picture URL', details: error.message });
+      }
     }
 
     // Set verification status based on user type
@@ -444,15 +451,26 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
         await s3Client.send(deleteCommand);
 
         // Update label with new profile picture URL
-        const newProfilePictureUrl = getPublicUrl(newKey);
-        label.profilePicture = newProfilePictureUrl;
-        await label.save();
+        // Always use getPublicUrl to ensure full URL is saved
+        try {
+          const newProfilePictureUrl = getPublicUrl(newKey);
+          label.profilePicture = newProfilePictureUrl;
+          await label.save();
 
-        console.log(`📸 Updated label profile picture URL: ${newProfilePictureUrl}`);
-        console.log(`📸 New file key: ${newKey}`);
+          console.log(`📸 Updated label profile picture URL: ${newProfilePictureUrl}`);
+          console.log(`📸 New file key: ${newKey}`);
+          console.log(`📸 Saved to database: ${label.profilePicture}`);
+        } catch (urlError) {
+          console.error('❌ Error generating public URL after file rename:', urlError.message);
+          // If URL generation fails, try to generate URL from newKey manually
+          // This should not happen if R2_PUBLIC_URL is set, but just in case
+          throw urlError; // Re-throw to be caught by outer catch
+        }
       } catch (error) {
         console.error('❌ Error updating label profile picture key:', error);
         // Don't fail the request if file rename fails - the original URL still works
+        // But log a warning that the URL might not be in the expected format
+        console.warn('⚠️ Label created but profile picture URL might not be in expected format');
       }
     }
 
@@ -517,16 +535,24 @@ router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('
       console.error('❌ req.file.key is missing! req.file:', req.file);
       return res.status(500).json({ error: 'File upload error: key not found' });
     }
-    const profilePicturePath = getPublicUrl(req.file.key);
-
-    console.log(`📸 Saving label profile picture: ${profilePicturePath} for label ${label.name}`);
-    console.log(`📸 File key: ${req.file.key}`);
-    console.log(`📸 R2_PUBLIC_URL: ${process.env.R2_PUBLIC_URL}`);
+    
+    // Always use getPublicUrl to get full URL - it will throw error if R2_PUBLIC_URL not set
+    let profilePicturePath;
+    try {
+      profilePicturePath = getPublicUrl(req.file.key);
+      console.log(`📸 Saving label profile picture: ${profilePicturePath} for label ${label.name}`);
+      console.log(`📸 File key: ${req.file.key}`);
+      console.log(`📸 R2_PUBLIC_URL: ${process.env.R2_PUBLIC_URL}`);
+    } catch (error) {
+      console.error('❌ Error generating public URL:', error.message);
+      return res.status(500).json({ error: 'Failed to generate profile picture URL', details: error.message });
+    }
 
     label.profilePicture = profilePicturePath;
     await label.save();
 
     console.log('✅ Label profile picture updated:', label.profilePicture);
+    console.log('✅ Saved URL in database:', label.profilePicture);
     res.json({ message: 'Label profile picture updated successfully', label });
   } catch (error) {
     console.error('Error updating label profile picture:', error.message);
