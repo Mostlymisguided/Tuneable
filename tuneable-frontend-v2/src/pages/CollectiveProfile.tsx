@@ -582,7 +582,7 @@ const CollectiveProfile: React.FC = () => {
               {collective.stats.globalCollectiveAggregate !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-6 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">£{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
+                  <div className="text-2xl font-bold text-white">{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
                   <div className="text-sm text-gray-300">Total Bids</div>
                 </div>
               )}
@@ -675,7 +675,7 @@ const CollectiveProfile: React.FC = () => {
                             {release.title}
                           </Link>
                           <p className="text-gray-400 text-sm truncate">{release.artist}</p>
-                          <p className="text-purple-400 text-sm">£{penceToPounds(release.stats.totalBidAmount)}</p>
+                          <p className="text-purple-400 text-sm">{penceToPounds(release.stats.totalBidAmount)}</p>
                         </div>
                       </div>
                     ))}
@@ -710,7 +710,7 @@ const CollectiveProfile: React.FC = () => {
                           <p className="text-gray-400 text-sm truncate">{media.artist}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-purple-400 font-medium">£{penceToPounds(media.stats.totalBidAmount)}</p>
+                          <p className="text-purple-400 font-medium">{penceToPounds(media.stats.totalBidAmount)}</p>
                           <p className="text-gray-400 text-sm">{media.stats.bidCount} bids</p>
                         </div>
                       </div>
@@ -808,7 +808,7 @@ const CollectiveProfile: React.FC = () => {
                       <p className="text-gray-400 text-sm mb-2 truncate">{release.artist}</p>
                       <div className="flex justify-between items-center">
                         <span className="text-purple-400 font-medium">
-                          £{penceToPounds(release.stats.totalBidAmount)}
+                          {penceToPounds(release.stats.totalBidAmount)}
                         </span>
                         <span className="text-gray-400 text-sm">
                           {release.stats.bidCount} bids
