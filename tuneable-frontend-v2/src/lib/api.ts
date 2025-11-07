@@ -667,6 +667,12 @@ export const labelAPI = {
     return response.data;
   },
 
+  // Get label team roster (owners/admins/members)
+  getTeam: async (slug: string) => {
+    const response = await api.get(`/labels/${slug}/team`);
+    return response.data;
+  },
+
   // Create label (authenticated)
   createLabel: async (labelData: FormData | {
     name: string;

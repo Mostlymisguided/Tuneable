@@ -72,6 +72,83 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get label team (public)
+router.get('/:slug/team', async (req, res) => {
+  try {
+    const label = await Label.findBySlug(req.params.slug)
+      .populate({
+        path: 'admins.userId',
+        select: 'username profilePic email uuid'
+      })
+      .lean();
+
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    const adminMembers = (label.admins || []).map((admin) => {
+      const user = admin.userId || {};
+      const userId = typeof user === 'object' ? (user._id || user.uuid) : admin.userId;
+      return {
+        userId: user,
+        username: user.username,
+        profilePic: user.profilePic,
+        email: user.email,
+        role: admin.role,
+        joinedAt: admin.addedAt,
+        addedBy: admin.addedBy,
+        _id: userId
+      };
+    });
+
+    const adminUserIds = new Set(adminMembers.map((member) => (member._id ? member._id.toString() : null)));
+
+    const affiliatedUsers = await User.find({
+      'labelAffiliations.labelId': label._id,
+      'labelAffiliations.status': 'active'
+    }).select('username profilePic email uuid labelAffiliations');
+
+    const affiliationMembers = [];
+    affiliatedUsers.forEach((user) => {
+      user.labelAffiliations
+        .filter((affiliation) => affiliation.labelId.toString() === label._id.toString())
+        .forEach((affiliation) => {
+          const userId = user._id?.toString() || user.uuid;
+          if (adminUserIds.has(userId)) {
+            return;
+          }
+          affiliationMembers.push({
+            userId: {
+              _id: user._id,
+              uuid: user.uuid,
+              username: user.username,
+              profilePic: user.profilePic,
+            },
+            username: user.username,
+            profilePic: user.profilePic,
+            email: user.email,
+            role: affiliation.role || 'member',
+            joinedAt: affiliation.joinedAt,
+            addedBy: affiliation.invitedBy,
+            _id: userId,
+          });
+        });
+    });
+
+    const team = [...adminMembers, ...affiliationMembers];
+
+    res.json({
+      team,
+      owners: adminMembers.filter((member) => member.role === 'owner'),
+      admins: adminMembers.filter((member) => member.role === 'admin'),
+      members: affiliationMembers,
+    });
+  } catch (error) {
+    console.error('Error fetching label team:', error);
+    res.status(500).json({ error: 'Failed to fetch label team', details: error.message });
+  }
+});
+
 // Get label by slug (public)
 router.get('/:slug', async (req, res) => {
   try {

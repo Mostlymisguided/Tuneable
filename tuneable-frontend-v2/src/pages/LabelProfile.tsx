@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
+import LabelTeamTable, { LabelTeamMember } from '../components/labels/LabelTeamTable';
 
 interface Label {
   _id: string;
@@ -81,7 +82,9 @@ const LabelProfile: React.FC = () => {
   const [topMedia, setTopMedia] = useState<Media[]>([]);
   const [artists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media' | 'team'>('overview');
+  const [teamMembers, setTeamMembers] = useState<LabelTeamMember[]>([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
@@ -201,6 +204,25 @@ const LabelProfile: React.FC = () => {
       // Handle error (label not found, etc.)
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (slug) {
+      void fetchLabelTeam(slug);
+    }
+  }, [slug]);
+
+  const fetchLabelTeam = async (labelSlug: string) => {
+    try {
+      setIsLoadingTeam(true);
+      const response = await labelAPI.getTeam(labelSlug);
+      setTeamMembers(response.team || response.members || []);
+    } catch (error) {
+      console.error('Error fetching label team:', error);
+      setTeamMembers([]);
+    } finally {
+      setIsLoadingTeam(false);
     }
   };
 
@@ -572,7 +594,8 @@ const LabelProfile: React.FC = () => {
               {[
                 { id: 'overview', label: 'Overview' },
                 { id: 'artists', label: 'Artists' },
-                { id: 'media', label: 'Releases' }
+                { id: 'media', label: 'Releases' },
+                { id: 'team', label: 'Team' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -763,6 +786,26 @@ const LabelProfile: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-gray-400">No releases found.</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'team' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-2">Label Team</h3>
+                <p className="text-sm text-gray-300">
+                  Owners, administrators, and members who can manage this label on Tuneable.
+                </p>
+              </div>
+
+              {isLoadingTeam ? (
+                <div className="flex items-center justify-center py-12 text-gray-300">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading team roster...
+                </div>
+              ) : (
+                <LabelTeamTable members={teamMembers} isEditable={canEditLabel(label)} />
               )}
             </div>
           )}
