@@ -143,12 +143,19 @@ const mediaSchema = new mongoose.Schema({
     percentage: { type: Number, min: 0, max: 100, required: true },
     role: { 
       type: String, 
-      enum: ['creator', 'aux'],
+      enum: ['creator', 'aux', 'primary'],
       default: 'creator'
     },
     verified: { type: Boolean, default: false },
+    verifiedAt: { type: Date, default: null },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    verificationMethod: { type: String, default: null },
+    verificationNotes: { type: String, default: null },
+    verificationSource: { type: String, default: null },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who added this ownership claim
     addedAt: { type: Date, default: Date.now },
+    lastUpdatedAt: { type: Date, default: Date.now },
+    lastUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     _id: false
   }],
   explicit: { type: Boolean, default: false }, // Explicit content flag
@@ -274,6 +281,21 @@ const mediaSchema = new mongoose.Schema({
       field: { type: String, required: true },
       oldValue: { type: mongoose.Schema.Types.Mixed },
       newValue: { type: mongoose.Schema.Types.Mixed }
+    }],
+    _id: false
+  }],
+
+  // Ownership-specific audit trail
+  ownershipHistory: [{
+    action: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    note: { type: String, default: null },
+    diff: [{
+      field: { type: String, required: true },
+      from: { type: mongoose.Schema.Types.Mixed, default: null },
+      to: { type: mongoose.Schema.Types.Mixed, default: null },
+      _id: false
     }],
     _id: false
   }]
@@ -510,7 +532,7 @@ mediaSchema.methods.getPendingCreators = function() {
 };
 
 // Schema method: Add a media owner
-mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator', addedBy) {
+mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator', addedBy, options = {}) {
   // Check if user is already an owner
   const existingOwner = this.mediaOwners.find(owner => 
     owner.userId.toString() === userId.toString()
@@ -526,13 +548,52 @@ mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator
     throw new Error('Total ownership percentage cannot exceed 100%');
   }
   
+  const now = new Date();
+  const verifiedAt = options.verifiedAt ? new Date(options.verifiedAt) : null;
+  const verifiedBy = options.verifiedBy ? mongoose.Types.ObjectId(options.verifiedBy) : null;
+  const actorId = options.addedBy
+    ? mongoose.Types.ObjectId(options.addedBy)
+    : (addedBy ? mongoose.Types.ObjectId(addedBy) : mongoose.Types.ObjectId(userId));
+
   this.mediaOwners.push({
     userId,
     percentage,
     role,
-    verified: false,
-    addedBy: addedBy || userId,
-    addedAt: new Date()
+    verified: options.verified === true || !!verifiedAt || !!verifiedBy,
+    verifiedAt,
+    verifiedBy,
+    verificationMethod: options.verificationMethod || null,
+    verificationNotes: options.verificationNotes || null,
+    verificationSource: options.verificationSource || null,
+    addedBy: actorId,
+    addedAt: options.addedAt ? new Date(options.addedAt) : now,
+    lastUpdatedAt: now,
+    lastUpdatedBy: actorId
+  });
+
+  if (!Array.isArray(this.ownershipHistory)) {
+    this.ownershipHistory = [];
+  }
+
+  this.ownershipHistory.push({
+    action: 'Added media owner',
+    timestamp: now,
+    actor: actorId,
+    note: options.note || null,
+    diff: [{
+      field: `owner:${userId.toString()}`,
+      from: null,
+      to: {
+        userId: userId.toString(),
+        percentage,
+        verified: options.verified === true || !!verifiedAt || !!verifiedBy,
+        verifiedAt,
+        verifiedBy: verifiedBy ? verifiedBy.toString() : null,
+        verificationMethod: options.verificationMethod || null,
+        verificationNotes: options.verificationNotes || null,
+        verificationSource: options.verificationSource || null
+      }
+    }]
   });
   
   return this;
@@ -571,6 +632,174 @@ mediaSchema.methods.updateOwnerPercentage = function(userId, newPercentage) {
   }
   
   owner.percentage = newPercentage;
+  owner.lastUpdatedAt = new Date();
+  return this;
+};
+
+mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
+  if (!Array.isArray(owners)) {
+    throw new Error('Owners must be an array');
+  }
+
+  const now = new Date();
+  const actorObjectId = actorId ? mongoose.Types.ObjectId(actorId) : null;
+
+  const oldOwnersSnapshot = (this.mediaOwners || []).map(owner => ({
+    userId: owner.userId?.toString(),
+    percentage: owner.percentage,
+    verified: owner.verified,
+    verifiedAt: owner.verifiedAt,
+    verifiedBy: owner.verifiedBy ? owner.verifiedBy.toString() : null,
+    verificationMethod: owner.verificationMethod || null,
+    verificationNotes: owner.verificationNotes || null,
+    verificationSource: owner.verificationSource || null
+  }));
+
+  const seen = new Set();
+  let total = 0;
+
+  const formattedOwners = owners.map(rawOwner => {
+    const userId = rawOwner.userId || rawOwner.owner?._id || rawOwner.owner?.id || rawOwner.owner?.uuid;
+    if (!userId) {
+      throw new Error('Each owner entry must include a userId');
+    }
+
+    const userIdStr = userId.toString();
+    if (seen.has(userIdStr)) {
+      throw new Error('Duplicate owner entries are not permitted');
+    }
+    seen.add(userIdStr);
+
+    const percentage = Number(
+      rawOwner.ownershipPercentage ??
+      rawOwner.percentage ??
+      0
+    );
+
+    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+      throw new Error('Ownership percentage must be between 0 and 100');
+    }
+
+    total += percentage;
+
+    const verifiedAt = rawOwner.verifiedAt ? new Date(rawOwner.verifiedAt) : null;
+    const verifiedBy = rawOwner.verifiedBy ? mongoose.Types.ObjectId(rawOwner.verifiedBy) : null;
+
+    const derivedAddedBy = rawOwner.addedBy
+      ? mongoose.Types.ObjectId(rawOwner.addedBy)
+      : (actorObjectId || mongoose.Types.ObjectId(userId));
+
+    return {
+      userId: mongoose.Types.ObjectId(userId),
+      percentage,
+      role: rawOwner.role || 'creator',
+      verified: rawOwner.verified === true || !!verifiedAt || !!verifiedBy,
+      verifiedAt,
+      verifiedBy,
+      verificationMethod: rawOwner.verificationMethod || null,
+      verificationNotes: rawOwner.verificationNotes || null,
+      verificationSource: rawOwner.verificationSource || null,
+      addedBy: derivedAddedBy,
+      addedAt: rawOwner.addedAt ? new Date(rawOwner.addedAt) : now,
+      lastUpdatedAt: now,
+      lastUpdatedBy: actorObjectId || derivedAddedBy
+    };
+  });
+
+  if (total > 100.001) {
+    throw new Error('Total ownership percentage cannot exceed 100%');
+  }
+
+  const oldOwnersMap = new Map();
+  oldOwnersSnapshot.forEach(owner => {
+    if (owner.userId) {
+      oldOwnersMap.set(owner.userId, owner);
+    }
+  });
+
+  const diff = [];
+
+  formattedOwners.forEach(owner => {
+    const userIdStr = owner.userId.toString();
+    const previous = oldOwnersMap.get(userIdStr);
+
+    const newRecord = {
+      userId: userIdStr,
+      percentage: owner.percentage,
+      verified: owner.verified,
+      verifiedAt: owner.verifiedAt,
+      verifiedBy: owner.verifiedBy ? owner.verifiedBy.toString() : null,
+      verificationMethod: owner.verificationMethod,
+      verificationNotes: owner.verificationNotes,
+      verificationSource: owner.verificationSource
+    };
+
+    if (!previous) {
+      diff.push({
+        field: `owner:${userIdStr}`,
+        from: null,
+        to: newRecord
+      });
+    } else {
+      const hasChanged = JSON.stringify(previous) !== JSON.stringify(newRecord);
+      if (hasChanged) {
+        diff.push({
+          field: `owner:${userIdStr}`,
+          from: previous,
+          to: newRecord
+        });
+      }
+      oldOwnersMap.delete(userIdStr);
+    }
+  });
+
+  // Remaining owners in map were removed
+  oldOwnersMap.forEach((previous, userIdStr) => {
+    diff.push({
+      field: `owner:${userIdStr}`,
+      from: previous,
+      to: null
+    });
+  });
+
+  this.mediaOwners = formattedOwners;
+  this.markModified('mediaOwners');
+
+  if (!Array.isArray(this.editHistory)) {
+    this.editHistory = [];
+  }
+
+  this.editHistory.push({
+    editedBy: actorObjectId,
+    editedAt: now,
+    changes: [{
+      field: 'mediaOwners',
+      oldValue: oldOwnersSnapshot,
+      newValue: formattedOwners.map(owner => ({
+        userId: owner.userId.toString(),
+        percentage: owner.percentage,
+        verified: owner.verified,
+        verifiedAt: owner.verifiedAt,
+        verifiedBy: owner.verifiedBy ? owner.verifiedBy.toString() : null,
+        verificationMethod: owner.verificationMethod,
+        verificationNotes: owner.verificationNotes,
+        verificationSource: owner.verificationSource
+      }))
+    }]
+  });
+
+  if (!Array.isArray(this.ownershipHistory)) {
+    this.ownershipHistory = [];
+  }
+
+  this.ownershipHistory.push({
+    action: 'Updated ownership allocation',
+    timestamp: now,
+    actor: actorObjectId,
+    note: note || null,
+    diff
+  });
+
   return this;
 };
 

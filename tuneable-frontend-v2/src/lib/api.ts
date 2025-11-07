@@ -407,6 +407,33 @@ export const mediaAPI = {
     return response.data;
   },
 
+  getOwnership: async (mediaId: string) => {
+    const response = await api.get(`/media/${mediaId}/ownership`);
+    return response.data;
+  },
+
+  updateOwnership: async (
+    mediaId: string,
+    payload: {
+      owners: Array<{
+        userId: string;
+        ownershipPercentage: number;
+        role?: string;
+        verifiedAt?: string | null;
+        verifiedBy?: string | null;
+        verificationMethod?: string | null;
+        verificationNotes?: string | null;
+        verificationSource?: string | null;
+        addedAt?: string | null;
+        addedBy?: string | null;
+      }>;
+      note?: string;
+    }
+  ) => {
+    const response = await api.put(`/media/${mediaId}/ownership`, payload);
+    return response.data;
+  },
+
   // Place global bid (chart support)
   placeGlobalBid: async (mediaId: string, amount: number) => {
     const response = await api.post(`/media/${mediaId}/global-bid`, { amount });
@@ -870,6 +897,12 @@ export const claimAPI = {
   getAllClaims: async (status?: string) => {
     const params = status ? { status } : {};
     const response = await api.get('/claims/all', { params });
+    return response.data;
+  },
+
+  // Admin only
+  getClaimsForMedia: async (mediaId: string) => {
+    const response = await api.get(`/claims/media/${mediaId}`);
     return response.data;
   },
   

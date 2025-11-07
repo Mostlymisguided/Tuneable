@@ -5,6 +5,8 @@ const Media = require('../models/Media');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const { canEditMedia } = require('../utils/permissionHelpers');
+const { isValidObjectId } = require('../utils/validators');
 const { sendClaimNotification, sendOwnershipNotification, sendClaimStatusNotification } = require('../utils/emailService');
 const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
 
@@ -100,6 +102,68 @@ router.get('/my-claims', authMiddleware, async (req, res) => {
   }
 });
 
+// Get claims for a specific media (admin/media editors only)
+router.get('/media/:mediaId', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!canEditMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to view claims for this media' });
+    }
+
+    const claims = await Claim.find({ mediaId })
+      .populate('userId', 'username email profilePic uuid')
+      .populate('reviewedBy', 'username email profilePic uuid')
+      .sort({ submittedAt: -1 });
+
+    const formattedClaims = claims.map(claim => {
+      const claimant = claim.userId ? {
+        _id: claim.userId._id,
+        username: claim.userId.username,
+        email: claim.userId.email,
+        profilePic: claim.userId.profilePic,
+        uuid: claim.userId.uuid
+      } : null;
+
+      const reviewer = claim.reviewedBy ? {
+        _id: claim.reviewedBy._id,
+        username: claim.reviewedBy.username,
+        email: claim.reviewedBy.email,
+        profilePic: claim.reviewedBy.profilePic,
+        uuid: claim.reviewedBy.uuid
+      } : null;
+
+      return {
+        _id: claim._id,
+        mediaId: claim.mediaId?.toString?.() || claim.mediaId,
+        status: claim.status,
+        proofText: claim.proofText,
+        proofFiles: claim.proofFiles || [],
+        submittedAt: claim.submittedAt,
+        updatedAt: claim.updatedAt,
+        reviewNotes: claim.reviewNotes || null,
+        reviewedAt: claim.reviewedAt || null,
+        claimant,
+        reviewer
+      };
+    });
+
+    res.json({ claims: formattedClaims });
+  } catch (error) {
+    console.error('Error fetching claims for media:', error);
+    res.status(500).json({ error: 'Failed to fetch claims for media' });
+  }
+});
+
 // Admin: Get all claims
 router.get('/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -166,7 +230,21 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
           // Add ownership with default percentage (admin can specify in request)
           const ownershipPercentage = req.body.ownershipPercentage || 50; // Default 50%
           try {
-            media.addMediaOwner(claim.userId, ownershipPercentage, 'primary', req.user._id);
+            media.addMediaOwner(
+              claim.userId,
+              ownershipPercentage,
+              'primary',
+              req.user._id,
+              {
+                verified: true,
+                verifiedAt: new Date(),
+                verifiedBy: req.user._id,
+                verificationMethod: 'Claim approval',
+                verificationNotes: reviewNotes || null,
+                verificationSource: 'claim_approval',
+                note: reviewNotes || null
+              }
+            );
 
             // Add to edit history
             media.editHistory.push({

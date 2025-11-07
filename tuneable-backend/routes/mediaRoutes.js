@@ -4,6 +4,7 @@ const path = require('path');
 const router = express.Router();
 const Media = require('../models/Media');
 const Comment = require('../models/Comment');
+const Claim = require('../models/Claim');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
@@ -13,6 +14,92 @@ const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../ut
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const MetadataExtractor = require('../utils/metadataExtractor');
+const { canUploadMedia, canEditMedia } = require('../utils/permissionHelpers');
+
+const toPlainUserReference = (user) => {
+  if (!user) return null;
+
+  if (typeof user === 'string') {
+    return {
+      _id: user,
+      username: null,
+      email: null,
+      profilePic: null,
+      uuid: null
+    };
+  }
+
+  if (user instanceof Date) {
+    return null;
+  }
+
+  if (typeof user === 'object' && user !== null) {
+    if (user._id || user.id || user.uuid) {
+      const id = user._id || user.id || user.uuid;
+      return {
+        _id: id && id.toString ? id.toString() : id,
+        username: user.username || null,
+        email: user.email || null,
+        profilePic: user.profilePic || null,
+        uuid: user.uuid || null
+      };
+    }
+
+    if (typeof user.toString === 'function') {
+      return {
+        _id: user.toString(),
+        username: null,
+        email: null,
+        profilePic: null,
+        uuid: null
+      };
+    }
+  }
+
+  return null;
+};
+
+const buildOwnershipResponse = (media) => {
+  const owners = (media.mediaOwners || []).map(owner => {
+    const userRef = toPlainUserReference(owner.userId);
+    const verifiedByRef = toPlainUserReference(owner.verifiedBy);
+    const addedByRef = toPlainUserReference(owner.addedBy);
+    const lastUpdatedByRef = toPlainUserReference(owner.lastUpdatedBy);
+
+    return {
+      userId: userRef?._id || (owner.userId && owner.userId.toString ? owner.userId.toString() : owner.userId),
+      ownershipPercentage: owner.percentage,
+      role: owner.role,
+      verified: owner.verified,
+      verifiedAt: owner.verifiedAt,
+      verifiedBy: verifiedByRef,
+      verificationMethod: owner.verificationMethod || null,
+      verificationNotes: owner.verificationNotes || null,
+      verificationSource: owner.verificationSource || null,
+      addedBy: addedByRef,
+      addedAt: owner.addedAt || null,
+      lastUpdatedAt: owner.lastUpdatedAt || null,
+      lastUpdatedBy: lastUpdatedByRef,
+      owner: userRef
+    };
+  });
+
+  const history = (media.ownershipHistory || []).map(entry => ({
+    action: entry.action,
+    timestamp: entry.timestamp,
+    actor: toPlainUserReference(entry.actor),
+    summary: entry.note || null,
+    diff: Array.isArray(entry.diff)
+      ? entry.diff.map(diffEntry => ({
+          field: diffEntry.field,
+          from: diffEntry.from,
+          to: diffEntry.to
+        }))
+      : []
+  }));
+
+  return { owners, history };
+};
 
 const LANGUAGE_NAMES = {
   en: 'English',
@@ -254,7 +341,6 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const { canUploadMedia } = require('../utils/permissionHelpers');
     if (!canUploadMedia(user)) {
       return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
@@ -450,8 +536,15 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         percentage: 100,
         role: 'creator',
         verified: true,
+        verifiedAt: new Date(),
+        verifiedBy: userId,
+        verificationMethod: 'Self-upload',
+        verificationNotes: null,
+        verificationSource: 'upload',
         addedBy: userId,
-        addedAt: new Date()
+        addedAt: new Date(),
+        lastUpdatedAt: new Date(),
+        lastUpdatedBy: userId
       }]
     });
     
@@ -1017,6 +1110,141 @@ router.get('/:mediaId/profile', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/:mediaId/ownership
+// @desc    Get ownership overview for a media item
+// @access  Private (admins, media owners, or verified creators linked to the media)
+router.get('/:mediaId/ownership', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(mediaId)
+      .populate([
+        { path: 'mediaOwners.userId', select: 'username email profilePic uuid' },
+        { path: 'mediaOwners.verifiedBy', select: 'username email profilePic uuid' },
+        { path: 'mediaOwners.addedBy', select: 'username email profilePic uuid' },
+        { path: 'mediaOwners.lastUpdatedBy', select: 'username email profilePic uuid' },
+        { path: 'ownershipHistory.actor', select: 'username email profilePic uuid' }
+      ]);
+
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!canEditMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to view ownership for this media' });
+    }
+
+    const { owners, history } = buildOwnershipResponse(media);
+
+    const claims = await Claim.find({ mediaId })
+      .populate('userId', 'username email profilePic uuid')
+      .populate('reviewedBy', 'username email profilePic uuid')
+      .sort({ submittedAt: -1 });
+
+    const formattedClaims = claims.map(claim => ({
+      _id: claim._id,
+      mediaId: claim.mediaId?.toString?.() || claim.mediaId,
+      status: claim.status,
+      proofText: claim.proofText,
+      proofFiles: claim.proofFiles || [],
+      submittedAt: claim.submittedAt,
+      updatedAt: claim.updatedAt,
+      reviewNotes: claim.reviewNotes || null,
+      reviewedAt: claim.reviewedAt || null,
+      claimant: toPlainUserReference(claim.userId),
+      reviewer: toPlainUserReference(claim.reviewedBy)
+    }));
+
+    res.json({
+      owners,
+      claims: formattedClaims,
+      history
+    });
+  } catch (error) {
+    console.error('Error fetching media ownership:', error);
+    res.status(500).json({ error: 'Failed to load ownership data', details: error.message });
+  }
+});
+
+// @route   PUT /api/media/:mediaId/ownership
+// @desc    Update ownership configuration for a media item
+// @access  Private (admins, media owners, or verified creators linked to the media)
+router.put('/:mediaId/ownership', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { owners, note } = req.body || {};
+
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    if (!Array.isArray(owners) || owners.length === 0) {
+      return res.status(400).json({ error: 'At least one ownership entry is required' });
+    }
+
+    const media = await Media.findById(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!canEditMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to update ownership for this media' });
+    }
+
+    try {
+      media.replaceMediaOwners(owners, req.user._id, note);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    await media.save();
+
+    const refreshedMedia = await Media.findById(mediaId)
+      .populate([
+        { path: 'mediaOwners.userId', select: 'username email profilePic uuid' },
+        { path: 'mediaOwners.verifiedBy', select: 'username email profilePic uuid' },
+        { path: 'mediaOwners.addedBy', select: 'username email profilePic uuid' },
+        { path: 'mediaOwners.lastUpdatedBy', select: 'username email profilePic uuid' },
+        { path: 'ownershipHistory.actor', select: 'username email profilePic uuid' }
+      ]);
+
+    const { owners: updatedOwners, history } = buildOwnershipResponse(refreshedMedia);
+
+    const claims = await Claim.find({ mediaId })
+      .populate('userId', 'username email profilePic uuid')
+      .populate('reviewedBy', 'username email profilePic uuid')
+      .sort({ submittedAt: -1 });
+
+    const formattedClaims = claims.map(claim => ({
+      _id: claim._id,
+      mediaId: claim.mediaId?.toString?.() || claim.mediaId,
+      status: claim.status,
+      proofText: claim.proofText,
+      proofFiles: claim.proofFiles || [],
+      submittedAt: claim.submittedAt,
+      updatedAt: claim.updatedAt,
+      reviewNotes: claim.reviewNotes || null,
+      reviewedAt: claim.reviewedAt || null,
+      claimant: toPlainUserReference(claim.userId),
+      reviewer: toPlainUserReference(claim.reviewedBy)
+    }));
+
+    res.json({
+      message: 'Ownership updated successfully',
+      owners: updatedOwners,
+      claims: formattedClaims,
+      history
+    });
+  } catch (error) {
+    console.error('Error updating media ownership:', error);
+    res.status(500).json({ error: 'Failed to update ownership', details: error.message });
+  }
+});
+
 // @route   PUT /api/media/:id
 // @desc    Update media details
 // @access  Private (Admin or Verified Creator only)
@@ -1037,7 +1265,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     
     // Check permissions: must be admin OR media owner OR verified creator
-    const { canEditMedia } = require('../utils/permissionHelpers');
     if (!canEditMedia(req.user, media)) {
       return res.status(403).json({ error: 'Not authorized to edit this media' });
     }
@@ -1460,7 +1687,6 @@ router.put('/:id/cover-art', authMiddleware, coverArtUploadSingle.single('coverA
     }
     
     // Check permissions: must be admin OR media owner OR verified creator
-    const { canEditMedia } = require('../utils/permissionHelpers');
     if (!canEditMedia(req.user, media)) {
       return res.status(403).json({ error: 'Not authorized to edit this media' });
     }

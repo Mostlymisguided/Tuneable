@@ -40,6 +40,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
+import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 
 interface Media {
   _id: string;
@@ -157,7 +158,7 @@ const TuneProfile: React.FC = () => {
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
   const isEditMode = searchParams.get('edit') === 'true';
-  const editTab = (searchParams.get('tab') as 'info' | 'edit') || 'info';
+  const editTab = (searchParams.get('tab') as 'info' | 'edit' | 'ownership') || 'info';
   const [tagInput, setTagInput] = useState(''); // Separate state for tag input
   const [genresInput, setGenresInput] = useState(''); // Separate state for genres input
   const [elementsInput, setElementsInput] = useState(''); // Separate state for elements input
@@ -384,7 +385,7 @@ const TuneProfile: React.FC = () => {
     setSearchParams({ edit: 'true', tab: 'edit' });
   };
 
-  const handleEditTabChange = (tab: 'info' | 'edit') => {
+  const handleEditTabChange = (tab: 'info' | 'edit' | 'ownership') => {
     setSearchParams({ edit: 'true', tab });
   };
 
@@ -1230,6 +1231,16 @@ const TuneProfile: React.FC = () => {
                 }`}
               >
                 Edit Tune
+              </button>
+              <button
+                onClick={() => handleEditTabChange('ownership')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'ownership'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Ownership
               </button>
             </nav>
           </div>
@@ -2434,6 +2445,16 @@ const TuneProfile: React.FC = () => {
                     Cancel
                   </button>
                 </div>
+              </div>
+            )}
+            {editTab === 'ownership' && mediaId && (
+              <div className="card p-6">
+                <MediaOwnershipTab
+                  mediaId={mediaId}
+                  canEdit={canEditTune()}
+                  currentUser={user as any}
+                  mediaTitle={media?.title}
+                />
               </div>
             )}
           </>
