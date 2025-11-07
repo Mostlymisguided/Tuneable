@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
   // Creator Dashboard state
   const [creatorStats, setCreatorStats] = useState<any>(null);
   const [isLoadingCreatorStats, setIsLoadingCreatorStats] = useState(false);
-  const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels'>('overview');
+  const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels' | 'collectives'>('overview');
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isCollectiveModalOpen, setIsCollectiveModalOpen] = useState(false);
   
@@ -86,6 +86,19 @@ const Dashboard: React.FC = () => {
     admin: boolean;
     affiliated: boolean;
   }>({ owned: false, admin: false, affiliated: false });
+
+  // Collectives tab state
+  const [collectives, setCollectives] = useState<any[]>([]);
+  const [isLoadingCollectives, setIsLoadingCollectives] = useState(false);
+  const [collectivesFilterRole, setCollectivesFilterRole] = useState<string>('all'); // 'all', 'founder', 'admin', 'member'
+  const [collectivesFilterVerification, setCollectivesFilterVerification] = useState<string>('all'); // 'all', 'verified', 'pending', 'unverified'
+  const [collectivesSortField, setCollectivesSortField] = useState<string>('name');
+  const [collectivesSortDirection, setCollectivesSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [collapsedCollectiveSections, setCollapsedCollectiveSections] = useState<{
+    owned: boolean;
+    admin: boolean;
+    member: boolean;
+  }>({ owned: false, admin: false, member: false });
 
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
@@ -186,6 +199,24 @@ const Dashboard: React.FC = () => {
     };
     loadMyMedia();
   }, [user, creatorActiveTab, myMediaPage, myMediaSortField, myMediaSortDirection]);
+
+  useEffect(() => {
+    const loadCollectives = async () => {
+      if (!showCreatorDashboard(user) || creatorActiveTab !== 'collectives') return;
+      
+      try {
+        setIsLoadingCollectives(true);
+        const data = await userAPI.getCollectiveMemberships();
+        setCollectives(data.collectives || []);
+      } catch (error) {
+        console.error('Failed to load collectives:', error);
+        toast.error('Failed to load your collectives');
+      } finally {
+        setIsLoadingCollectives(false);
+      }
+    };
+    loadCollectives();
+  }, [user, creatorActiveTab]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -522,6 +553,17 @@ const Dashboard: React.FC = () => {
                   >
                     <Building className="h-4 w-4 mr-2" />
                     Labels
+                  </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('collectives')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'collectives'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Collectives
                   </button>
                 </nav>
               </div>
@@ -1452,6 +1494,512 @@ const Dashboard: React.FC = () => {
                               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                             >
                               Create Label
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {creatorActiveTab === 'collectives' && (() => {
+                    // Helper functions for collectives
+                    const getCollectiveRoleBadgeColor = (role: string) => {
+                      if (role === 'founder') return 'bg-purple-600';
+                      if (role === 'admin') return 'bg-blue-600';
+                      return 'bg-gray-600';
+                    };
+
+                    const getCollectiveRoleLabel = (role: string) => {
+                      if (role === 'founder') return 'Founder';
+                      if (role === 'admin') return 'Admin';
+                      return 'Member';
+                    };
+
+                    // Filter and sort collectives
+                    const filteredCollectives = collectives.filter((collective: any) => {
+                      // Filter by role
+                      if (collectivesFilterRole !== 'all') {
+                        if (collectivesFilterRole === 'founder' && collective.role !== 'founder') {
+                          return false;
+                        }
+                        if (collectivesFilterRole === 'admin' && collective.role !== 'admin') {
+                          return false;
+                        }
+                        if (collectivesFilterRole === 'member' && collective.role !== 'member') {
+                          return false;
+                        }
+                      }
+
+                      // Filter by verification status
+                      if (collectivesFilterVerification !== 'all') {
+                        if (collectivesFilterVerification === 'verified' && collective.verificationStatus !== 'verified') {
+                          return false;
+                        }
+                        if (collectivesFilterVerification === 'pending' && collective.verificationStatus !== 'pending') {
+                          return false;
+                        }
+                        if (collectivesFilterVerification === 'unverified' && collective.verificationStatus === 'verified') {
+                          return false;
+                        }
+                      }
+
+                      return true;
+                    });
+
+                    // Sort collectives
+                    const sortedCollectives = [...filteredCollectives].sort((a: any, b: any) => {
+                      let comparison = 0;
+                      
+                      if (collectivesSortField === 'name') {
+                        comparison = a.name.localeCompare(b.name);
+                      } else if (collectivesSortField === 'totalBids') {
+                        comparison = (a.globalCollectiveAggregate || 0) - (b.globalCollectiveAggregate || 0);
+                      } else if (collectivesSortField === 'memberCount') {
+                        comparison = (a.memberCount || 0) - (b.memberCount || 0);
+                      } else if (collectivesSortField === 'releaseCount') {
+                        comparison = (a.releaseCount || 0) - (b.releaseCount || 0);
+                      } else if (collectivesSortField === 'verificationStatus') {
+                        comparison = (a.verificationStatus || 'unverified').localeCompare(b.verificationStatus || 'unverified');
+                      }
+
+                      return collectivesSortDirection === 'asc' ? comparison : -comparison;
+                    });
+
+                    // Group collectives by role
+                    const ownedCollectives = sortedCollectives.filter((collective: any) => 
+                      collective.role === 'founder'
+                    );
+                    const adminCollectives = sortedCollectives.filter((collective: any) => 
+                      collective.role === 'admin'
+                    );
+                    const memberCollectives = sortedCollectives.filter((collective: any) => 
+                      collective.role === 'member'
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white">My Collectives</h3>
+                          <button
+                            onClick={() => setIsCollectiveModalOpen(true)}
+                            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Collective
+                          </button>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-4 items-center bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-400">Filter by:</span>
+                          </div>
+                          <select
+                            value={collectivesFilterRole}
+                            onChange={(e) => setCollectivesFilterRole(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Roles</option>
+                            <option value="founder">Founder</option>
+                            <option value="admin">Admin</option>
+                            <option value="member">Member</option>
+                          </select>
+                          <select
+                            value={collectivesFilterVerification}
+                            onChange={(e) => setCollectivesFilterVerification(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Status</option>
+                            <option value="verified">Verified</option>
+                            <option value="pending">Pending</option>
+                            <option value="unverified">Unverified</option>
+                          </select>
+                        </div>
+
+                        {isLoadingCollectives ? (
+                          <div className="text-center py-8">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                            <p className="text-gray-400 mt-2">Loading collectives...</p>
+                          </div>
+                        ) : sortedCollectives.length > 0 ? (
+                          <div className="space-y-6">
+                            {/* Owned Collectives Section */}
+                            {ownedCollectives.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, owned: !prev.owned }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Award className="h-5 w-5 text-purple-400" />
+                                    Collectives You Own ({ownedCollectives.length})
+                                  </h4>
+                                  {collapsedCollectiveSections.owned ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedCollectiveSections.owned && (
+                                  <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full">
+                                        <thead className="bg-gray-800">
+                                          <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'name' ? '' : 'name');
+                                                  setCollectivesSortDirection(collectivesSortField === 'name' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Collective
+                                                {collectivesSortField === 'name' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'memberCount' ? '' : 'memberCount');
+                                                  setCollectivesSortDirection(collectivesSortField === 'memberCount' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Members
+                                                {collectivesSortField === 'memberCount' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'releaseCount' ? '' : 'releaseCount');
+                                                  setCollectivesSortDirection(collectivesSortField === 'releaseCount' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Releases
+                                                {collectivesSortField === 'releaseCount' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'totalBids' ? '' : 'totalBids');
+                                                  setCollectivesSortDirection(collectivesSortField === 'totalBids' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Total Bids
+                                                {collectivesSortField === 'totalBids' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'verificationStatus' ? '' : 'verificationStatus');
+                                                  setCollectivesSortDirection(collectivesSortField === 'verificationStatus' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Status
+                                                {collectivesSortField === 'verificationStatus' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-800">
+                                          {ownedCollectives.map((collective: any) => (
+                                            <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                  <img 
+                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                    alt={collective.name} 
+                                                    className="h-10 w-10 rounded object-cover"
+                                                    onError={(e) => {
+                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                    }}
+                                                  />
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                  >
+                                                    {collective.name}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
+                                              <td className="px-4 py-3">
+                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                {collective.verificationStatus === 'verified' ? (
+                                                  <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                                ) : (
+                                                  <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                    {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                  >
+                                                    View
+                                                  </button>
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
+                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                  >
+                                                    <Settings className="h-3 w-3" />
+                                                    Manage
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Admin Collectives Section */}
+                            {adminCollectives.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, admin: !prev.admin }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Users className="h-5 w-5 text-blue-400" />
+                                    Collectives You Admin ({adminCollectives.length})
+                                  </h4>
+                                  {collapsedCollectiveSections.admin ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedCollectiveSections.admin && (
+                                  <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full">
+                                        <thead className="bg-gray-800">
+                                          <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Collective</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-800">
+                                          {adminCollectives.map((collective: any) => (
+                                            <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                  <img 
+                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                    alt={collective.name} 
+                                                    className="h-10 w-10 rounded object-cover"
+                                                    onError={(e) => {
+                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                    }}
+                                                  />
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                  >
+                                                    {collective.name}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
+                                              <td className="px-4 py-3">
+                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                {collective.verificationStatus === 'verified' ? (
+                                                  <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                                ) : (
+                                                  <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                    {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                  >
+                                                    View
+                                                  </button>
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
+                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                  >
+                                                    <Settings className="h-3 w-3" />
+                                                    Manage
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Member Collectives Section */}
+                            {memberCollectives.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, member: !prev.member }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Music className="h-5 w-5 text-gray-400" />
+                                    Collectives You're a Member Of ({memberCollectives.length})
+                                  </h4>
+                                  {collapsedCollectiveSections.member ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedCollectiveSections.member && (
+                                  <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full">
+                                        <thead className="bg-gray-800">
+                                          <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Collective</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Your Role</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-800">
+                                          {memberCollectives.map((collective: any) => (
+                                            <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                  <img 
+                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                    alt={collective.name} 
+                                                    className="h-10 w-10 rounded object-cover"
+                                                    onError={(e) => {
+                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                    }}
+                                                  />
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                  >
+                                                    {collective.name}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                <span className={`px-2 py-1 ${getCollectiveRoleBadgeColor(collective.role || 'member')} text-white text-xs rounded`}>
+                                                  {getCollectiveRoleLabel(collective.role || 'member')}
+                                                </span>
+                                              </td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
+                                              <td className="px-4 py-3">
+                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                {collective.verificationStatus === 'verified' ? (
+                                                  <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                                ) : (
+                                                  <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                    {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                <button
+                                                  onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                >
+                                                  View
+                                                </button>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-gray-900 rounded-lg">
+                            <Users className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                            <p className="text-gray-400 mb-2">No collectives found</p>
+                            <p className="text-gray-500 text-sm mb-4">
+                              {collectivesFilterRole !== 'all' || collectivesFilterVerification !== 'all' 
+                                ? 'Try adjusting your filters' 
+                                : 'Create your first collective or join an existing one!'}
+                            </p>
+                            {(collectivesFilterRole !== 'all' || collectivesFilterVerification !== 'all') && (
+                              <button
+                                onClick={() => {
+                                  setCollectivesFilterRole('all');
+                                  setCollectivesFilterVerification('all');
+                                }}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors mr-2"
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setIsCollectiveModalOpen(true)}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            >
+                              Create Collective
                             </button>
                           </div>
                         )}

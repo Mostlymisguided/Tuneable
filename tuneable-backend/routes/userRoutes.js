@@ -2385,7 +2385,7 @@ router.get('/me/collective-memberships', authMiddleware, async (req, res) => {
     .select('name slug profilePicture verificationStatus stats members')
     .lean();
     
-    // Format collectives with member role information
+    // Format collectives with member role information and stats
     const formattedCollectives = collectives.map(collective => {
       const memberInfo = collective.members.find(
         m => m.userId.toString() === userId.toString() && !m.leftAt
@@ -2399,7 +2399,10 @@ router.get('/me/collective-memberships', authMiddleware, async (req, res) => {
         role: memberInfo?.role || 'member', // 'founder', 'member', 'admin'
         instrument: memberInfo?.instrument || null,
         joinedAt: memberInfo?.joinedAt || null,
-        verified: memberInfo?.verified || false
+        verified: memberInfo?.verified || false,
+        memberCount: collective.stats?.memberCount || 0,
+        releaseCount: collective.stats?.releaseCount || 0,
+        globalCollectiveAggregate: collective.stats?.globalCollectiveAggregate || 0
       };
     });
     
