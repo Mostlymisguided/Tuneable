@@ -31,6 +31,7 @@ const ROLE_BADGE_MAP: Record<string, { label: string; classes: string }> = {
   owner: { label: 'Owner', classes: 'bg-purple-500/20 text-purple-300 border border-purple-500/60' },
   admin: { label: 'Admin', classes: 'bg-blue-500/20 text-blue-300 border border-blue-500/60' },
   member: { label: 'Member', classes: 'bg-gray-500/20 text-gray-300 border border-gray-500/60' },
+  founder: { label: 'Founder', classes: 'bg-orange-500/20 text-orange-300 border border-orange-500/60' },
 };
 
 const formatDate = (iso?: string) => {

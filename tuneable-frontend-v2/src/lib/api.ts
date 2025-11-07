@@ -799,6 +799,12 @@ export const collectiveAPI = {
     return response.data;
   },
 
+  // Get collective team roster (founders/admins/members)
+  getTeam: async (slug: string) => {
+    const response = await api.get(`/collectives/${slug}/team`);
+    return response.data;
+  },
+
   // Get collective's media (public)
   getCollectiveMedia: async (slug: string, params?: {
     page?: number;

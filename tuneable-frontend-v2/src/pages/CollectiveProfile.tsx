@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
+import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 
 interface Collective {
   _id: string;
@@ -78,11 +79,14 @@ const CollectiveProfile: React.FC = () => {
   const [members, setMembers] = useState<Collective['members']>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'media'>('overview');
+  const [teamMembers, setTeamMembers] = useState<LabelTeamMember[]>([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+  const [hasLoadedTeam, setHasLoadedTeam] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
   const isEditMode = searchParams.get('edit') === 'true';
-  const editTab = (searchParams.get('tab') as 'info' | 'edit') || 'info';
+  const editTab = (searchParams.get('tab') as 'info' | 'edit' | 'ownership') || 'info';
   
   // Report state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -132,6 +136,21 @@ const CollectiveProfile: React.FC = () => {
     return countryMap[countryName] || '';
   };
 
+  const fetchCollectiveTeam = async (collectiveSlug: string) => {
+    if (!collectiveSlug) return;
+    try {
+      setIsLoadingTeam(true);
+      const response = await collectiveAPI.getTeam(collectiveSlug);
+      setTeamMembers(response.team || response.members || []);
+      setHasLoadedTeam(true);
+    } catch (error) {
+      console.error('Error fetching collective team:', error);
+      setTeamMembers([]);
+    } finally {
+      setIsLoadingTeam(false);
+    }
+  };
+
   // Check if user can edit this collective
   const canEditCollective = (collectiveData?: Collective) => {
     const collectiveToCheck = collectiveData || collective;
@@ -160,6 +179,32 @@ const CollectiveProfile: React.FC = () => {
       fetchCollectiveData();
     }
   }, [slug]);
+
+useEffect(() => {
+  if (!isEditMode) {
+    setHasLoadedTeam(false);
+    setTeamMembers([]);
+  }
+}, [isEditMode]);
+
+useEffect(() => {
+  setHasLoadedTeam(false);
+  setTeamMembers([]);
+}, [slug]);
+
+useEffect(() => {
+  if (
+    isEditMode &&
+    editTab === 'ownership' &&
+    slug &&
+    collective &&
+    canEditCollective(collective) &&
+    !hasLoadedTeam &&
+    !isLoadingTeam
+  ) {
+    void fetchCollectiveTeam(slug);
+  }
+}, [isEditMode, editTab, slug, collective, hasLoadedTeam, isLoadingTeam]);
 
   const fetchCollectiveData = async () => {
     try {
@@ -257,7 +302,7 @@ const CollectiveProfile: React.FC = () => {
     setSearchParams({ edit: 'true', tab: 'edit' });
   };
 
-  const handleEditTabChange = (tab: 'info' | 'edit') => {
+  const handleEditTabChange = (tab: 'info' | 'edit' | 'ownership') => {
     setSearchParams({ edit: 'true', tab });
   };
 
@@ -389,6 +434,39 @@ const CollectiveProfile: React.FC = () => {
                 <span className="hidden sm:inline">Edit Collective</span>
                 <span className="sm:hidden">Edit</span>
               </button>
+            )}
+
+            {editTab === 'ownership' && (
+              <div className="card p-6 space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Collective Ownership</h2>
+                    <p className="text-sm text-gray-300">
+                      Founders, admins, and members who manage this collective on Tuneable.
+                    </p>
+                  </div>
+                  {slug && (
+                    <button
+                      onClick={() => fetchCollectiveTeam(slug)}
+                      disabled={isLoadingTeam}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Loader2 className={`h-4 w-4 ${isLoadingTeam ? 'animate-spin' : 'hidden'}`} />
+                      {!isLoadingTeam && 'Refresh'}
+                      {isLoadingTeam && 'Refreshing...'}
+                    </button>
+                  )}
+                </div>
+
+                {isLoadingTeam && !hasLoadedTeam ? (
+                  <div className="flex items-center justify-center py-12 text-gray-300">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Loading ownership roster...
+                  </div>
+                ) : (
+                  <LabelTeamTable members={teamMembers} isEditable />
+                )}
+              </div>
             )}
             {/* Exit Edit Mode Button - Only show if in edit mode */}
             {canEditCollective() && isEditMode && (
@@ -551,6 +629,16 @@ const CollectiveProfile: React.FC = () => {
                 }`}
               >
                 Edit Collective
+              </button>
+              <button
+                onClick={() => handleEditTabChange('ownership')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'ownership'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Ownership
               </button>
             </nav>
           </div>

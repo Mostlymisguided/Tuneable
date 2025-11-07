@@ -78,6 +78,67 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get collective team (collective admins only)
+router.get('/:slug/team', authMiddleware, async (req, res) => {
+  try {
+    const collective = await Collective.findBySlug(req.params.slug)
+      .populate('members.userId', 'username profilePic email uuid')
+      .lean();
+
+    if (!collective) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+
+    const isPlatformAdmin = req.user?.role?.includes('admin');
+    if (!isPlatformAdmin) {
+      const viewerId = req.user?._id?.toString() || req.user?.id?.toString() || req.user?.uuid?.toString();
+      const isCollectiveEditor = (collective.members || []).some((member) => {
+        if (!member || !member.userId || member.leftAt) return false;
+        const memberId =
+          typeof member.userId === 'object'
+            ? (member.userId._id?.toString() || member.userId.uuid?.toString() || member.userId.toString())
+            : member.userId.toString();
+        return (
+          memberId === viewerId &&
+          (member.role === 'founder' || member.role === 'admin')
+        );
+      });
+
+      if (!isCollectiveEditor) {
+        return res.status(403).json({ error: 'Not authorized to view collective ownership' });
+      }
+    }
+
+    const activeMembers = (collective.members || []).filter((member) => !member.leftAt);
+
+    const team = activeMembers.map((member) => {
+      const user = member.userId || {};
+      const userId = typeof user === 'object' ? (user._id || user.uuid || user.toString()) : member.userId;
+      return {
+        userId: user,
+        username: user.username,
+        profilePic: user.profilePic,
+        email: user.email,
+        role: member.role,
+        joinedAt: member.joinedAt,
+        addedBy: member.addedBy,
+        instrument: member.instrument,
+        _id: userId
+      };
+    });
+
+    res.json({
+      team,
+      founders: team.filter((member) => member.role === 'founder'),
+      admins: team.filter((member) => member.role === 'admin'),
+      members: team.filter((member) => member.role === 'member'),
+    });
+  } catch (error) {
+    console.error('Error fetching collective team:', error);
+    res.status(500).json({ error: 'Failed to fetch collective team', details: error.message });
+  }
+});
+
 // Get collective by slug (public)
 router.get('/:slug', async (req, res) => {
   try {
