@@ -128,7 +128,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       explicit,
       tags,
       description,
-      coverArt
+      coverArt,
+      language
     } = req.body;
     
     // Upload audio file to R2 manually
@@ -246,7 +247,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       
       // Content classification
       genres: finalGenres,
-      language: mappedMetadata.language || 'en',
+      language: (language && language.trim()) || mappedMetadata.language || 'en', // User input takes priority, then extracted, then default (empty string becomes default)
       tags: parsedTags,
       description: description || '',
       coverArt: finalCoverArt,
@@ -878,7 +879,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       'title', 'producer', 'album', 'genre',
       'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'description'
+      'lyrics', 'description', 'language'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
     
@@ -893,6 +894,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
           if (!isNaN(numValue)) {
             value = numValue;
           }
+        }
+        
+        // Handle language field: empty string means use default
+        if (field === 'language' && (value === '' || value === null)) {
+          value = 'en'; // Default language
         }
         
         // Check if value actually changed
