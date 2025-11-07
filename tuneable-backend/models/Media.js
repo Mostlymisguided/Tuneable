@@ -552,6 +552,14 @@ mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator
     throw new Error('Invalid userId');
   }
 
+  const normalizePercentage = (value) => {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric) || numeric < 0) {
+      return 0;
+    }
+    return Math.round(numeric * 100) / 100;
+  };
+
   // Check if user is already an owner
   const existingOwner = this.mediaOwners.find(owner => 
     owner.userId.toString() === normalizedUserId.toString()
@@ -568,13 +576,14 @@ mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator
   }
   
   const now = new Date();
+  const normalizedPercentage = normalizePercentage(percentage);
   const verifiedAt = options.verifiedAt ? new Date(options.verifiedAt) : null;
   const verifiedBy = toObjectId(options.verifiedBy);
   const actorId = toObjectId(options.addedBy) || toObjectId(addedBy) || normalizedUserId;
 
   this.mediaOwners.push({
     userId: normalizedUserId,
-    percentage,
+    percentage: normalizedPercentage,
     role,
     verified: options.verified === true || !!verifiedAt || !!verifiedBy,
     verifiedAt,
@@ -602,7 +611,7 @@ mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator
       from: null,
       to: {
         userId: normalizedUserId.toString(),
-        percentage,
+        percentage: normalizedPercentage,
         verified: options.verified === true || !!verifiedAt || !!verifiedBy,
         verifiedAt,
         verifiedBy: verifiedBy ? verifiedBy.toString() : null,
@@ -658,6 +667,14 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
     throw new Error('Owners must be an array');
   }
 
+  const normalizePercentage = (value) => {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric) || numeric < 0) {
+      return 0;
+    }
+    return Math.round(numeric * 100) / 100;
+  };
+
   const now = new Date();
   const actorObjectId = toObjectId(actorId);
 
@@ -673,7 +690,7 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
   }));
 
   const seen = new Set();
-  let total = 0;
+  let totalBasisPoints = 0;
 
   const formattedOwners = owners.map(rawOwner => {
     const userId = rawOwner.userId || rawOwner.owner?._id || rawOwner.owner?.id || rawOwner.owner?.uuid;
@@ -692,17 +709,15 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
     }
     seen.add(userIdStr);
 
-    const percentage = Number(
-      rawOwner.ownershipPercentage ??
-      rawOwner.percentage ??
-      0
+    const normalizedPercentage = normalizePercentage(
+      rawOwner.ownershipPercentage ?? rawOwner.percentage ?? 0
     );
 
-    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+    if (normalizedPercentage > 100) {
       throw new Error('Ownership percentage must be between 0 and 100');
     }
 
-    total += percentage;
+    totalBasisPoints += Math.round(normalizedPercentage * 100);
 
     const verifiedAt = rawOwner.verifiedAt ? new Date(rawOwner.verifiedAt) : null;
     const verifiedBy = toObjectId(rawOwner.verifiedBy);
@@ -712,7 +727,7 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
 
     return {
       userId: normalizedUserId,
-      percentage,
+      percentage: normalizedPercentage,
       role: rawOwner.role || 'creator',
       verified: rawOwner.verified === true || !!verifiedAt || !!verifiedBy,
       verifiedAt,
@@ -727,7 +742,7 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
     };
   });
 
-  if (total > 100.001) {
+  if (totalBasisPoints > 10000) {
     throw new Error('Total ownership percentage cannot exceed 100%');
   }
 
