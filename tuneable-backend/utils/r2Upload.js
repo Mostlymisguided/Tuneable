@@ -35,19 +35,50 @@ const getPublicUrl = (key) => {
     throw new Error('File key is required to generate public URL');
   }
   
-  // If R2 is configured, we must have R2_PUBLIC_URL set
+  // If R2 is configured, try to use R2_PUBLIC_URL
   if (isR2Configured()) {
-    if (!process.env.R2_PUBLIC_URL) {
-      console.error('❌ R2_PUBLIC_URL is not set but R2 is configured!');
-      throw new Error('R2_PUBLIC_URL environment variable is required when using R2 storage');
+    if (process.env.R2_PUBLIC_URL) {
+      // Remove leading slash from key if present to avoid double slashes
+      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+      // Remove trailing slash from R2_PUBLIC_URL if present
+      const baseUrl = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
+      const fullUrl = `${baseUrl}/${cleanKey}`;
+      console.log(`🔗 Generated public URL: ${fullUrl} (from key: ${key})`);
+      return fullUrl;
+    } else {
+      // R2 is configured but R2_PUBLIC_URL is not set
+      // Construct fallback URL using R2 endpoint (not ideal, but allows uploads to work)
+      console.warn('⚠️ R2_PUBLIC_URL is not set but R2 is configured! Using fallback URL construction.');
+      const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+      const endpoint = process.env.R2_ENDPOINT || '';
+      const bucketName = process.env.R2_BUCKET_NAME || '';
+      
+      // Try to construct a public URL from the endpoint
+      // R2_ENDPOINT format: https://<account-id>.r2.cloudflarestorage.com
+      // R2 public URLs can be: https://<account-id>.r2.cloudflarestorage.com/<bucket-name>/<key>
+      if (endpoint && bucketName) {
+        try {
+          // Remove trailing slash from endpoint if present
+          const cleanEndpoint = endpoint.replace(/\/$/, '');
+          // Construct R2 public URL: endpoint/bucket/key
+          const fallbackUrl = `${cleanEndpoint}/${bucketName}/${cleanKey}`;
+          console.warn(`⚠️ Using fallback R2 URL: ${fallbackUrl}`);
+          console.warn(`⚠️ NOTE: R2_PUBLIC_URL should be set in production for proper custom domain URLs`);
+          return fallbackUrl;
+        } catch (error) {
+          console.error('❌ Error constructing fallback URL:', error);
+          // Last resort: return path-based URL
+          const fallbackUrl = `/uploads/${cleanKey}`;
+          console.warn(`⚠️ Using path-based fallback URL: ${fallbackUrl}`);
+          return fallbackUrl;
+        }
+      } else {
+        // Last resort: return path-based URL
+        const fallbackUrl = `/uploads/${cleanKey}`;
+        console.warn(`⚠️ Using path-based fallback URL: ${fallbackUrl} (R2_PUBLIC_URL should be set for proper URLs)`);
+        return fallbackUrl;
+      }
     }
-    // Remove leading slash from key if present to avoid double slashes
-    const cleanKey = key.startsWith('/') ? key.slice(1) : key;
-    // Remove trailing slash from R2_PUBLIC_URL if present
-    const baseUrl = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
-    const fullUrl = `${baseUrl}/${cleanKey}`;
-    console.log(`🔗 Generated public URL: ${fullUrl} (from key: ${key})`);
-    return fullUrl;
   }
   
   // Fallback to local path if R2 not configured (development only)
