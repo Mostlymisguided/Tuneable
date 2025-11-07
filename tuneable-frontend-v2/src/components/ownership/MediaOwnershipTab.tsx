@@ -108,6 +108,38 @@ const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
   currentUser,
   mediaTitle,
 }) => {
+  const formatDiffValue = (value: any) => {
+    if (value === null || value === undefined || value === '') {
+      return '—';
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return value.toString();
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (value instanceof Date) {
+      return value.toString();
+    }
+
+    if (Array.isArray(value)) {
+      return value.length === 0 ? '[]' : JSON.stringify(value);
+    }
+
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch (_error) {
+        return '[object]';
+      }
+    }
+
+    return String(value);
+  };
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [ownershipRows, setOwnershipRows] = useState<OwnershipRecord[]>([]);
@@ -813,8 +845,8 @@ const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
                       {entry.diff.map((diffItem, diffIdx) => (
                         <li key={diffIdx}>
                           <span className="text-gray-400">{diffItem.field}:</span>{' '}
-                          <span className="text-red-300">{diffItem.from ?? '—'}</span> →{' '}
-                          <span className="text-green-300">{diffItem.to ?? '—'}</span>
+                          <span className="text-red-300">{formatDiffValue(diffItem.from)}</span> →{' '}
+                          <span className="text-green-300">{formatDiffValue(diffItem.to)}</span>
                         </li>
                       ))}
                     </ul>
