@@ -166,14 +166,14 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
         'media.mediaId': { $in: mediaIds }
       });
 
-      // Calculate total party bid amount
+      // Calculate party label aggregate (party-scoped bids only)
       const partyBids = await Bid.find({
         mediaId: { $in: mediaIds },
         bidScope: 'party',
         status: 'active'
       }).lean();
 
-      const totalPartyBidAmount = partyBids.reduce((sum, bid) => sum + bid.amount, 0);
+      const partyLabelAggregate = partyBids.reduce((sum, bid) => sum + bid.amount, 0);
 
       // Update label stats
       label.stats = {
@@ -185,7 +185,7 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
         globalLabelBidCount,
         topPerformingMedia,
         partiesWithLabelMedia,
-        totalPartyBidAmount,
+        partyLabelAggregate,
         uniqueBidders: uniqueBidders.length,
         topBidders,
         lastBidAt,
@@ -206,7 +206,7 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
         globalLabelBidCount: 0,
         topPerformingMedia: [],
         partiesWithLabelMedia: 0,
-        totalPartyBidAmount: 0,
+        partyLabelAggregate: 0,
         uniqueBidders: 0,
         topBidders: [],
         lastBidAt: null,

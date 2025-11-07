@@ -83,7 +83,7 @@ const labelSchema = new mongoose.Schema({
     
     // Party Engagement
     partiesWithLabelMedia: { type: Number, default: 0 }, // Count of parties that have played label's media
-    totalPartyBidAmount: { type: Number, default: 0 }, // Sum of bids across all parties for label's media
+    partyLabelAggregate: { type: Number, default: 0 }, // Sum of party-scoped bids (bidScope: 'party') across all label's media (in pence)
     
     // User Engagement
     uniqueBidders: { type: Number, default: 0 }, // Count of unique users who have bid on label's media

@@ -25,7 +25,7 @@
  * @typedef {'aggregate' | 'top' | 'average' | 'rank'} MetricType
  * @typedef {'amount' | 'order'} OutputType
  * @typedef {'stored' | 'computed'} StorageType
- * @typedef {'user' | 'media' | 'party'} EntityType
+ * @typedef {'user' | 'media' | 'party' | 'label' | 'collective'} EntityType
  */
 
 /**
@@ -88,7 +88,7 @@ const STORAGE_TYPES = ['stored', 'computed'];
  * Valid entity types that can be referenced in metrics
  * @type {EntityType[]}
  */
-const ENTITY_TYPES = ['user', 'media', 'party'];
+const ENTITY_TYPES = ['user', 'media', 'party', 'label', 'collective'];
 
 /**
  * Complete registry of all bid metrics in the Tuneable system
@@ -211,6 +211,200 @@ const BID_METRICS_SCHEMA = {
     description: 'Sum of Bids for given Party, User and Media',
     storage: 'stored', // Stored in Bid model
     formula: 'SUM(bids WHERE partyId = X AND userId = Y AND mediaId = Z)'
+  },
+
+  // ========================================
+  // LABEL METRICS (Aggregations across label's media)
+  // ========================================
+  
+  GlobalLabelAggregate: {
+    scope: 'global',
+    type: 'aggregate',
+    entities: ['label'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      labelId: 'ObjectId',
+      labelUuid: 'String',
+      labelName: 'String'
+    },
+    associatedEntities: ['label'],
+    description: 'Sum of all bids across all media belonging to a label (includes both party-scoped and global-scoped bids)',
+    storage: 'stored', // Stored in Label.stats.globalLabelAggregate
+    formula: 'SUM(globalMediaAggregate for all media WHERE label.labelId = X)'
+  },
+  
+  GlobalLabelBidAvg: {
+    scope: 'global',
+    type: 'average',
+    entities: ['label'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      labelId: 'ObjectId',
+      labelUuid: 'String',
+      labelName: 'String',
+      bidCount: 'Number'
+    },
+    associatedEntities: ['label'],
+    description: 'Average bid amount across all bids on label\'s media',
+    storage: 'stored', // Stored in Label.stats.globalLabelBidAvg
+    formula: 'GlobalLabelAggregate / GlobalLabelBidCount'
+  },
+  
+  GlobalLabelBidTop: {
+    scope: 'global',
+    type: 'top',
+    entities: ['label'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      labelId: 'ObjectId',
+      labelUuid: 'String',
+      labelName: 'String',
+      mediaId: 'ObjectId',
+      mediaUuid: 'String',
+      title: 'String'
+    },
+    associatedEntities: ['label', 'media'],
+    description: 'Highest individual bid amount across all label\'s media',
+    storage: 'stored', // Stored in Label.stats.globalLabelBidTop
+    formula: 'MAX(globalMediaBidTop for all media WHERE label.labelId = X)'
+  },
+  
+  GlobalLabelBidCount: {
+    scope: 'global',
+    type: 'aggregate', // Count is a type of aggregate
+    entities: ['label'],
+    outputType: 'amount', // Returns count as number
+    returns: {
+      count: 'Number',
+      labelId: 'ObjectId',
+      labelUuid: 'String',
+      labelName: 'String'
+    },
+    associatedEntities: ['label'],
+    description: 'Total count of all bids on label\'s media',
+    storage: 'stored', // Stored in Label.stats.globalLabelBidCount
+    formula: 'COUNT(all bids WHERE mediaId IN (media WHERE label.labelId = X))'
+  },
+  
+  PartyLabelAggregate: {
+    scope: 'party',
+    type: 'aggregate',
+    entities: ['label'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      labelId: 'ObjectId',
+      labelUuid: 'String',
+      labelName: 'String'
+    },
+    associatedEntities: ['label'],
+    description: 'Sum of party-scoped bids (bidScope: \'party\') across all media belonging to a label',
+    storage: 'stored', // Stored in Label.stats.partyLabelAggregate
+    formula: 'SUM(bids WHERE bidScope = \'party\' AND mediaId IN (media WHERE label.labelId = X))'
+  },
+  
+  // ========================================
+  // COLLECTIVE METRICS (Aggregations across collective's media)
+  // ========================================
+  
+  GlobalCollectiveAggregate: {
+    scope: 'global',
+    type: 'aggregate',
+    entities: ['collective'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      collectiveId: 'ObjectId',
+      collectiveUuid: 'String',
+      collectiveName: 'String'
+    },
+    associatedEntities: ['collective'],
+    description: 'Sum of all bids across all media belonging to a collective (includes both party-scoped and global-scoped bids)',
+    storage: 'stored', // Stored in Collective.stats.globalCollectiveAggregate
+    formula: 'SUM(globalMediaAggregate for all media WHERE artist.collectiveId = X OR producer.collectiveId = X OR featuring.collectiveId = X)'
+  },
+  
+  GlobalCollectiveBidAvg: {
+    scope: 'global',
+    type: 'average',
+    entities: ['collective'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      collectiveId: 'ObjectId',
+      collectiveUuid: 'String',
+      collectiveName: 'String',
+      bidCount: 'Number'
+    },
+    associatedEntities: ['collective'],
+    description: 'Average bid amount across all bids on collective\'s media',
+    storage: 'stored', // Stored in Collective.stats.globalCollectiveBidAvg
+    formula: 'GlobalCollectiveAggregate / GlobalCollectiveBidCount'
+  },
+  
+  GlobalCollectiveBidTop: {
+    scope: 'global',
+    type: 'top',
+    entities: ['collective'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      collectiveId: 'ObjectId',
+      collectiveUuid: 'String',
+      collectiveName: 'String',
+      mediaId: 'ObjectId',
+      mediaUuid: 'String',
+      title: 'String'
+    },
+    associatedEntities: ['collective', 'media'],
+    description: 'Highest individual bid amount across all collective\'s media',
+    storage: 'stored', // Stored in Collective.stats.globalCollectiveBidTop
+    formula: 'MAX(globalMediaBidTop for all media WHERE artist.collectiveId = X OR producer.collectiveId = X OR featuring.collectiveId = X)'
+  },
+  
+  GlobalCollectiveBidCount: {
+    scope: 'global',
+    type: 'aggregate',
+    entities: ['collective'],
+    outputType: 'amount',
+    returns: {
+      count: 'Number',
+      collectiveId: 'ObjectId',
+      collectiveUuid: 'String',
+      collectiveName: 'String'
+    },
+    associatedEntities: ['collective'],
+    description: 'Total count of all bids on collective\'s media',
+    storage: 'stored', // Stored in Collective.stats.globalCollectiveBidCount
+    formula: 'COUNT(all bids WHERE mediaId IN (media WHERE artist.collectiveId = X OR producer.collectiveId = X OR featuring.collectiveId = X))'
+  },
+  
+  PartyCollectiveAggregate: {
+    scope: 'party',
+    type: 'aggregate',
+    entities: ['collective'],
+    outputType: 'amount',
+    returns: {
+      amount: 'Number',
+      currency: 'String',
+      collectiveId: 'ObjectId',
+      collectiveUuid: 'String',
+      collectiveName: 'String'
+    },
+    associatedEntities: ['collective'],
+    description: 'Sum of party-scoped bids (bidScope: \'party\') across all media belonging to a collective',
+    storage: 'stored', // Stored in Collective.stats.partyCollectiveAggregate
+    formula: 'SUM(bids WHERE bidScope = \'party\' AND mediaId IN (media WHERE artist.collectiveId = X OR producer.collectiveId = X OR featuring.collectiveId = X))'
   },
 
   // ========================================

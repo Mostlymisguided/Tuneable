@@ -98,7 +98,7 @@ const collectiveSchema = new mongoose.Schema({
     
     // Party Engagement
     partiesWithCollectiveMedia: { type: Number, default: 0 }, // Count of parties that have played collective's media
-    totalPartyBidAmount: { type: Number, default: 0 }, // Sum of bids across all parties for collective's media
+    partyCollectiveAggregate: { type: Number, default: 0 }, // Sum of party-scoped bids (bidScope: 'party') across all collective's media (in pence)
     
     // User Engagement
     uniqueBidders: { type: Number, default: 0 }, // Count of unique users who have bid on collective's media

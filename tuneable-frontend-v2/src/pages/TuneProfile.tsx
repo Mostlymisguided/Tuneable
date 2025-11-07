@@ -935,7 +935,7 @@ const TuneProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
-        {/* Header */}
+        {/* Tune Profile Header */}
         <div className="mb-6 md:mb-8 relative">
           <button
             onClick={() => navigate(-1)}

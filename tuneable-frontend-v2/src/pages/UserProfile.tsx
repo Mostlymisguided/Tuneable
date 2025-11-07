@@ -747,7 +747,7 @@ const UserProfile: React.FC = () => {
           <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
         )}
 
-        {/* Header */}
+        {/* User Profile Header */}
         <div className="mb-8 relative">
           <button
             onClick={() => navigate(-1)}
