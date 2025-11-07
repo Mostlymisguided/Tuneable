@@ -451,6 +451,15 @@ router.post(
       
       console.log('User registered successfully:', user);
 
+      // Give beta users £11.11 credit on sign up
+      try {
+        const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
+        await giveBetaSignupCredit(user);
+      } catch (betaCreditError) {
+        console.error('Failed to give beta signup credit:', betaCreditError);
+        // Don't fail registration if beta credit fails
+      }
+
       // Decrement inviter's invite credits (unless admin - admins have unlimited)
       if (!isInviterAdmin && inviter.inviteCredits > 0) {
         inviter.inviteCredits -= 1;
