@@ -357,7 +357,10 @@ mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by ow
 mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
 mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user
 mediaSchema.index({ "editHistory.editedAt": -1 }); // Index for recent edits
-mediaSchema.index({ title: 'text', description: 'text' });
+mediaSchema.index(
+  { title: 'text', description: 'text' },
+  { default_language: 'english', language_override: 'none' }
+);
 
 // Virtual for formatted duration
 mediaSchema.virtual('formattedDuration').get(function() {
