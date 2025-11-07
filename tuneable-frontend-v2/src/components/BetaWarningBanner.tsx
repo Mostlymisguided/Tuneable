@@ -68,9 +68,9 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
               🚧 Tuneable is in Beta Testing 🚧
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed">
-              We're currently in beta testing mode. All transactions use test mode (not real money). 
-              You can top up for free but please spend as you would in real life. When we launch, you will be able to transfer your 
-              username and activity.
+              We're currently in beta testing mode. 
+              You can top up for free but please spend as you would in real life.
+              When we launch, you will be able to transfer your username and activity.
             </p>
           </div>
           {dismissible && (
