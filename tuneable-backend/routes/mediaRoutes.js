@@ -862,10 +862,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Update allowed fields
     // Note: 'sources' is handled separately below due to Map type
     const allowedUpdates = [
-      'title', 'producer', 'featuring', 'album', 'genre',
+      'title', 'producer', 'album', 'genre',
       'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
       'lyrics', 'description'
+      // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
     
     allowedUpdates.forEach(field => {
@@ -983,13 +984,21 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Only process if artist wasn't a string (already handled above)
     if (req.body.featuring !== undefined && typeof req.body.artist !== 'string') {
       if (Array.isArray(req.body.featuring)) {
-        media.featuring = req.body.featuring
-          .filter(name => name && typeof name === 'string' && name.trim())
-          .map(name => ({
-            name: typeof name === 'string' ? name.trim() : name.name,
-            userId: null,
-            verified: false
-          }));
+        // Handle both string arrays and empty arrays
+        if (req.body.featuring.length === 0) {
+          media.featuring = [];
+        } else {
+          media.featuring = req.body.featuring
+            .filter(name => name && typeof name === 'string' && name.trim().length > 0)
+            .map(name => ({
+              name: typeof name === 'string' ? name.trim() : name.name,
+              userId: null,
+              verified: false
+            }));
+        }
+      } else if (req.body.featuring === '' || req.body.featuring === null) {
+        // Clear featuring if empty string or null
+        media.featuring = [];
       }
     }
     
@@ -998,16 +1007,44 @@ router.put('/:id', authMiddleware, async (req, res) => {
       media.creatorDisplay = formatCreatorDisplay(media.artist || [], media.featuring || []);
     }
     
-    // Genre field (singular -> genres array)
-    if (req.body.genre !== undefined) {
-      const oldGenres = media.genres;
-      media.genres = req.body.genre ? [req.body.genre] : [];
-      if (JSON.stringify(oldGenres) !== JSON.stringify(media.genres)) {
+    // Genres field (array of strings -> genres array)
+    // Handle both 'genre' (singular, for backward compatibility) and 'genres' (plural, array)
+    if (req.body.genres !== undefined) {
+      const oldGenres = media.genres || [];
+      let newGenres = [];
+      
+      if (Array.isArray(req.body.genres)) {
+        // If genres is already an array, use it directly (filter empty strings)
+        newGenres = req.body.genres
+          .filter(g => g && typeof g === 'string' && g.trim().length > 0)
+          .map(g => g.trim());
+      } else if (typeof req.body.genres === 'string' && req.body.genres.trim()) {
+        // If genres is a string (comma-separated), split it
+        newGenres = req.body.genres.split(',')
+          .map(g => g.trim())
+          .filter(g => g.length > 0);
+      }
+      
+      // Only update if changed
+      if (JSON.stringify(oldGenres.sort()) !== JSON.stringify(newGenres.sort())) {
         changes.push({
           field: 'genres',
           oldValue: oldGenres,
-          newValue: media.genres
+          newValue: newGenres
         });
+        media.genres = newGenres;
+      }
+    } else if (req.body.genre !== undefined) {
+      // Backward compatibility: handle singular 'genre' field
+      const oldGenres = media.genres || [];
+      const newGenres = req.body.genre ? [req.body.genre] : [];
+      if (JSON.stringify(oldGenres) !== JSON.stringify(newGenres)) {
+        changes.push({
+          field: 'genres',
+          oldValue: oldGenres,
+          newValue: newGenres
+        });
+        media.genres = newGenres;
       }
     }
     

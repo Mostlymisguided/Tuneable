@@ -159,6 +159,9 @@ const TuneProfile: React.FC = () => {
   const isEditMode = searchParams.get('edit') === 'true';
   const editTab = (searchParams.get('tab') as 'info' | 'edit') || 'info';
   const [tagInput, setTagInput] = useState(''); // Separate state for tag input
+  const [genresInput, setGenresInput] = useState(''); // Separate state for genres input
+  const [elementsInput, setElementsInput] = useState(''); // Separate state for elements input
+  const [featuringInput, setFeaturingInput] = useState(''); // Separate state for featuring input
   const [selectedLabel, setSelectedLabel] = useState<{ _id: string; name: string; slug?: string } | null>(null);
   const [labelSearchResults, setLabelSearchResults] = useState<any[]>([]);
   const [isSearchingLabels, setIsSearchingLabels] = useState(false);
@@ -439,6 +442,10 @@ const TuneProfile: React.FC = () => {
       });
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
+      // Set other comma-separated inputs
+      setGenresInput(genresArray.join(', ') || '');
+      setElementsInput((media.elements || []).join(', ') || '');
+      setFeaturingInput(featuringNames.join(', ') || '');
       
       // Set selected label if label has labelId
       const existingLabel = (media as any).label?.[0];
@@ -485,8 +492,18 @@ const TuneProfile: React.FC = () => {
     if (!mediaId) return;
     
     try {
+      // Convert input strings to arrays before saving
+      const tags = tagInput.split(',').map(t => t.trim()).filter(t => t);
+      const genres = genresInput.split(',').map(g => g.trim()).filter(g => g.length > 0);
+      const elements = elementsInput.split(',').map(el => el.trim()).filter(el => el.length > 0);
+      const featuring = featuringInput.split(',').map(f => f.trim()).filter(f => f.length > 0);
+      
       const updateData: any = {
         ...editForm,
+        tags,
+        genres,
+        elements,
+        featuring,
         labelId: selectedLabel?._id || null // Send labelId if selected
       };
       
@@ -520,6 +537,24 @@ const TuneProfile: React.FC = () => {
       e.preventDefault();
       handleTagInputBlur();
     }
+  };
+
+  // Process genres from input string
+  const handleGenresInputBlur = () => {
+    const genres = genresInput.split(',').map(g => g.trim()).filter(g => g.length > 0);
+    setEditForm({ ...editForm, genres });
+  };
+
+  // Process elements from input string
+  const handleElementsInputBlur = () => {
+    const elements = elementsInput.split(',').map(el => el.trim()).filter(el => el.length > 0);
+    setEditForm({ ...editForm, elements });
+  };
+
+  // Process featuring from input string
+  const handleFeaturingInputBlur = () => {
+    const featuring = featuringInput.split(',').map(f => f.trim()).filter(f => f.length > 0);
+    setEditForm({ ...editForm, featuring });
   };
 
   // Get platform icon and color
@@ -1684,8 +1719,8 @@ const TuneProfile: React.FC = () => {
                               className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
                               placeholder="0.01"
                             />
-                          </div>
-                          <button
+            </div>
+              <button
                             onClick={handleGlobalBid}
                             disabled={isPlacingGlobalBid || globalBidAmount < minimumBid}
                             className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
@@ -1701,535 +1736,559 @@ const TuneProfile: React.FC = () => {
                                 <span>Place Global Bid</span>
                               </>
                             )}
-                          </button>
-                        </div>
+              </button>
+            </div>
                         <p className="text-xs text-gray-400">
                           Minimum bid: £{minimumBid.toFixed(2)}
                         </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              </div>
+            </div>
+                </div>
+              )}
 
                 {/* All other normal content sections would go here - comments, top bidders, etc. */}
                 {/* For now, showing a message that user can switch to edit tab */}
                 <div className="card p-6 text-center">
                   <p className="text-gray-300">Switch to the "Edit Tune" tab to modify tune details.</p>
-                </div>
-              </div>
-            )}
+          </div>
+        </div>
+      )}
 
             {editTab === 'edit' && (
               /* Edit Tune Tab - Edit Form */
               <div className="card p-6">
                 <h2 className="text-2xl font-bold text-white mb-6">Edit Tune</h2>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Title *</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="input"
+                    placeholder="Song title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Artist *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={editForm.artist}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditForm({ ...editForm, artist: value });
+                        // If user types, clear collective selection for artist
+                        if (collectiveSearchField === 'artist') {
+                          setSelectedCollective(null);
+                          setCollectiveSearchQuery('');
+                          setShowCollectiveDropdown(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        // Optionally show collective search if query exists
+                        if (collectiveSearchField === 'artist' && collectiveSearchQuery) {
+                          setShowCollectiveDropdown(true);
+                        }
+                      }}
+                      className="input pr-10"
+                      placeholder="Artist name or search for collective"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (collectiveSearchField === 'artist') {
+                          // Toggle off
+                          setCollectiveSearchField(null);
+                          setCollectiveSearchQuery('');
+                          setShowCollectiveDropdown(false);
+                        } else {
+                          // Toggle on for artist
+                          setCollectiveSearchField('artist');
+                          setCollectiveSearchQuery(editForm.artist);
+                          if (editForm.artist && editForm.artist.length >= 2) {
+                            searchCollectives(editForm.artist);
+                          }
+                        }
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-400 transition-colors"
+                      title={collectiveSearchField === 'artist' ? 'Clear collective link' : 'Link to collective'}
+                    >
+                      <Users className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {collectiveSearchField === 'artist' && showCollectiveDropdown && collectiveSearchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ top: '100%', left: 0 }}>
+                      {collectiveSearchResults.map((collective) => (
+                        <button
+                          key={collective._id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCollective(collective);
+                            setEditForm({ ...editForm, artist: collective.name });
+                            setCollectiveSearchQuery(collective.name);
+                            setShowCollectiveDropdown(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
+                        >
+                          <img
+                            src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                            alt={collective.name}
+                            className="h-8 w-8 rounded object-cover flex-shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{collective.name}</div>
+                            {collective.description && (
+                              <div className="text-sm text-gray-400 truncate">{collective.description}</div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {isSearchingCollectives && collectiveSearchField === 'artist' && (
+                    <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    </div>
+                  )}
+                  {selectedCollective && collectiveSearchField === 'artist' && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <span>Linked to: {selectedCollective.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Producer and Album */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Producer</label>
+                  <input
+                    type="text"
+                    value={editForm.producer}
+                    onChange={(e) => setEditForm({ ...editForm, producer: e.target.value })}
+                    className="input"
+                    placeholder="Producer name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Album</label>
+                  <input
+                    type="text"
+                    value={editForm.album}
+                    onChange={(e) => setEditForm({ ...editForm, album: e.target.value })}
+                    className="input"
+                    placeholder="Album name"
+                  />
+                </div>
+              </div>
+              {/* Featuring Artists */}
+              <div>
+                <label className="block text-white font-medium mb-2">Featuring (comma-separated)</label>
+                <input
+                  type="text"
+                      value={featuringInput}
+                      onChange={(e) => setFeaturingInput(e.target.value)}
+                      onBlur={handleFeaturingInputBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleFeaturingInputBlur();
+                        }
+                      }}
+                  className="input"
+                  placeholder="Artist 1, Artist 2, Artist 3"
+                />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Type artists separated by commas. Press Enter or click away to save.
+                    </p>
+              </div>
+   {/* Tags */}
+   <div>
+                <label className="block text-white font-medium mb-2">Tags (comma-separated)</label>
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onBlur={handleTagInputBlur}
+                  onKeyDown={handleTagInputKeyDown}
+                  className="input"
+                  placeholder="pop, indie, summer, upbeat"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Type tags separated by commas. Press Enter or click away to save.
+                </p>
+              </div>
+              {/* Elements */}
+              <div>
+                <label className="block text-white font-medium mb-2">Elements (comma-separated)</label>
+                <input
+                  type="text"
+                      value={elementsInput}
+                      onChange={(e) => setElementsInput(e.target.value)}
+                      onBlur={handleElementsInputBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleElementsInputBlur();
+                        }
+                      }}
+                  className="input"
+                  placeholder="guitar, drums, bass, synthesizer, vocals"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                      Enter musical elements/instruments separated by commas. Press Enter or click away to save.
+                </p>
+              </div>
+
+              {/* Genres and Release Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
+                  <input
+                    type="text"
+                        value={genresInput}
+                        onChange={(e) => setGenresInput(e.target.value)}
+                        onBlur={handleGenresInputBlur}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleGenresInputBlur();
+                          }
+                        }}
+                    className="input"
+                    placeholder="pop, indie, rock, electronic"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                        Enter multiple genres separated by commas. Press Enter or click away to save.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Release Date</label>
+                  <input
+                    type="date"
+                    value={editForm.releaseDate}
+                    onChange={(e) => setEditForm({ ...editForm, releaseDate: e.target.value })}
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              {/* Duration and Explicit */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">Duration (seconds)</label>
+                  <input
+                    type="number"
+                    value={editForm.duration}
+                    onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+                    className="input"
+                    placeholder="Duration in seconds"
+                  />
+                </div>
+                <div className="flex items-center mt-8">
+                  <input
+                    type="checkbox"
+                    id="explicit"
+                    checked={editForm.explicit}
+                    onChange={(e) => setEditForm({ ...editForm, explicit: e.target.checked })}
+                    className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                  />
+                  <label htmlFor="explicit" className="ml-2 text-white font-medium">
+                    Explicit Content
+                  </label>
+                </div>
+              </div>
+            
+              {/* Description */}
+              <div>
+                <label className="block text-white font-medium mb-2">Description</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="input min-h-[100px]"
+                  placeholder="Song description..."
+                />
+              </div>
+
+              {/* Lyrics */}
+              <div>
+                <label className="block text-white font-medium mb-2">Lyrics</label>
+                <textarea
+                  value={editForm.lyrics}
+                  onChange={(e) => setEditForm({ ...editForm, lyrics: e.target.value })}
+                  className="input min-h-[200px] font-mono text-sm"
+                  placeholder="Enter lyrics..."
+                />
+              </div>
+
+              {/* Enhanced Metadata Section */}
+              <div className="border-t border-gray-600 pt-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <Music className="h-5 w-5 mr-2 text-purple-400" />
+                  Enhanced Metadata
+                </h3>
+
+                {/* Creator Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Composer</label>
+                    <input
+                      type="text"
+                      value={editForm.composer}
+                      onChange={(e) => setEditForm({ ...editForm, composer: e.target.value })}
+                      className="input"
+                      placeholder="Composer name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Songwriter</label>
+                    <input
+                      type="text"
+                      value={editForm.mediawriter}
+                      onChange={(e) => setEditForm({ ...editForm, mediawriter: e.target.value })}
+                      className="input"
+                      placeholder="Songwriter name"
+                    />
+                      </div>
+                  </div>
                 
-                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                  {/* Basic Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-white font-medium mb-2">Title *</label>
+    {/* EP */}
+                    <div className="mb-4">
+                <label className="block text-white font-medium mb-2">EP</label>
+                <input
+                  type="text"
+                  value={editForm.EP}
+                  onChange={(e) => setEditForm({ ...editForm, EP: e.target.value })}
+                  className="input"
+                  placeholder="Extended Play name"
+                />
+              </div>
+
+                {/* Label */}
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
+                  <div className="relative" ref={editFormRef}>
+                    <label className="block text-white font-medium mb-2">Label</label>
+                    <div className="relative">
                       <input
                         type="text"
-                        value={editForm.title}
-                        onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                        value={labelSearchQuery}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setLabelSearchQuery(value);
+                          setEditForm({ ...editForm, label: value });
+                          if (!value) {
+                            setSelectedLabel(null);
+                            setShowLabelDropdown(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (labelSearchQuery && labelSearchResults.length > 0) {
+                            setShowLabelDropdown(true);
+                          }
+                        }}
                         className="input"
-                        placeholder="Song title"
+                        placeholder="Search for a label..."
                       />
-                    </div>
-                    <div>
-                      <label className="block text-white font-medium mb-2">Artist *</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={editForm.artist}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setEditForm({ ...editForm, artist: value });
-                            // If user types, clear collective selection for artist
-                            if (collectiveSearchField === 'artist') {
-                              setSelectedCollective(null);
-                              setCollectiveSearchQuery('');
-                              setShowCollectiveDropdown(false);
-                            }
-                          }}
-                          onFocus={() => {
-                            // Optionally show collective search if query exists
-                            if (collectiveSearchField === 'artist' && collectiveSearchQuery) {
-                              setShowCollectiveDropdown(true);
-                            }
-                          }}
-                          className="input pr-10"
-                          placeholder="Artist name or search for collective"
-                        />
+                      {selectedLabel && (
                         <button
                           type="button"
                           onClick={() => {
-                            if (collectiveSearchField === 'artist') {
-                              // Toggle off
-                              setCollectiveSearchField(null);
-                              setCollectiveSearchQuery('');
-                              setShowCollectiveDropdown(false);
-                            } else {
-                              // Toggle on for artist
-                              setCollectiveSearchField('artist');
-                              setCollectiveSearchQuery(editForm.artist);
-                              if (editForm.artist && editForm.artist.length >= 2) {
-                                searchCollectives(editForm.artist);
-                              }
-                            }
+                            setSelectedLabel(null);
+                            setLabelSearchQuery('');
+                            setEditForm({ ...editForm, label: '' });
+                            setShowLabelDropdown(false);
                           }}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-400 transition-colors"
-                          title={collectiveSearchField === 'artist' ? 'Clear collective link' : 'Link to collective'}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                          title="Clear label"
                         >
-                          <Users className="h-4 w-4" />
+                          <X className="h-4 w-4" />
                         </button>
-                      </div>
-                      {collectiveSearchField === 'artist' && showCollectiveDropdown && collectiveSearchResults.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ top: '100%', left: 0 }}>
-                          {collectiveSearchResults.map((collective) => (
-                            <button
-                              key={collective._id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedCollective(collective);
-                                setEditForm({ ...editForm, artist: collective.name });
-                                setCollectiveSearchQuery(collective.name);
-                                setShowCollectiveDropdown(false);
-                              }}
-                              className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
-                            >
-                              <img
-                                src={collective.profilePicture || DEFAULT_PROFILE_PIC}
-                                alt={collective.name}
-                                className="h-8 w-8 rounded object-cover flex-shrink-0"
-                                onError={(e) => {
-                                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{collective.name}</div>
-                                {collective.description && (
-                                  <div className="text-sm text-gray-400 truncate">{collective.description}</div>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {isSearchingCollectives && collectiveSearchField === 'artist' && (
-                        <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
-                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                        </div>
-                      )}
-                      {selectedCollective && collectiveSearchField === 'artist' && (
-                        <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
-                          <CheckCircle className="h-4 w-4 text-green-400" />
-                          <span>Linked to: {selectedCollective.name}</span>
-                        </div>
                       )}
                     </div>
-                  </div>
-
-                  {/* Producer and Album */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-white font-medium mb-2">Producer</label>
-                      <input
-                        type="text"
-                        value={editForm.producer}
-                        onChange={(e) => setEditForm({ ...editForm, producer: e.target.value })}
-                        className="input"
-                        placeholder="Producer name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-white font-medium mb-2">Album</label>
-                      <input
-                        type="text"
-                        value={editForm.album}
-                        onChange={(e) => setEditForm({ ...editForm, album: e.target.value })}
-                        className="input"
-                        placeholder="Album name"
-                      />
-                    </div>
-                  </div>
-                  {/* Featuring Artists */}
-                  <div>
-                    <label className="block text-white font-medium mb-2">Featuring (comma-separated)</label>
-                    <input
-                      type="text"
-                      value={editForm.featuring.join(', ')}
-                      onChange={(e) => setEditForm({ ...editForm, featuring: e.target.value.split(',').map(t => t.trim()).filter(t => t) })}
-                      className="input"
-                      placeholder="Artist 1, Artist 2, Artist 3"
-                    />
-                  </div>
-                  {/* Tags */}
-                  <div>
-                    <label className="block text-white font-medium mb-2">Tags (comma-separated)</label>
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onBlur={handleTagInputBlur}
-                      onKeyDown={handleTagInputKeyDown}
-                      className="input"
-                      placeholder="pop, indie, summer, upbeat"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Type tags separated by commas. Press Enter or click away to save.
-                    </p>
-                  </div>
-                  {/* Elements */}
-                  <div>
-                    <label className="block text-white font-medium mb-2">Elements (comma-separated)</label>
-                    <input
-                      type="text"
-                      value={editForm.elements.join(', ')}
-                      onChange={(e) => setEditForm({ ...editForm, elements: e.target.value.split(',').map(e => e.trim()).filter(e => e) })}
-                      className="input"
-                      placeholder="guitar, drums, bass, synthesizer, vocals"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Enter musical elements/instruments separated by commas
-                    </p>
-                  </div>
-
-                  {/* Genres and Release Date */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
-                      <input
-                        type="text"
-                        value={editForm.genres.join(', ')}
-                        onChange={(e) => setEditForm({ ...editForm, genres: e.target.value.split(',').map(g => g.trim()).filter(g => g) })}
-                        className="input"
-                        placeholder="pop, indie, rock, electronic"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">
-                        Enter multiple genres separated by commas
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-white font-medium mb-2">Release Date</label>
-                      <input
-                        type="date"
-                        value={editForm.releaseDate}
-                        onChange={(e) => setEditForm({ ...editForm, releaseDate: e.target.value })}
-                        className="input"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Duration and Explicit */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-white font-medium mb-2">Duration (seconds)</label>
-                      <input
-                        type="number"
-                        value={editForm.duration}
-                        onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
-                        className="input"
-                        placeholder="Duration in seconds"
-                      />
-                    </div>
-                    <div className="flex items-center mt-8">
-                      <input
-                        type="checkbox"
-                        id="explicit"
-                        checked={editForm.explicit}
-                        onChange={(e) => setEditForm({ ...editForm, explicit: e.target.checked })}
-                        className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
-                      />
-                      <label htmlFor="explicit" className="ml-2 text-white font-medium">
-                        Explicit Content
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-white font-medium mb-2">Description</label>
-                    <textarea
-                      value={editForm.description}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="input min-h-[100px]"
-                      placeholder="Song description..."
-                    />
-                  </div>
-
-                  {/* Lyrics */}
-                  <div>
-                    <label className="block text-white font-medium mb-2">Lyrics</label>
-                    <textarea
-                      value={editForm.lyrics}
-                      onChange={(e) => setEditForm({ ...editForm, lyrics: e.target.value })}
-                      className="input min-h-[200px] font-mono text-sm"
-                      placeholder="Enter lyrics..."
-                    />
-                  </div>
-
-                  {/* Enhanced Metadata Section */}
-                  <div className="border-t border-gray-600 pt-6">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                      <Music className="h-5 w-5 mr-2 text-purple-400" />
-                      Enhanced Metadata
-                    </h3>
-
-                    {/* Creator Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-white font-medium mb-2">Composer</label>
-                        <input
-                          type="text"
-                          value={editForm.composer}
-                          onChange={(e) => setEditForm({ ...editForm, composer: e.target.value })}
-                          className="input"
-                          placeholder="Composer name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white font-medium mb-2">Songwriter</label>
-                        <input
-                          type="text"
-                          value={editForm.mediawriter}
-                          onChange={(e) => setEditForm({ ...editForm, mediawriter: e.target.value })}
-                          className="input"
-                          placeholder="Songwriter name"
-                        />
-                      </div>
-                    </div>
-
-                    {/* EP */}
-                    <div className="mb-4">
-                      <label className="block text-white font-medium mb-2">EP</label>
-                      <input
-                        type="text"
-                        value={editForm.EP}
-                        onChange={(e) => setEditForm({ ...editForm, EP: e.target.value })}
-                        className="input"
-                        placeholder="Extended Play name"
-                      />
-                    </div>
-
-                    {/* Label */}
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
-                      <div className="relative" ref={editFormRef}>
-                        <label className="block text-white font-medium mb-2">Label</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={labelSearchQuery}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setLabelSearchQuery(value);
-                              setEditForm({ ...editForm, label: value });
-                              if (!value) {
-                                setSelectedLabel(null);
-                                setShowLabelDropdown(false);
-                              }
+                    {showLabelDropdown && labelSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {labelSearchResults.map((label) => (
+                          <button
+                            key={label._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLabel(label);
+                              setLabelSearchQuery(label.name);
+                              setEditForm({ ...editForm, label: label.name });
+                              setShowLabelDropdown(false);
                             }}
-                            onFocus={() => {
-                              if (labelSearchQuery && labelSearchResults.length > 0) {
-                                setShowLabelDropdown(true);
-                              }
-                            }}
-                            className="input"
-                            placeholder="Search for a label..."
-                          />
-                          {selectedLabel && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedLabel(null);
-                                setLabelSearchQuery('');
-                                setEditForm({ ...editForm, label: '' });
-                                setShowLabelDropdown(false);
+                            className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
+                          >
+                            <img
+                              src={label.profilePicture || DEFAULT_PROFILE_PIC}
+                              alt={label.name}
+                              className="h-8 w-8 rounded object-cover flex-shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
                               }}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                              title="Clear label"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                        {showLabelDropdown && labelSearchResults.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                            {labelSearchResults.map((label) => (
-                              <button
-                                key={label._id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedLabel(label);
-                                  setLabelSearchQuery(label.name);
-                                  setEditForm({ ...editForm, label: label.name });
-                                  setShowLabelDropdown(false);
-                                }}
-                                className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
-                              >
-                                <img
-                                  src={label.profilePicture || DEFAULT_PROFILE_PIC}
-                                  alt={label.name}
-                                  className="h-8 w-8 rounded object-cover flex-shrink-0"
-                                  onError={(e) => {
-                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                  }}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium truncate">{label.name}</div>
-                                  {label.description && (
-                                    <div className="text-sm text-gray-400 truncate">{label.description}</div>
-                                  )}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {isSearchingLabels && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                          </div>
-                        )}
-                        {selectedLabel && (
-                          <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                            <span>Linked to: {selectedLabel.name}</span>
-                          </div>
-                        )}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{label.name}</div>
+                              {label.description && (
+                                <div className="text-sm text-gray-400 truncate">{label.description}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    </div>
+                    )}
+                    {isSearchingLabels && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      </div>
+                    )}
+                    {selectedLabel && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
+                        <CheckCircle className="h-4 w-4 text-green-400" />
+                        <span>Linked to: {selectedLabel.name}</span>
+                      </div>
+                    )}
+                </div>
+                </div>
 
-                    {/* Technical Metadata */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <label className="block text-white font-medium mb-2">Bitrate (kbps)</label>
-                        <input
-                          type="number"
-                          value={editForm.bitrate}
-                          onChange={(e) => setEditForm({ ...editForm, bitrate: parseInt(e.target.value) || 0 })}
-                          className="input"
-                          placeholder="320"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white font-medium mb-2">Sample Rate (Hz)</label>
-                        <input
-                          type="number"
-                          value={editForm.sampleRate}
-                          onChange={(e) => setEditForm({ ...editForm, sampleRate: parseInt(e.target.value) || 0 })}
-                          className="input"
-                          placeholder="44100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white font-medium mb-2">Pitch (Hz)</label>
-                        <input
-                          type="number"
-                          step="1"
-                          value={editForm.pitch}
-                          onChange={(e) => setEditForm({ ...editForm, pitch: parseInt(e.target.value) || 440 })}
-                          className="input"
-                          placeholder="440"
-                        />
-                      </div>
-                    </div>
-
-                    {/* BPM and Key */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-white font-medium mb-2">BPM</label>
-                        <input
-                          type="number"
-                          value={editForm.bpm}
-                          onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
-                          className="input"
-                          placeholder="Beats per minute"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white font-medium mb-2">Key</label>
-                        <input
-                          type="text"
-                          value={editForm.key}
-                          onChange={(e) => setEditForm({ ...editForm, key: e.target.value })}
-                          className="input"
-                          placeholder="Musical key (e.g., C Major)"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Time Signature and Language */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-white font-medium mb-2">Time Signature</label>
-                        <input
-                          type="text"
-                          value={editForm.timeSignature}
-                          onChange={(e) => setEditForm({ ...editForm, timeSignature: e.target.value })}
-                          className="input"
-                          placeholder="4/4"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white font-medium mb-2">Language</label>
-                        <input
-                          type="text"
-                          value={editForm.language}
-                          onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
-                          className="input"
-                          placeholder="en"
-                        />
-                      </div>
-                    </div>
-                    {/* ISRC and UPC */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-white font-medium mb-2">ISRC</label>
-                        <input
-                          type="text"
-                          value={editForm.isrc}
-                          onChange={(e) => setEditForm({ ...editForm, isrc: e.target.value })}
-                          className="input"
-                          placeholder="ISRC code"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white font-medium mb-2">UPC</label>
-                        <input
-                          type="text"
-                          value={editForm.upc}
-                          onChange={(e) => setEditForm({ ...editForm, upc: e.target.value })}
-                          className="input"
-                          placeholder="UPC code"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Cover Art URL */}
-                    <div>
-                      <label className="block text-white font-medium mb-2">Cover Art URL</label>
-                      <input
-                        type="url"
-                        value={editForm.coverArt}
-                        onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
-                        className="input"
-                        placeholder="https://example.com/cover.jpg"
-                      />
-                    </div>
+                {/* Technical Metadata */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Bitrate (kbps)</label>
+                    <input
+                      type="number"
+                      value={editForm.bitrate}
+                      onChange={(e) => setEditForm({ ...editForm, bitrate: parseInt(e.target.value) || 0 })}
+                      className="input"
+                      placeholder="320"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Sample Rate (Hz)</label>
+                    <input
+                      type="number"
+                      value={editForm.sampleRate}
+                      onChange={(e) => setEditForm({ ...editForm, sampleRate: parseInt(e.target.value) || 0 })}
+                      className="input"
+                      placeholder="44100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Pitch (Hz)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={editForm.pitch}
+                      onChange={(e) => setEditForm({ ...editForm, pitch: parseInt(e.target.value) || 440 })}
+                      className="input"
+                      placeholder="440"
+                    />
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex space-x-3 mt-6">
-                  <button
-                    onClick={handleSaveTune}
-                    className="btn-primary flex-1 flex items-center justify-center space-x-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    <span>Save Changes</span>
-                  </button>
-                  <button
+              {/* BPM and Key */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">BPM</label>
+                  <input
+                    type="number"
+                    value={editForm.bpm}
+                    onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
+                    className="input"
+                    placeholder="Beats per minute"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Key</label>
+                  <input
+                    type="text"
+                    value={editForm.key}
+                    onChange={(e) => setEditForm({ ...editForm, key: e.target.value })}
+                    className="input"
+                    placeholder="Musical key (e.g., C Major)"
+                  />
+                </div>
+              </div>
+
+                {/* Time Signature and Language */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Time Signature</label>
+                    <input
+                      type="text"
+                      value={editForm.timeSignature}
+                      onChange={(e) => setEditForm({ ...editForm, timeSignature: e.target.value })}
+                      className="input"
+                      placeholder="4/4"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Language</label>
+                    <input
+                      type="text"
+                      value={editForm.language}
+                      onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
+                      className="input"
+                      placeholder="en"
+                    />
+                  </div>
+                </div>
+                 {/* ISRC and UPC */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white font-medium mb-2">ISRC</label>
+                  <input
+                    type="text"
+                    value={editForm.isrc}
+                    onChange={(e) => setEditForm({ ...editForm, isrc: e.target.value })}
+                    className="input"
+                    placeholder="ISRC code"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">UPC</label>
+                  <input
+                    type="text"
+                    value={editForm.upc}
+                    onChange={(e) => setEditForm({ ...editForm, upc: e.target.value })}
+                    className="input"
+                    placeholder="UPC code"
+                  />
+                </div>
+              </div>
+
+                {/* Cover Art URL */}
+                <div>
+                  <label className="block text-white font-medium mb-2">Cover Art URL</label>
+                  <input
+                    type="url"
+                    value={editForm.coverArt}
+                    onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
+                    className="input"
+                    placeholder="https://example.com/cover.jpg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleSaveTune}
+                className="btn-primary flex-1 flex items-center justify-center space-x-2"
+              >
+                <Save className="h-4 w-4" />
+                <span>Save Changes</span>
+              </button>
+              <button
                     onClick={exitEditMode}
                     className="btn-secondary"
                   >
