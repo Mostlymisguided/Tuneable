@@ -143,7 +143,7 @@ const mediaSchema = new mongoose.Schema({
     percentage: { type: Number, min: 0, max: 100, required: true },
     role: { 
       type: String, 
-      enum: ['creator', 'aux', 'primary'],
+      enum: ['creator', 'primary', 'aux', 'publisher', 'label', 'collective'],
       default: 'creator'
     },
     verified: { type: Boolean, default: false },

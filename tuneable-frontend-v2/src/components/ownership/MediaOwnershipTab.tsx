@@ -102,6 +102,15 @@ const DEFAULT_OWNER_ROW: OwnershipRecord = {
   lastUpdatedAt: null,
 };
 
+const OWNER_ROLE_OPTIONS = [
+  { value: 'creator', label: 'Creator' },
+  { value: 'primary', label: 'Primary (Lead)' },
+  { value: 'aux', label: 'Auxiliary' },
+  { value: 'publisher', label: 'Publisher' },
+  { value: 'label', label: 'Label' },
+  { value: 'collective', label: 'Collective' },
+];
+
 const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
   mediaId,
   canEdit,
@@ -556,6 +565,24 @@ const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
                           disabled={!canEdit}
                           className="w-full rounded-lg border border-gray-700 bg-black/60 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 disabled:opacity-60 disabled:cursor-not-allowed"
                         />
+                      </div>
+
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-gray-500 mb-1 block">
+                          Owner Role
+                        </label>
+                        <select
+                          value={row.role || 'creator'}
+                          onChange={(e) => handleVerificationFieldChange(originalIndex, 'role', e.target.value)}
+                          disabled={!canEdit}
+                          className="w-full rounded-lg border border-gray-700 bg-black/60 px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {OWNER_ROLE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
