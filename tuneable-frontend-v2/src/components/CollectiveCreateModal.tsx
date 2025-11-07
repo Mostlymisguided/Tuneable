@@ -18,6 +18,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({ isOpen, o
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [genresInput, setGenresInput] = useState(''); // Separate state for genres input
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -40,10 +41,24 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({ isOpen, o
         genres: [],
         foundedYear: ''
       });
+      setGenresInput('');
       setProfilePicture(null);
       setProfilePicturePreview(null);
     }
   }, [isOpen, user]);
+
+  // Process genres from input string
+  const handleGenresInputBlur = () => {
+    const genres = genresInput.split(',').map(g => g.trim()).filter(g => g.length > 0);
+    setFormData(prev => ({ ...prev, genres }));
+  };
+
+  const handleGenresInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleGenresInputBlur();
+    }
+  };
 
   // Handle profile picture selection
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +96,15 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({ isOpen, o
     try {
       setIsLoading(true);
       
+      // Process genres from input if not already processed (in case user didn't blur or press Enter)
+      let genresToUse = formData.genres;
+      if (genresInput.trim()) {
+        const processedGenres = genresInput.split(',').map(g => g.trim()).filter(g => g.length > 0);
+        if (processedGenres.length > 0) {
+          genresToUse = processedGenres;
+        }
+      }
+      
       // Create FormData for file upload
       const createData = new FormData();
       createData.append('name', formData.name);
@@ -88,8 +112,8 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({ isOpen, o
       if (formData.description) createData.append('description', formData.description);
       if (formData.website) createData.append('website', formData.website);
       createData.append('type', formData.type);
-      if (formData.genres.length > 0) {
-        formData.genres.forEach(genre => createData.append('genres', genre));
+      if (genresToUse.length > 0) {
+        genresToUse.forEach(genre => createData.append('genres', genre));
       }
       if (formData.foundedYear) createData.append('foundedYear', formData.foundedYear);
       if (profilePicture) createData.append('profilePicture', profilePicture);
@@ -209,14 +233,16 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({ isOpen, o
             <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
             <input
               type="text"
-              value={formData.genres.join(', ')}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                genres: e.target.value.split(',').map(g => g.trim()).filter(g => g)
-              }))}
+              value={genresInput}
+              onChange={(e) => setGenresInput(e.target.value)}
+              onBlur={handleGenresInputBlur}
+              onKeyDown={handleGenresInputKeyDown}
               className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
               placeholder="electronic, hip-hop, rock"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Press Enter or click outside to save genres
+            </p>
           </div>
 
           <div>
