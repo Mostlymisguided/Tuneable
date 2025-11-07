@@ -12,7 +12,7 @@ const labelSchema = new mongoose.Schema({
   coverImage: { type: String }, // URL to cover image
   
   // Contact & Location
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true },
   website: { type: String },
   location: {
     city: { type: String },
