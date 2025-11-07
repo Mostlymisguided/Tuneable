@@ -531,11 +531,30 @@ mediaSchema.methods.getPendingCreators = function() {
   return pendingCreators;
 };
 
+const toObjectId = (value) => {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId || value instanceof mongoose.mongo.ObjectId) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return new mongoose.Types.ObjectId(value);
+  }
+  if (typeof value === 'object' && value._id) {
+    return toObjectId(value._id);
+  }
+  return new mongoose.Types.ObjectId(String(value));
+};
+
 // Schema method: Add a media owner
 mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator', addedBy, options = {}) {
+  const normalizedUserId = toObjectId(userId);
+  if (!normalizedUserId) {
+    throw new Error('Invalid userId');
+  }
+
   // Check if user is already an owner
   const existingOwner = this.mediaOwners.find(owner => 
-    owner.userId.toString() === userId.toString()
+    owner.userId.toString() === normalizedUserId.toString()
   );
   
   if (existingOwner) {
@@ -550,13 +569,11 @@ mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator
   
   const now = new Date();
   const verifiedAt = options.verifiedAt ? new Date(options.verifiedAt) : null;
-  const verifiedBy = options.verifiedBy ? mongoose.Types.ObjectId(options.verifiedBy) : null;
-  const actorId = options.addedBy
-    ? mongoose.Types.ObjectId(options.addedBy)
-    : (addedBy ? mongoose.Types.ObjectId(addedBy) : mongoose.Types.ObjectId(userId));
+  const verifiedBy = toObjectId(options.verifiedBy);
+  const actorId = toObjectId(options.addedBy) || toObjectId(addedBy) || normalizedUserId;
 
   this.mediaOwners.push({
-    userId,
+    userId: normalizedUserId,
     percentage,
     role,
     verified: options.verified === true || !!verifiedAt || !!verifiedBy,
@@ -581,10 +598,10 @@ mediaSchema.methods.addMediaOwner = function(userId, percentage, role = 'creator
     actor: actorId,
     note: options.note || null,
     diff: [{
-      field: `owner:${userId.toString()}`,
+      field: `owner:${normalizedUserId.toString()}`,
       from: null,
       to: {
-        userId: userId.toString(),
+        userId: normalizedUserId.toString(),
         percentage,
         verified: options.verified === true || !!verifiedAt || !!verifiedBy,
         verifiedAt,
@@ -642,7 +659,7 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
   }
 
   const now = new Date();
-  const actorObjectId = actorId ? mongoose.Types.ObjectId(actorId) : null;
+  const actorObjectId = toObjectId(actorId);
 
   const oldOwnersSnapshot = (this.mediaOwners || []).map(owner => ({
     userId: owner.userId?.toString(),
@@ -664,7 +681,12 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
       throw new Error('Each owner entry must include a userId');
     }
 
-    const userIdStr = userId.toString();
+    const normalizedUserId = toObjectId(userId);
+    if (!normalizedUserId) {
+      throw new Error('Invalid userId');
+    }
+
+    const userIdStr = normalizedUserId.toString();
     if (seen.has(userIdStr)) {
       throw new Error('Duplicate owner entries are not permitted');
     }
@@ -683,14 +705,13 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
     total += percentage;
 
     const verifiedAt = rawOwner.verifiedAt ? new Date(rawOwner.verifiedAt) : null;
-    const verifiedBy = rawOwner.verifiedBy ? mongoose.Types.ObjectId(rawOwner.verifiedBy) : null;
+    const verifiedBy = toObjectId(rawOwner.verifiedBy);
 
-    const derivedAddedBy = rawOwner.addedBy
-      ? mongoose.Types.ObjectId(rawOwner.addedBy)
-      : (actorObjectId || mongoose.Types.ObjectId(userId));
+    const derivedAddedBy = toObjectId(rawOwner.addedBy) || actorObjectId || normalizedUserId;
+    const lastUpdatedBy = actorObjectId || derivedAddedBy;
 
     return {
-      userId: mongoose.Types.ObjectId(userId),
+      userId: normalizedUserId,
       percentage,
       role: rawOwner.role || 'creator',
       verified: rawOwner.verified === true || !!verifiedAt || !!verifiedBy,
@@ -702,7 +723,7 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
       addedBy: derivedAddedBy,
       addedAt: rawOwner.addedAt ? new Date(rawOwner.addedAt) : now,
       lastUpdatedAt: now,
-      lastUpdatedBy: actorObjectId || derivedAddedBy
+      lastUpdatedBy
     };
   });
 
