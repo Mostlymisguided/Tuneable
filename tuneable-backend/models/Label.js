@@ -43,6 +43,7 @@ const labelSchema = new mongoose.Schema({
   
   // Management & Staff
   admins: [{
+    _id: false, // Disable _id for subdocuments (not needed since we identify by userId)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     role: { type: String, enum: ['owner', 'admin'], required: true },
     addedAt: { type: Date, default: Date.now },

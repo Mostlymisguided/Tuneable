@@ -51,6 +51,7 @@ const collectiveSchema = new mongoose.Schema({
   
   // Members (like Label's admins, but more flexible for creative roles)
   members: [{
+    _id: false, // Disable _id for subdocuments (not needed since we identify by userId)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     role: { 
       type: String, 
