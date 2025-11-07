@@ -1056,7 +1056,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">{penceToPounds(label.totalBidAmount || 0)}</div>
+                                              <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1224,7 +1224,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">{penceToPounds(label.totalBidAmount || 0)}</div>
+                                              <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (
@@ -1398,7 +1398,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
                                             <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
                                             <td className="px-4 py-3">
-                                              <div className="text-white font-medium">{penceToPounds(label.totalBidAmount || 0)}</div>
+                                              <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                               {label.verificationStatus === 'verified' ? (

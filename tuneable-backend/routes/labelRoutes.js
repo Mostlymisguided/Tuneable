@@ -44,8 +44,8 @@ router.get('/', async (req, res) => {
 
     // Build sort object
     const sort = {};
-    if (sortBy === 'totalBidAmount') {
-      sort['stats.totalBidAmount'] = sortOrder === 'desc' ? -1 : 1;
+    if (sortBy === 'totalBidAmount' || sortBy === 'globalLabelAggregate') {
+      sort['stats.globalLabelAggregate'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'artistCount') {
       sort['stats.artistCount'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'name') {
@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
     }
 
     const labels = await Label.find(query)
-      .select('name slug profilePicture description genres stats.totalBidAmount stats.artistCount stats.releaseCount')
+      .select('name slug profilePicture description genres stats.globalLabelAggregate stats.artistCount stats.releaseCount')
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -212,10 +212,10 @@ router.get('/:slug', async (req, res) => {
       labelResponse.stats = {
         artistCount: 0,
         releaseCount: 0,
-        totalBidAmount: 0,
-        averageBidAmount: 0,
-        topBidAmount: 0,
-        totalBidCount: 0
+        globalLabelAggregate: 0,
+        globalLabelBidAvg: 0,
+        globalLabelBidTop: 0,
+        globalLabelBidCount: 0
       };
     }
 
@@ -267,15 +267,15 @@ router.get('/:slug/media', async (req, res) => {
     const sort = {};
     if (sortBy === 'releaseDate') {
       sort.releaseDate = sortOrder === 'desc' ? -1 : 1;
-    } else if (sortBy === 'totalBidAmount') {
-      sort['stats.totalBidAmount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'totalBidAmount' || sortBy === 'globalMediaAggregate') {
+      sort.globalMediaAggregate = sortOrder === 'desc' ? -1 : 1;
     }
 
     const media = await Media.find({ 
       'label.labelId': label._id,
       isActive: true 
     })
-    .select('title artist coverArt releaseDate stats.totalBidAmount stats.bidCount')
+    .select('title artist coverArt releaseDate globalMediaAggregate uuid _id')
     .sort(sort)
     .limit(limit * 1)
     .skip((page - 1) * limit);
@@ -577,8 +577,8 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
       sort.name = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'verificationStatus') {
       sort.verificationStatus = sortOrder === 'desc' ? -1 : 1;
-    } else if (sortBy === 'totalBidAmount') {
-      sort['stats.totalBidAmount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'totalBidAmount' || sortBy === 'globalLabelAggregate') {
+      sort['stats.globalLabelAggregate'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'artistCount') {
       sort['stats.artistCount'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'releaseCount') {
@@ -590,7 +590,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
     }
 
     const labels = await Label.find(query)
-      .select('name slug email logo verificationStatus verificationMethod verifiedAt verifiedBy stats.totalBidAmount stats.artistCount stats.releaseCount stats.lastBidAt genres createdAt updatedAt')
+      .select('name slug email logo verificationStatus verificationMethod verifiedAt verifiedBy stats.globalLabelAggregate stats.artistCount stats.releaseCount stats.lastBidAt genres createdAt updatedAt')
       .populate('admins.userId', 'username email uuid profilePic')
       .populate('verifiedBy', 'username')
       .sort(sort)

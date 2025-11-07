@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
  * This service calculates label stats from actual data:
  * - artistCount: Users with active labelAffiliations to this label
  * - releaseCount: Media items with this label's labelId
- * - totalBidAmount: Sum of globalMediaAggregate for all label's media
+ * - globalLabelAggregate: Sum of globalMediaAggregate for all label's media
  * - Other bid metrics: aggregated from label's media
  * 
  * @param {ObjectId|String} labelId - Label ID (ObjectId or string)
@@ -71,20 +71,20 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
     const mediaIds = labelMedia.map(m => m._id);
 
     // 4. Calculate bid metrics from label's media
-    let totalBidAmount = 0;
-    let topBidAmount = 0;
-    let totalBidCount = 0;
+    let globalLabelAggregate = 0;
+    let globalLabelBidTop = 0;
+    let globalLabelBidCount = 0;
     let lastBidAt = null;
     let firstBidAt = null;
 
     if (mediaIds.length > 0) {
       // Sum total bid amounts from media
-      totalBidAmount = labelMedia.reduce((sum, media) => {
+      globalLabelAggregate = labelMedia.reduce((sum, media) => {
         return sum + (media.globalMediaAggregate || 0);
       }, 0);
 
       // Find top bid amount
-      topBidAmount = Math.max(...labelMedia.map(m => m.globalMediaBidTop || 0), 0);
+      globalLabelBidTop = Math.max(...labelMedia.map(m => m.globalMediaBidTop || 0), 0);
 
       // Count total bids on label's media
       const bids = await Bid.find({
@@ -92,7 +92,7 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
         status: 'active'
       }).select('amount createdAt').sort({ createdAt: 1 }).lean();
 
-      totalBidCount = bids.length;
+      globalLabelBidCount = bids.length;
 
       // Find first and last bid dates
       if (bids.length > 0) {
@@ -101,8 +101,8 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
       }
 
       // Calculate average bid amount
-      const averageBidAmount = totalBidAmount > 0 && totalBidCount > 0 
-        ? totalBidAmount / totalBidCount 
+      const globalLabelBidAvg = globalLabelAggregate > 0 && globalLabelBidCount > 0 
+        ? globalLabelAggregate / globalLabelBidCount 
         : 0;
 
       // Get top performing media (top 10 by totalBidAmount)
@@ -179,10 +179,10 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
       label.stats = {
         artistCount,
         releaseCount,
-        totalBidAmount,
-        averageBidAmount,
-        topBidAmount,
-        totalBidCount,
+        globalLabelAggregate,
+        globalLabelBidAvg,
+        globalLabelBidTop,
+        globalLabelBidCount,
         topPerformingMedia,
         partiesWithLabelMedia,
         totalPartyBidAmount,
@@ -200,10 +200,10 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
       label.stats = {
         artistCount,
         releaseCount,
-        totalBidAmount: 0,
-        averageBidAmount: 0,
-        topBidAmount: 0,
-        totalBidCount: 0,
+        globalLabelAggregate: 0,
+        globalLabelBidAvg: 0,
+        globalLabelBidTop: 0,
+        globalLabelBidCount: 0,
         topPerformingMedia: [],
         partiesWithLabelMedia: 0,
         totalPartyBidAmount: 0,
@@ -221,7 +221,7 @@ async function calculateAndUpdateLabelStats(labelId, forceRecalculate = false) {
 
     console.log(`✅ Updated stats for label ${label.name}:`);
     console.log(`   Artists: ${artistCount}, Releases: ${releaseCount}`);
-    console.log(`   Total Bids: £${totalBidAmount.toFixed(2)} (${totalBidCount} bids)`);
+    console.log(`   Total Bids: £${(globalLabelAggregate / 100).toFixed(2)} (${globalLabelBidCount} bids)`);
 
     return label.stats;
   } catch (error) {
@@ -271,10 +271,10 @@ async function calculateLabelRankings() {
   try {
     const Label = require('../models/Label');
 
-    // Get all labels sorted by totalBidAmount
+    // Get all labels sorted by globalLabelAggregate
     const allLabels = await Label.find({ isActive: true })
-      .select('_id name genres stats.totalBidAmount')
-      .sort({ 'stats.totalBidAmount': -1 });
+      .select('_id name genres stats.globalLabelAggregate')
+      .sort({ 'stats.globalLabelAggregate': -1 });
 
     // Calculate global rankings
     allLabels.forEach((label, index) => {
@@ -297,10 +297,10 @@ async function calculateLabelRankings() {
       }
     });
 
-    // Sort by totalBidAmount within each genre
+    // Sort by globalLabelAggregate within each genre
     Object.keys(genreGroups).forEach(genre => {
       const genreLabels = genreGroups[genre].sort((a, b) => 
-        (b.stats?.totalBidAmount || 0) - (a.stats?.totalBidAmount || 0)
+        (b.stats?.globalLabelAggregate || 0) - (a.stats?.globalLabelAggregate || 0)
       );
       
       genreLabels.forEach((label, index) => {

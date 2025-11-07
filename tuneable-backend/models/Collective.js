@@ -81,10 +81,10 @@ const collectiveSchema = new mongoose.Schema({
     
     // Bid Metrics (from bidMetricsSchema)
     // NOTE: All amounts stored in PENCE (integer), not pounds
-    totalBidAmount: { type: Number, default: 0 }, // GlobalAggregate for collective's media (in pence)
-    averageBidAmount: { type: Number, default: 0 }, // GlobalBidAvg for collective's media (in pence)
-    topBidAmount: { type: Number, default: 0 }, // GlobalBidTop for collective's media (in pence)
-    totalBidCount: { type: Number, default: 0 }, // Count of all bids on collective's media
+    globalCollectiveAggregate: { type: Number, default: 0 }, // GlobalAggregate for collective's media (in pence)
+    globalCollectiveBidAvg: { type: Number, default: 0 }, // GlobalBidAvg for collective's media (in pence)
+    globalCollectiveBidTop: { type: Number, default: 0 }, // GlobalBidTop for collective's media (in pence)
+    globalCollectiveBidCount: { type: Number, default: 0 }, // Count of all bids on collective's media
     
     // Media Performance (bid-centric)
     topPerformingMedia: [{
@@ -140,7 +140,7 @@ collectiveSchema.index({ name: 1 });
 collectiveSchema.index({ slug: 1 });
 collectiveSchema.index({ email: 1 });
 collectiveSchema.index({ type: 1 });
-collectiveSchema.index({ 'stats.totalBidAmount': -1 });
+collectiveSchema.index({ 'stats.globalCollectiveAggregate': -1 });
 collectiveSchema.index({ 'stats.globalRank': 1 });
 collectiveSchema.index({ 'stats.genreRank': 1 });
 collectiveSchema.index({ 'stats.lastBidAt': -1 });
@@ -225,10 +225,10 @@ collectiveSchema.statics.findBySlug = function(slug) {
 
 // Static method to get top collectives by bid amount
 collectiveSchema.statics.getTopByBidAmount = function(limit = 10) {
-  return this.find({ isActive: true, 'stats.totalBidAmount': { $gt: 0 } })
-    .sort({ 'stats.totalBidAmount': -1 })
+  return this.find({ isActive: true, 'stats.globalCollectiveAggregate': { $gt: 0 } })
+    .sort({ 'stats.globalCollectiveAggregate': -1 })
     .limit(limit)
-    .select('name slug profilePicture stats.totalBidAmount stats.memberCount stats.releaseCount type');
+    .select('name slug profilePicture stats.globalCollectiveAggregate stats.memberCount stats.releaseCount type');
 };
 
 // Static method to get collectives by genre
@@ -236,9 +236,9 @@ collectiveSchema.statics.getByGenre = function(genre, limit = 20) {
   return this.find({ 
     isActive: true, 
     genres: genre,
-    'stats.totalBidAmount': { $gt: 0 }
+    'stats.globalCollectiveAggregate': { $gt: 0 }
   })
-  .sort({ 'stats.totalBidAmount': -1 })
+  .sort({ 'stats.globalCollectiveAggregate': -1 })
   .limit(limit);
 };
 
@@ -247,9 +247,9 @@ collectiveSchema.statics.getByType = function(type, limit = 20) {
   return this.find({ 
     isActive: true, 
     type: type,
-    'stats.totalBidAmount': { $gt: 0 }
+    'stats.globalCollectiveAggregate': { $gt: 0 }
   })
-  .sort({ 'stats.totalBidAmount': -1 })
+  .sort({ 'stats.globalCollectiveAggregate': -1 })
   .limit(limit);
 };
 

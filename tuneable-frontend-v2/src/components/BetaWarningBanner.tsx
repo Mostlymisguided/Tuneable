@@ -43,7 +43,7 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="h-4 w-4 text-yellow-400" />
-            <span className="text-sm font-medium">Beta Testing Mode - Test Credits Only</span>
+            <span className="text-sm font-medium">Beta Testing Mode</span>
           </div>
           {dismissible && (
             <button

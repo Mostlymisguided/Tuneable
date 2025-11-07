@@ -719,7 +719,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       .populate({
         path: 'label.labelId',
         model: 'Label',
-        select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.totalBidAmount'
+        select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.globalLabelAggregate'
       })
       .populate({
         path: 'artist.collectiveId',

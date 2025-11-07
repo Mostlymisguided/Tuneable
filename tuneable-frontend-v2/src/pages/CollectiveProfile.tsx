@@ -36,10 +36,10 @@ interface Collective {
   stats?: {
     memberCount?: number;
     releaseCount?: number;
-    totalBidAmount?: number;
-    averageBidAmount?: number;
-    topBidAmount?: number;
-    totalBidCount?: number;
+    globalCollectiveAggregate?: number;
+    globalCollectiveBidAvg?: number;
+    globalCollectiveBidTop?: number;
+    globalCollectiveBidCount?: number;
   };
   verificationStatus?: string;
   createdAt?: string;
@@ -494,17 +494,17 @@ const CollectiveProfile: React.FC = () => {
                   <div className="text-sm text-gray-300">Releases</div>
                 </div>
               )}
-              {collective.stats.totalBidAmount !== undefined && (
+              {collective.stats.globalCollectiveAggregate !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-6 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">£{penceToPounds(collective.stats.totalBidAmount || 0)}</div>
+                  <div className="text-2xl font-bold text-white">£{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
                   <div className="text-sm text-gray-300">Total Bids</div>
                 </div>
               )}
-              {collective.stats.totalBidCount !== undefined && (
+              {collective.stats.globalCollectiveBidCount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-6 text-center">
                   <Calendar className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{collective.stats.totalBidCount || 0}</div>
+                  <div className="text-2xl font-bold text-white">{collective.stats.globalCollectiveBidCount || 0}</div>
                   <div className="text-sm text-gray-300">Total Bid Count</div>
                 </div>
               )}

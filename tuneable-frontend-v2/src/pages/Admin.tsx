@@ -906,11 +906,11 @@ const Admin: React.FC = () => {
                         </th>
                         <th 
                           className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleLabelSort('totalBidAmount')}
+                          onClick={() => handleLabelSort('globalLabelAggregate')}
                         >
                           <div className="flex items-center">
                             Total Bids
-                            {getLabelSortIcon('totalBidAmount')}
+                            {getLabelSortIcon('globalLabelAggregate')}
                           </div>
                         </th>
                         <th 
@@ -1000,7 +1000,7 @@ const Admin: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              {penceToPounds(label.stats?.totalBidAmount || 0)}
+                              {penceToPounds(label.stats?.globalLabelAggregate || 0)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

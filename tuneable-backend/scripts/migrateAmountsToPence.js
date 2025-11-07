@@ -10,9 +10,9 @@
  * - Media.globalMediaAggregate
  * - Media.globalMediaBidTop
  * - Media.globalMediaAggregateTop
- * - Label.stats.totalBidAmount
- * - Label.stats.averageBidAmount
- * - Label.stats.topBidAmount
+ * - Label.stats.globalLabelAggregate
+ * - Label.stats.globalLabelBidAvg
+ * - Label.stats.globalLabelBidTop
  * 
  * Usage:
  * MONGO_URI="your_mongo_uri" node tuneable-backend/scripts/migrateAmountsToPence.js
@@ -150,23 +150,23 @@ async function migrateAmountsToPence() {
       if (label.stats && typeof label.stats === 'object') {
         let updated = false;
         
-        if (label.stats.totalBidAmount !== undefined && label.stats.totalBidAmount !== null && typeof label.stats.totalBidAmount === 'number') {
-          if (label.stats.totalBidAmount < 100000) {
-            label.stats.totalBidAmount = Math.round(label.stats.totalBidAmount * 100);
+        if (label.stats.globalLabelAggregate !== undefined && label.stats.globalLabelAggregate !== null && typeof label.stats.globalLabelAggregate === 'number') {
+          if (label.stats.globalLabelAggregate < 100000) {
+            label.stats.globalLabelAggregate = Math.round(label.stats.globalLabelAggregate * 100);
             updated = true;
           }
         }
         
-        if (label.stats.averageBidAmount !== undefined && label.stats.averageBidAmount !== null && typeof label.stats.averageBidAmount === 'number') {
-          if (label.stats.averageBidAmount < 100000) {
-            label.stats.averageBidAmount = Math.round(label.stats.averageBidAmount * 100);
+        if (label.stats.globalLabelBidAvg !== undefined && label.stats.globalLabelBidAvg !== null && typeof label.stats.globalLabelBidAvg === 'number') {
+          if (label.stats.globalLabelBidAvg < 100000) {
+            label.stats.globalLabelBidAvg = Math.round(label.stats.globalLabelBidAvg * 100);
             updated = true;
           }
         }
         
-        if (label.stats.topBidAmount !== undefined && label.stats.topBidAmount !== null && typeof label.stats.topBidAmount === 'number') {
-          if (label.stats.topBidAmount < 100000) {
-            label.stats.topBidAmount = Math.round(label.stats.topBidAmount * 100);
+        if (label.stats.globalLabelBidTop !== undefined && label.stats.globalLabelBidTop !== null && typeof label.stats.globalLabelBidTop === 'number') {
+          if (label.stats.globalLabelBidTop < 100000) {
+            label.stats.globalLabelBidTop = Math.round(label.stats.globalLabelBidTop * 100);
             updated = true;
           }
         }

@@ -1056,7 +1056,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       // Use calculated total from bids, fallback to stored stats
       const calculatedTotal = adminLabelBidTotals[label._id.toString()] !== undefined
         ? adminLabelBidTotals[label._id.toString()]
-        : (label.stats?.totalBidAmount || 0);
+        : (label.stats?.globalLabelAggregate || 0);
       
       // Calculate release count from actual media (fallback to stored stats)
       const calculatedReleaseCount = adminLabelReleaseCounts[label._id.toString()] !== undefined
@@ -1069,7 +1069,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         slug: label.slug,
         profilePicture: label.profilePicture,
         verificationStatus: label.verificationStatus,
-        totalBidAmount: calculatedTotal,
+        globalLabelAggregate: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
         releaseCount: calculatedReleaseCount,
         role: adminEntry?.role || 'admin', // 'owner' or 'admin'
@@ -1158,7 +1158,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
       // Use calculated total from bids, fallback to stored stats
       const calculatedTotal = affiliationLabelBidTotals[label._id.toString()] !== undefined
         ? affiliationLabelBidTotals[label._id.toString()]
-        : (label.stats?.totalBidAmount || 0);
+        : (label.stats?.globalLabelAggregate || 0);
       
       // Calculate release count from actual media (fallback to stored stats)
       const calculatedReleaseCount = affiliationLabelReleaseCounts[label._id.toString()] !== undefined
@@ -1171,7 +1171,7 @@ router.get('/me/creator-stats', authMiddleware, async (req, res) => {
         slug: label.slug,
         profilePicture: label.profilePicture,
         verificationStatus: label.verificationStatus,
-        totalBidAmount: calculatedTotal,
+        globalLabelAggregate: calculatedTotal,
         artistCount: label.stats?.artistCount || 0,
         releaseCount: calculatedReleaseCount,
         role: affiliation.role, // 'artist', 'producer', 'manager', 'staff'
@@ -2421,7 +2421,7 @@ router.get('/me/labels', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user._id)
       .populate({
         path: 'labelAffiliations.labelId',
-        select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.totalBidAmount'
+        select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.globalLabelAggregate'
       })
       .select('labelAffiliations');
     

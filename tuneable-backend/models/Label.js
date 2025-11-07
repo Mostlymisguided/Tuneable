@@ -66,10 +66,10 @@ const labelSchema = new mongoose.Schema({
     
     // Bid Metrics (from bidMetricsSchema)
     // NOTE: All amounts stored in PENCE (integer), not pounds
-    totalBidAmount: { type: Number, default: 0 }, // GlobalAggregate for label's media (in pence)
-    averageBidAmount: { type: Number, default: 0 }, // GlobalBidAvg for label's media (in pence)
-    topBidAmount: { type: Number, default: 0 }, // GlobalBidTop for label's media (in pence)
-    totalBidCount: { type: Number, default: 0 }, // Count of all bids on label's media
+    globalLabelAggregate: { type: Number, default: 0 }, // GlobalAggregate for label's media (in pence)
+    globalLabelBidAvg: { type: Number, default: 0 }, // GlobalBidAvg for label's media (in pence)
+    globalLabelBidTop: { type: Number, default: 0 }, // GlobalBidTop for label's media (in pence)
+    globalLabelBidCount: { type: Number, default: 0 }, // Count of all bids on label's media
     
     // Media Performance (bid-centric)
     topPerformingMedia: [{
@@ -124,7 +124,7 @@ const labelSchema = new mongoose.Schema({
 labelSchema.index({ name: 1 });
 labelSchema.index({ slug: 1 });
 labelSchema.index({ email: 1 });
-labelSchema.index({ 'stats.totalBidAmount': -1 });
+labelSchema.index({ 'stats.globalLabelAggregate': -1 });
 labelSchema.index({ 'stats.globalRank': 1 });
 labelSchema.index({ 'stats.genreRank': 1 });
 labelSchema.index({ 'stats.lastBidAt': -1 });
@@ -183,10 +183,10 @@ labelSchema.statics.findBySlug = function(slug) {
 
 // Static method to get top labels by bid amount
 labelSchema.statics.getTopByBidAmount = function(limit = 10) {
-  return this.find({ isActive: true, 'stats.totalBidAmount': { $gt: 0 } })
-    .sort({ 'stats.totalBidAmount': -1 })
+  return this.find({ isActive: true, 'stats.globalLabelAggregate': { $gt: 0 } })
+    .sort({ 'stats.globalLabelAggregate': -1 })
     .limit(limit)
-    .select('name slug profilePicture stats.totalBidAmount stats.artistCount stats.releaseCount');
+    .select('name slug profilePicture stats.globalLabelAggregate stats.artistCount stats.releaseCount');
 };
 
 // Static method to get labels by genre
@@ -194,9 +194,9 @@ labelSchema.statics.getByGenre = function(genre, limit = 20) {
   return this.find({ 
     isActive: true, 
     genres: genre,
-    'stats.totalBidAmount': { $gt: 0 }
+    'stats.globalLabelAggregate': { $gt: 0 }
   })
-  .sort({ 'stats.totalBidAmount': -1 })
+  .sort({ 'stats.globalLabelAggregate': -1 })
   .limit(limit);
 };
 

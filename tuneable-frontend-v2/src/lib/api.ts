@@ -600,7 +600,7 @@ export const labelAPI = {
     page?: number;
     limit?: number;
     genre?: string;
-    sortBy?: 'totalBidAmount' | 'artistCount' | 'name';
+    sortBy?: 'globalLabelAggregate' | 'totalBidAmount' | 'artistCount' | 'name';
     sortOrder?: 'asc' | 'desc';
     search?: string;
   }) => {
@@ -625,7 +625,7 @@ export const labelAPI = {
   getLabelMedia: async (slug: string, params?: {
     page?: number;
     limit?: number;
-    sortBy?: 'releaseDate' | 'totalBidAmount';
+    sortBy?: 'releaseDate' | 'globalMediaAggregate' | 'totalBidAmount';
     sortOrder?: 'asc' | 'desc';
   }) => {
     const response = await api.get(`/labels/${slug}/media`, { params });
@@ -707,7 +707,7 @@ export const labelAPI = {
     verificationStatus?: string;
     genre?: string;
     search?: string;
-    sortBy?: 'name' | 'verificationStatus' | 'totalBidAmount' | 'artistCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
+    sortBy?: 'name' | 'verificationStatus' | 'globalLabelAggregate' | 'totalBidAmount' | 'artistCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
     sortOrder?: 'asc' | 'desc';
     page?: number;
     limit?: number;
@@ -738,7 +738,7 @@ export const collectiveAPI = {
     limit?: number;
     genre?: string;
     type?: 'band' | 'collective' | 'production_company' | 'other';
-    sortBy?: 'totalBidAmount' | 'memberCount' | 'name';
+    sortBy?: 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'name';
     sortOrder?: 'asc' | 'desc';
     search?: string;
   }) => {
@@ -763,7 +763,7 @@ export const collectiveAPI = {
   getCollectiveMedia: async (slug: string, params?: {
     page?: number;
     limit?: number;
-    sortBy?: 'releaseDate' | 'totalBidAmount';
+    sortBy?: 'releaseDate' | 'globalMediaAggregate' | 'totalBidAmount';
     sortOrder?: 'asc' | 'desc';
   }) => {
     const response = await api.get(`/collectives/${slug}/media`, { params });

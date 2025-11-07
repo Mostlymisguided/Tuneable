@@ -50,8 +50,8 @@ router.get('/', async (req, res) => {
 
     // Build sort object
     const sort = {};
-    if (sortBy === 'totalBidAmount') {
-      sort['stats.totalBidAmount'] = sortOrder === 'desc' ? -1 : 1;
+    if (sortBy === 'totalBidAmount' || sortBy === 'globalCollectiveAggregate') {
+      sort['stats.globalCollectiveAggregate'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'memberCount') {
       sort['stats.memberCount'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'name') {
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
     }
 
     const collectives = await Collective.find(query)
-      .select('name slug profilePicture description genres type stats.totalBidAmount stats.memberCount stats.releaseCount')
+      .select('name slug profilePicture description genres type stats.globalCollectiveAggregate stats.memberCount stats.releaseCount')
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -211,10 +211,10 @@ router.get('/:slug', async (req, res) => {
       collectiveResponse.stats = {
         memberCount: 0,
         releaseCount: 0,
-        totalBidAmount: 0,
-        averageBidAmount: 0,
-        topBidAmount: 0,
-        totalBidCount: 0
+        globalCollectiveAggregate: 0,
+        globalCollectiveBidAvg: 0,
+        globalCollectiveBidTop: 0,
+        globalCollectiveBidCount: 0
       };
     }
 

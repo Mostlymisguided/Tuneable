@@ -34,10 +34,10 @@ interface Label {
   stats?: {
     artistCount?: number;
     releaseCount?: number;
-    totalBidAmount?: number;
-    averageBidAmount?: number;
-    topBidAmount?: number;
-    totalBidCount?: number;
+    globalLabelAggregate?: number;
+    globalLabelBidAvg?: number;
+    globalLabelBidTop?: number;
+    globalLabelBidCount?: number;
   };
   verificationStatus?: string;
   createdAt?: string;
@@ -468,17 +468,17 @@ const LabelProfile: React.FC = () => {
                   <div className="text-sm text-gray-300">Releases</div>
                 </div>
               )}
-              {label.stats.totalBidAmount !== undefined && (
+              {label.stats.globalLabelAggregate !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-6 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{penceToPounds(label.stats.totalBidAmount || 0)}</div>
+                  <div className="text-2xl font-bold text-white">{penceToPounds(label.stats.globalLabelAggregate || 0)}</div>
                   <div className="text-sm text-gray-300">Total Bids</div>
                 </div>
               )}
-              {label.stats.totalBidCount !== undefined && (
+              {label.stats.globalLabelBidCount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-6 text-center">
                   <Calendar className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{label.stats.totalBidCount || 0}</div>
+                  <div className="text-2xl font-bold text-white">{label.stats.globalLabelBidCount || 0}</div>
                   <div className="text-sm text-gray-300">Total Bid Count</div>
                 </div>
               )}
