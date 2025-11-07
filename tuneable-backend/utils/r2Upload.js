@@ -346,9 +346,11 @@ const createLabelProfilePictureUpload = () => {
       acl: 'public-read',
       contentType: multerS3.AUTO_CONTENT_TYPE,
       key: function (req, file, cb) {
-        const labelId = req.params?.id || req.params?.labelId || req.body?.labelId || 'label';
+        // For label creation, use user ID (will be updated after label creation if needed)
+        // For label update, use the label ID from params
+        const labelId = req.params?.id || req.body?.labelId || req.user?._id?.toString() || req.user?.id?.toString() || Date.now().toString();
         const timestamp = Date.now();
-        const filename = `profile-pictures/${labelId}-${timestamp}${path.extname(file.originalname)}`;
+        const filename = `label-logos/${labelId}-${timestamp}${path.extname(file.originalname)}`;
         cb(null, filename);
       }
     }),

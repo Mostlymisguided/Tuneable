@@ -363,14 +363,19 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
 
     // Handle profile picture upload if provided
     let profilePictureUrl = null;
+    let uploadedFileKey = null;
     if (req.file) {
       // Use custom domain URL via getPublicUrl (uses R2_PUBLIC_URL env var)
-      // req.file.key contains the S3 key (e.g., "profile-pictures/labelId-timestamp.jpg")
-      // req.file.location is the default R2 URL, but we want the custom domain
+      // req.file.key contains the S3 key (e.g., "label-logos/userId-timestamp.jpg")
       // Always use getPublicUrl to ensure we get the full R2 URL with custom domain
-      const fileKey = req.file.key || (req.file.location ? req.file.location.split('/').slice(-2).join('/') : `profile-pictures/${req.file.filename || 'label-' + Date.now() + '.jpg'}`);
-      profilePictureUrl = getPublicUrl(fileKey);
-      console.log(`📸 Saving label profile picture: ${profilePictureUrl} for label ${name}`);
+      if (!req.file.key) {
+        console.error('❌ req.file.key is missing! req.file:', req.file);
+        return res.status(500).json({ error: 'File upload error: key not found' });
+      }
+      uploadedFileKey = req.file.key;
+      profilePictureUrl = getPublicUrl(uploadedFileKey);
+      console.log(`📸 Uploaded label profile picture: ${profilePictureUrl}`);
+      console.log(`📸 File key: ${uploadedFileKey}`);
     }
 
     // Set verification status based on user type
@@ -397,6 +402,59 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
     });
 
     await label.save();
+
+    // After label is saved, if profile picture was uploaded, update the file key to use label ID
+    // and update the profile picture URL in the database
+    if (uploadedFileKey && profilePictureUrl) {
+      try {
+        const { S3Client, CopyObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint: process.env.R2_ENDPOINT,
+          credentials: {
+            accessKeyId: process.env.R2_ACCESS_KEY_ID,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+          },
+        });
+
+        // Extract file extension from original key
+        const pathModule = require('path');
+        const pathParts = uploadedFileKey.split('/');
+        const oldFilename = pathParts[pathParts.length - 1];
+        const fileExt = pathModule.extname(oldFilename);
+        const timestamp = Date.now();
+        
+        // Create new key with label ID (matches format: label-logos/labelId-timestamp.ext)
+        const newKey = `label-logos/${label._id.toString()}-${timestamp}${fileExt}`;
+        
+        // Copy file to new location with label ID
+        const copyCommand = new CopyObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          CopySource: `${process.env.R2_BUCKET_NAME}/${uploadedFileKey}`,
+          Key: newKey,
+          ACL: 'public-read'
+        });
+        await s3Client.send(copyCommand);
+
+        // Delete old file
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: uploadedFileKey
+        });
+        await s3Client.send(deleteCommand);
+
+        // Update label with new profile picture URL
+        const newProfilePictureUrl = getPublicUrl(newKey);
+        label.profilePicture = newProfilePictureUrl;
+        await label.save();
+
+        console.log(`📸 Updated label profile picture URL: ${newProfilePictureUrl}`);
+        console.log(`📸 New file key: ${newKey}`);
+      } catch (error) {
+        console.error('❌ Error updating label profile picture key:', error);
+        // Don't fail the request if file rename fails - the original URL still works
+      }
+    }
 
     res.status(201).json({ label });
   } catch (error) {
@@ -453,13 +511,17 @@ router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('
     }
 
     // Use custom domain URL via getPublicUrl (uses R2_PUBLIC_URL env var)
-    // req.file.key contains the S3 key (e.g., "profile-pictures/labelId-timestamp.jpg")
-    // req.file.location is the default R2 URL, but we want the custom domain
+    // req.file.key contains the S3 key (e.g., "label-logos/labelId-timestamp.jpg")
     // Always use getPublicUrl to ensure we get the full R2 URL with custom domain
-    const fileKey = req.file.key || (req.file.location ? req.file.location.split('/').slice(-2).join('/') : `profile-pictures/${req.file.filename || 'label-' + Date.now() + '.jpg'}`);
-    const profilePicturePath = getPublicUrl(fileKey);
+    if (!req.file.key) {
+      console.error('❌ req.file.key is missing! req.file:', req.file);
+      return res.status(500).json({ error: 'File upload error: key not found' });
+    }
+    const profilePicturePath = getPublicUrl(req.file.key);
 
     console.log(`📸 Saving label profile picture: ${profilePicturePath} for label ${label.name}`);
+    console.log(`📸 File key: ${req.file.key}`);
+    console.log(`📸 R2_PUBLIC_URL: ${process.env.R2_PUBLIC_URL}`);
 
     label.profilePicture = profilePicturePath;
     await label.save();
