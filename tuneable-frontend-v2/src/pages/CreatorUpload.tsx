@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle } from 'lucide-react';
+import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
+import { labelAPI } from '../lib/api';
 import axios from 'axios';
 
 const CreatorUpload: React.FC = () => {
@@ -16,6 +17,13 @@ const CreatorUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [labelSuggestions, setLabelSuggestions] = useState<any[]>([]);
+  const [isSearchingLabels, setIsSearchingLabels] = useState(false);
+  const [showLabelSuggestions, setShowLabelSuggestions] = useState(false);
+  const [labelSearchDebounce, setLabelSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+  const [selectedLabelIndex, setSelectedLabelIndex] = useState(-1);
+  const labelInputRef = useRef<HTMLInputElement>(null);
+  const labelSuggestionsRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     title: '',
     artistName: '', // For admins or to override creatorProfile name
@@ -115,6 +123,119 @@ const CreatorUpload: React.FC = () => {
       }));
     }
   }, [extractedMetadata]);
+
+  // Debounced label search function
+  const searchLabels = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setLabelSuggestions([]);
+      setShowLabelSuggestions(false);
+      return;
+    }
+
+    setIsSearchingLabels(true);
+    try {
+      const response = await labelAPI.getLabels({
+        search: query.trim(),
+        limit: 10,
+        sortBy: 'name',
+        sortOrder: 'asc'
+      });
+      setLabelSuggestions(response.labels || []);
+      setShowLabelSuggestions(true);
+    } catch (error) {
+      console.error('Error searching labels:', error);
+      setLabelSuggestions([]);
+    } finally {
+      setIsSearchingLabels(false);
+    }
+  }, []);
+
+  // Handle label input change with debouncing
+  const handleLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, label: value }));
+    setSelectedLabelIndex(-1); // Reset selection when typing
+
+    // Clear existing debounce
+    if (labelSearchDebounce) {
+      clearTimeout(labelSearchDebounce);
+    }
+
+    // Set new debounce
+    const timeout = setTimeout(() => {
+      searchLabels(value);
+    }, 300);
+    setLabelSearchDebounce(timeout);
+  };
+
+  // Handle keyboard navigation for label suggestions
+  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showLabelSuggestions || labelSuggestions.length === 0) {
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedLabelIndex((prev) => 
+          prev < labelSuggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedLabelIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedLabelIndex >= 0 && selectedLabelIndex < labelSuggestions.length) {
+          handleLabelSelect(labelSuggestions[selectedLabelIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowLabelSuggestions(false);
+        setSelectedLabelIndex(-1);
+        labelInputRef.current?.blur();
+        break;
+    }
+  };
+
+  // Handle label selection from suggestions
+  const handleLabelSelect = (label: any) => {
+    setFormData(prev => ({ ...prev, label: label.name }));
+    setLabelSuggestions([]);
+    setShowLabelSuggestions(false);
+    setSelectedLabelIndex(-1);
+    labelInputRef.current?.blur();
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        labelInputRef.current &&
+        labelSuggestionsRef.current &&
+        !labelInputRef.current.contains(event.target as Node) &&
+        !labelSuggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowLabelSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (labelSearchDebounce) {
+        clearTimeout(labelSearchDebounce);
+      }
+    };
+  }, [labelSearchDebounce]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -668,18 +789,87 @@ const CreatorUpload: React.FC = () => {
 
               {/* Label */}
               <div className="grid grid-cols-1 gap-4 mb-6">
-                <div>
-                  <label className="block text-white font-medium mb-2">
+                <div className="relative">
+                  <label className="block text-white font-medium mb-2 flex items-center">
+                    <Building className="h-4 w-4 mr-2 text-purple-400" />
                     Label
                   </label>
-                  <input
-                    type="text"
-                    name="label"
-                    value={formData.label}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder="Record label"
-                  />
+                  <div className="relative">
+                    <input
+                      ref={labelInputRef}
+                      type="text"
+                      name="label"
+                      value={formData.label}
+                      onChange={handleLabelChange}
+                      onKeyDown={handleLabelKeyDown}
+                      onFocus={() => {
+                        if (formData.label && formData.label.trim().length >= 2) {
+                          searchLabels(formData.label);
+                        }
+                      }}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 pr-10"
+                      placeholder="Start typing to search labels..."
+                    />
+                    {isSearchingLabels && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 text-purple-400 animate-spin" />
+                      </div>
+                    )}
+                    {showLabelSuggestions && labelSuggestions.length > 0 && (
+                      <div
+                        ref={labelSuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                      >
+                        {labelSuggestions.map((label, index) => (
+                          <button
+                            key={label._id}
+                            type="button"
+                            onClick={() => handleLabelSelect(label)}
+                            className={`w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors flex items-center gap-3 border-b border-gray-700 last:border-b-0 ${
+                              index === selectedLabelIndex ? 'bg-gray-700' : ''
+                            }`}
+                          >
+                            {label.profilePicture ? (
+                              <img
+                                src={label.profilePicture}
+                                alt={label.name}
+                                className="h-8 w-8 rounded object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = '';
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-8 w-8 rounded bg-gray-700 flex items-center justify-center">
+                                <Building className="h-4 w-4 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="flex-1">
+                              <div className="text-white font-medium">{label.name}</div>
+                              {label.description && (
+                                <div className="text-gray-400 text-sm truncate">{label.description}</div>
+                              )}
+                            </div>
+                            {label.verificationStatus === 'verified' && (
+                              <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showLabelSuggestions && labelSuggestions.length === 0 && formData.label.trim().length >= 2 && !isSearchingLabels && (
+                      <div
+                        ref={labelSuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-4 text-center"
+                      >
+                        <p className="text-gray-400 text-sm">No labels found</p>
+                        <p className="text-gray-500 text-xs mt-1">You can still enter a custom label name</p>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Start typing to search existing labels or enter a custom label name
+                  </p>
                 </div>
               </div>
 
