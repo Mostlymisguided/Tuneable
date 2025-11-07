@@ -364,7 +364,12 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
     // Handle profile picture upload if provided
     let profilePictureUrl = null;
     if (req.file) {
-      profilePictureUrl = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`));
+      // Use custom domain URL via getPublicUrl (uses R2_PUBLIC_URL env var)
+      // req.file.key contains the S3 key (e.g., "profile-pictures/labelId-timestamp.jpg")
+      // req.file.location is the default R2 URL, but we want the custom domain
+      // Always use getPublicUrl to ensure we get the full R2 URL with custom domain
+      const fileKey = req.file.key || (req.file.location ? req.file.location.split('/').slice(-2).join('/') : `profile-pictures/${req.file.filename || 'label-' + Date.now() + '.jpg'}`);
+      profilePictureUrl = getPublicUrl(fileKey);
       console.log(`📸 Saving label profile picture: ${profilePictureUrl} for label ${name}`);
     }
 
@@ -447,8 +452,12 @@ router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('
       return res.status(403).json({ error: 'Not authorized to update this label' });
     }
 
-    // Use custom domain URL via getPublicUrl
-    const profilePicturePath = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`));
+    // Use custom domain URL via getPublicUrl (uses R2_PUBLIC_URL env var)
+    // req.file.key contains the S3 key (e.g., "profile-pictures/labelId-timestamp.jpg")
+    // req.file.location is the default R2 URL, but we want the custom domain
+    // Always use getPublicUrl to ensure we get the full R2 URL with custom domain
+    const fileKey = req.file.key || (req.file.location ? req.file.location.split('/').slice(-2).join('/') : `profile-pictures/${req.file.filename || 'label-' + Date.now() + '.jpg'}`);
+    const profilePicturePath = getPublicUrl(fileKey);
 
     console.log(`📸 Saving label profile picture: ${profilePicturePath} for label ${label.name}`);
 
