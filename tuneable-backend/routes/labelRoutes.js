@@ -304,7 +304,29 @@ router.get('/:slug/media', async (req, res) => {
 // Create label (with optional profile picture upload)
 router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
-    const { name, description, email, website, genres, foundedYear } = req.body;
+    const { name, description, email, website, genres, foundedYear, userType } = req.body;
+    
+    // Handle social media links (can come as nested object or individual fields from FormData)
+    let socialMedia = {};
+    if (req.body.socialMedia) {
+      // If sent as object (JSON)
+      socialMedia = typeof req.body.socialMedia === 'string' 
+        ? JSON.parse(req.body.socialMedia) 
+        : req.body.socialMedia;
+    } else {
+      // Handle form-data format: socialMedia[facebook], socialMedia[youtube], etc.
+      socialMedia = {
+        facebook: req.body['socialMedia[facebook]'] || '',
+        youtube: req.body['socialMedia[youtube]'] || '',
+        soundcloud: req.body['socialMedia[soundcloud]'] || ''
+      };
+      // Remove empty strings
+      Object.keys(socialMedia).forEach(key => {
+        if (!socialMedia[key] || socialMedia[key].trim() === '') {
+          delete socialMedia[key];
+        }
+      });
+    }
 
     // Validate required fields
     if (!name || !email) {
@@ -317,10 +339,14 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       return res.status(400).json({ error: 'Label name already exists' });
     }
 
-    // Check if user already has a label
-    const userLabels = await Label.find({ 'admins.userId': req.user.id });
-    if (userLabels.length > 0) {
-      return res.status(400).json({ error: 'User already has a label' });
+    // Check if user already has a label (only for owners)
+    // Affiliated artists can be associated with multiple labels
+    const adminRole = userType === 'affiliated-artist' ? 'admin' : 'owner';
+    if (adminRole === 'owner') {
+      const userLabels = await Label.find({ 'admins.userId': req.user.id, 'admins.role': 'owner' });
+      if (userLabels.length > 0) {
+        return res.status(400).json({ error: 'User already owns a label' });
+      }
     }
 
     // Generate slug from name (before creating label)
@@ -342,6 +368,11 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       console.log(`📸 Saving label profile picture: ${profilePictureUrl} for label ${name}`);
     }
 
+    // Set verification status based on user type
+    // Owners start as 'pending' (awaiting admin verification)
+    // Affiliated artists start as 'unverified' (less priority)
+    const verificationStatus = adminRole === 'owner' ? 'pending' : 'unverified';
+
     const label = new Label({
       name,
       slug, // Explicitly set slug
@@ -351,11 +382,13 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       genres: genres || [],
       foundedYear,
       profilePicture: profilePictureUrl,
+      socialMedia: Object.keys(socialMedia).length > 0 ? socialMedia : undefined,
       admins: [{
         userId: req.user.id,
-        role: 'owner',
+        role: adminRole,
         addedAt: new Date()
-      }]
+      }],
+      verificationStatus: verificationStatus
     });
 
     await label.save();

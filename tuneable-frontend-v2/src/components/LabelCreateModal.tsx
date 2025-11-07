@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { X, Loader2, Image } from 'lucide-react';
+import { X, Loader2, Image, Facebook, Youtube, Music } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -18,13 +18,19 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [userType, setUserType] = useState<'owner' | 'affiliated-artist'>('owner');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     email: '',
     website: '',
     genres: [] as string[],
-    foundedYear: ''
+    foundedYear: '',
+    socialMedia: {
+      facebook: '',
+      youtube: '',
+      soundcloud: ''
+    }
   });
 
   // Reset form when modal opens/closes
@@ -36,10 +42,16 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
         email: user?.email || '',
         website: '',
         genres: [],
-        foundedYear: ''
+        foundedYear: '',
+        socialMedia: {
+          facebook: '',
+          youtube: '',
+          soundcloud: ''
+        }
       });
       setProfilePicture(null);
       setProfilePicturePreview(null);
+      setUserType('owner');
     }
   }, [isOpen, user]);
 
@@ -70,6 +82,16 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
     reader.readAsDataURL(file);
   };
 
+  const handleSocialMediaChange = (platform: 'facebook' | 'youtube' | 'soundcloud', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      socialMedia: {
+        ...prev.socialMedia,
+        [platform]: value
+      }
+    }));
+  };
+
   const handleCreateLabel = async () => {
     if (!formData.name || !formData.email) {
       toast.error('Label name and email are required');
@@ -90,6 +112,20 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
       }
       if (formData.foundedYear) createData.append('foundedYear', formData.foundedYear);
       if (profilePicture) createData.append('profilePicture', profilePicture);
+      
+      // Add social media links
+      if (formData.socialMedia.facebook) {
+        createData.append('socialMedia[facebook]', formData.socialMedia.facebook);
+      }
+      if (formData.socialMedia.youtube) {
+        createData.append('socialMedia[youtube]', formData.socialMedia.youtube);
+      }
+      if (formData.socialMedia.soundcloud) {
+        createData.append('socialMedia[soundcloud]', formData.socialMedia.soundcloud);
+      }
+      
+      // Add user type (owner or affiliated-artist)
+      createData.append('userType', userType);
       
       const response = await labelAPI.createLabel(createData);
       
@@ -186,6 +222,88 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
               min="1900"
               max={new Date().getFullYear()}
             />
+          </div>
+
+          {/* Social Media Links Section */}
+          <div>
+            <label className="block text-white font-medium mb-3">Social Media Links (Optional)</label>
+            <div className="space-y-3">
+              <div>
+                <label className="flex items-center text-gray-300 text-sm mb-1">
+                  <Facebook className="h-4 w-4 mr-2" />
+                  Facebook
+                </label>
+                <input
+                  type="url"
+                  value={formData.socialMedia.facebook}
+                  onChange={(e) => handleSocialMediaChange('facebook', e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="https://facebook.com/yourlabel"
+                />
+              </div>
+              
+              <div>
+                <label className="flex items-center text-gray-300 text-sm mb-1">
+                  <Youtube className="h-4 w-4 mr-2" />
+                  YouTube
+                </label>
+                <input
+                  type="url"
+                  value={formData.socialMedia.youtube}
+                  onChange={(e) => handleSocialMediaChange('youtube', e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="https://youtube.com/@yourlabel"
+                />
+              </div>
+              
+              <div>
+                <label className="flex items-center text-gray-300 text-sm mb-1">
+                  <Music className="h-4 w-4 mr-2" />
+                  SoundCloud
+                </label>
+                <input
+                  type="url"
+                  value={formData.socialMedia.soundcloud}
+                  onChange={(e) => handleSocialMediaChange('soundcloud', e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  placeholder="https://soundcloud.com/yourlabel"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* User Type Selection */}
+          <div>
+            <label className="block text-white font-medium mb-3">I am:</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setUserType('owner')}
+                className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors ${
+                  userType === 'owner'
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                }`}
+              >
+                Label Owner
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserType('affiliated-artist')}
+                className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors ${
+                  userType === 'affiliated-artist'
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                }`}
+              >
+                Affiliated Artist
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              {userType === 'owner' 
+                ? 'You own or manage this label' 
+                : 'You are an artist affiliated with this label'}
+            </p>
           </div>
 
           <div>
