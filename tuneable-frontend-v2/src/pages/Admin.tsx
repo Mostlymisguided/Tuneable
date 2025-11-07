@@ -17,11 +17,13 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Building
+  Building,
+  Bell
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
+import NotificationsManager from '../components/NotificationsManager';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
@@ -74,7 +76,7 @@ const Admin: React.FC = () => {
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
-  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label'>('media');
+  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'claims' | 'invites'>('media');
 
   useEffect(() => {
     checkAdminStatus();
@@ -392,6 +394,12 @@ const Admin: React.FC = () => {
     }
   }, [vetoedBidsSortField, vetoedBidsSortDirection, vetoedBidsPage, activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'reports' && reportsSubTab === 'claims' && isAdmin) {
+      loadClaims();
+    }
+  }, [activeTab, reportsSubTab]);
+
   const getLabelSortIcon = (field: string) => {
     if (labelSortField !== field) {
       return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
@@ -456,9 +464,8 @@ const Admin: React.FC = () => {
     { id: 'labels', name: 'Labels', icon: Building },
     { id: 'vetoed-bids', name: 'Vetoed Bids', icon: XCircle },
     { id: 'creators', name: 'Creator Applications', icon: Award },
-    { id: 'claims', name: 'Tune Claims', icon: Music },
     { id: 'reports', name: 'Reports', icon: AlertTriangle },
-    { id: 'invites', name: 'Invite Requests', icon: Mail },
+    { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
@@ -1381,108 +1388,6 @@ const Admin: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'claims' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Tune Claims</h2>
-              <button
-                onClick={loadClaims}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
-            
-            {isLoadingClaims ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              </div>
-            ) : claims.length === 0 ? (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <Music className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No pending tune claims</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {claims.map((claim) => (
-                  <div key={claim._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-4">
-                        {claim.mediaId?.coverArt && (
-                          <img
-                            src={claim.mediaId.coverArt}
-                            alt={claim.mediaId.title}
-                            className="w-16 h-16 rounded object-cover"
-                          />
-                        )}
-                        <div>
-                          <h3 className="text-xl font-bold text-white">{claim.mediaId?.title}</h3>
-                          <p className="text-gray-400">{claim.mediaId?.artist?.[0]?.name || claim.mediaId?.artist}</p>
-                          <p className="text-sm text-gray-500">
-                            Claimed by: @{claim.userId?.username} ({claim.userId?.email})
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Submitted: {new Date(claim.submittedAt).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-400 mb-2">Proof:</p>
-                      <p className="text-gray-300 text-sm">{claim.proofText}</p>
-                    </div>
-
-                    {claim.proofFiles && claim.proofFiles.length > 0 && (
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-400 mb-2">Documents:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {claim.proofFiles.map((file: any, idx: number) => (
-                            <a
-                              key={idx}
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
-                            >
-                              Document {idx + 1}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex space-x-3 pt-4 border-t border-gray-700">
-                      <button
-                        onClick={() => {
-                          const notes = prompt('Add review notes (optional):');
-                          reviewClaim(claim._id, 'approved', notes || '');
-                        }}
-                        className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          const notes = prompt('Add rejection reason:');
-                          if (notes) {
-                            reviewClaim(claim._id, 'rejected', notes);
-                          }
-                        }}
-                        className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {activeTab === 'reports' && (
           <div className="space-y-6">
             {/* Sub-tabs for Reports */}
@@ -1522,18 +1427,146 @@ const Admin: React.FC = () => {
                     <Building className="h-4 w-4 mr-2" />
                     <span>Label Reports</span>
                   </button>
+                  <button
+                    onClick={() => setReportsSubTab('claims')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'claims'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Music className="h-4 w-4 mr-2" />
+                    <span>Tune Claims</span>
+                  </button>
+                  <button
+                    onClick={() => setReportsSubTab('invites')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'invites'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    <span>Invite Requests</span>
+                  </button>
                 </nav>
               </div>
             </div>
             
             {/* Reports Content */}
-            <ReportsAdmin reportType={reportsSubTab} />
+            {reportsSubTab === 'invites' ? (
+              <div>
+                <InviteRequestsAdmin />
+              </div>
+            ) : reportsSubTab === 'claims' ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">Tune Claims</h2>
+                  <button
+                    onClick={loadClaims}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                
+                {isLoadingClaims ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : claims.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <Music className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No pending tune claims</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {claims.map((claim) => (
+                      <div key={claim._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-4">
+                            {claim.mediaId?.coverArt && (
+                              <img
+                                src={claim.mediaId.coverArt}
+                                alt={claim.mediaId.title}
+                                className="w-16 h-16 rounded object-cover"
+                              />
+                            )}
+                            <div>
+                              <h3 className="text-xl font-bold text-white">{claim.mediaId?.title}</h3>
+                              <p className="text-gray-400">{claim.mediaId?.artist?.[0]?.name || claim.mediaId?.artist}</p>
+                              <p className="text-sm text-gray-500">
+                                Claimed by: @{claim.userId?.username} ({claim.userId?.email})
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                Submitted: {new Date(claim.submittedAt).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-400 mb-2">Proof:</p>
+                          <p className="text-gray-300 text-sm">{claim.proofText}</p>
+                        </div>
+
+                        {claim.proofFiles && claim.proofFiles.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-sm text-gray-400 mb-2">Documents:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {claim.proofFiles.map((file: any, idx: number) => (
+                                <a
+                                  key={idx}
+                                  href={file.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
+                                >
+                                  Document {idx + 1}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex space-x-3 pt-4 border-t border-gray-700">
+                          <button
+                            onClick={() => {
+                              const notes = prompt('Add review notes (optional):');
+                              reviewClaim(claim._id, 'approved', notes || '');
+                            }}
+                            className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => {
+                              const notes = prompt('Add rejection reason:');
+                              if (notes) {
+                                reviewClaim(claim._id, 'rejected', notes);
+                              }
+                            }}
+                            className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <ReportsAdmin reportType={reportsSubTab} />
+            )}
           </div>
         )}
 
-        {activeTab === 'invites' && (
+        {activeTab === 'notifications' && (
           <div>
-            <InviteRequestsAdmin />
+            <NotificationsManager />
           </div>
         )}
 
