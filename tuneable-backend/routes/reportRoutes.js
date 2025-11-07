@@ -23,7 +23,7 @@ router.post('/media/:mediaId/report', authMiddleware, async (req, res) => {
     }
 
     // Validate category (media categories)
-    const validCategories = ['copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other'];
+    const validCategories = ['copyright', 'incorrect_info', 'inappropriate', 'duplicate', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -75,7 +75,6 @@ router.post('/media/:mediaId/report', authMiddleware, async (req, res) => {
       const categoryLabels = {
         copyright: 'Copyright/Rights Issue',
         incorrect_info: 'Incorrect Information',
-        incorrect_tags: 'Incorrect Tags',
         inappropriate: 'Inappropriate Content',
         duplicate: 'Duplicate',
         other: 'Other Issue'
@@ -141,7 +140,7 @@ router.post('/:mediaId/report', authMiddleware, async (req, res, next) => {
       return res.status(400).json({ error: 'Category and description are required' });
     }
 
-    const validCategories = ['copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other'];
+    const validCategories = ['copyright', 'incorrect_info', 'inappropriate', 'duplicate', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -187,7 +186,6 @@ router.post('/:mediaId/report', authMiddleware, async (req, res, next) => {
       const categoryLabels = {
         copyright: 'Copyright/Rights Issue',
         incorrect_info: 'Incorrect Information',
-        incorrect_tags: 'Incorrect Tags',
         inappropriate: 'Inappropriate Content',
         duplicate: 'Duplicate',
         other: 'Other Issue'

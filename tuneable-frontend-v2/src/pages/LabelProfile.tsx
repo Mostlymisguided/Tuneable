@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
+import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
@@ -29,7 +29,6 @@ interface Label {
     soundcloud?: string;
     spotify?: string;
     youtube?: string;
-    twitter?: string;
     tiktok?: string;
   };
   foundedYear?: number;
@@ -114,7 +113,6 @@ const LabelProfile: React.FC = () => {
       soundcloud: '',
       spotify: '',
       youtube: '',
-      twitter: '',
       tiktok: ''
     }
   });
@@ -194,7 +192,6 @@ const LabelProfile: React.FC = () => {
             soundcloud: data.label.socialMedia?.soundcloud || '',
             spotify: data.label.socialMedia?.spotify || '',
             youtube: data.label.socialMedia?.youtube || '',
-            twitter: data.label.socialMedia?.twitter || '',
             tiktok: data.label.socialMedia?.tiktok || ''
           }
         });
@@ -281,7 +278,6 @@ const LabelProfile: React.FC = () => {
           soundcloud: editForm.socialMedia.soundcloud || undefined,
           spotify: editForm.socialMedia.spotify || undefined,
           youtube: editForm.socialMedia.youtube || undefined,
-          twitter: editForm.socialMedia.twitter || undefined,
           tiktok: editForm.socialMedia.tiktok || undefined
         }
       };
@@ -310,9 +306,6 @@ const LabelProfile: React.FC = () => {
     }
     if (label.socialMedia.youtube) {
       links.push({ name: 'YouTube', url: label.socialMedia.youtube, icon: Youtube, color: 'hover:text-red-400' });
-    }
-    if (label.socialMedia.twitter) {
-      links.push({ name: 'Twitter', url: label.socialMedia.twitter, icon: Twitter, color: 'hover:text-cyan-400' });
     }
     
     return links;
@@ -990,16 +983,6 @@ const LabelProfile: React.FC = () => {
                           onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, youtube: e.target.value } })}
                           className="input"
                           placeholder="https://youtube.com/..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white text-sm mb-2">Twitter</label>
-                        <input
-                          type="url"
-                          value={editForm.socialMedia.twitter}
-                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, twitter: e.target.value } })}
-                          className="input"
-                          placeholder="https://twitter.com/..."
                         />
                       </div>
                       <div>

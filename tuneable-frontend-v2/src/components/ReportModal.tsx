@@ -24,14 +24,7 @@ const reportCategoriesByType = {
     {
       value: 'incorrect_info',
       label: 'Incorrect Information',
-      description: 'Artist name, title, or other metadata is wrong',
-      requiresEmail: false,
-      priority: false
-    },
-    {
-      value: 'incorrect_tags',
-      label: 'Incorrect Tags',
-      description: 'Genre or other tags are inaccurate',
+      description: 'Artist name, title, tags or other metadata are wrong',
       requiresEmail: false,
       priority: false
     },

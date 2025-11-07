@@ -50,12 +50,13 @@ const reportSchema = new mongoose.Schema({
   // Report details
   category: {
     type: String,
-    // Media categories: copyright, incorrect_info, incorrect_tags, inappropriate, duplicate, other
+    // Media categories: copyright, incorrect_info, inappropriate, duplicate, other
     // User categories: harassment, spam, impersonation, inappropriate, copyright, other
     // Label categories: copyright, label_impersonation, unauthorized_claim, label_incorrect_info, scam_fraud, inappropriate, other
     enum: [
       // Media categories
       'copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other',
+      // Note: 'incorrect_tags' kept in enum for backward compatibility but removed from frontend/validation
       // User categories
       'harassment', 'spam', 'impersonation',
       // Label categories (reuse some, add new ones)

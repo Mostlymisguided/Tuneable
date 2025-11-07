@@ -32,7 +32,6 @@ const labelSchema = new mongoose.Schema({
     soundcloud: String,
     spotify: String,
     youtube: String,
-    twitter: String,
     tiktok: String
   },
   
