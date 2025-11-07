@@ -72,8 +72,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get label team (public)
-router.get('/:slug/team', async (req, res) => {
+// Get label team (label editors only)
+router.get('/:slug/team', authMiddleware, async (req, res) => {
   try {
     const label = await Label.findBySlug(req.params.slug)
       .populate({
@@ -84,6 +84,23 @@ router.get('/:slug/team', async (req, res) => {
 
     if (!label) {
       return res.status(404).json({ error: 'Label not found' });
+    }
+
+    const isPlatformAdmin = req.user?.role?.includes('admin');
+    if (!isPlatformAdmin) {
+      const viewerId = req.user?._id?.toString() || req.user?.id?.toString() || req.user?.uuid?.toString();
+      const isLabelEditor = label.admins?.some((admin) => {
+        if (!admin || !admin.userId) return false;
+        const adminId =
+          typeof admin.userId === 'object'
+            ? (admin.userId._id?.toString() || admin.userId.uuid?.toString() || admin.userId.toString())
+            : admin.userId.toString();
+        return adminId === viewerId && (admin.role === 'owner' || admin.role === 'admin');
+      });
+
+      if (!isLabelEditor) {
+        return res.status(403).json({ error: 'Not authorized to view label ownership' });
+      }
     }
 
     const adminMembers = (label.admins || []).map((admin) => {

@@ -82,14 +82,15 @@ const LabelProfile: React.FC = () => {
   const [topMedia, setTopMedia] = useState<Media[]>([]);
   const [artists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media' | 'team'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media'>('overview');
   const [teamMembers, setTeamMembers] = useState<LabelTeamMember[]>([]);
   const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+  const [hasLoadedTeam, setHasLoadedTeam] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
   const isEditMode = searchParams.get('edit') === 'true';
-  const editTab = (searchParams.get('tab') as 'info' | 'edit') || 'info';
+  const editTab = (searchParams.get('tab') as 'info' | 'edit' | 'ownership') || 'info';
   
   // Report state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -208,16 +209,30 @@ const LabelProfile: React.FC = () => {
   };
 
   useEffect(() => {
-    if (slug) {
-      void fetchLabelTeam(slug);
+    if (!isEditMode) {
+      setHasLoadedTeam(false);
+      setTeamMembers([]);
     }
+  }, [isEditMode]);
+
+  useEffect(() => {
+    setHasLoadedTeam(false);
+    setTeamMembers([]);
   }, [slug]);
 
+  useEffect(() => {
+    if (isEditMode && editTab === 'ownership' && label && slug && canEditLabel(label) && !hasLoadedTeam && !isLoadingTeam) {
+      void fetchLabelTeam(slug);
+    }
+  }, [isEditMode, editTab, label, slug, hasLoadedTeam, isLoadingTeam]);
+
   const fetchLabelTeam = async (labelSlug: string) => {
+    if (!labelSlug) return;
     try {
       setIsLoadingTeam(true);
       const response = await labelAPI.getTeam(labelSlug);
       setTeamMembers(response.team || response.members || []);
+      setHasLoadedTeam(true);
     } catch (error) {
       console.error('Error fetching label team:', error);
       setTeamMembers([]);
@@ -268,7 +283,7 @@ const LabelProfile: React.FC = () => {
     setSearchParams({ edit: 'true', tab: 'edit' });
   };
 
-  const handleEditTabChange = (tab: 'info' | 'edit') => {
+  const handleEditTabChange = (tab: 'info' | 'edit' | 'ownership') => {
     setSearchParams({ edit: 'true', tab });
   };
 
@@ -542,6 +557,16 @@ const LabelProfile: React.FC = () => {
               >
                 Edit Label
               </button>
+              <button
+                onClick={() => handleEditTabChange('ownership')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'ownership'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Ownership
+              </button>
             </nav>
           </div>
         )}
@@ -595,7 +620,6 @@ const LabelProfile: React.FC = () => {
                 { id: 'overview', label: 'Overview' },
                 { id: 'artists', label: 'Artists' },
                 { id: 'media', label: 'Releases' },
-                { id: 'team', label: 'Team' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -790,25 +814,6 @@ const LabelProfile: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'team' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-2xl font-bold text-white mb-2">Label Team</h3>
-                <p className="text-sm text-gray-300">
-                  Owners, administrators, and members who can manage this label on Tuneable.
-                </p>
-              </div>
-
-              {isLoadingTeam ? (
-                <div className="flex items-center justify-center py-12 text-gray-300">
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  Loading team roster...
-                </div>
-              ) : (
-                <LabelTeamTable members={teamMembers} isEditable={canEditLabel(label)} />
-              )}
-            </div>
-          )}
         </div>
           </>
         ) : (
@@ -1069,6 +1074,39 @@ const LabelProfile: React.FC = () => {
                     Cancel
                   </button>
                 </div>
+              </div>
+            )}
+
+            {editTab === 'ownership' && (
+              <div className="card p-6 space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Label Ownership</h2>
+                    <p className="text-sm text-gray-300">
+                      Owners and administrators with management access to this label.
+                    </p>
+                  </div>
+                  {slug && (
+                    <button
+                      onClick={() => fetchLabelTeam(slug)}
+                      disabled={isLoadingTeam}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Loader2 className={`h-4 w-4 ${isLoadingTeam ? 'animate-spin' : 'hidden'}`} />
+                      {!isLoadingTeam && 'Refresh'}
+                      {isLoadingTeam && 'Refreshing...'}
+                    </button>
+                  )}
+                </div>
+
+                {isLoadingTeam && !hasLoadedTeam ? (
+                  <div className="flex items-center justify-center py-12 text-gray-300">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Loading ownership roster...
+                  </div>
+                ) : (
+                  <LabelTeamTable members={teamMembers} isEditable />
+                )}
               </div>
             )}
           </>
