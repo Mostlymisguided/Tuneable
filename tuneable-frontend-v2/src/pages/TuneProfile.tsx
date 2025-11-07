@@ -35,7 +35,6 @@ import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI } from '../lib/ap
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
-import BetaWarningBanner from '../components/BetaWarningBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
@@ -1253,9 +1252,6 @@ const TuneProfile: React.FC = () => {
                   Boost this tune's global ranking and support the artist
                 </p>
                 
-                {/* Beta Warning */}
-                <BetaWarningBanner variant="compact" className="mb-4" />
-                
                 <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                   <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
                     <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
@@ -1755,9 +1751,6 @@ const TuneProfile: React.FC = () => {
                         <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
                           Boost this tune's global ranking and support the artist
                         </p>
-                        
-                        {/* Beta Warning */}
-                        <BetaWarningBanner variant="compact" className="mb-4" />
                         
                         <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                           <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">

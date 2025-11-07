@@ -475,7 +475,7 @@ const Dashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-900">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Beta Warning Banner */}
-      <BetaWarningBanner variant="compact" dismissible={true} className="mb-6" />
+      <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
       
       <div className="mb-8">
         <h1 className="text-3xl text-center font-bold text-gray-300">
