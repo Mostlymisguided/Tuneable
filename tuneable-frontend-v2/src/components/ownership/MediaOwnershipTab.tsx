@@ -111,6 +111,17 @@ const OWNER_ROLE_OPTIONS = [
   { value: 'collective', label: 'Collective' },
 ];
 
+const extractLocalDate = (iso?: string | null) =>
+  iso ? new Date(iso).toISOString().slice(0, 10) : '';
+const extractLocalTime = (iso?: string | null) =>
+  iso ? new Date(iso).toISOString().slice(11, 16) : '';
+const combineDateTime = (date: string, time: string) => {
+  if (!date) return null;
+  const safeTime = time || '00:00';
+  const combined = new Date(`${date}T${safeTime}:00`);
+  return Number.isNaN(combined.getTime()) ? null : combined.toISOString();
+};
+
 const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
   mediaId,
   canEdit,
@@ -552,19 +563,43 @@ const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
                         <label className="text-xs uppercase tracking-wide text-gray-500 mb-1 block">
                           Verified At
                         </label>
-                        <input
-                          type="datetime-local"
-                          value={row.verifiedAt ? new Date(row.verifiedAt).toISOString().slice(0, 16) : ''}
-                          onChange={(e) =>
-                            handleVerificationFieldChange(
-                              originalIndex,
-                              'verifiedAt',
-                              e.target.value ? new Date(e.target.value).toISOString() : null
-                            )
-                          }
-                          disabled={!canEdit}
-                          className="w-full rounded-lg border border-gray-700 bg-black/60 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 disabled:opacity-60 disabled:cursor-not-allowed"
-                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="date"
+                            value={extractLocalDate(row.verifiedAt)}
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              const currentTime = extractLocalTime(row.verifiedAt);
+                              const iso = combineDateTime(newDate, currentTime);
+                              handleVerificationFieldChange(originalIndex, 'verifiedAt', iso);
+                            }}
+                            disabled={!canEdit}
+                            className="rounded-lg border border-gray-700 bg-black/60 px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                          />
+                          <input
+                            type="time"
+                            value={extractLocalTime(row.verifiedAt)}
+                            onChange={(e) => {
+                              const newTime = e.target.value;
+                              const currentDate = extractLocalDate(row.verifiedAt);
+                              const iso = combineDateTime(currentDate, newTime);
+                              handleVerificationFieldChange(originalIndex, 'verifiedAt', iso);
+                            }}
+                            disabled={!canEdit}
+                            className="rounded-lg border border-gray-700 bg-black/60 px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleVerificationFieldChange(originalIndex, 'verifiedAt', new Date().toISOString())
+                            }
+                            className="mt-2 inline-flex items-center gap-2 text-xs text-purple-300 hover:text-purple-200 transition-colors"
+                          >
+                            Set to now
+                          </button>
+                        )}
                       </div>
 
                       <div>
