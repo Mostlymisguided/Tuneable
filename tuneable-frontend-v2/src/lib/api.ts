@@ -370,6 +370,14 @@ export const mediaAPI = {
     return response.data;
   },
 
+  // Upload cover art for existing media
+  uploadCoverArt: async (mediaId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('coverArtFile', file);
+    const response = await api.put(`/media/${mediaId}/cover-art`, formData);
+    return response.data;
+  },
+
   updateMedia: async (mediaId: string, updates: {
     title?: string;
     artist?: string;

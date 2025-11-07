@@ -46,6 +46,8 @@ const CreatorUpload: React.FC = () => {
     label: '',
     language: ''
   });
+  const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
+  const coverArtFileInputRef = useRef<HTMLInputElement>(null);
 
   // Check if user is verified creator or admin
   const isAdmin = user && (user as any).role?.includes('admin');
@@ -278,10 +280,15 @@ const CreatorUpload: React.FC = () => {
       uploadData.append('explicit', formData.explicit.toString());
       if (formData.tags) uploadData.append('tags', formData.tags);
       if (formData.description) uploadData.append('description', formData.description.trim());
-      if (formData.coverArt) uploadData.append('coverArt', formData.coverArt.trim());
-      
-      // Add extracted artwork if available and no custom cover art URL provided
-      if (extractedMetadata?.artwork && extractedMetadata.artwork.length > 0 && !formData.coverArt) {
+      // Add cover art file if selected
+      if (coverArtFile) {
+        uploadData.append('coverArtFile', coverArtFile);
+      } else if (formData.coverArt) {
+        uploadData.append('coverArt', formData.coverArt.trim());
+      }
+
+      // Add extracted artwork if available and no custom cover art URL or file provided
+      if (extractedMetadata?.artwork && extractedMetadata.artwork.length > 0 && !formData.coverArt && !coverArtFile) {
         try {
           const artwork = extractedMetadata.artwork[0]; // Get the first (primary) artwork
           const blob = new Blob([artwork.data], { type: artwork.format });
@@ -624,19 +631,75 @@ const CreatorUpload: React.FC = () => {
                     🖼️ Artwork found in file
                   </span>
                 )}
+                {coverArtFile && (
+                  <span className="ml-2 px-2 py-1 bg-purple-900/30 text-purple-300 text-xs rounded-full border border-purple-500/30">
+                    📁 File selected: {coverArtFile.name}
+                  </span>
+                )}
               </label>
-              <input
-                type="url"
-                name="coverArt"
-                value={formData.coverArt}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                placeholder={
-                  extractedMetadata?.artwork && extractedMetadata.artwork.length > 0
-                    ? "Artwork found in file - enter URL to override or leave blank to use embedded artwork"
-                    : "https://example.com/cover.jpg"
-                }
-              />
+              <div className="flex space-x-2">
+                <input
+                  type="url"
+                  name="coverArt"
+                  value={formData.coverArt}
+                  onChange={handleChange}
+                  className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  placeholder={
+                    extractedMetadata?.artwork && extractedMetadata.artwork.length > 0
+                      ? "Artwork found in file - enter URL to override or leave blank to use embedded artwork"
+                      : "https://example.com/cover.jpg"
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => coverArtFileInputRef.current?.click()}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors flex items-center space-x-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Upload</span>
+                </button>
+                <input
+                  ref={coverArtFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      // Validate file type
+                      if (!file.type.startsWith('image/')) {
+                        toast.error('Please select an image file');
+                        return;
+                      }
+                      // Validate file size (5MB max)
+                      if (file.size > 5 * 1024 * 1024) {
+                        toast.error('Cover art file size must be less than 5MB');
+                        return;
+                      }
+                      setCoverArtFile(file);
+                      // Clear URL field when file is selected (file takes priority)
+                      setFormData(prev => ({ ...prev, coverArt: '' }));
+                    }
+                  }}
+                  className="hidden"
+                />
+              </div>
+              {coverArtFile && (
+                <div className="mt-2 text-sm text-purple-300">
+                  Selected file: {coverArtFile.name} ({(coverArtFile.size / 1024 / 1024).toFixed(2)} MB)
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverArtFile(null);
+                      if (coverArtFileInputRef.current) {
+                        coverArtFileInputRef.current.value = '';
+                      }
+                    }}
+                    className="ml-2 text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
               {extractedMetadata?.artwork && extractedMetadata.artwork.length > 0 && (
                 <div className="mt-2 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
@@ -648,7 +711,7 @@ const CreatorUpload: React.FC = () => {
                     The artwork will be automatically extracted and used as the cover art.
                   </p>
                   <p className="text-gray-400 text-xs mt-1">
-                    You can still provide a custom URL above to override the embedded artwork.
+                    You can upload a custom file or provide a custom URL above to override the embedded artwork.
                   </p>
                 </div>
               )}

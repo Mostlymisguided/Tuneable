@@ -28,7 +28,8 @@ import {
   Flag,
   Building,
   CheckCircle,
-  Users
+  Users,
+  Upload
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
@@ -223,6 +224,10 @@ const TuneProfile: React.FC = () => {
 
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
+
+  // Cover art upload state
+  const coverArtFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
 
   // WebPlayer integration
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
@@ -438,7 +443,7 @@ const TuneProfile: React.FC = () => {
         pitch: media.pitch || 440,
         timeSignature: media.timeSignature || '',
         elements: media.elements || [],
-        coverArt: media.coverArt || ''
+        coverArt: media.coverArt || DEFAULT_COVER_ART // Always show the URL that's actually stored (or default)
       });
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
@@ -642,6 +647,53 @@ const TuneProfile: React.FC = () => {
           color
         };
       });
+  };
+
+  // Handle cover art file upload
+  const handleCoverArtUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Cover art file size must be less than 5MB');
+      return;
+    }
+
+    if (!mediaId) {
+      toast.error('Media ID not found');
+      return;
+    }
+
+    setIsUploadingCoverArt(true);
+    try {
+      const response = await mediaAPI.uploadCoverArt(media?._id || mediaId, file);
+      toast.success('Cover art uploaded successfully!');
+      // Update the form with the new URL
+      setEditForm({ ...editForm, coverArt: response.coverArt });
+      // Refresh media data
+      await fetchMediaProfile();
+    } catch (err: any) {
+      console.error('Error uploading cover art:', err);
+      toast.error(err.response?.data?.error || 'Failed to upload cover art');
+    } finally {
+      setIsUploadingCoverArt(false);
+      // Reset file input
+      if (coverArtFileInputRef.current) {
+        coverArtFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle cover art upload button click
+  const handleCoverArtUploadClick = () => {
+    coverArtFileInputRef.current?.click();
   };
 
   // Handle adding a new link
@@ -2330,13 +2382,45 @@ const TuneProfile: React.FC = () => {
                 {/* Cover Art URL */}
                 <div>
                   <label className="block text-white font-medium mb-2">Cover Art URL</label>
+                  <div className="flex space-x-2">
                   <input
                     type="url"
                     value={editForm.coverArt}
                     onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
-                    className="input"
+                      className="input flex-1"
                     placeholder="https://example.com/cover.jpg"
                   />
+                    <button
+                      type="button"
+                      onClick={handleCoverArtUploadClick}
+                      disabled={isUploadingCoverArt}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
+                    >
+                      {isUploadingCoverArt ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          <span>Upload</span>
+                        </>
+                      )}
+                    </button>
+                    <input
+                      ref={coverArtFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoverArtUpload}
+                      className="hidden"
+                  />
+                </div>
+                  {editForm.coverArt && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Current: {editForm.coverArt}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

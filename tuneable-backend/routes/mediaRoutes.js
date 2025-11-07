@@ -53,6 +53,19 @@ const mixedUpload = multer({
   }
 });
 
+// Multer config for cover art upload only (for update endpoint)
+const coverArtUploadSingle = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      return cb(null, true);
+    } else {
+      return cb(new Error('Only image files are allowed for cover art'));
+    }
+  }
+});
+
 // @route   POST /api/media/upload
 // @desc    Upload media file (MP3) - Creator/Admin only
 // @access  Private (Verified creators and admins)
@@ -1244,6 +1257,94 @@ router.put('/:id', authMiddleware, async (req, res) => {
     console.error('Media ID:', req.params.id);
     res.status(500).json({ 
       error: 'Failed to update media',
+      details: error.message 
+    });
+  }
+});
+
+// @route   PUT /api/media/:id/cover-art
+// @desc    Upload cover art for existing media
+// @access  Private (Admin or Verified Creator only)
+router.put('/:id/cover-art', authMiddleware, coverArtUploadSingle.single('coverArtFile'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    
+    // Validate media ID
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+    
+    // Find the media
+    const media = await Media.findById(id);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    
+    // Check permissions: must be admin OR media owner OR verified creator
+    const { canEditMedia } = require('../utils/permissionHelpers');
+    if (!canEditMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to edit this media' });
+    }
+    
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ error: 'No cover art file uploaded' });
+    }
+    
+    try {
+      console.log('🖼️ Processing cover art upload for media:', id);
+      
+      // Upload cover art to R2 manually
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const s3Client = new S3Client({
+        region: 'auto',
+        endpoint: process.env.R2_ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        },
+      });
+      
+      const timestamp = Date.now();
+      const safeTitle = (media.title || 'cover').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileExt = path.extname(req.file.originalname) || '.jpg';
+      const coverArtKey = `cover-art/${safeTitle}-${timestamp}${fileExt}`;
+      
+      const coverArtCommand = new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: coverArtKey,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+        ACL: 'public-read',
+        CacheControl: 'public, max-age=31536000'
+      });
+      
+      await s3Client.send(coverArtCommand);
+      const coverArtUrl = getPublicUrl(coverArtKey);
+      
+      // Update media with cover art URL
+      media.coverArt = coverArtUrl;
+      await media.save();
+      
+      console.log(`✅ Cover art uploaded and saved: ${coverArtUrl}`);
+      
+      res.json({
+        success: true,
+        coverArt: coverArtUrl,
+        message: 'Cover art uploaded successfully'
+      });
+    } catch (uploadError) {
+      console.error('❌ Error uploading cover art:', uploadError.message);
+      res.status(500).json({ 
+        error: 'Failed to upload cover art',
+        details: uploadError.message 
+      });
+    }
+  } catch (error) {
+    console.error('Error uploading cover art:', error);
+    res.status(500).json({ 
+      error: 'Failed to upload cover art',
       details: error.message 
     });
   }
