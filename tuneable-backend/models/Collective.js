@@ -23,7 +23,9 @@ const collectiveSchema = new mongoose.Schema({
   website: { type: String },
   location: {
     city: { type: String },
+    region: { type: String }, // State, province, or region
     country: { type: String },
+    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
     coordinates: {
       lat: { type: Number },
       lng: { type: Number }

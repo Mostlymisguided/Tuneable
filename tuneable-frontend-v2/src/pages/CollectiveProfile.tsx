@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
 import { collectiveAPI } from '../lib/api';
@@ -20,7 +20,9 @@ interface Collective {
   type: 'band' | 'collective' | 'production_company' | 'other';
   location?: {
     city?: string;
+    region?: string;
     country?: string;
+    countryCode?: string;
   };
   socialMedia?: {
     instagram?: string;
@@ -76,9 +78,13 @@ const CollectiveProfile: React.FC = () => {
   const [members, setMembers] = useState<Collective['members']>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'media'>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  // Edit and Report state
-  const [isEditingCollective, setIsEditingCollective] = useState(false);
+  // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
+  const isEditMode = searchParams.get('edit') === 'true';
+  const editTab = (searchParams.get('tab') as 'info' | 'edit') || 'info';
+  
+  // Report state
   const [showReportModal, setShowReportModal] = useState(false);
   
   // Profile picture upload state
@@ -94,7 +100,9 @@ const CollectiveProfile: React.FC = () => {
     genres: [] as string[],
     location: {
       city: '',
-      country: ''
+      region: '',
+      country: '',
+      countryCode: ''
     },
     socialMedia: {
       instagram: '',
@@ -106,6 +114,23 @@ const CollectiveProfile: React.FC = () => {
       tiktok: ''
     }
   });
+
+  // Helper function to get country code from country name
+  const getCountryCode = (countryName: string): string => {
+    const countryMap: Record<string, string> = {
+      'United Kingdom': 'GB',
+      'United States': 'US',
+      'Canada': 'CA',
+      'Australia': 'AU',
+      'Germany': 'DE',
+      'France': 'FR',
+      'Spain': 'ES',
+      'Italy': 'IT',
+      'Netherlands': 'NL',
+      'Belgium': 'BE'
+    };
+    return countryMap[countryName] || '';
+  };
 
   // Check if user can edit this collective
   const canEditCollective = (collectiveData?: Collective) => {
@@ -155,7 +180,7 @@ const CollectiveProfile: React.FC = () => {
         }
       }
       
-      // Populate edit form when collective loads
+      // Populate edit form when collective loads (always populate, not just in edit mode)
       if (data.collective && canEditCollective(data.collective)) {
         setEditForm({
           name: data.collective.name || '',
@@ -165,10 +190,12 @@ const CollectiveProfile: React.FC = () => {
           foundedYear: data.collective.foundedYear?.toString() || '',
           type: data.collective.type || 'collective',
           genres: data.collective.genres || [],
-          location: {
-            city: data.collective.location?.city || '',
-            country: data.collective.location?.country || ''
-          },
+            location: {
+              city: data.collective.location?.city || '',
+              region: data.collective.location?.region || '',
+              country: data.collective.location?.country || '',
+              countryCode: data.collective.location?.countryCode || ''
+            },
           socialMedia: {
             instagram: data.collective.socialMedia?.instagram || '',
             facebook: data.collective.socialMedia?.facebook || '',
@@ -225,6 +252,19 @@ const CollectiveProfile: React.FC = () => {
     }
   };
 
+  // Handlers for edit mode navigation
+  const handleEditClick = () => {
+    setSearchParams({ edit: 'true', tab: 'edit' });
+  };
+
+  const handleEditTabChange = (tab: 'info' | 'edit') => {
+    setSearchParams({ edit: 'true', tab });
+  };
+
+  const exitEditMode = () => {
+    setSearchParams({});
+  };
+
   // Handle save collective
   const handleSaveCollective = async () => {
     if (!collective) return;
@@ -238,9 +278,11 @@ const CollectiveProfile: React.FC = () => {
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
         type: editForm.type,
         genres: editForm.genres.length > 0 ? editForm.genres : undefined,
-        location: (editForm.location.city || editForm.location.country) ? {
+        location: (editForm.location.city || editForm.location.region || editForm.location.country) ? {
           city: editForm.location.city || undefined,
-          country: editForm.location.country || undefined
+          region: editForm.location.region || undefined,
+          country: editForm.location.country || undefined,
+          countryCode: editForm.location.countryCode || undefined
         } : undefined,
         socialMedia: {
           instagram: editForm.socialMedia.instagram || undefined,
@@ -255,7 +297,8 @@ const CollectiveProfile: React.FC = () => {
 
       await collectiveAPI.updateCollective(collective._id, updates);
       toast.success('Collective updated successfully!');
-      setIsEditingCollective(false);
+      // Exit edit mode after successful save
+      exitEditMode();
       await fetchCollectiveData(); // Refresh collective data
     } catch (error: any) {
       console.error('Error updating collective:', error);
@@ -337,14 +380,24 @@ const CollectiveProfile: React.FC = () => {
               <span className="hidden sm:inline">Report</span>
             </button>
             
-            {/* Edit Collective Button - Only show if user can edit */}
-            {canEditCollective() && (
+            {/* Edit Collective Button - Only show if user can edit and not in edit mode */}
+            {canEditCollective() && !isEditMode && (
               <button
-                onClick={() => setIsEditingCollective(true)}
+                onClick={handleEditClick}
                 className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <span className="hidden sm:inline">Edit Collective</span>
                 <span className="sm:hidden">Edit</span>
+              </button>
+            )}
+            {/* Exit Edit Mode Button - Only show if in edit mode */}
+            {canEditCollective() && isEditMode && (
+              <button
+                onClick={exitEditMode}
+                className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Cancel</span>
               </button>
             )}
           </div>
@@ -411,12 +464,12 @@ const CollectiveProfile: React.FC = () => {
                 )}
                 
                 {/* Location */}
-                {collective.location && (collective.location.city || collective.location.country) && (
+                {collective.location && (collective.location.city || collective.location.region || collective.location.country) && (
                   <div className="mb-4">
                     <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                       <MapPin className="h-3.5 w-3.5" />
                       <span>
-                        {[collective.location.city, collective.location.country].filter(Boolean).join(', ')}
+                        {[collective.location.city, collective.location.region, collective.location.country].filter(Boolean).join(', ')}
                       </span>
                     </div>
                   </div>
@@ -475,6 +528,38 @@ const CollectiveProfile: React.FC = () => {
           </div>
         </div>
 
+        {/* Tab Navigation - Only show when in edit mode */}
+        {isEditMode && canEditCollective() && (
+          <div className="mb-6 border-b border-gray-700">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => handleEditTabChange('info')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'info'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Collective Info
+              </button>
+              <button
+                onClick={() => handleEditTabChange('edit')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'edit'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Edit Collective
+              </button>
+            </nav>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        {!isEditMode ? (
+          /* NORMAL VIEW - All existing content */
+          <>
         {/* Stats */}
         {collective.stats && (
           <div className="mb-8">
@@ -552,10 +637,10 @@ const CollectiveProfile: React.FC = () => {
                     </div>
                   )}
                   
-                  {collective.location && (collective.location.city || collective.location.country) && (
+                  {collective.location && (collective.location.city || collective.location.region || collective.location.country) && (
                     <div className="flex items-center space-x-2 text-gray-300">
                       <MapPin className="w-4 h-4" />
-                      <span>{[collective.location.city, collective.location.country].filter(Boolean).join(', ')}</span>
+                      <span>{[collective.location.city, collective.location.region, collective.location.country].filter(Boolean).join(', ')}</span>
                     </div>
                   )}
                   
@@ -738,61 +823,87 @@ const CollectiveProfile: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Edit Collective Modal */}
-      {isEditingCollective && canEditCollective() && collective && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 overflow-y-auto" style={{ zIndex: 10000 }}>
-          <div className="card max-w-4xl w-full my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Edit Collective</h2>
-              <button
-                onClick={() => setIsEditingCollective(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">Collective Name *</label>
-                  <input
-                    type="text"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="input"
-                    placeholder="Collective name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Email *</label>
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="input"
-                    placeholder="collective@example.com"
-                  />
+          </>
+        ) : (
+          /* EDIT MODE - Tab Content */
+          <>
+            {editTab === 'info' && (
+              /* Collective Info Tab - Show normal content when viewing info tab in edit mode */
+              <div className="space-y-8">
+                {/* Stats */}
+                {collective.stats && (
+                  <div className="mb-8">
+                    <h2 className="text-2xl font-bold text-center text-white mb-4">Collective Statistics</h2>
+                    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {collective.stats.memberCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{collective.stats.memberCount || 0}</div>
+                          <div className="text-sm text-gray-300">Members</div>
+                        </div>
+                      )}
+                      {collective.stats.releaseCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{collective.stats.releaseCount || 0}</div>
+                          <div className="text-sm text-gray-300">Releases</div>
+                        </div>
+                      )}
+                      {collective.stats.globalCollectiveAggregate !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <TrendingUp className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
+                          <div className="text-sm text-gray-300">Total Bids</div>
+                        </div>
+                      )}
+                      {collective.stats.globalCollectiveBidCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <Music className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{collective.stats.globalCollectiveBidCount || 0}</div>
+                          <div className="text-sm text-gray-300">Total Bid Count</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* Show message that user can switch to edit tab */}
+                <div className="card p-6 text-center">
+                  <p className="text-gray-300">Switch to the "Edit Collective" tab to modify collective details.</p>
                 </div>
               </div>
+            )}
 
-              <div>
-                <label className="block text-white font-medium mb-2">Description</label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="input"
-                  rows={3}
-                  placeholder="Tell us about your collective..."
-                />
-              </div>
+            {editTab === 'edit' && (
+              /* Edit Collective Tab - Edit Form */
+              <div className="card p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Edit Collective</h2>
+                
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-white font-medium mb-2">Collective Name *</label>
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="input"
+                        placeholder="Collective name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">Email *</label>
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="input"
+                        placeholder="collective@example.com"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">Type</label>
+                  <div>
                   <select
                     value={editForm.type}
                     onChange={(e) => setEditForm({ ...editForm, type: e.target.value as any })}
@@ -830,7 +941,7 @@ const CollectiveProfile: React.FC = () => {
               </div>
 
               {/* Location */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-white font-medium mb-2">City</label>
                   <input
@@ -842,14 +953,46 @@ const CollectiveProfile: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-white font-medium mb-2">Country</label>
+                  <label className="block text-white font-medium mb-2">Region/State</label>
                   <input
                     type="text"
-                    value={editForm.location.country}
-                    onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, country: e.target.value } })}
+                    value={editForm.location.region}
+                    onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, region: e.target.value } })}
                     className="input"
-                    placeholder="Country"
+                    placeholder="Region/State"
                   />
+                </div>
+                <div>
+                  <label className="block text-white font-medium mb-2">Country</label>
+                  <select
+                    value={editForm.location.country}
+                    onChange={(e) => {
+                      const country = e.target.value;
+                      const countryCode = getCountryCode(country);
+                      setEditForm({ 
+                        ...editForm, 
+                        location: { 
+                          ...editForm.location, 
+                          country: country,
+                          countryCode: countryCode
+                        } 
+                      });
+                    }}
+                    className="input"
+                  >
+                    <option value="">Select Country</option>
+                    <option value="United Kingdom">United Kingdom</option>
+                    <option value="United States">United States</option>
+                    <option value="Canada">Canada</option>
+                    <option value="Australia">Australia</option>
+                    <option value="Germany">Germany</option>
+                    <option value="France">France</option>
+                    <option value="Spain">Spain</option>
+                    <option value="Italy">Italy</option>
+                    <option value="Netherlands">Netherlands</option>
+                    <option value="Belgium">Belgium</option>
+                    {/* Add more countries as needed */}
+                  </select>
                 </div>
               </div>
 
@@ -931,26 +1074,29 @@ const CollectiveProfile: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-700">
-              <button
-                onClick={() => setIsEditingCollective(false)}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveCollective}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-              >
-                <Save className="h-4 w-4" />
-                <span>Save Changes</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                {/* Action Buttons */}
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    onClick={handleSaveCollective}
+                    disabled={!editForm.name || !editForm.email}
+                    className="btn-primary flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>Save Changes</span>
+                  </button>
+                  <button
+                    onClick={exitEditMode}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Report Modal */}
       {showReportModal && collective && (

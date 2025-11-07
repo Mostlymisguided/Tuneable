@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
 import { labelAPI } from '../lib/api';
@@ -18,7 +18,9 @@ interface Label {
   website: string;
   location?: {
     city?: string;
+    region?: string;
     country?: string;
+    countryCode?: string;
   };
   socialMedia?: {
     instagram?: string;
@@ -80,9 +82,13 @@ const LabelProfile: React.FC = () => {
   const [artists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media'>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  // Edit and Report state
-  const [isEditingLabel, setIsEditingLabel] = useState(false);
+  // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
+  const isEditMode = searchParams.get('edit') === 'true';
+  const editTab = (searchParams.get('tab') as 'info' | 'edit') || 'info';
+  
+  // Report state
   const [showReportModal, setShowReportModal] = useState(false);
   
   // Profile picture upload state
@@ -97,7 +103,9 @@ const LabelProfile: React.FC = () => {
     genres: [] as string[],
     location: {
       city: '',
-      country: ''
+      region: '',
+      country: '',
+      countryCode: ''
     },
     socialMedia: {
       instagram: '',
@@ -109,6 +117,23 @@ const LabelProfile: React.FC = () => {
       tiktok: ''
     }
   });
+
+  // Helper function to get country code from country name
+  const getCountryCode = (countryName: string): string => {
+    const countryMap: Record<string, string> = {
+      'United Kingdom': 'GB',
+      'United States': 'US',
+      'Canada': 'CA',
+      'Australia': 'AU',
+      'Germany': 'DE',
+      'France': 'FR',
+      'Spain': 'ES',
+      'Italy': 'IT',
+      'Netherlands': 'NL',
+      'Belgium': 'BE'
+    };
+    return countryMap[countryName] || '';
+  };
 
   // Check if user can edit this label
   const canEditLabel = (labelData?: Label) => {
@@ -147,7 +172,7 @@ const LabelProfile: React.FC = () => {
       setRecentReleases(data.recentReleases || []);
       setTopMedia(data.topMedia || []);
       
-      // Populate edit form when label loads
+      // Populate edit form when label loads (always populate, not just in edit mode)
       if (data.label && canEditLabel(data.label)) {
         setEditForm({
           name: data.label.name || '',
@@ -158,7 +183,9 @@ const LabelProfile: React.FC = () => {
           genres: data.label.genres || [],
           location: {
             city: data.label.location?.city || '',
-            country: data.label.location?.country || ''
+            region: data.label.location?.region || '',
+            country: data.label.location?.country || '',
+            countryCode: data.label.location?.countryCode || ''
           },
           socialMedia: {
             instagram: data.label.socialMedia?.instagram || '',
@@ -216,6 +243,19 @@ const LabelProfile: React.FC = () => {
     }
   };
 
+  // Handlers for edit mode navigation
+  const handleEditClick = () => {
+    setSearchParams({ edit: 'true', tab: 'edit' });
+  };
+
+  const handleEditTabChange = (tab: 'info' | 'edit') => {
+    setSearchParams({ edit: 'true', tab });
+  };
+
+  const exitEditMode = () => {
+    setSearchParams({});
+  };
+
   // Handle save label
   const handleSaveLabel = async () => {
     if (!label) return;
@@ -228,9 +268,11 @@ const LabelProfile: React.FC = () => {
         website: editForm.website || undefined,
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
         genres: editForm.genres.length > 0 ? editForm.genres : undefined,
-        location: (editForm.location.city || editForm.location.country) ? {
+        location: (editForm.location.city || editForm.location.region || editForm.location.country) ? {
           city: editForm.location.city || undefined,
-          country: editForm.location.country || undefined
+          region: editForm.location.region || undefined,
+          country: editForm.location.country || undefined,
+          countryCode: editForm.location.countryCode || undefined
         } : undefined,
         socialMedia: {
           instagram: editForm.socialMedia.instagram || undefined,
@@ -245,7 +287,8 @@ const LabelProfile: React.FC = () => {
 
       await labelAPI.updateLabel(label._id, updates);
       toast.success('Label updated successfully!');
-      setIsEditingLabel(false);
+      // Exit edit mode after successful save
+      exitEditMode();
       await fetchLabelData(); // Refresh label data
     } catch (error: any) {
       console.error('Error updating label:', error);
@@ -316,14 +359,24 @@ const LabelProfile: React.FC = () => {
               <span className="hidden sm:inline">Report</span>
             </button>
             
-            {/* Edit Label Button - Only show if user can edit */}
-            {canEditLabel() && (
+            {/* Edit Label Button - Only show if user can edit and not in edit mode */}
+            {canEditLabel() && !isEditMode && (
               <button
-                onClick={() => setIsEditingLabel(true)}
+                onClick={handleEditClick}
                 className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <span className="hidden sm:inline">Edit Label</span>
                 <span className="sm:hidden">Edit</span>
+              </button>
+            )}
+            {/* Exit Edit Mode Button - Only show if in edit mode */}
+            {canEditLabel() && isEditMode && (
+              <button
+                onClick={exitEditMode}
+                className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Cancel</span>
               </button>
             )}
           </div>
@@ -385,12 +438,12 @@ const LabelProfile: React.FC = () => {
                 )}
                 
                 {/* Location */}
-                {label.location && (label.location.city || label.location.country) && (
+                {label.location && (label.location.city || label.location.region || label.location.country) && (
                   <div className="mb-4">
                     <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                       <MapPin className="h-3.5 w-3.5" />
                       <span>
-                        {[label.location.city, label.location.country].filter(Boolean).join(', ')}
+                        {[label.location.city, label.location.region, label.location.country].filter(Boolean).join(', ')}
                       </span>
                     </div>
                   </div>
@@ -449,6 +502,38 @@ const LabelProfile: React.FC = () => {
           </div>
         </div>
 
+        {/* Tab Navigation - Only show when in edit mode */}
+        {isEditMode && canEditLabel() && (
+          <div className="mb-6 border-b border-gray-700">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => handleEditTabChange('info')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'info'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Label Info
+              </button>
+              <button
+                onClick={() => handleEditTabChange('edit')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  editTab === 'edit'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Edit Label
+              </button>
+            </nav>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        {!isEditMode ? (
+          /* NORMAL VIEW - All existing content */
+          <>
         {/* Stats */}
         {label.stats && (
           <div className="mb-8">
@@ -526,10 +611,10 @@ const LabelProfile: React.FC = () => {
                     </div>
                   )}
                   
-                  {label.location && (label.location.city || label.location.country) && (
+                  {label.location && (label.location.city || label.location.region || label.location.country) && (
                     <div className="flex items-center space-x-2 text-gray-300">
                       <MapPin className="w-4 h-4" />
-                      <span>{[label.location.city, label.location.country].filter(Boolean).join(', ')}</span>
+                      <span>{[label.location.city, label.location.region, label.location.country].filter(Boolean).join(', ')}</span>
                     </div>
                   )}
                   
@@ -688,209 +773,280 @@ const LabelProfile: React.FC = () => {
             </div>
           )}
         </div>
+          </>
+        ) : (
+          /* EDIT MODE - Tab Content */
+          <>
+            {editTab === 'info' && (
+              /* Label Info Tab - Show normal content when viewing info tab in edit mode */
+              <div className="space-y-8">
+                {/* Stats */}
+                {label.stats && (
+                  <div className="mb-8">
+                    <h2 className="text-2xl font-bold text-center text-white mb-4">Label Statistics</h2>
+                    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {label.stats.artistCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{label.stats.artistCount || 0}</div>
+                          <div className="text-sm text-gray-300">Artists</div>
+                        </div>
+                      )}
+                      {label.stats.releaseCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{label.stats.releaseCount || 0}</div>
+                          <div className="text-sm text-gray-300">Releases</div>
+                        </div>
+                      )}
+                      {label.stats.globalLabelAggregate !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <TrendingUp className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{penceToPounds(label.stats.globalLabelAggregate || 0)}</div>
+                          <div className="text-sm text-gray-300">Total Bids</div>
+                        </div>
+                      )}
+                      {label.stats.globalLabelBidCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                          <Music className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
+                          <div className="text-2xl font-bold text-white">{label.stats.globalLabelBidCount || 0}</div>
+                          <div className="text-sm text-gray-300">Total Bid Count</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* Show message that user can switch to edit tab */}
+                <div className="card p-6 text-center">
+                  <p className="text-gray-300">Switch to the "Edit Label" tab to modify label details.</p>
+                </div>
+              </div>
+            )}
+
+            {editTab === 'edit' && (
+              /* Edit Label Tab - Edit Form */
+              <div className="card p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Edit Label</h2>
+                
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-white font-medium mb-2">Label Name *</label>
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="input"
+                        placeholder="Label name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">Email *</label>
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="input"
+                        placeholder="label@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-medium mb-2">Description</label>
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="input"
+                      rows={3}
+                      placeholder="Tell us about your label..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-white font-medium mb-2">Website</label>
+                      <input
+                        type="url"
+                        value={editForm.website}
+                        onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                        className="input"
+                        placeholder="https://example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">Founded Year</label>
+                      <input
+                        type="number"
+                        value={editForm.foundedYear}
+                        onChange={(e) => setEditForm({ ...editForm, foundedYear: e.target.value })}
+                        className="input"
+                        placeholder="2020"
+                        min="1900"
+                        max={new Date().getFullYear()}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-white font-medium mb-2">City</label>
+                      <input
+                        type="text"
+                        value={editForm.location.city}
+                        onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, city: e.target.value } })}
+                        className="input"
+                        placeholder="City"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">Region/State</label>
+                      <input
+                        type="text"
+                        value={editForm.location.region}
+                        onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, region: e.target.value } })}
+                        className="input"
+                        placeholder="Region/State"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">Country</label>
+                      <select
+                        value={editForm.location.country}
+                        onChange={(e) => {
+                          const country = e.target.value;
+                          const countryCode = getCountryCode(country);
+                          setEditForm({ 
+                            ...editForm, 
+                            location: { 
+                              ...editForm.location, 
+                              country: country,
+                              countryCode: countryCode
+                            } 
+                          });
+                        }}
+                        className="input"
+                      >
+                        <option value="">Select Country</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Germany">Germany</option>
+                        <option value="France">France</option>
+                        <option value="Spain">Spain</option>
+                        <option value="Italy">Italy</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="Belgium">Belgium</option>
+                        {/* Add more countries as needed */}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Genres */}
+                  <div>
+                    <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={editForm.genres.join(', ')}
+                      onChange={(e) => setEditForm({ ...editForm, genres: e.target.value.split(',').map(g => g.trim()).filter(g => g) })}
+                      className="input"
+                      placeholder="electronic, hip-hop, rock"
+                    />
+                  </div>
+
+                  {/* Social Media */}
+                  <div>
+                    <label className="block text-white font-medium mb-3">Social Media</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-white text-sm mb-2">Instagram</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.instagram}
+                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, instagram: e.target.value } })}
+                          className="input"
+                          placeholder="https://instagram.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">Facebook</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.facebook}
+                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, facebook: e.target.value } })}
+                          className="input"
+                          placeholder="https://facebook.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">YouTube</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.youtube}
+                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, youtube: e.target.value } })}
+                          className="input"
+                          placeholder="https://youtube.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">Twitter</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.twitter}
+                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, twitter: e.target.value } })}
+                          className="input"
+                          placeholder="https://twitter.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">SoundCloud</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.soundcloud}
+                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, soundcloud: e.target.value } })}
+                          className="input"
+                          placeholder="https://soundcloud.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-2">Spotify</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.spotify}
+                          onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, spotify: e.target.value } })}
+                          className="input"
+                          placeholder="https://open.spotify.com/..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    onClick={handleSaveLabel}
+                    disabled={!editForm.name || !editForm.email}
+                    className="btn-primary flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>Save Changes</span>
+                  </button>
+                  <button
+                    onClick={exitEditMode}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
-
-      {/* Edit Label Modal */}
-      {isEditingLabel && canEditLabel() && label && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 overflow-y-auto" style={{ zIndex: 10000 }}>
-          <div className="card max-w-4xl w-full my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Edit Label</h2>
-              <button
-                onClick={() => setIsEditingLabel(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">Label Name *</label>
-                  <input
-                    type="text"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="input"
-                    placeholder="Label name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Email *</label>
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="input"
-                    placeholder="label@example.com"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-white font-medium mb-2">Description</label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="input"
-                  rows={3}
-                  placeholder="Tell us about your label..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">Website</label>
-                  <input
-                    type="url"
-                    value={editForm.website}
-                    onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                    className="input"
-                    placeholder="https://example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Founded Year</label>
-                  <input
-                    type="number"
-                    value={editForm.foundedYear}
-                    onChange={(e) => setEditForm({ ...editForm, foundedYear: e.target.value })}
-                    className="input"
-                    placeholder="2020"
-                    min="1900"
-                    max={new Date().getFullYear()}
-                  />
-                </div>
-              </div>
-
-              {/* Location */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">City</label>
-                  <input
-                    type="text"
-                    value={editForm.location.city}
-                    onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, city: e.target.value } })}
-                    className="input"
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Country</label>
-                  <input
-                    type="text"
-                    value={editForm.location.country}
-                    onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, country: e.target.value } })}
-                    className="input"
-                    placeholder="Country"
-                  />
-                </div>
-              </div>
-
-              {/* Genres */}
-              <div>
-                <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
-                <input
-                  type="text"
-                  value={editForm.genres.join(', ')}
-                  onChange={(e) => setEditForm({ ...editForm, genres: e.target.value.split(',').map(g => g.trim()).filter(g => g) })}
-                  className="input"
-                  placeholder="electronic, hip-hop, rock"
-                />
-              </div>
-
-              {/* Social Media */}
-              <div>
-                <label className="block text-white font-medium mb-3">Social Media</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-white text-sm mb-2">Instagram</label>
-                    <input
-                      type="url"
-                      value={editForm.socialMedia.instagram}
-                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, instagram: e.target.value } })}
-                      className="input"
-                      placeholder="https://instagram.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm mb-2">Facebook</label>
-                    <input
-                      type="url"
-                      value={editForm.socialMedia.facebook}
-                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, facebook: e.target.value } })}
-                      className="input"
-                      placeholder="https://facebook.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm mb-2">YouTube</label>
-                    <input
-                      type="url"
-                      value={editForm.socialMedia.youtube}
-                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, youtube: e.target.value } })}
-                      className="input"
-                      placeholder="https://youtube.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm mb-2">Twitter</label>
-                    <input
-                      type="url"
-                      value={editForm.socialMedia.twitter}
-                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, twitter: e.target.value } })}
-                      className="input"
-                      placeholder="https://twitter.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm mb-2">SoundCloud</label>
-                    <input
-                      type="url"
-                      value={editForm.socialMedia.soundcloud}
-                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, soundcloud: e.target.value } })}
-                      className="input"
-                      placeholder="https://soundcloud.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm mb-2">Spotify</label>
-                    <input
-                      type="url"
-                      value={editForm.socialMedia.spotify}
-                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, spotify: e.target.value } })}
-                      className="input"
-                      placeholder="https://open.spotify.com/..."
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
-                <button
-                  type="button"
-                  onClick={() => setIsEditingLabel(false)}
-                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveLabel}
-                  disabled={!editForm.name || !editForm.email}
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save Changes</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Report Modal */}
       {showReportModal && label && (
