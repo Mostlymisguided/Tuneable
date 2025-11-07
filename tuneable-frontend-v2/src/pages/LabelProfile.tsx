@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
-import LabelTeamTable, { LabelTeamMember } from '../components/labels/LabelTeamTable';
+import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 
 interface Label {
   _id: string;
