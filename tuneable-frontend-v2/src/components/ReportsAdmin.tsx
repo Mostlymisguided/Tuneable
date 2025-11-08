@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { Flag, ExternalLink, CheckCircle, XCircle, Clock, User as UserIcon, Music, Building } from 'lucide-react';
+import { Flag, ExternalLink, CheckCircle, XCircle, Clock, User as UserIcon, Music, Building, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Report {
   _id: string;
-  reportType: 'media' | 'user' | 'label';
+  reportType: 'media' | 'user' | 'label' | 'collective';
   mediaId?: {
     _id: string;
     uuid: string;
@@ -21,6 +21,13 @@ interface Report {
     profilePic?: string;
   };
   labelId?: {
+    _id: string;
+    uuid?: string;
+    slug?: string;
+    name: string;
+    profilePicture?: string;
+  };
+  collectiveId?: {
     _id: string;
     uuid?: string;
     slug?: string;
@@ -47,7 +54,7 @@ interface Report {
 }
 
 interface ReportsAdminProps {
-  reportType?: 'media' | 'user' | 'label';
+  reportType?: 'media' | 'user' | 'label' | 'collective';
 }
 
 const categoryLabels: { [key: string]: string } = {
@@ -65,7 +72,12 @@ const categoryLabels: { [key: string]: string } = {
   // Label categories
   label_impersonation: 'Impersonation',
   label_incorrect_info: 'Incorrect Information',
-  label_spam: 'Spam'
+  label_spam: 'Spam',
+  // Collective categories
+  collective_impersonation: 'Collective Impersonation',
+  collective_incorrect_info: 'Incorrect Information',
+  collective_spam: 'Spam',
+};
 };
 
 const statusColors: { [key: string]: string } = {
@@ -153,6 +165,16 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media' }) => 
         link: `/label/${report.labelId.slug || report.labelId.uuid}`,
         profilePicture: report.labelId.profilePicture
       };
+    } else if (report.reportType === 'collective' && report.collectiveId) {
+      return {
+        type: 'collective',
+        icon: Users,
+        title: report.collectiveId.name,
+        subtitle: report.collectiveId.slug || report.collectiveId.uuid,
+        id: report.collectiveId.slug || report.collectiveId.uuid,
+        link: `/collective/${report.collectiveId.slug || report.collectiveId.uuid || report.collectiveId._id}`,
+        profilePicture: report.collectiveId.profilePicture
+      };
     }
     return null;
   };
@@ -165,6 +187,8 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media' }) => 
         return 'User Reports';
       case 'label':
         return 'Label Reports';
+      case 'collective':
+        return 'Collective Reports';
       default:
         return 'Reports';
     }

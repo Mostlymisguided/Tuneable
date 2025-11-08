@@ -76,7 +76,7 @@ const Admin: React.FC = () => {
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
-  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'claims' | 'invites' | 'applications'>('media');
+  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
 
   useEffect(() => {
     checkAdminStatus();
@@ -1272,6 +1272,17 @@ const Admin: React.FC = () => {
                     <span>Label Reports</span>
                   </button>
                   <button
+                    onClick={() => setReportsSubTab('collective')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'collective'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    <span>Collective Reports</span>
+                  </button>
+                  <button
                     onClick={() => setReportsSubTab('claims')}
                     className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                       reportsSubTab === 'claims'
@@ -1559,7 +1570,7 @@ const Admin: React.FC = () => {
                 )}
               </div>
             ) : (
-              <ReportsAdmin reportType={reportsSubTab} />
+              <ReportsAdmin reportType={reportsSubTab as 'media' | 'user' | 'label' | 'collective'} />
             )}
           </div>
         )}
