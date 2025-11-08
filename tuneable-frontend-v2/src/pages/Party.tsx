@@ -1295,7 +1295,7 @@ const Party: React.FC = () => {
                               className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
                             >
                               {/* Album Artwork with Play Icon Overlay */}
-                              <div className="relative w-16 h-16 flex-shrink-0">
+                              <div className="relative w-32 h-32 md:w-16 md:h-16 flex-shrink-0">
                                 <img
                                   src={mediaData.coverArt || DEFAULT_COVER_ART}
                                   alt={mediaData.title || 'Unknown Media'}
@@ -1465,7 +1465,7 @@ const Party: React.FC = () => {
                                     <div className="flex flex-row md:contents items-start gap-3 mb-1 md:mb-0">
                                       {/* Media Thumbnail with Overlays */}
                                       <div 
-                                        className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
+                                        className="relative w-32 h-32 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
                                         onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                                       >
                                         <img
@@ -1798,7 +1798,7 @@ const Party: React.FC = () => {
                             <div className="flex flex-row md:contents items-start gap-3 mb-1 md:mb-0">
                               {/* Media Thumbnail with Overlays */}
                               <div 
-                                className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
+                                className="relative w-32 h-32 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
                                 onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                               >
                                 <img
