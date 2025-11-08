@@ -1866,7 +1866,7 @@ const Party: React.FC = () => {
                               </div>
                             </div>
                             {/* Action Buttons */}
-                            <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2 mt-3 md:mt-0">
+                            <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
                               <div className="flex items-center space-x-2">
                                 {/* Metrics Display */}
                                 <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">

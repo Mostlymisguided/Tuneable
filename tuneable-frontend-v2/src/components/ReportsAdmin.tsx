@@ -105,7 +105,7 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
     try {
       setLoading(true);
       const data = await reportAPI.getReports(statusFilter || undefined, undefined, reportType);
-      const reportsList = data.reports || [];
+      const reportsList = (data.reports || []) as Report[];
       setReports(reportsList);
 
       const totalFromApi = data.total ?? reportsList.length ?? 0;
