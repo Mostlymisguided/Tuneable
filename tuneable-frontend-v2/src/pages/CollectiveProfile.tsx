@@ -436,38 +436,7 @@ useEffect(() => {
               </button>
             )}
 
-            {editTab === 'ownership' && (
-              <div className="card p-6 space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">Collective Ownership</h2>
-                    <p className="text-sm text-gray-300">
-                      Founders, admins, and members who manage this collective on Tuneable.
-                    </p>
-                  </div>
-                  {slug && (
-                    <button
-                      onClick={() => fetchCollectiveTeam(slug)}
-                      disabled={isLoadingTeam}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <Loader2 className={`h-4 w-4 ${isLoadingTeam ? 'animate-spin' : 'hidden'}`} />
-                      {!isLoadingTeam && 'Refresh'}
-                      {isLoadingTeam && 'Refreshing...'}
-                    </button>
-                  )}
-                </div>
 
-                {isLoadingTeam && !hasLoadedTeam ? (
-                  <div className="flex items-center justify-center py-12 text-gray-300">
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Loading ownership roster...
-                  </div>
-                ) : (
-                  <LabelTeamTable members={teamMembers} isEditable />
-                )}
-              </div>
-            )}
             {/* Exit Edit Mode Button - Only show if in edit mode */}
             {canEditCollective() && isEditMode && (
               <button
@@ -1168,6 +1137,39 @@ useEffect(() => {
                     Cancel
                   </button>
                 </div>
+              </div>
+            )}
+
+{editTab === 'ownership' && (
+              <div className="card p-6 space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Collective Ownership</h2>
+                    <p className="text-sm text-gray-300">
+                      Founders, admins, and members who manage this collective on Tuneable.
+                    </p>
+                  </div>
+                  {slug && (
+                    <button
+                      onClick={() => fetchCollectiveTeam(slug)}
+                      disabled={isLoadingTeam}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Loader2 className={`h-4 w-4 ${isLoadingTeam ? 'animate-spin' : 'hidden'}`} />
+                      {!isLoadingTeam && 'Refresh'}
+                      {isLoadingTeam && 'Refreshing...'}
+                    </button>
+                  )}
+                </div>
+
+                {isLoadingTeam && !hasLoadedTeam ? (
+                  <div className="flex items-center justify-center py-12 text-gray-300">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Loading ownership roster...
+                  </div>
+                ) : (
+                  <LabelTeamTable members={teamMembers} isEditable />
+                )}
               </div>
             )}
             </div>
