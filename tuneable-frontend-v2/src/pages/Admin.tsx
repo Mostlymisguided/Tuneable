@@ -76,7 +76,7 @@ const Admin: React.FC = () => {
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
-  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'claims' | 'invites'>('media');
+  const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'claims' | 'invites' | 'applications'>('media');
 
   useEffect(() => {
     checkAdminStatus();
@@ -395,10 +395,14 @@ const Admin: React.FC = () => {
   }, [vetoedBidsSortField, vetoedBidsSortDirection, vetoedBidsPage, activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'reports' && reportsSubTab === 'claims' && isAdmin) {
-      loadClaims();
+    if (activeTab === 'reports' && isAdmin) {
+      if (reportsSubTab === 'claims') {
+        loadClaims();
+      } else if (reportsSubTab === 'applications') {
+        loadCreatorApplications();
+      }
     }
-  }, [activeTab, reportsSubTab]);
+  }, [activeTab, reportsSubTab, isAdmin]);
 
   const getLabelSortIcon = (field: string) => {
     if (labelSortField !== field) {
@@ -463,8 +467,7 @@ const Admin: React.FC = () => {
     { id: 'users', name: 'Users', icon: Users },
     { id: 'labels', name: 'Labels', icon: Building },
     { id: 'vetoed-bids', name: 'Vetoed Bids', icon: XCircle },
-    { id: 'creators', name: 'Creator Applications', icon: Award },
-    { id: 'reports', name: 'Reports', icon: AlertTriangle },
+    { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -1229,165 +1232,6 @@ const Admin: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'creators' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Creator Applications</h2>
-              <button
-                onClick={loadCreatorApplications}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
-            
-            {isLoadingApplications ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              </div>
-            ) : creatorApplications.length === 0 ? (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <Clock className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No pending creator applications</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {creatorApplications.map((app) => (
-                  <div key={app._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-4">
-                        {app.profilePic && (
-                          <img
-                            src={app.profilePic}
-                            alt={app.username}
-                            className="w-16 h-16 rounded-full object-cover"
-                          />
-                        )}
-                        <div>
-                          <h3 className="text-xl font-bold text-white">{app.creatorProfile?.artistName}</h3>
-                          <p className="text-gray-400">@{app.username} • {app.email}</p>
-                          <p className="text-sm text-gray-500">
-                            Applied: {new Date(app.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                        app.creatorProfile?.verificationStatus === 'pending'
-                          ? 'bg-yellow-900 text-yellow-200'
-                          : app.creatorProfile?.verificationStatus === 'verified'
-                          ? 'bg-green-900 text-green-200'
-                          : 'bg-red-900 text-red-200'
-                      }`}>
-                        {app.creatorProfile?.verificationStatus?.toUpperCase()}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-gray-400">Roles:</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {app.creatorProfile?.roles?.map((role: string) => (
-                            <span key={role} className="px-2 py-1 bg-purple-900 text-purple-200 text-xs rounded-full">
-                              {role}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <p className="text-sm text-gray-400">Genres:</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {app.creatorProfile?.genres?.slice(0, 3).map((genre: string) => (
-                            <span key={genre} className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded-full">
-                              {genre}
-                            </span>
-                          ))}
-                          {app.creatorProfile?.genres?.length > 3 && (
-                            <span className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full">
-                              +{app.creatorProfile.genres.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-400 mb-2">Bio:</p>
-                      <p className="text-gray-300 text-sm">{app.creatorProfile?.bio}</p>
-                    </div>
-
-                    {app.creatorProfile?.socialMedia && Object.entries(app.creatorProfile.socialMedia).some(([_, v]) => v) && (
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-400 mb-2">Social Media:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(app.creatorProfile.socialMedia).map(([platform, url]: [string, any]) => 
-                            url ? (
-                              <a
-                                key={platform}
-                                href={url as string}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-purple-400 hover:text-purple-300"
-                              >
-                                {platform}
-                              </a>
-                            ) : null
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {app.creatorProfile?.proofFiles && app.creatorProfile.proofFiles.length > 0 && (
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-400 mb-2">Proof Documents:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {app.creatorProfile.proofFiles.map((file: any, idx: number) => (
-                            <a
-                              key={idx}
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
-                            >
-                              Document {idx + 1}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex space-x-3 pt-4 border-t border-gray-700">
-                      <button
-                        onClick={() => {
-                          const notes = prompt('Add review notes (optional):');
-                          reviewCreatorApplication(app._id, 'verified', notes || '');
-                        }}
-                        className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          const notes = prompt('Add rejection reason:');
-                          if (notes) {
-                            reviewCreatorApplication(app._id, 'rejected', notes);
-                          }
-                        }}
-                        className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {activeTab === 'reports' && (
           <div className="space-y-6">
             {/* Sub-tabs for Reports */}
@@ -1437,6 +1281,17 @@ const Admin: React.FC = () => {
                   >
                     <Music className="h-4 w-4 mr-2" />
                     <span>Tune Claims</span>
+                  </button>
+                  <button
+                    onClick={() => setReportsSubTab('applications')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      reportsSubTab === 'applications'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Award className="h-4 w-4 mr-2" />
+                    <span>Creator Applications</span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('invites')}
@@ -1552,6 +1407,151 @@ const Admin: React.FC = () => {
                             <XCircle className="h-4 w-4 mr-2" />
                             Reject
                           </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : reportsSubTab === 'applications' ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">Creator Applications</h2>
+                  <button
+                    onClick={loadCreatorApplications}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {isLoadingApplications ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : creatorApplications.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <Clock className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No pending creator applications</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {creatorApplications.map((app) => (
+                      <div key={app._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-4">
+                            {app.profilePic && (
+                              <img
+                                src={app.profilePic}
+                                alt={app.username}
+                                className="w-16 h-16 rounded-full object-cover"
+                              />
+                            )}
+                            <div>
+                              <h3 className="text-xl font-bold text-white">{app.creatorProfile?.artistName}</h3>
+                              <p className="text-gray-400">@{app.username} • {app.email}</p>
+                              <p className="text-sm text-gray-500">
+                                Applied: {new Date(app.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            app.creatorProfile?.verificationStatus === 'pending'
+                              ? 'bg-yellow-900 text-yellow-200'
+                              : app.creatorProfile?.verificationStatus === 'verified'
+                              ? 'bg-green-900 text-green-200'
+                              : 'bg-red-900 text-red-200'
+                          }`}>
+                            {app.creatorProfile?.verificationStatus?.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Roles:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {app.creatorProfile?.roles?.map((role: string) => (
+                                <span key={role} className="px-2 py-1 bg-purple-900 text-purple-200 text-xs rounded-full">
+                                  {role}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-sm text-gray-400">Genres:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {app.creatorProfile?.genres?.slice(0, 3).map((genre: string) => (
+                                <span key={genre} className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded-full">
+                                  {genre}
+                                </span>
+                              ))}
+                              {app.creatorProfile?.genres?.length > 3 && (
+                                <span className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full">
+                                  +{app.creatorProfile.genres.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-400 mb-2">Bio:</p>
+                          <p className="text-gray-300 text-sm">{app.creatorProfile?.bio}</p>
+                        </div>
+
+                        {app.creatorProfile?.socialMedia && Object.entries(app.creatorProfile.socialMedia).some(([_, v]) => v) && (
+                          <div className="mb-4">
+                            <p className="text-sm text-gray-400 mb-2">Social Media:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(app.creatorProfile.socialMedia).map(([platform, url]: [string, any]) => 
+                                url ? (
+                                  <a
+                                    key={platform}
+                                    href={url as string}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-purple-400 hover:text-purple-300"
+                                  >
+                                    {platform}
+                                  </a>
+                                ) : null
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between mt-6 border-t border-gray-700 pt-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Status:</p>
+                            {getVerificationStatusBadge(app.creatorProfile?.verificationStatus || 'pending')}
+                          </div>
+
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={() => {
+                                const notes = prompt('Add approval notes (optional):');
+                                reviewCreatorApplication(app.userId?._id || app.userId, 'verified', notes || '');
+                              }}
+                              className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                const notes = prompt('Add rejection reason:');
+                                if (notes) {
+                                  reviewCreatorApplication(app.userId?._id || app.userId, 'rejected', notes);
+                                }
+                              }}
+                              className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Reject
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
