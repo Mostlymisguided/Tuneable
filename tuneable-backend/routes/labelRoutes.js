@@ -433,15 +433,7 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       return res.status(400).json({ error: 'Label name already exists' });
     }
 
-    // Check if user already has a label (only for owners)
-    // Affiliated artists can be associated with multiple labels
     const adminRole = userType === 'affiliated-artist' ? 'admin' : 'owner';
-    if (adminRole === 'owner') {
-      const userLabels = await Label.find({ 'admins.userId': req.user.id, 'admins.role': 'owner' });
-      if (userLabels.length > 0) {
-        return res.status(400).json({ error: 'User already owns a label' });
-      }
-    }
 
     // Generate slug from name (before creating label)
     const slug = name

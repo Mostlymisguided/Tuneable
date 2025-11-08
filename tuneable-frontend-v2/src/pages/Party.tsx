@@ -1462,7 +1462,7 @@ const Party: React.FC = () => {
                                     )}
                                     
                                     {/* Mobile-only wrapper for thumbnail + details side by side */}
-                                    <div className="flex flex-row md:contents items-start gap-3 mb-3 md:mb-0">
+                                    <div className="flex flex-row md:contents items-start gap-3 mb-1 md:mb-0">
                                       {/* Media Thumbnail with Overlays */}
                                       <div 
                                         className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
@@ -1540,8 +1540,8 @@ const Party: React.FC = () => {
                                       </div>
                                     </div>
                                     {/* Action Buttons */}
-                                    <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2 mt-3 md:mt-0">
-                                      <div className="flex items-center space-x-2">
+                                    <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
+                                      <div className="flex items-center justify-center space-x-2">
                                         {/* Metrics Display */}
                                         <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
                                           <div className="text-center p-1 md:p-2">
@@ -1795,7 +1795,7 @@ const Party: React.FC = () => {
                             </div>
                             
                             {/* Mobile-only wrapper for thumbnail + details side by side */}
-                            <div className="flex flex-row md:contents items-start gap-3 mb-3 md:mb-0">
+                            <div className="flex flex-row md:contents items-start gap-3 mb-1 md:mb-0">
                               {/* Media Thumbnail with Overlays */}
                               <div 
                                 className="relative w-16 h-16 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
@@ -1867,7 +1867,7 @@ const Party: React.FC = () => {
                             </div>
                             {/* Action Buttons */}
                             <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center justify-center space-x-2">
                                 {/* Metrics Display */}
                                 <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
                                   <div className="text-center p-1 md:p-2">
