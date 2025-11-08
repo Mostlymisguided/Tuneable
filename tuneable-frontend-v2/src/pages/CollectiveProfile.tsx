@@ -901,7 +901,7 @@ useEffect(() => {
           </>
         ) : (
           /* EDIT MODE - Tab Content */
-          <>
+          <div className="space-y-8 mt-6">
             {editTab === 'info' && (
               /* Collective Info Tab - Show normal content when viewing info tab in edit mode */
               <div className="space-y-8">
@@ -1169,7 +1169,7 @@ useEffect(() => {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
