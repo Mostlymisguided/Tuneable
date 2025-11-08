@@ -466,7 +466,7 @@ const Admin: React.FC = () => {
     { id: 'overview', name: 'Overview', icon: BarChart3 },
     { id: 'users', name: 'Users', icon: Users },
     { id: 'labels', name: 'Labels', icon: Building },
-    { id: 'vetoed-bids', name: 'Vetoed Bids', icon: XCircle },
+    { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
     { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'media', name: 'Media Import', icon: Youtube },
@@ -1059,7 +1059,7 @@ const Admin: React.FC = () => {
         {activeTab === 'vetoed-bids' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Vetoed Bids</h2>
+              <h2 className="text-2xl font-bold text-white">Vetoes</h2>
               <button
                 onClick={loadVetoedBids}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
@@ -1075,7 +1075,7 @@ const Admin: React.FC = () => {
             ) : vetoedBids.length === 0 ? (
               <div className="bg-gray-800 rounded-lg p-8 text-center">
                 <XCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No vetoed bids found</p>
+                <p className="text-gray-400">No vetoes found</p>
               </div>
             ) : (
               <div className="bg-gray-800 rounded-lg overflow-hidden">
