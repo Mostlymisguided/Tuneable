@@ -1007,6 +1007,18 @@ export const reportAPI = {
   },
 };
 
+export const emailAPI = {
+  confirmVerification: async (token: string) => {
+    const response = await api.post('/email/verify/confirm', { token });
+    return response.data;
+  },
+
+  resendVerification: async () => {
+    const response = await api.post('/email/verify/send');
+    return response.data;
+  },
+};
+
 // TuneBytes API functions
 // Notification API
 export const notificationAPI = {
