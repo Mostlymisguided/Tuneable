@@ -1445,7 +1445,7 @@ const Party: React.FC = () => {
                                 return (
                                   <div
                                     key={`queue-search-${mediaData.id || mediaData._id}-${index}`}
-                                    className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-3 md:p-4 pt-8 md:pt-4"
+                                    className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 pt-8 md:pt-4"
                                   >
                                     {/* Admin Veto Button - Top Right */}
                                     {isAdmin && (
@@ -1462,7 +1462,7 @@ const Party: React.FC = () => {
                                     )}
                                     
                                     {/* Mobile-only wrapper for thumbnail + details side by side */}
-                                    <div className="flex flex-row md:contents items-start gap-3 mb-1 md:mb-0">
+                                    <div className="flex flex-row md:contents items-start gap-2 mb-1 md:mb-0">
                                       {/* Media Thumbnail with Overlays */}
                                       <div 
                                         className="relative w-32 h-32 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
@@ -1517,7 +1517,7 @@ const Party: React.FC = () => {
                                         </div>
                                         
                                         {/* Mini Supporters Bar - shows top supporters for this media */}
-                                        <div className="mt-2 md:mt-0">
+                                        <div className="md:mt-0">
                                           <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
                                         </div>
                                         
@@ -1773,7 +1773,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-3 md:p-4 pt-8 md:pt-4"
+                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 pt-8 md:pt-4"
                           >
                             {/* Admin Veto Button - Top Right */}
                             {isAdmin && (
@@ -1795,7 +1795,7 @@ const Party: React.FC = () => {
                             </div>
                             
                             {/* Mobile-only wrapper for thumbnail + details side by side */}
-                            <div className="flex flex-row md:contents items-start gap-3 mb-1 md:mb-0">
+                            <div className="flex flex-row md:contents items-start gap-2 mb-1 md:mb-0">
                               {/* Media Thumbnail with Overlays */}
                               <div 
                                 className="relative w-32 h-32 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
@@ -1843,7 +1843,7 @@ const Party: React.FC = () => {
                                 </div>
                                 
                                 {/* Mini Supporters Bar - shows top supporters for this media */}
-                                <div className="mt-2 md:mt-0">
+                                <div className="md:mt-0">
                                   <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
                                 </div>
                                 

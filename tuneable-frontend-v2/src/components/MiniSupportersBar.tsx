@@ -51,7 +51,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
   const moreCount = supporters.length - maxVisible;
 
   return (
-    <div className="mt-2">
+    <div className="md:mt-2">
       <div className={scrollable ? 'flex gap-2 overflow-x-auto py-1' : 'flex flex-wrap gap-2'}>
         {visible.map((s) => {
           const id = s.user.uuid || s.user._id || s.user.id || s.user.username;
