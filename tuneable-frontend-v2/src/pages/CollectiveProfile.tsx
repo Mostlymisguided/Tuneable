@@ -606,40 +606,27 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Tab Navigation - Only show when in edit mode */}
+        {/* Edit Tab Navigation */}
         {isEditMode && canEditCollective() && (
           <div className="mb-6 border-b border-gray-700">
             <nav className="flex space-x-8">
-              <button
-                onClick={() => handleEditTabChange('info')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  editTab === 'info'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                Collective Info
-              </button>
-              <button
-                onClick={() => handleEditTabChange('edit')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  editTab === 'edit'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                Edit Collective
-              </button>
-              <button
-                onClick={() => handleEditTabChange('ownership')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  editTab === 'ownership'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                Ownership
-              </button>
+              {[
+                { id: 'info', label: 'Collective Info' },
+                { id: 'edit', label: 'Edit Collective' },
+                { id: 'ownership', label: 'Ownership' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleEditTabChange(tab.id as 'info' | 'edit' | 'ownership')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    editTab === tab.id
+                      ? 'border-purple-500 text-purple-400'
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </nav>
           </div>
         )}
