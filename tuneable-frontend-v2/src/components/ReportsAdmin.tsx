@@ -55,6 +55,7 @@ interface Report {
 
 interface ReportsAdminProps {
   reportType?: 'media' | 'user' | 'label' | 'collective';
+  onPendingCountChange?: (pendingCount: number) => void;
 }
 
 const categoryLabels: { [key: string]: string } = {
@@ -87,7 +88,7 @@ const statusColors: { [key: string]: string } = {
   dismissed: 'bg-gray-600'
 };
 
-const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media' }) => {
+const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPendingCountChange }) => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,10 +105,22 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media' }) => 
     try {
       setLoading(true);
       const data = await reportAPI.getReports(statusFilter || undefined, undefined, reportType);
-      setReports(data.reports || []);
+      const reportsList = data.reports || [];
+      setReports(reportsList);
+
+      const totalFromApi = data.total ?? reportsList.length ?? 0;
+      if (onPendingCountChange) {
+        if (statusFilter === '' || statusFilter === 'pending') {
+          onPendingCountChange(totalFromApi);
+        } else {
+          const pendingCount = reportsList.filter((report) => report.status === 'pending').length;
+          onPendingCountChange(pendingCount);
+        }
+      }
     } catch (error) {
       console.error('Error loading reports:', error);
       toast.error('Failed to load reports');
+      onPendingCountChange?.(0);
     } finally {
       setLoading(false);
     }

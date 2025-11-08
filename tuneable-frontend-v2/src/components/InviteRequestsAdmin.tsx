@@ -15,7 +15,11 @@ interface InviteRequest {
   rejectedReason?: string;
 }
 
-const InviteRequestsAdmin: React.FC = () => {
+interface InviteRequestsAdminProps {
+  onPendingCountChange?: (pendingCount: number) => void;
+}
+
+const InviteRequestsAdmin: React.FC<InviteRequestsAdminProps> = ({ onPendingCountChange }) => {
   const [requests, setRequests] = useState<InviteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
@@ -30,10 +34,16 @@ const InviteRequestsAdmin: React.FC = () => {
       setLoading(true);
       const statusParam = filter === 'all' ? undefined : filter;
       const response = await userAPI.getInviteRequests(statusParam);
-      setRequests(response.requests || []);
+      const requestList = response.requests || [];
+      setRequests(requestList);
+      if (onPendingCountChange) {
+        const pendingCount = requestList.filter((request: InviteRequest) => request.status === 'pending').length;
+        onPendingCountChange(pendingCount);
+      }
     } catch (error: any) {
       console.error('Error loading invite requests:', error);
       toast.error('Failed to load invite requests');
+      onPendingCountChange?.(0);
     } finally {
       setLoading(false);
     }

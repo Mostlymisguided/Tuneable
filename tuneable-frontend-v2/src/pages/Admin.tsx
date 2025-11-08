@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, 
@@ -77,6 +77,19 @@ const Admin: React.FC = () => {
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
+  const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
+    media: 0,
+    user: 0,
+    label: 0,
+    collective: 0,
+    claims: 0,
+    applications: 0,
+    invites: 0,
+  });
+
+  const hasReportsNotifications = useMemo(() => {
+    return Object.values(reportsSummary).some((count) => count > 0);
+  }, [reportsSummary]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -103,6 +116,7 @@ const Admin: React.FC = () => {
         loadOverviewStats();
         loadQuotaStatus();
         loadLabels();
+        refreshReportCounts();
       } else {
         setIsAdmin(false);
         navigate('/');
@@ -124,6 +138,38 @@ const Admin: React.FC = () => {
       toast.error('Failed to load users');
     }
   };
+
+  const refreshReportCounts = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const [mediaRes, userRes, labelRes, collectiveRes, invitesRes] = await Promise.all([
+        reportAPI.getReports('pending', undefined, 'media', 1, 0),
+        reportAPI.getReports('pending', undefined, 'user', 1, 0),
+        reportAPI.getReports('pending', undefined, 'label', 1, 0),
+        reportAPI.getReports('pending', undefined, 'collective', 1, 0),
+        userAPI.getInviteRequests('pending'),
+      ]);
+
+      setReportsSummary((prev) => ({
+        ...prev,
+        media: mediaRes.total ?? mediaRes.reports?.length ?? 0,
+        user: userRes.total ?? userRes.reports?.length ?? 0,
+        label: labelRes.total ?? labelRes.reports?.length ?? 0,
+        collective: collectiveRes.total ?? collectiveRes.reports?.length ?? 0,
+        invites: Array.isArray(invitesRes.requests)
+          ? invitesRes.requests.filter((req: any) => req.status === 'pending').length
+          : 0,
+      }));
+    } catch (error) {
+      console.error('Error refreshing report counts:', error);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      void refreshReportCounts();
+    }
+  }, [isAdmin, reportsSubTab, refreshReportCounts]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -246,10 +292,19 @@ const Admin: React.FC = () => {
     try {
       setIsLoadingApplications(true);
       const response = await creatorAPI.getAllApplications('pending');
-      setCreatorApplications(response.applications || []);
+      const pendingApps = response.applications || [];
+      setCreatorApplications(pendingApps);
+      setReportsSummary((prev) => ({
+        ...prev,
+        applications: pendingApps.length,
+      }));
     } catch (error) {
       console.error('Error loading creator applications:', error);
       toast.error('Failed to load creator applications');
+      setReportsSummary((prev) => ({
+        ...prev,
+        applications: 0,
+      }));
     } finally {
       setIsLoadingApplications(false);
     }
@@ -259,10 +314,19 @@ const Admin: React.FC = () => {
     try {
       setIsLoadingClaims(true);
       const response = await claimAPI.getAllClaims('pending');
-      setClaims(response.claims || []);
+      const pendingClaims = response.claims || [];
+      setClaims(pendingClaims);
+      setReportsSummary((prev) => ({
+        ...prev,
+        claims: pendingClaims.length,
+      }));
     } catch (error) {
       console.error('Error loading claims:', error);
       toast.error('Failed to load claims');
+      setReportsSummary((prev) => ({
+        ...prev,
+        claims: 0,
+      }));
     } finally {
       setIsLoadingClaims(false);
     }
@@ -467,7 +531,7 @@ const Admin: React.FC = () => {
     { id: 'users', name: 'Users', icon: Users },
     { id: 'labels', name: 'Labels', icon: Building },
     { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
-    { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle },
+    { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -513,7 +577,14 @@ const Admin: React.FC = () => {
                   }`}
                 >
                   <Icon className="h-4 w-4 mr-2" />
-                  {tab.name}
+                  <span className="flex items-center">
+                    {tab.name}
+                    {tab.hasNotification && (
+                      <span className="ml-2 flex items-center">
+                        <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -1322,7 +1393,14 @@ const Admin: React.FC = () => {
             {/* Reports Content */}
             {reportsSubTab === 'invites' ? (
               <div>
-                <InviteRequestsAdmin />
+                <InviteRequestsAdmin
+                  onPendingCountChange={(count) =>
+                    setReportsSummary((prev) => ({
+                      ...prev,
+                      invites: count,
+                    }))
+                  }
+                />
               </div>
             ) : reportsSubTab === 'claims' ? (
               <div className="space-y-6">
@@ -1570,7 +1648,15 @@ const Admin: React.FC = () => {
                 )}
               </div>
             ) : (
-              <ReportsAdmin reportType={reportsSubTab as 'media' | 'user' | 'label' | 'collective'} />
+              <ReportsAdmin
+                reportType={reportsSubTab as 'media' | 'user' | 'label' | 'collective'}
+                onPendingCountChange={(count) =>
+                  setReportsSummary((prev) => ({
+                    ...prev,
+                    [reportsSubTab as 'media' | 'user' | 'label' | 'collective']: count,
+                  }))
+                }
+              />
             )}
           </div>
         )}
