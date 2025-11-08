@@ -1182,7 +1182,7 @@ useEffect(() => {
         <ReportModal
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
-          reportType="label"
+          reportType="collective"
           targetId={collective._id}
           targetTitle={collective.name}
         />

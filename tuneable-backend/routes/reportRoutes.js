@@ -5,6 +5,7 @@ const Report = require('../models/Report');
 const Media = require('../models/Media');
 const User = require('../models/User');
 const Label = require('../models/Label');
+const Collective = require('../models/Collective');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { sendEmail } = require('../utils/emailService');
@@ -456,6 +457,127 @@ router.post('/labels/:labelId/report', authMiddleware, async (req, res) => {
       });
     }
     
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+});
+
+// Submit a report for a collective
+router.post('/collectives/:collectiveId/report', authMiddleware, async (req, res) => {
+  try {
+    const { collectiveId: targetCollectiveId } = req.params;
+    const { category, description, contactEmail } = req.body;
+    const reporterId = req.user._id;
+
+    if (!category || !description) {
+      return res.status(400).json({ error: 'Category and description are required' });
+    }
+
+    const validCategories = [
+      'copyright',
+      'collective_impersonation',
+      'collective_incorrect_info',
+      'collective_spam',
+      'unauthorized_claim',
+      'inappropriate',
+      'other'
+    ];
+
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({ error: 'Invalid category' });
+    }
+
+    const targetCollective = await Collective.findOne({
+      $or: [
+        { _id: isValidObjectId(targetCollectiveId) ? targetCollectiveId : null },
+        { slug: targetCollectiveId },
+        { uuid: targetCollectiveId }
+      ]
+    });
+
+    if (!targetCollective) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+
+    const existingReport = await Report.findOne({
+      reportType: 'collective',
+      collectiveId: targetCollective._id,
+      reportedBy: reporterId
+    });
+
+    if (existingReport) {
+      return res.status(400).json({
+        error: 'You have already reported this collective. Please wait for our review.'
+      });
+    }
+
+    const report = new Report({
+      reportType: 'collective',
+      collectiveId: targetCollective._id,
+      collectiveUuid: targetCollective.uuid || targetCollective.slug,
+      reportedBy: reporterId,
+      category,
+      description: description.trim(),
+      contactEmail: contactEmail?.trim() || null,
+      status: 'pending'
+    });
+
+    await report.save();
+    await report.populate('reportedBy', 'username email uuid');
+
+    try {
+      const categoryLabels = {
+        copyright: 'Copyright/Rights Issue',
+        collective_impersonation: 'Impersonation',
+        collective_incorrect_info: 'Incorrect Information',
+        collective_spam: 'Spam/Scam',
+        unauthorized_claim: 'Unauthorized Use/False Claim',
+        inappropriate: 'Inappropriate Content',
+        other: 'Other Issue'
+      };
+
+      const emailHtml = `
+        <h2>New Collective Report Submitted</h2>
+        <p><strong>Priority:</strong> ${
+          category === 'copyright' || category === 'collective_impersonation' || category === 'unauthorized_claim'
+            ? '🔴 HIGH'
+            : '🟡 NORMAL'
+        }</p>
+        <p><strong>Category:</strong> ${categoryLabels[category]}</p>
+        <p><strong>Collective:</strong> ${targetCollective.name}</p>
+        <p><strong>Collective Slug:</strong> ${targetCollective.slug || targetCollective.uuid}</p>
+        <p><strong>Reported By:</strong> @${report.reportedBy.username} (${report.reportedBy.uuid})</p>
+        ${contactEmail ? `<p><strong>Contact Email:</strong> ${contactEmail}</p>` : ''}
+        <p><strong>Description:</strong></p>
+        <p style="background: #f5f5f5; padding: 15px; border-radius: 5px;">${description}</p>
+        <p><a href="https://tuneable.stream/admin" style="background: #8b5cf6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Review in Admin Panel</a></p>
+      `;
+
+      await sendEmail({
+        to: process.env.ADMIN_EMAIL || 'mostlymisguided@icloud.com',
+        subject: `${
+          category === 'copyright' || category === 'collective_impersonation' || category === 'unauthorized_claim'
+            ? '🔴 URGENT: '
+            : ''
+        }Collective Report - ${categoryLabels[category]}`,
+        html: emailHtml
+      });
+    } catch (emailError) {
+      console.error('Failed to send collective report notification email:', emailError);
+    }
+
+    res.json({
+      message: 'Report submitted successfully. We will review it shortly.',
+      reportId: report._id
+    });
+  } catch (error) {
+    console.error('Error submitting collective report:', error);
+
+    if (error.code === 11000) {
+      return res.status(400).json({
+        error: 'You have already reported this collective'
+      });
+    }
+
     res.status(500).json({ error: 'Failed to submit report' });
   }
 });

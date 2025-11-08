@@ -982,6 +982,12 @@ export const reportAPI = {
     return response.data;
   },
 
+  // Report a collective
+  reportCollective: async (collectiveId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
+    const response = await api.post(`/reports/collectives/${collectiveId}/report`, reportData);
+    return response.data;
+  },
+
   // Get all reports (admin only)
   getReports: async (status?: string, category?: string, reportType?: string, limit?: number, skip?: number) => {
     const params: any = {};

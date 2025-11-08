@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  reportType: 'media' | 'user' | 'label';
+  reportType: 'media' | 'user' | 'label' | 'collective';
   targetId: string;
   targetTitle: string;
 }
@@ -130,6 +130,57 @@ const reportCategoriesByType = {
       requiresEmail: false,
       priority: false
     }
+  ],
+  collective: [
+    {
+      value: 'copyright',
+      label: 'Copyright/Rights Infringement',
+      description: 'This collective is claiming rights they do not own or represent',
+      requiresEmail: true,
+      priority: true
+    },
+    {
+      value: 'collective_impersonation',
+      label: 'Impersonation',
+      description: 'Someone is impersonating or falsely representing this collective',
+      requiresEmail: false,
+      priority: true
+    },
+    {
+      value: 'collective_incorrect_info',
+      label: 'Incorrect Information',
+      description: 'Collective name, location, contact info, or other details are incorrect',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'collective_spam',
+      label: 'Spam/Scam',
+      description: 'This collective is posting spam or scam content',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'unauthorized_claim',
+      label: 'Unauthorized Use/False Claim',
+      description: 'Someone is claiming to represent this collective without authorization',
+      requiresEmail: false,
+      priority: true
+    },
+    {
+      value: 'inappropriate',
+      label: 'Inappropriate Content',
+      description: 'This collective is posting inappropriate, offensive, or harmful content',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'other',
+      label: 'Other Issue',
+      description: 'Something else needs attention',
+      requiresEmail: false,
+      priority: false
+    }
   ]
 };
 
@@ -180,6 +231,13 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, reportType, 
             contactEmail: contactEmail.trim() || undefined
           });
           break;
+        case 'collective':
+          await reportAPI.reportCollective(targetId, {
+            category,
+            description: description.trim(),
+            contactEmail: contactEmail.trim() || undefined
+          });
+          break;
       }
 
       toast.success('Report submitted successfully. We\'ll review it shortly.');
@@ -207,7 +265,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, reportType, 
   };
 
   const getCopyrightNotice = () => {
-    if ((reportType === 'media' || reportType === 'label') && category === 'copyright') {
+    if ((reportType === 'media' || reportType === 'label' || reportType === 'collective') && category === 'copyright') {
       return (
         <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-4">
           <div className="flex items-start space-x-3">

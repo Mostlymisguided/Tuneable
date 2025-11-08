@@ -73,6 +73,7 @@ const categoryLabels: { [key: string]: string } = {
   label_impersonation: 'Impersonation',
   label_incorrect_info: 'Incorrect Information',
   label_spam: 'Spam',
+  unauthorized_claim: 'Unauthorized Use/False Claim',
   // Collective categories
   collective_impersonation: 'Collective Impersonation',
   collective_incorrect_info: 'Incorrect Information',

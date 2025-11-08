@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 
 const reportSchema = new mongoose.Schema({
-  // Report type: media, user, or label
   reportType: {
     type: String,
-    enum: ['media', 'user', 'label'],
+    enum: ['media', 'user', 'label', 'collective'],
     required: true,
     index: true
   },
@@ -38,6 +37,15 @@ const reportSchema = new mongoose.Schema({
   labelUuid: {
     type: String
   },
+  // Collective being reported (for collective reports)
+  collectiveId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Collective',
+    index: true
+  },
+  collectiveUuid: {
+    type: String
+  },
   
   // Reporter information
   reportedBy: { 
@@ -60,7 +68,9 @@ const reportSchema = new mongoose.Schema({
       // User categories
       'harassment', 'spam', 'impersonation',
       // Label categories (reuse some, add new ones)
-      'label_impersonation', 'label_incorrect_info', 'label_spam', 'unauthorized_claim', 'scam_fraud'
+      'label_impersonation', 'label_incorrect_info', 'label_spam', 'unauthorized_claim', 'scam_fraud',
+      // Collective categories
+      'collective_impersonation', 'collective_incorrect_info', 'collective_spam'
       // Note: 'copyright' and 'inappropriate' are reused from media/user categories, 'label_spam' kept for backward compatibility
     ],
     required: true
@@ -100,6 +110,7 @@ reportSchema.index({ reportType: 1, status: 1 });
 reportSchema.index({ mediaId: 1, reportedBy: 1 });
 reportSchema.index({ userId: 1, reportedBy: 1 });
 reportSchema.index({ labelId: 1, reportedBy: 1 });
+reportSchema.index({ collectiveId: 1, reportedBy: 1 });
 
 // Prevent duplicate reports from same user for same target
 // Compound indexes for uniqueness based on report type
@@ -117,6 +128,11 @@ reportSchema.index({ reportType: 1, labelId: 1, reportedBy: 1 }, {
   unique: true, 
   sparse: true,
   partialFilterExpression: { reportType: 'label' }
+});
+reportSchema.index({ reportType: 1, collectiveId: 1, reportedBy: 1 }, {
+  unique: true,
+  sparse: true,
+  partialFilterExpression: { reportType: 'collective' }
 });
 
 module.exports = mongoose.model('Report', reportSchema);
