@@ -606,35 +606,36 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Edit Tab Navigation */}
-        {isEditMode && canEditCollective() && (
-          <div className="mb-6 border-b border-gray-700">
-            <nav className="flex space-x-8">
-              {[
-                { id: 'info', label: 'Collective Info' },
-                { id: 'edit', label: 'Edit Collective' },
-                { id: 'ownership', label: 'Ownership' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleEditTabChange(tab.id as 'info' | 'edit' | 'ownership')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    editTab === tab.id
-                      ? 'border-purple-500 text-purple-400'
-                      : 'border-transparent text-gray-400 hover:text-white'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        )}
+        <div className="relative z-10">
+          {/* Edit Tab Navigation */}
+          {isEditMode && canEditCollective() && (
+            <div className="mb-6 border-b border-gray-700">
+              <nav className="flex space-x-8">
+                {[
+                  { id: 'info', label: 'Collective Info' },
+                  { id: 'edit', label: 'Edit Collective' },
+                  { id: 'ownership', label: 'Ownership' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleEditTabChange(tab.id as 'info' | 'edit' | 'ownership')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      editTab === tab.id
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
 
-        {/* Tab Content */}
-        {!isEditMode ? (
-          /* NORMAL VIEW - All existing content */
-          <>
+          {/* Tab Content */}
+          {!isEditMode ? (
+            /* NORMAL VIEW - All existing content */
+            <>
         {/* Stats */}
         {collective.stats && (
           <div className="mb-8">
@@ -898,10 +899,10 @@ useEffect(() => {
             </div>
           )}
         </div>
-          </>
-        ) : (
-          /* EDIT MODE - Tab Content */
-          <div className="space-y-8 mt-6">
+            </>
+          ) : (
+            /* EDIT MODE - Tab Content */
+            <div className="space-y-8 mt-6">
             {editTab === 'info' && (
               /* Collective Info Tab - Show normal content when viewing info tab in edit mode */
               <div className="space-y-8">
@@ -1169,8 +1170,9 @@ useEffect(() => {
                 </div>
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Report Modal */}
