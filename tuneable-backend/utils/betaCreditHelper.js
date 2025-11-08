@@ -15,9 +15,18 @@ const notificationService = require('../services/notificationService');
 const giveBetaSignupCredit = async (user) => {
   try {
     const BETA_SIGNUP_CREDIT_PENCE = 1111; // £11.11 in pence
-    const isBetaMode = ['true', true].includes(process.env.VITE_BETA_MODE);
-    
+    const rawBetaMode = process.env.VITE_BETA_MODE;
+    const normalizedBetaMode = typeof rawBetaMode === 'string'
+      ? rawBetaMode.trim().toLowerCase()
+      : rawBetaMode;
+    const isBetaMode = normalizedBetaMode === 'true' ||
+      normalizedBetaMode === '1' ||
+      normalizedBetaMode === 'yes' ||
+      normalizedBetaMode === 'on' ||
+      normalizedBetaMode === true;
+
     if (!isBetaMode) {
+      console.log(`[BetaSignupCredit] Skipping credit — VITE_BETA_MODE is set to "${rawBetaMode ?? 'undefined'}"`);
       return false;
     }
     

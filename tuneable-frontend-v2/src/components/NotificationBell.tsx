@@ -161,9 +161,7 @@ const NotificationBell: React.FC = () => {
     };
   }, []);
 
-  // Handle mark as read
-  const handleMarkAsRead = async (notificationId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const markAsReadInternal = async (notificationId: string) => {
     try {
       await notificationAPI.markAsRead(notificationId);
       setNotifications(prev =>
@@ -175,6 +173,12 @@ const NotificationBell: React.FC = () => {
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
+  };
+
+  // Handle mark as read from icon button
+  const handleMarkAsRead = async (notificationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await markAsReadInternal(notificationId);
   };
 
   // Handle mark all as read
@@ -192,9 +196,21 @@ const NotificationBell: React.FC = () => {
   };
 
   // Handle notification click
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead) {
-      handleMarkAsRead(notification._id, {} as React.MouseEvent);
+      await markAsReadInternal(notification._id);
+    }
+    navigate('/notifications');
+    setIsOpen(false);
+  };
+
+  const handleNotificationLinkClick = async (
+    e: React.MouseEvent,
+    notification: Notification
+  ) => {
+    e.stopPropagation();
+    if (!notification.isRead) {
+      await markAsReadInternal(notification._id);
     }
     if (notification.link) {
       navigate(notification.link);
@@ -274,9 +290,12 @@ const NotificationBell: React.FC = () => {
                           {notification.message}
                         </p>
                         {notification.linkText && (
-                          <span className="text-xs text-purple-400 mt-1 inline-block">
-                            {notification.linkText} →
-                          </span>
+                          <button
+                            onClick={(e) => handleNotificationLinkClick(e, notification)}
+                            className="text-xs text-purple-400 mt-1 inline-flex items-center gap-1 hover:text-purple-300 transition-colors"
+                          >
+                            {notification.linkText} <span aria-hidden="true">→</span>
+                          </button>
                         )}
                       </div>
                       <button
