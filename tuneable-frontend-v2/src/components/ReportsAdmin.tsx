@@ -78,7 +78,6 @@ const categoryLabels: { [key: string]: string } = {
   collective_incorrect_info: 'Incorrect Information',
   collective_spam: 'Spam',
 };
-};
 
 const statusColors: { [key: string]: string } = {
   pending: 'bg-yellow-600',
