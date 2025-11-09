@@ -1295,7 +1295,7 @@ const Party: React.FC = () => {
                               className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
                             >
                               {/* Album Artwork with Play Icon Overlay */}
-                              <div className="relative w-32 h-32 md:w-16 md:h-16 flex-shrink-0">
+                              <div className="relative w-32 h-32 md:w-16 md:h-16 flex-shrink-0 group">
                                 <img
                                   src={mediaData.coverArt || DEFAULT_COVER_ART}
                                   alt={mediaData.title || 'Unknown Media'}
@@ -1304,9 +1304,14 @@ const Party: React.FC = () => {
                                   height="64"
                                 />
                                 {/* Play Icon Overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded">
-                                  <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                                    <Play className="h-4 w-4 text-white" fill="currentColor" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-default md:cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePlayMedia(item, index);
+                                  }}
+                                >
+                                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
+                                    <Play className="h-5 w-5 md:h-6 md:w-6 text-white" />
                                   </div>
                                 </div>
                               </div>
@@ -1478,7 +1483,7 @@ const Party: React.FC = () => {
                                         
                                         {/* Play Icon Overlay */}
                                         <div 
-                                          className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                          className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             // Find the actual index in the full queue for playing
@@ -1491,8 +1496,8 @@ const Party: React.FC = () => {
                                             }
                                           }}
                                         >
-                                          <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
-                                            <Play className="h-4 w-4 md:h-6 md:w-6 text-white" fill="currentColor" />
+                                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
+                                            <Play className="h-5 w-5 md:h-6 md:w-6 text-white" />
                                           </div>
                                         </div>
                                       </div>
@@ -1811,14 +1816,14 @@ const Party: React.FC = () => {
                                 
                                 {/* Play Icon Overlay */}
                                 <div 
-                                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                  className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handlePlayMedia(item, index);
                                   }}
                                 >
-                                  <div className="w-8 h-8 md:w-12 md:h-12 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors">
-                                    <Play className="h-4 w-4 md:h-6 md:w-6 text-white" fill="currentColor" />
+                                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
+                                    <Play className="h-5 w-5 md:h-6 md:w-6 text-white" />
                                   </div>
                                 </div>
                               </div>

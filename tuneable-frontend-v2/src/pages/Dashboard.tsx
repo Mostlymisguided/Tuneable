@@ -494,7 +494,7 @@ const Dashboard: React.FC = () => {
               <div className="px-4 sm:px-6 lg:px-8 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Award className="h-6 w-6 text-purple-400 mr-3" />
+                    <Award className="hidden md:inline h-6 w-6 text-purple-400 mr-3" />
                     <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -502,14 +502,14 @@ const Dashboard: React.FC = () => {
                       onClick={() => setIsCollectiveModalOpen(true)}
                       className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                     >
-                      <Users className="h-4 w-4 mr-2" />
+                      <Users className="hidden md:inline h-4 w-4 mr-2" />
                       Create Collective
                     </button>
                     <button
                       onClick={() => setIsLabelModalOpen(true)}
                       className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     >
-                      <Building className="h-4 w-4 mr-2" />
+                      <Building className="hidden md:inline h-4 w-4 mr-2" />
                       Create Label
                     </button>
                   </div>
@@ -529,7 +529,7 @@ const Dashboard: React.FC = () => {
                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
                     }`}
                   >
-                    <TrendingUp className="h-4 w-4 mr-2" />
+                    <TrendingUp className="hidden md:inline h-4 w-4 mr-2" />
                     Overview
                   </button>
                   <button
@@ -540,7 +540,7 @@ const Dashboard: React.FC = () => {
                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
                     }`}
                   >
-                    <Music className="h-4 w-4 mr-2" />
+                    <Music className="hidden md:inline h-4 w-4 mr-2" />
                     My Media
                   </button>
                   <button
@@ -551,7 +551,7 @@ const Dashboard: React.FC = () => {
                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
                     }`}
                   >
-                    <Building className="h-4 w-4 mr-2" />
+                    <Building className="hidden md:inline h-4 w-4 mr-2" />
                     Labels
                   </button>
                   <button
@@ -562,7 +562,7 @@ const Dashboard: React.FC = () => {
                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
                     }`}
                   >
-                    <Users className="h-4 w-4 mr-2" />
+                    <Users className="hidden md:inline h-4 w-4 mr-2" />
                     Collectives
                   </button>
                 </nav>
