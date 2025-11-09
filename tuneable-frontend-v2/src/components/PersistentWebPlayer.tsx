@@ -670,7 +670,7 @@ const PersistentWebPlayer: React.FC = () => {
             </div>
 
             {/* Center: Scrubber and Duration */}
-            <div className="flex-1 flex items-center space-x-3">
+            <div className="hidden flex-1 md:flex items-center space-x-3">
               <div className="flex-1 max-w-md">
                 <input
                   type="range"
@@ -696,7 +696,7 @@ const PersistentWebPlayer: React.FC = () => {
             {playerType === 'youtube' && (
               <div 
                 ref={playerRef} 
-                className="w-24 h-16 sm:w-32 sm:h-20 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-gray-600"
+                className="w-12 h-8 sm:w-32 sm:h-20 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-gray-600"
               />
             )}
 
@@ -707,45 +707,45 @@ const PersistentWebPlayer: React.FC = () => {
               <button
                   onClick={() => previous()}
                 disabled={currentMediaIndex === 0 || !currentMedia}
-                  className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Previous Song"
               >
-                <SkipBack className="h-4 w-4" />
+                <SkipBack className="h-3 w-3 md:h-4 md:w-4" />
               </button>
 
               <button
                   onClick={() => togglePlayPause()}
               disabled={!currentMedia}
-                  className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               title={currentMedia ? (isPlaying ? 'Pause' : 'Play') : 'No media playing'}
               >
                 {isPlaying ? (
-                  <Pause className="h-6 w-6 ml-0.5" />
+                  <Pause className="h-3 w-3 md:h-4 md:w-4 ml-0.5" />
                 ) : (
-                  <Play className="h-6 w-6 ml-1" />
+                  <Play className="h-3 w-3 md:h-4 md:w-4 ml-1" />
                 )}
               </button>
 
               <button
                   onClick={next}
                 disabled={currentMediaIndex >= queue.length - 1 || !currentMedia}
-                  className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Next Song"
               >
-                <SkipForward className="h-4 w-4" />
+                <SkipForward className="h-3 w-3 md:h-4 md:w-4" />
               </button>
             </div>
 
               {/* Mute Toggle */}
             <button
                 onClick={toggleMute}
-              className="w-12 h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (
-                  <VolumeX className="h-4 w-4" />
+                  <VolumeX className="h-3 w-3 md:h-4 md:w-4" />
                 ) : (
-                  <Volume2 className="h-4 w-4" />
+                  <Volume2 className="h-3 w-3 md:h-4 md:w-4" />
                 )}
             </button>
 
@@ -753,10 +753,10 @@ const PersistentWebPlayer: React.FC = () => {
               {playerType === 'youtube' && (
                 <button 
                   onClick={openYouTubeFullscreen}
-                  className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-white text-gray-900 hover:bg-purple-50"
+                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-white text-gray-900 hover:bg-purple-50"
                   title="Open YouTube Fullscreen"
                 >
-                  <Maximize className="h-5 w-5" />
+                  <Maximize className="h-3 w-3 md:h-4 md:w-4" />
                 </button>
               )}
           </div>
