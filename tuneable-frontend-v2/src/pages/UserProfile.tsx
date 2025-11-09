@@ -1075,7 +1075,7 @@ const UserProfile: React.FC = () => {
         {mediaWithBids.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl text-center font-bold text-white mb-4">Top Tunes</h2>
-            <div className="bg-black/20 rounded-lg p-0 md:p-6">
+            <div className="md:bg-black/20 rounded-lg p-0 md:p-6">
               <div className="space-y-4">
                 {(showAllTunes ? mediaWithBids : mediaWithBids.slice(0, 10)).map((mediaData, index) => (
                   <div key={mediaData.media?._id || mediaData.media?.uuid || 'unknown'} className="card flex items-center space-x-4 p-2 md:p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
@@ -1181,32 +1181,38 @@ const UserProfile: React.FC = () => {
         {tagRankings.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Top Tags</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               {tagRankings.slice(0, 6).map((ranking, index) => (
                 <div 
                   key={ranking.tag} 
-                  className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-6 hover:border-purple-500/60 transition-all"
+                  className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-4 md:p-6 hover:border-purple-500/60 transition-all"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-purple-600/50 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-white font-bold text-sm">#{index + 1}</span>
-                      </div>
-                      <span className="text-white font-medium text-lg">{ranking.tag}</span>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <div className="w-7 h-7 md:w-8 md:h-8 bg-purple-600/50 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-xs md:text-sm">#{index + 1}</span>
                     </div>
+                    <span className="text-white font-medium text-base md:text-lg truncate">
+                      {ranking.tag}
+                    </span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 md:space-y-2 text-xs md:text-sm text-gray-300">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Total Bid</span>
-                      <span className="text-xl font-bold text-white">{penceToPounds(ranking.aggregate || 0)}</span>
+                      <span>Total Bid</span>
+                      <span className="text-sm md:text-base font-semibold text-white">
+                        {penceToPounds(ranking.aggregate || 0)}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Rank</span>
-                      <span className="text-lg font-bold text-purple-400">#{ranking.rank}</span>
+                      <span>Rank</span>
+                      <span className="text-sm md:text-base font-semibold text-purple-300">
+                        #{ranking.rank}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Percentile</span>
-                      <span className="text-sm text-purple-300">Top {ranking.percentile}%</span>
+                      <span>Percentile</span>
+                      <span className="text-sm md:text-base text-purple-200">
+                        Top {ranking.percentile}%
+                      </span>
                     </div>
                   </div>
                 </div>
