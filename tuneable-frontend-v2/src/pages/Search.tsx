@@ -37,7 +37,7 @@ const SearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [bidAmounts, setBidAmounts] = useState<Record<string, number>>({});
+  const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [activeTab] = useState<'songs' | 'podcasts'>('songs');
   const [party, setParty] = useState<any>(null);
@@ -73,12 +73,12 @@ const SearchPage: React.FC = () => {
 
   // Initialize bid amounts for new search results
   const initializeBidAmounts = (newResults: SearchResult[]) => {
-    const newBidAmounts: Record<string, number> = {};
+    const newBidAmounts: Record<string, string> = {};
     const minBid = party?.minimumBid || 0.01;
     
     newResults.forEach(song => {
       if (!bidAmounts[song.id]) {
-        newBidAmounts[song.id] = Math.max(minBid, 1.00);
+        newBidAmounts[song.id] = (minBid).toFixed(2);
       }
     });
     
@@ -266,7 +266,9 @@ const SearchPage: React.FC = () => {
   const handleBid = async (song: SearchResult) => {
     if (!partyId) return;
     
-    const songBidAmount = bidAmounts[song.id] || (party?.minimumBid || 0.01);
+    const rawAmount = bidAmounts[song.id] ?? '';
+    const parsedAmount = parseFloat(rawAmount);
+    const songBidAmount = Number.isFinite(parsedAmount) ? parsedAmount : (party?.minimumBid || 0.01);
     
     try {
       if (song.isPodcast) {
@@ -366,7 +368,9 @@ const SearchPage: React.FC = () => {
     if (!pendingMedia || !partyId) return;
 
     const song = pendingMedia;
-    const songBidAmount = bidAmounts[song.id] || (party?.minimumBid || 0.01);
+    const rawAmount = bidAmounts[song.id] ?? '';
+    const parsedAmount = parseFloat(rawAmount);
+    const songBidAmount = Number.isFinite(parsedAmount) ? parsedAmount : (party?.minimumBid || 0.01);
     
     try {
       // Handle regular song - detect platform from available sources
@@ -407,13 +411,6 @@ const SearchPage: React.FC = () => {
       setShowTagModal(false);
       setPendingMedia(null);
     }
-  };
-
-  const handleBidAmountChange = (mediaId: string, amount: number) => {
-    setBidAmounts(prev => ({
-      ...prev,
-      [mediaId]: amount
-    }));
   };
 
   const formatDuration = (seconds: number) => {
@@ -687,7 +684,13 @@ const SearchPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600">Bid Amount:</span>
                           <span className="text-sm font-medium text-gray-900">
-                            £{(bidAmounts[song.id] || (party?.minimumBid || 0.01)).toFixed(2)}
+                            {(() => {
+                              const rawValue = bidAmounts[song.id] ?? '';
+                              const parsed = parseFloat(rawValue);
+                              const min = party?.minimumBid || 0.01;
+                              const base = Number.isFinite(parsed) ? parsed : min;
+                              return `£${base.toFixed(2)}`;
+                            })()}
                           </span>
                         </div>
                         <input
@@ -695,11 +698,22 @@ const SearchPage: React.FC = () => {
                           min={party?.minimumBid || 0.01}
                           max="11.11"
                           step="0.01"
-                          value={bidAmounts[song.id] || (party?.minimumBid || 0.01)}
-                          onChange={(e) => handleBidAmountChange(song.id, parseFloat(e.target.value))}
+                          value={bidAmounts[song.id] ?? ''}
+                          onChange={(e) => setBidAmounts(prev => ({
+                            ...prev,
+                            [song.id]: e.target.value
+                          }))}
                           className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                           style={{
-                            background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((bidAmounts[song.id] || (party?.minimumBid || 0.01)) - (party?.minimumBid || 0.01)) / (11.11 - (party?.minimumBid || 0.01)) * 100}%, #e5e7eb ${((bidAmounts[song.id] || (party?.minimumBid || 0.01)) - (party?.minimumBid || 0.01)) / (11.11 - (party?.minimumBid || 0.01)) * 100}%, #e5e7eb 100%)`
+                            background: (() => {
+                              const rawValue = bidAmounts[song.id] ?? '';
+                              const parsed = parseFloat(rawValue);
+                              const min = party?.minimumBid || 0.01;
+                              const base = Number.isFinite(parsed) ? parsed : min;
+                              const percentage = ((base - min) / (11.11 - min)) * 100;
+                              const clamped = Math.max(0, Math.min(100, percentage));
+                              return `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${clamped}%, #e5e7eb ${clamped}%, #e5e7eb 100%)`;
+                            })()
                           }}
                         />
                         <div className="flex justify-between text-xs text-gray-500">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
@@ -216,11 +216,12 @@ const TuneProfile: React.FC = () => {
   const [newLinkUrl, setNewLinkUrl] = useState('');
 
   // Global bidding state
-  const [globalBidAmount, setGlobalBidAmount] = useState<number>(0.33);
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
+  const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [topParties, setTopParties] = useState<any[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
+  const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
 
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -231,6 +232,12 @@ const TuneProfile: React.FC = () => {
 
   // WebPlayer integration
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
+
+  const parsedGlobalBidAmount = useMemo(() => {
+    const parsed = parseFloat(globalBidInput);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }, [globalBidInput]);
+  const isGlobalBidValid = Number.isFinite(parsedGlobalBidAmount) && parsedGlobalBidAmount >= minimumBid;
 
   useEffect(() => {
     console.log('🔍 TuneProfile useEffect triggered with mediaId:', mediaId);
@@ -254,8 +261,13 @@ const TuneProfile: React.FC = () => {
         const globalParty = response.parties.find((p: any) => p.type === 'global');
         if (globalParty && globalParty.minimumBid) {
           setMinimumBid(globalParty.minimumBid);
-          // Keep default bid at 0.33 to encourage higher bids, but respect minimum
-          setGlobalBidAmount(Math.max(0.33, globalParty.minimumBid));
+          if (!hasInitializedBidInput) {
+            setGlobalBidInput(globalParty.minimumBid.toFixed(2));
+            setHasInitializedBidInput(true);
+          }
+        } else if (!hasInitializedBidInput) {
+          setGlobalBidInput('0.33');
+          setHasInitializedBidInput(true);
         }
       } catch (error) {
         console.error('Error fetching global party minimum bid:', error);
@@ -263,7 +275,7 @@ const TuneProfile: React.FC = () => {
       }
     };
     fetchGlobalPartyMinimumBid();
-  }, []);
+  }, [hasInitializedBidInput]);
 
   const fetchMediaProfile = async () => {
     try {
@@ -957,14 +969,14 @@ const TuneProfile: React.FC = () => {
       return;
     }
 
-    if (globalBidAmount < minimumBid) {
+    if (!Number.isFinite(parsedGlobalBidAmount) || parsedGlobalBidAmount < minimumBid) {
       toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
       return;
     }
 
     // Convert balance from pence to pounds for comparison
     const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-    if (balanceInPounds < globalBidAmount) {
+    if (balanceInPounds < parsedGlobalBidAmount) {
       toast.error('Insufficient balance. Please top up your wallet.');
       navigate('/wallet');
       return;
@@ -973,9 +985,9 @@ const TuneProfile: React.FC = () => {
     setIsPlacingGlobalBid(true);
 
     try {
-      await mediaAPI.placeGlobalBid(mediaId!, globalBidAmount);
+      await mediaAPI.placeGlobalBid(mediaId!, parsedGlobalBidAmount);
       
-      toast.success(`Placed £${globalBidAmount.toFixed(2)} bid on "${media?.title}"!`);
+      toast.success(`Placed £${parsedGlobalBidAmount.toFixed(2)} bid on "${media?.title}"!`);
       
       // Refresh media data to show updated metrics
       await fetchMediaProfile();
@@ -1275,26 +1287,25 @@ const TuneProfile: React.FC = () => {
                       type="number"
                       step="0.01"
                       min={minimumBid}
-                      value={globalBidAmount}
-                      onChange={(e) => setGlobalBidAmount(parseFloat(e.target.value) || minimumBid)}
+                      value={globalBidInput}
+                      onChange={(e) => {
+                        setHasInitializedBidInput(true);
+                        setGlobalBidInput(e.target.value);
+                      }}
                       className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
                     />
                   </div>
                   <button
                     onClick={handleGlobalBid}
-                    disabled={isPlacingGlobalBid || globalBidAmount < minimumBid}
+                    disabled={isPlacingGlobalBid || !isGlobalBidValid}
                     className="w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
                   >
                     {isPlacingGlobalBid ? (
-                      <>
-                        <Loader2 className="h-5 w-5 md:h-6 md:w-6 animate-spin" />
-                        <span>Placing Bid...</span>
-                      </>
+                      <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
                     ) : (
-                      <>
-                        <Coins className="h-5 w-5 md:h-6 md:w-6" />
-                        <span>Bid £{globalBidAmount.toFixed(2)}</span>
-                      </>
+                      <span>
+                        {isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid'}
+                      </span>
                     )}
                   </button>
                 </div>
@@ -1304,7 +1315,7 @@ const TuneProfile: React.FC = () => {
                   {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
                     <button
                       key={amount}
-                      onClick={() => setGlobalBidAmount(amount)}
+                      onClick={() => setGlobalBidInput(amount.toFixed(2))}
                       className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
                     >
                       £{amount.toFixed(2)}
@@ -1775,37 +1786,49 @@ const TuneProfile: React.FC = () => {
                               type="number"
                               step="0.01"
                               min={minimumBid}
-                              value={globalBidAmount}
-                              onChange={(e) => setGlobalBidAmount(parseFloat(e.target.value) || minimumBid)}
+                              value={globalBidInput}
+                              onChange={(e) => {
+                                setHasInitializedBidInput(true);
+                                setGlobalBidInput(e.target.value);
+                              }}
                               className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
-                              placeholder="0.01"
                             />
-            </div>
-              <button
+                          </div>
+                          <button
                             onClick={handleGlobalBid}
-                            disabled={isPlacingGlobalBid || globalBidAmount < minimumBid}
+                            disabled={isPlacingGlobalBid || !isGlobalBidValid}
                             className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                           >
                             {isPlacingGlobalBid ? (
-                              <>
-                                <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" />
-                                <span>Placing...</span>
-                              </>
+                              <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
                             ) : (
-                              <>
-                                <Coins className="h-4 w-4 md:h-5 md:w-5" />
-                                <span>Place Global Bid</span>
-                              </>
+                              <span>
+                                {isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid'}
+                              </span>
                             )}
-              </button>
-            </div>
-                        <p className="text-xs text-gray-400">
+                          </button>
+                        </div>
+                        
+                        {/* Quick amounts */}
+                        <div className="flex flex-wrap justify-center gap-2 mb-4">
+                          {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
+                            <button
+                              key={amount}
+                              onClick={() => setGlobalBidInput(amount.toFixed(2))}
+                              className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
+                            >
+                              £{amount.toFixed(2)}
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <p className="text-xs md:text-sm text-gray-400">
                           Minimum bid: £{minimumBid.toFixed(2)}
                         </p>
-              </div>
-            </div>
-                </div>
-              )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* All other normal content sections would go here - comments, top bidders, etc. */}
                 {/* For now, showing a message that user can switch to edit tab */}

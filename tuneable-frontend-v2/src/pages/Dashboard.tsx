@@ -57,7 +57,7 @@ const Dashboard: React.FC = () => {
   const [addTuneQuery, setAddTuneQuery] = useState('');
   const [addTuneResults, setAddTuneResults] = useState<SearchResult[]>([]);
   const [isSearchingTune, setIsSearchingTune] = useState(false);
-  const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, number>>({});
+  const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, string>>({});
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
 
@@ -476,9 +476,9 @@ Join here: ${inviteLink}`.trim();
         
         // Initialize bid amounts (default to 0.33 to encourage higher bids)
         const defaultBid = 0.33;
-        const newBidAmounts: Record<string, number> = {};
+        const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid);
+          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       } else {
@@ -497,9 +497,9 @@ Join here: ${inviteLink}`.trim();
         
         // Initialize bid amounts (default to 0.33 to encourage higher bids)
         const defaultBid = 0.33;
-        const newBidAmounts: Record<string, number> = {};
+        const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid);
+          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       }
@@ -524,8 +524,14 @@ Join here: ${inviteLink}`.trim();
       return;
     }
 
-    const bidAmount = addTuneBidAmounts[mediaId] || Math.max(0.33, minimumBid);
-    
+    const rawAmount = addTuneBidAmounts[mediaId] ?? '';
+    const bidAmount = parseFloat(rawAmount);
+
+    if (!Number.isFinite(bidAmount) || bidAmount < minimumBid) {
+      toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+
     if ((user as any)?.balance < bidAmount) {
       toast.error('Insufficient balance');
       return;
@@ -2162,23 +2168,33 @@ Join here: ${inviteLink}`.trim();
                       type="number"
                       min={minimumBid}
                       step="0.01"
-                      value={addTuneBidAmounts[result._id || result.id || ''] || Math.max(0.33, minimumBid)}
+                      value={addTuneBidAmounts[result._id || result.id || ''] ?? ''}
                       onChange={(e) => {
-                        const amount = parseFloat(e.target.value);
-                        setAddTuneBidAmounts(prev => ({
+                        const value = e.target.value;
+                        setAddTuneBidAmounts((prev) => ({
                           ...prev,
-                          [result._id || result.id || '']: amount || Math.max(0.33, minimumBid)
+                          [result._id || result.id || '']: value
                         }));
                       }}
-                      className="w-20 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-purple-500"
+                      className="w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
                     />
                   </div>
                   <button
-                    onClick={() => handleAddTune(result)}
                     disabled={isAddingTune}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                    onClick={() => handleAddTune(result)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                   >
-                    {isAddingTune ? 'Adding...' : 'Add'}
+                    <Play className="h-4 w-4" />
+                    <span>
+                      {(() => {
+                        const raw = addTuneBidAmounts[result._id || result.id || ''] ?? '';
+                        const parsed = parseFloat(raw);
+                        if (!Number.isFinite(parsed)) {
+                          return 'Add';
+                        }
+                        return `Add £${parsed.toFixed(2)}`;
+                      })()}
+                    </span>
                   </button>
                 </div>
             </div>
