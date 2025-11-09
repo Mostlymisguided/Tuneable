@@ -536,15 +536,15 @@ Join here: ${inviteLink}`.trim();
       return;
     }
 
-    const isLocal = media.isLocal !== false ? media.isLocal : false;
-    const targetMediaId = isLocal ? (media._id || media.id || '') : 'external';
+    const isExistingMedia = Boolean(media._id);
+    const targetMediaId = isExistingMedia ? (media._id || media.id || '') : 'external';
 
     if (!targetMediaId) {
       toast.error('Invalid media ID');
       return;
     }
 
-    const externalSources = !isLocal
+    const externalSources = !isExistingMedia
       ? (media.sources && Object.keys(media.sources).length > 0
           ? media.sources
           : media.id
@@ -552,7 +552,7 @@ Join here: ${inviteLink}`.trim();
             : {})
       : {};
 
-    if (!isLocal && Object.keys(externalSources).length === 0) {
+    if (!isExistingMedia && Object.keys(externalSources).length === 0) {
       toast.error('Unable to add this tune because no source URL was provided.');
       return;
     }
@@ -560,7 +560,7 @@ Join here: ${inviteLink}`.trim();
     setIsAddingTune(true);
 
     try {
-      const externalMedia = !isLocal
+      const externalMedia = !isExistingMedia
         ? {
             title: media.title,
             artist: media.artist,
@@ -594,7 +594,7 @@ Join here: ${inviteLink}`.trim();
   };
 
   const startAddTune = (media: SearchResult) => {
-    if (media.isLocal === false) {
+    if (!media._id) {
       setPendingAddTuneResult(media);
       setShowAddTuneTagModal(true);
     } else {
