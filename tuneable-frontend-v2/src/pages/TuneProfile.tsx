@@ -1039,51 +1039,54 @@ const TuneProfile: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
         {/* Tune Profile Header */}
-        <div className="mb-6 md:mb-8 relative">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-3 md:px-4 py-2 mb-4 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 text-sm md:text-base"   >
-            Back
-          </button>
-          
-          {/* Edit Tune & Report Buttons */}
-          <div className='inline rounded-full items-center absolute right-0 top-0 md:right-3 mb-4 flex space-x-2'>
-            {/* Report Button - Always visible */}
+        <div className="mb-6 md:mb-8">  
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 md:mb-6">
             <button
-              onClick={() => setShowReportModal(true)}
-              className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+              onClick={() => navigate(-1)}
+              className="px-3 md:px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 text-sm md:text-base"
             >
-              <Flag className="h-4 w-4" />
-              <span className="hidden sm:inline">Report</span>
+              Back
             </button>
+            {/* Edit Tune & Report Buttons */}
+            <div className="flex flex-wrap justify-end gap-2 md:flex-nowrap md:items-center">
             
-            {/* Edit Tune Button - Only show if user can edit and not in edit mode */}
-            {canEditTune() && !isEditMode && (
+              {/* Report Button - Always visible */}
               <button
-                onClick={handleEditClick}
-                className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                onClick={() => setShowReportModal(true)}
+                className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
-                <span className="hidden sm:inline">Edit Tune</span>
-                <span className="sm:hidden">Edit</span>
+                <Flag className="h-4 w-4" />
+                <span className="hidden sm:inline">Report</span>
               </button>
-            )}
-            {/* Exit Edit Mode Button - Only show if in edit mode */}
-            {canEditTune() && isEditMode && (
-              <button
-                onClick={exitEditMode}
-                className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
-              >
-                <X className="h-4 w-4" />
-                <span className="hidden sm:inline">Cancel</span>
-              </button>
-            )}
+              
+              {/* Edit Tune Button - Only show if user can edit and not in edit mode */}
+              {canEditTune() && !isEditMode && (
+                <button
+                  onClick={handleEditClick}
+                  className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                >
+                  <span className="hidden sm:inline">Edit Tune</span>
+                  <span className="sm:hidden">Edit</span>
+                </button>
+              )}
+              {/* Exit Edit Mode Button - Only show if in edit mode */}
+              {canEditTune() && isEditMode && (
+                <button
+                  onClick={exitEditMode}
+                  className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="hidden sm:inline">Cancel</span>
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="card flex flex-col md:flex-row items-start relative">
             {/* Claim Tune Button - Top Right */}
             <button
               onClick={handleClaimTune}
-              className="absolute top-3 right-3 md:top-6 md:right-6 px-3 py-2 md:px-4 md:py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-xs md:text-base z-10"
+              className="self-end mb-4 md:mb-0 absolute md:top-6 md:right-6 px-3 py-2 md:px-4 md:py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-xs md:text-base z-10"
             >
               <Award className="h-3 w-3 md:h-4 md:w-4" />
               <span className="hidden sm:inline">Claim Tune</span>
@@ -1095,7 +1098,7 @@ const TuneProfile: React.FC = () => {
               <img
                 src={media.coverArt || DEFAULT_COVER_ART}
                 alt={`${media.title} cover`}
-                className="w-48 h-48 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
+                className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
               {/* Play Button Overlay */}
               <div 
@@ -1116,7 +1119,7 @@ const TuneProfile: React.FC = () => {
               </p>
               
               {/* Bid Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 px-2 md:px-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 px-2 md:px-0">
                 {/* Bid Total */}
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>

@@ -792,8 +792,8 @@ const UserProfile: React.FC = () => {
             )}
           </div>
           
-          <div className="card flex items-start relative">
-            <div className='absolute top-0 right-0'>
+          <div className="card flex flex-col sm:flex-row items-start relative">
+            <div className='absolute top-2 right-2 sm:top-0 sm:right-0'>
 
               {/* Member Since */}
               <div className="flex rounded-full p-4 items-center">
@@ -806,7 +806,7 @@ const UserProfile: React.FC = () => {
       
             </div>
             {/* Profile Picture */}
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative sm:mx-0">
               <img
                 src={user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={`${user.username} profile`}
@@ -833,16 +833,16 @@ const UserProfile: React.FC = () => {
             </div>
             
             {/* User Info */}
-            <div className="ml-6 flex-1 text-white">
+            <div className="mt-2 sm:mt-0 sm:ml-6 flex-1 text-white">
               <div className="">
-                <h1 className="text-4xl font-bold mb-4">{user.username}</h1>
+                <h1 className="text-4xl font-bold">{user.username}</h1>
                 {(user.givenName || user.familyName) && (
                   <p className="text-xl text-gray-300 mb-2">
                     {user.givenName} {user.familyName}
                   </p>
                 )}
                 {(user.homeLocation?.city || user.homeLocation?.country || user.secondaryLocation?.city || user.secondaryLocation?.country) && (
-                  <div className="flex flex-col gap-2 mb-4">
+                  <div className="flex flex-col gap-2 mb-1">
                     {user.homeLocation?.city || user.homeLocation?.country ? (
                       <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                         <MapPin className="h-3.5 w-3.5" />
@@ -871,11 +871,11 @@ const UserProfile: React.FC = () => {
               )}
               </div>
               
-              <div className="mb-6"></div>
+              <div className="mb-2"></div>
 
               {/* Add Label & Collective Buttons - Only for creators/admins viewing own profile */}
               {isOwnProfile && currentUser && (currentUser.role?.includes('creator') || currentUser.role?.includes('admin')) && (
-                <div className="mb-4 flex items-center space-x-2">
+                <div className="mb-2 flex items-center space-x-2">
                   <button
                     onClick={() => setIsCollectiveModalOpen(true)}
                     className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
@@ -895,7 +895,7 @@ const UserProfile: React.FC = () => {
 
               {/* Collective Memberships - Above label affiliations */}
               {collectiveMemberships.length > 0 && (
-                <div className="mb-4">
+                <div className="mb-2">
                   <h3 className="text-sm font-semibold text-gray-300 mb-2">Collective Memberships</h3>
                   <div className="flex flex-wrap gap-2">
                     {collectiveMemberships.map((collective) => {
@@ -937,7 +937,7 @@ const UserProfile: React.FC = () => {
 
               {/* Label Affiliations - Above social media */}
               {labelAffiliations.length > 0 && (
-                <div className="mb-4">
+                <div className="mb-2">
                   <h3 className="text-sm font-semibold text-gray-300 mb-2">Label Affiliations</h3>
                   <div className="flex flex-wrap gap-2">
                     {labelAffiliations.map((affiliation) => {
@@ -980,7 +980,7 @@ const UserProfile: React.FC = () => {
 
               {/* Social Media Buttons - Hide in anonymous mode (unless own profile) */}
               {!((user as any)?.preferences?.anonymousMode && !isOwnProfile) && getSocialMediaLinks().length > 0 && (
-                <div className="mb-4">
+                <div className="mb-2">
                   <div className="flex flex-wrap gap-2">
                     {getSocialMediaLinks().map((social) => (
                       <a
@@ -1030,7 +1030,7 @@ const UserProfile: React.FC = () => {
                   </button>
 
               )}
-              <div className="absolute bottom-0 right-0 p-4">
+              <div className="absolute bottom-0 right-0 p-4 pb-6">
               <span className={`px-3 py-2 bg-purple-600/50 text-xs md:text-base rounded-full font-semibold ${getRoleColor(user.role)}`}>
                   {getRoleDisplay(user.role)}
                 </span>
@@ -1046,26 +1046,26 @@ const UserProfile: React.FC = () => {
         {stats && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="card bg-black/20 rounded-lg p-6 text-center">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{stats.totalBids || 0}</div>
-                <div className="text-sm text-gray-300">Total Bids</div>
+                <div className="text-lg md:text-2xl font-bold text-white">{stats.totalBids || 0}</div>
+                <div className="text-xs md:text-sm text-gray-300">Total Bids</div>
               </div>
-              <div className="card bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
-                <div className="text-sm text-gray-300">Total Spent</div>
+                <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
+                <div className="text-xs md:text-sm text-gray-300">Total Spent</div>
               </div>
-              <div className="card bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
-                <div className="text-sm text-gray-300">Avg Bid</div>
+                <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
+                <div className="text-xs md:text-sm text-gray-300">Avg Bid</div>
               </div>
-              <div className="card bg-black/20 rounded-lg p-6 text-center">
+              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
-                <div className="text-sm text-gray-300">Tunes Bid</div>
+                <div className="text-lg md:text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
+                <div className="text-xs md:text-sm text-gray-300">Tunes Bid</div>
               </div>
             </div>
           </div>
@@ -1075,13 +1075,13 @@ const UserProfile: React.FC = () => {
         {mediaWithBids.length > 0 && (
           <div className="mb-8">
             <h2 className="text-2xl text-center font-bold text-white mb-4">Top Tunes</h2>
-            <div className="bg-black/20 rounded-lg p-6">
+            <div className="bg-black/20 rounded-lg p-0 md:p-6">
               <div className="space-y-4">
                 {(showAllTunes ? mediaWithBids : mediaWithBids.slice(0, 10)).map((mediaData, index) => (
-                  <div key={mediaData.media?._id || mediaData.media?.uuid || 'unknown'} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
+                  <div key={mediaData.media?._id || mediaData.media?.uuid || 'unknown'} className="card flex items-center space-x-4 p-2 md:p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
                     <div className="flex-shrink-0">
-                      <div className="flex items-center justify-center w-12 h-12 bg-purple-600/50 rounded-full">
-                        <span className="text-white font-bold text-lg">{index + 1}</span>
+                      <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-bold text-base md:text-lg">{index + 1}</span>
                       </div>
                     </div>
                     {/* Album Artwork with Play Icon Overlay */}
@@ -1109,9 +1109,9 @@ const UserProfile: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-1 sm:space-y-0">
                         <h3 
-                          className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
+                          className="text-base md:text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
                           onClick={() => {
                             const mediaId = mediaData.media?._id || mediaData.media?.uuid;
                             if (mediaId) navigate(`/tune/${mediaId}`);
@@ -1119,8 +1119,10 @@ const UserProfile: React.FC = () => {
                         >
                           {mediaData.media?.title || 'Unknown Song'}
                         </h3>
-                        <span className="text-gray-400">by</span>
-                        <span className="text-purple-300">{mediaData.media?.artist || 'Unknown Artist'}</span>
+                        <div className="flex items-center text-sm text-gray-400">
+                          <span className="hidden sm:inline mr-1">by</span>
+                          <span className="text-purple-300">{mediaData.media?.artist || 'Unknown Artist'}</span>
+                        </div>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-gray-400">
                         <span className="flex items-center">
@@ -1152,8 +1154,8 @@ const UserProfile: React.FC = () => {
                       )}
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-green-400">{penceToPounds(mediaData.totalAmount || 0)}</div>
-                      <div className="text-sm text-gray-400">Total Bid</div>
+                      <div className="text-lg md:text-xl font-bold text-green-400">{penceToPounds(mediaData.totalAmount || 0)}</div>
+                      <div className="text-xs md:text-sm text-gray-400">Total Bid</div>
                     </div>
                   </div>
                 ))}

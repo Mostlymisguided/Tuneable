@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { User as UserIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
@@ -110,7 +111,7 @@ const Navbar: React.FC = () => {
                     onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                   >
                     <span className="hidden sm:inline">{user.username}</span>
-                    <span className="sm:hidden">{user.username?.slice(0, 8)}</span>
+                    <UserIcon className="h-4 w-4 sm:hidden" />
                   </Link>
                   <NotificationBell />
                   <button
