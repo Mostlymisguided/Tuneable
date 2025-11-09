@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -384,19 +384,7 @@ const Parties: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">Tunes</h1>
           <p className="text-gray-300 mt-2">Discover Tunes and Join Parties</p>
         </div>
-       
-        {user?.role?.includes('admin') && (
-
-          <Link
-            to="/create-party"
-            className="btn-primary flex items-center space-x-2"
-          >
-            <Music className="h-4 w-4" />
-            <span className="text-base font-semibold no-underline">Create Party</span>
-          </Link>
-          
-        )}
-        </div>
+      </div>
      
       {/* Search Section */}
       <div className="mb-6">
@@ -470,16 +458,11 @@ const Parties: React.FC = () => {
         <div className="text-center py-12">
           <Music className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-300 mb-2">No parties found</h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600">
             {user?.role?.includes('admin') 
-              ? "Be the first to create a party!" 
+              ? "No parties yet. You can create one from the admin panel." 
               : "Check back later for new parties!"}
           </p>
-          {user?.role?.includes('admin') && (
-            <Link to="/create-party" className="btn-primary">
-              Create Your First Party
-            </Link>
-          )}
         </div>
       )}
 

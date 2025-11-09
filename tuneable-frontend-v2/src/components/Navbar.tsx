@@ -40,24 +40,13 @@ const Navbar: React.FC = () => {
                   Home
                 </Link>
                 {user.role?.includes('admin') && (
-                  <>
-                    <Link
-                      to="/admin"
-                      className="hidden sm:block px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-colors"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      Admin Panel
-                    </Link>
-                    <Link
-                      to="/create-party"
-                      className="hidden sm:block px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                      style={{ textDecoration: 'none' }}
-                      onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                      onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                    >
-                      Create Party
-                    </Link>
-                  </>
+                  <Link
+                    to="/admin"
+                    className="hidden sm:block px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Admin Panel
+                  </Link>
                 )}
                 {(user.role?.includes('creator') || user.role?.includes('admin')) && (
                   <Link

@@ -543,9 +543,17 @@ const Admin: React.FC = () => {
       <div className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Shield className="h-8 w-8 text-purple-400 mr-3" />
-              <h1 className="text-xl font-semibold text-white">Admin Panel</h1>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center">
+                <Shield className="h-8 w-8 text-purple-400 mr-3" />
+                <h1 className="text-xl font-semibold text-white">Admin Panel</h1>
+              </div>
+              <button
+                onClick={() => navigate('/create-party')}
+                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Create Party
+              </button>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">Welcome, {user?.username}</span>
