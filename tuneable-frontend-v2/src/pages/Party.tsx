@@ -889,15 +889,14 @@ const Party: React.FC = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Are you sure you want to veto "${mediaData.title || 'this media'}"? All bids will be refunded to users.`
-    );
-    
-    if (!confirmed) return;
-
     try {
+      const confirmationMessage = `Are you sure you want to veto "${mediaData.title || 'this media'}"? All bids will be refunded to users.`;
+      if (!window.confirm(confirmationMessage)) return;
+
+      const vetoReason = window.prompt('Optional: provide a reason for the veto (leave blank to skip).')?.trim();
+
       // Veto the media (sets status to 'vetoed' and refunds bids)
-      await partyAPI.vetoMedia(partyId!, mediaId);
+      await partyAPI.vetoMedia(partyId!, mediaId, vetoReason || undefined);
       toast.success('Media vetoed and bids refunded');
       
       // Refresh party data

@@ -254,8 +254,10 @@ export const partyAPI = {
     return response.data;
   },
   
-  vetoMedia: async (partyId: string, mediaId: string) => {
-    const response = await api.put(`/parties/${partyId}/media/${mediaId}/veto`);
+  vetoMedia: async (partyId: string, mediaId: string, reason?: string) => {
+    const response = await api.delete(`/parties/${partyId}/media/${mediaId}`, {
+      data: { reason },
+    });
     return response.data;
   },
   
