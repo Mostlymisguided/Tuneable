@@ -497,22 +497,7 @@ const Dashboard: React.FC = () => {
                     <Award className="hidden md:inline h-6 w-6 text-purple-400 mr-3" />
                     <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setIsCollectiveModalOpen(true)}
-                      className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                    >
-                      <Users className="hidden md:inline h-4 w-4 mr-2" />
-                      Create Collective
-                    </button>
-                    <button
-                      onClick={() => setIsLabelModalOpen(true)}
-                      className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                      <Building className="hidden md:inline h-4 w-4 mr-2" />
-                      Create Label
-                    </button>
-                  </div>
+                 
                 </div>
               </div>
             </div>
@@ -581,7 +566,7 @@ const Dashboard: React.FC = () => {
                   {creatorActiveTab === 'overview' && (
                     <div className="space-y-6">
                       {/* Stats Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="bg-gray-900 rounded-lg p-4">
                           <div className="flex items-center justify-between">
                             <div>
@@ -643,12 +628,22 @@ const Dashboard: React.FC = () => {
                             <ArrowUp className="h-4 w-4 text-white" />
                           </button>
                           <button
-                            onClick={() => navigate('/labels/create')}
+                            onClick={() => setIsLabelModalOpen(true)}
                             className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                           >
                             <div className="flex items-center">
                               <Building className="h-5 w-5 text-white mr-3" />
                               <span className="text-white font-medium">Create Label</span>
+                            </div>
+                            <Plus className="h-4 w-4 text-white" />
+                          </button>
+                          <button
+                            onClick={() => setIsCollectiveModalOpen(true)}
+                            className="flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Users className="h-5 w-5 text-white mr-3" />
+                              <span className="text-white font-medium">Create Collective</span>
                             </div>
                             <Plus className="h-4 w-4 text-white" />
                           </button>
@@ -2034,7 +2029,7 @@ const Dashboard: React.FC = () => {
                   handleAddTuneSearch();
                 }
               }}
-              placeholder="Search for tunes in our database or paste a YouTube URL..."
+              placeholder="Search our database or paste a YouTube URL..."
               className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
             />
           </div>
