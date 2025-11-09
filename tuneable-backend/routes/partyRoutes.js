@@ -845,6 +845,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
 router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
+        const { reason } = req.body || {};
         const { bidAmount } = req.body;
         const userId = req.user._id;
 
