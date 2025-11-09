@@ -35,7 +35,7 @@ const CreateParty: React.FC = () => {
     startTime: '',
     privacy: 'public' as 'public' | 'private',
     type: 'remote' as 'remote' | 'live' | 'global',
-    minimumBid: 0.33,
+    minimumBid: 0.01,
     tags: '',
     description: '',
   });
@@ -48,7 +48,7 @@ const CreateParty: React.FC = () => {
     
     setFormData({
       ...formData,
-      [name]: name === 'minimumBid' ? parseFloat(value) || 0.33 : value,
+      [name]: name === 'minimumBid' ? parseFloat(value) || 0.01 : value,
     });
   };
 

@@ -108,6 +108,17 @@ const Home: React.FC = () => {
             </div>
 
             <div className="text-center group">
+              <div className="bg-yellow-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-yellow-500/30 group-hover:border-yellow-400 group-hover:bg-yellow-600/30 transition-all">
+                <Zap className="h-10 w-10 text-yellow-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                Support Artists
+              </h3>
+              <p className="text-gray-300 leading-relaxed">
+                Artists earn most of what you bid on Tuneable
+              </p>
+            </div>
+            <div className="text-center group">
               <div className="bg-purple-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-purple-500/30 group-hover:border-purple-400 group-hover:bg-purple-600/30 transition-all">
                 <Music className="h-10 w-10 text-purple-400" />
               </div>
@@ -124,24 +135,13 @@ const Home: React.FC = () => {
                 <Users className="h-10 w-10 text-blue-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Social Music
+                Discover Music
               </h3>
               <p className="text-gray-300 leading-relaxed">
                 Connect with friends and discover new music together
               </p>
             </div>
 
-            <div className="text-center group">
-              <div className="bg-yellow-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-yellow-500/30 group-hover:border-yellow-400 group-hover:bg-yellow-600/30 transition-all">
-                <Zap className="h-10 w-10 text-yellow-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Support Artists
-              </h3>
-              <p className="text-gray-300 leading-relaxed">
-                Artists earn most of what you bid on Tuneable
-              </p>
-            </div>
           </div>
         </div>
       </section>
