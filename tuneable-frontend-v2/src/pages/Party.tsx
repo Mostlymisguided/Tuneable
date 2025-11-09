@@ -1773,7 +1773,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 pt-8 md:pt-4"
+                            className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 pt-8"
                           >
                             {/* Admin Veto Button - Top Right */}
                             {isAdmin && (
@@ -1782,16 +1782,16 @@ const Party: React.FC = () => {
                                   e.stopPropagation();
                                   handleVetoClick(item);
                                 }}
-                                className="absolute top-2 right-2 z-20 p-1 md:p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
+                                className="absolute top-2 right-2 z-20 p-1 md:p-1.5 border hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
                                 title="Veto this tune (Admin Only)"
                               >
-                                <X className="h-3 w-3 md:h-4 md:w-4" />
+                                <X className="h-2 w-2 md:h-4 md:w-4" />
                               </button>
                             )}
                             
                             {/* Queue Number Badge - Centered at top on mobile, Left Gutter on desktop */}
-                            <div className="absolute left-1/2 -translate-x-1/2 md:-left-12 md:translate-x-0 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-6 h-6 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
-                              <span className="text-white font-bold text-xs md:text-sm">{index + 1}</span>
+                            <div className="absolute left-1/2 -translate-x-1/2 md:-left-12 md:translate-x-0 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-5 h-5 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
+                              <span className="text-white font-bold text-[10px] md:text-sm">{index + 1}</span>
                             </div>
                             
                             {/* Mobile-only wrapper for thumbnail + details side by side */}
@@ -1825,7 +1825,7 @@ const Party: React.FC = () => {
                               
                               {/* Media Details */}
                               <div className="flex-1 min-w-0 md:ml-4">
-                                <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 md:space-x-2">
+                                <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 md:space-x-2">
                                   <h4 
                                     className="font-medium text-white text-sm md:text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
                                     onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
@@ -1849,13 +1849,13 @@ const Party: React.FC = () => {
                                 
                                 {/* Tags Display */}
                                 {mediaData.tags && mediaData.tags.length > 0 && (
-                                  <div className="mt-2 flex">
+                                  <div className="mt-1 md:mt-2 flex">
                                     <div className="flex flex-wrap gap-1">
                                       {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
                                         <Link
                                           key={tagIndex}
                                           to={`/tune/${mediaData._id || mediaData.id}`}
-                                          className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
+                                          className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[10px] md:text-sm rounded-full transition-colors no-underline"
                                         >
                                           #{tag}
                                         </Link>
@@ -1869,22 +1869,22 @@ const Party: React.FC = () => {
                             <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
                               <div className="flex items-center justify-center space-x-2">
                                 {/* Metrics Display */}
-                                <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
+                                <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-1 py-1 md:px-2 md:py-2 rounded-lg">
                                   <div className="text-center p-1 md:p-2">
-                                    <div className="text-xs text-gray-300 tracking-wide">Total</div>
-                                    <div className="text-xs md:text-lg text-gray-300">
+                                    <div className="text-[9px] md:text-xs text-gray-300 tracking-wide">Total</div>
+                                    <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
                                       {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
                                     </div>
                                   </div>
                                   <div className="text-center p-1 md:p-2">
-                                    <div className="text-xs text-gray-300 tracking-wide">Avg Bid</div>
-                                    <div className="text-xs md:text-lg text-gray-300">
+                                    <div className="text-[9px] md:text-xs text-gray-300 tracking-wide">Avg Bid</div>
+                                    <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
                                       {penceToPounds(calculateAverageBid(mediaData))}
                                     </div>
                                   </div>
                                 </div>
                                 {/* Inline Bidding */}
-                                <div className="flex items-center space-x-1 md:space-x-2">
+                                <div className="flex items-center space-x-2">
                                   <input
                                     type="number"
                                     step="0.01"

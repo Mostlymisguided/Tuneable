@@ -59,7 +59,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
             <button
               key={id}
               onClick={() => navigate(`/user/${id}`)}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-black/25 border border-white/10 hover:border-purple-400 transition-colors flex-shrink-0"
+              className="flex items-center gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 border border-white/10 hover:border-purple-400 transition-colors flex-shrink-0"
               title={`${penceToPounds(s.total)} (${s.count} bids)`}
             >
               <img
@@ -70,8 +70,8 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
                   e.currentTarget.src = DEFAULT_PROFILE_PIC;
                 }}
               />
-              <span className="text-sm text-white whitespace-nowrap">{s.user.username}</span>
-              <span className="text-xs text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
+              <span className="text-xs md:text-sm text-white whitespace-nowrap">{s.user.username}</span>
+              <span className="text-xs md:text- text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
             </button>
           );
         })}
