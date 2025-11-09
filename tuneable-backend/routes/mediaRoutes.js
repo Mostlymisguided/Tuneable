@@ -1980,7 +1980,7 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
 router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
   try {
     const { mediaId } = req.params;
-    const { amount } = req.body;
+    const { amount, externalMedia } = req.body;
     const userId = req.user._id;
 
     // Validate amount
@@ -2010,14 +2010,54 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     // Find media by ObjectId (preferred) or UUID (fallback)
     // Note: ObjectId is preferred for consistency with other routes, UUID is fallback for compatibility
     let media;
-    if (isValidObjectId(mediaId)) {
+    const isObjectId = isValidObjectId(mediaId);
+    const isUuid = !isObjectId && mediaId.includes('-');
+    const isExternalRequest = !isObjectId && !isUuid;
+
+    if (isObjectId) {
       // ObjectId format (preferred)
       media = await Media.findById(mediaId);
-    } else if (mediaId.includes('-')) {
+    } else if (isUuid) {
       // UUID format (fallback)
       media = await Media.findOne({ uuid: mediaId });
     } else {
       return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    if (!media && isExternalRequest) {
+      if (!externalMedia) {
+        return res.status(400).json({ error: 'External media metadata is required to create a new track.' });
+      }
+
+      const { title, artist, sources, coverArt, duration, tags, category } = externalMedia;
+      if (!title || !artist) {
+        return res.status(400).json({ error: 'Title and artist are required for new media.' });
+      }
+
+      const sourceEntries = sources && typeof sources === 'object' ? Object.entries(sources).filter(([, url]) => !!url) : [];
+      if (sourceEntries.length === 0) {
+        return res.status(400).json({ error: 'At least one media source is required for new media.' });
+      }
+
+      const sourcesMap = new Map(sourceEntries);
+
+      media = new Media({
+        title,
+        artist: [{ name: artist, userId: null, verified: false }],
+        coverArt: coverArt || DEFAULT_COVER_ART,
+        duration: duration || 0,
+        sources: sourcesMap,
+        tags: Array.isArray(tags) ? tags : [],
+        category: category || 'Unknown',
+        addedBy: userId,
+        globalMediaAggregate: 0,
+        contentType: ['music'],
+        contentForm: ['tune'],
+        mediaType: ['mp3']
+      });
+
+      await media.save();
+      console.log(`✅ Created new media via global bid: "${media.title}" (${media._id})`);
     }
 
     if (!media) {

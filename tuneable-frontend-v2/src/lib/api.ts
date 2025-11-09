@@ -435,8 +435,17 @@ export const mediaAPI = {
   },
 
   // Place global bid (chart support)
-  placeGlobalBid: async (mediaId: string, amount: number) => {
-    const response = await api.post(`/media/${mediaId}/global-bid`, { amount });
+  placeGlobalBid: async (mediaId: string, amount: number, externalMedia?: {
+    title: string;
+    artist: string;
+    coverArt?: string | null;
+    duration?: number;
+    category?: string;
+    tags?: string[];
+    sources: Record<string, string>;
+  }) => {
+    const payload = externalMedia ? { amount, externalMedia } : { amount };
+    const response = await api.post(`/media/${mediaId}/global-bid`, payload);
     return response.data;
   },
 

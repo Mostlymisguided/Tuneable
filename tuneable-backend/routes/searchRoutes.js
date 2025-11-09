@@ -181,7 +181,7 @@ router.get('/', async (req, res) => {
                             : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`,
                         duration: video.duration || 111,
                         sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` },
-                        tags: video.tags || [],
+                        tags: [],
                         category: video.category || 'Unknown',
                         isLocal: false // Flag to indicate this is from external API
                     })),
@@ -343,7 +343,7 @@ router.get('/youtube-url', async (req, res) => {
             coverArt: videoDetails.thumbnail || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
             duration: videoDetails.duration || 0,
             sources: { youtube: url },
-            tags: videoDetails.tags || [],
+            tags: [],
             category: videoDetails.category || 'Unknown',
             isLocal: false // Flag to indicate this is from external API
         };

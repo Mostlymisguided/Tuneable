@@ -180,7 +180,7 @@ const getVideoDetails = async (videoId) => {
                 channelTitle: snippet.channelTitle || 'Unknown Artist',
                 thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || null,
                 duration: durationInSeconds,
-                tags: snippet.tags || [],
+                tags: [],
                 category: categoryName,
                 categoryId: categoryId
             };

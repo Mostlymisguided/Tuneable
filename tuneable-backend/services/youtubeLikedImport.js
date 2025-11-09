@@ -110,7 +110,7 @@ async function getBatchVideoDetails(videoIds, accessToken) {
                 thumbnail: video.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`,
                 duration: parseYouTubeDuration(video.contentDetails.duration),
                 categoryId: video.snippet.categoryId,
-                tags: video.snippet.tags || []
+                tags: []
             }));
 
             allVideos.push(...videos);
@@ -276,7 +276,7 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
                     description: video.description,
                     sources: new Map([['youtube', `https://www.youtube.com/watch?v=${video.id}`]]),
                     externalIds: new Map([['youtube', video.id]]),
-                    tags: video.tags,
+                    tags: [],
                     category: categoryMapping[video.categoryId] || 'Music',
                     addedBy: userId,
                     contentType: ['music'],
