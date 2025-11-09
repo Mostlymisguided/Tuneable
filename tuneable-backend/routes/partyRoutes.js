@@ -845,7 +845,6 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
 router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
-        const { reason } = req.body || {};
         const { bidAmount } = req.body;
         const userId = req.user._id;
 
@@ -1676,6 +1675,7 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
 router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
+        const { reason } = req.body || {};
         const Bid = require('../models/Bid');
         const User = require('../models/User');
         const Media = require('../models/Media');
