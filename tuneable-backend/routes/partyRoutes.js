@@ -1784,18 +1784,6 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
 
         await party.save();
 
-        // Broadcast the veto event to all party members
-        const { broadcastToParty } = require('../utils/broadcast');
-        broadcastToParty(partyId, {
-            type: 'MEDIA_VETOED',
-            mediaId: mediaId,
-            vetoedAt: mediaEntry.vetoedAt,
-            vetoedBy: req.user._id,
-            vetoedBy_uuid: req.user.uuid,
-            refundedBidsCount: bidsToRefund.length,
-            refundedUsersCount: refundsByUser.size
-        });
-
         const totalRefunded = Array.from(refundsByUser.values()).reduce((sum, r) => sum + r.totalAmount, 0);
 
         res.json({
