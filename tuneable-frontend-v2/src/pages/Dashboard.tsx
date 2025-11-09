@@ -2142,28 +2142,35 @@ Join here: ${inviteLink}`.trim();
         {addTuneResults.length > 0 && (
         <div className="mt-4 space-y-2">
             {addTuneResults.map((result) => (
-              <div key={result._id || result.id} className="flex items-center justify-between bg-black/20 rounded px-4 py-3">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div
+                key={result._id || result.id}
+                className="bg-black/20 rounded px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+              >
+                <div className="flex items-start md:items-center gap-3 flex-1 min-w-0">
                   {result.coverArt && (
                     <img 
                       src={result.coverArt} 
                       alt={result.title}
-                      className="h-12 w-12 rounded object-cover flex-shrink-0"
+                      className="h-14 w-14 rounded object-cover flex-shrink-0"
                     />
                   )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white font-medium truncate">{result.title}</div>
-                    <div className="text-gray-400 text-sm truncate">{result.artist}</div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="text-white font-medium text-sm md:text-base truncate">
+                      {result.title}
+                    </div>
+                    <div className="text-gray-400 text-xs md:text-sm truncate">
+                      {result.artist}
+                    </div>
                     {result.isLocal && (
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-purple-900 text-purple-200 text-xs rounded">
+                      <span className="inline-block px-2 py-0.5 bg-purple-900 text-purple-200 text-xs rounded">
                         In Database
                       </span>
                     )}
                   </div>
                 </div>
-              <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-gray-400 text-xs">Bid Amount</div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div>
+                    <div className="text-gray-400 text-xs mb-1">Bid Amount</div>
                     <input
                       type="number"
                       min={minimumBid}
@@ -2176,15 +2183,15 @@ Join here: ${inviteLink}`.trim();
                           [result._id || result.id || '']: value
                         }));
                       }}
-                      className="w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      className="w-full sm:w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
                     />
                   </div>
                   <button
                     disabled={isAddingTune}
                     onClick={() => handleAddTune(result)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                   >
-                    <Play className="h-4 w-4" />
+
                     <span>
                       {(() => {
                         const raw = addTuneBidAmounts[result._id || result.id || ''] ?? '';
@@ -2197,9 +2204,9 @@ Join here: ${inviteLink}`.trim();
                     </span>
                   </button>
                 </div>
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

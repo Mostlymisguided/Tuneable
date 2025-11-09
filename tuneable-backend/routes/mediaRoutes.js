@@ -1984,8 +1984,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     const userId = req.user._id;
 
     // Validate amount
-    if (!amount || amount < 0.33) {
-      return res.status(400).json({ error: 'Minimum bid is £0.33' });
+    if (!amount || amount < 0.01) {
+      return res.status(400).json({ error: 'Minimum bid is £0.01' });
     }
 
     // Get user and check balance
