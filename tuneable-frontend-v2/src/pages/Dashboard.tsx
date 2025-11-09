@@ -2107,7 +2107,7 @@ const Dashboard: React.FC = () => {
       </div>
 
 {/* User Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
           <div className="flex items-center">
             <div className="bg-primary-100 p-3 rounded-lg">
@@ -2115,7 +2115,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Balance</p>
-              <p className="text-2xl font-semibold text-white">
+              <p className="text-base md:text-2xl font-semibold text-white">
                 {penceToPounds(user?.balance || 0)}
               </p>
             </div>
@@ -2129,7 +2129,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Global Rank</p>
-              <p className="text-2xl font-semibold text-white">
+              <p className="text-base md:text-2xl font-semibold text-white">
                 #{user?.globalUserAggregateRank || 'N/A'}
               </p>
             </div>
@@ -2143,7 +2143,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">TuneBytes</p>
-              <p className="text-2xl font-semibold text-white">
+              <p className="text-base md:text-2xl font-semibold text-white">
                 {(user as any)?.tuneBytes?.toFixed(0) || '0'}
               </p>
             </div>
@@ -2157,7 +2157,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Avg Bid</p>
-              <p className="text-2xl font-semibold text-white">
+              <p className="text-base md:text-2xl font-semibold text-white">
                 {penceToPounds(user?.globalUserBidAvg || 0)}
               </p>
             </div>
@@ -2171,7 +2171,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Total Bids</p>
-              <p className="text-2xl font-semibold text-white">
+              <p className="text-base md:text-2xl font-semibold text-white">
                 {user?.globalUserBids || 0}
               </p>
             </div>
@@ -2185,7 +2185,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-white">Invite Credits</p>
-              <p className="text-2xl font-semibold text-white">
+              <p className="text-base md:text-2xl font-semibold text-white">
                 {user?.inviteCredits ?? 10}
               </p>
             </div>
