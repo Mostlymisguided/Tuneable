@@ -93,11 +93,11 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
       {topSupporters.map((supporter: any, index: number) => (
         <div
           key={supporter.user._id || supporter.user.uuid || index}
-          className="flex flex-col md:flex-row md:items-center md:justify-between p-2 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
+          className="flex flex-row md:items-center md:justify-between p-1.5 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
           onClick={() => (supporter.user._id || supporter.user.uuid) && navigate(`/user/${supporter.user._id || supporter.user.uuid}`)}
         >
           {/* Left: Rank + Profile + Info */}
-          <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0 mb-2 md:mb-0">
+          <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
             {/* Rank Badge */}
             <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-xs md:text-sm">#{index + 1}</span>
@@ -142,8 +142,8 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
           </div>
           
           {/* Right: Totals */}
-          <div className="text-left md:text-right flex-shrink-0 md:ml-4 flex items-center md:block justify-between md:justify-end">
-            <div className="text-xl md:text-2xl font-bold text-green-400">
+          <div className="text-right md:ml-4 items-center block justify-between md:justify-end">
+            <div className="text-sm md:text-xl font-bold text-green-400">
               {penceToPounds(supporter.totalAmount)}
             </div>
             <div className="text-xs text-gray-400">

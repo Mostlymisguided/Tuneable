@@ -1188,11 +1188,11 @@ const Party: React.FC = () => {
         </div>
 
         {/* Top Tags + Top Supporters (two columns on desktop) */}
-        <div className="max-w-7xl mx-auto mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Top Tags Cloud */}
           {topTags.length > 0 && (
-            <div className="card">
-              <div className="flex items-center justify-between mb-3">
+            <div className="card p-3 md:p-6">
+              <div className="flex items-center justify-between mb-1 md:mb-3">
                 <h3 className="text-lg font-semibold text-white flex items-center">
                   <Tag className="h-4 w-4 mr-2 text-purple-400" />
                   Top Tags
@@ -1211,7 +1211,7 @@ const Party: React.FC = () => {
                   const hash = `#${tag}`;
                   const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
                   const weight = Math.max(0.75, Math.min(1.25, total / 50));
-                  const sizeClass = weight > 1.1 ? 'text-base' : weight > 0.95 ? 'text-sm' : 'text-xs';
+                  const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
 
                   return (
                     <button
@@ -1238,8 +1238,8 @@ const Party: React.FC = () => {
           )}
 
           {/* Top Supporters */}
-          <div className="card">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3 gap-2 md:gap-0">
+          <div className="card p-3 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3">
               <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
               {selectedTagFilters.length > 0 ? (
                 <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
@@ -1734,10 +1734,10 @@ const Party: React.FC = () => {
                 {!showVetoed && (
                   <div className="mb-6">
                     <h3 className="text-base sm:text-lg font-semibold text-white text-center mb-3 p-2">Sort by Time</h3>
-                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 justify-center">
+                    <div className="flex flex-row flex-wrap gap-2 justify-center">
                       {[
                         { key: 'all-time', label: 'All Time' },
-                        { key: 'this-year', label: 'This Year' },
+                       /* { key: 'this-year', label: 'This Year' }, */
                         { key: 'this-month', label: 'This Month' },
                         { key: 'this-week', label: 'This Week' },
                         { key: 'today', label: 'Today' }
@@ -1790,7 +1790,7 @@ const Party: React.FC = () => {
                             )}
                             
                             {/* Queue Number Badge - Centered at top on mobile, Left Gutter on desktop */}
-                            <div className="absolute left-1/2 -translate-x-1/2 md:-left-12 md:translate-x-0 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-5 h-5 md:w-8 md:h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-lg z-10">
+                            <div className="absolute left-1/2 -translate-x-1/2 md:-left-12 md:translate-x-0 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg z-10">
                               <span className="text-white font-bold text-[10px] md:text-sm">{index + 1}</span>
                             </div>
                             
