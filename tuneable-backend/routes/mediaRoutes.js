@@ -2021,7 +2021,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       // UUID format (fallback)
       media = await Media.findOne({ uuid: mediaId });
     } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
+      media = null; // Treat as external creation request
     }
 
     if (!media && isExternalRequest) {
