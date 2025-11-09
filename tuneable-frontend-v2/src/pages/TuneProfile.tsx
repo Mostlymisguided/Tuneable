@@ -1059,6 +1059,18 @@ const TuneProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
+              {/* Claim Tune Button - show only when user cannot edit */}
+              {!canEditTune() && (
+                <button
+                  onClick={handleClaimTune}
+                  className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
+                >
+                  <Award className="h-4 w-4" />
+                  <span className="hidden sm:inline">Claim Tune</span>
+                  <span className="sm:hidden">Claim</span>
+                </button>
+              )}
+              
               {/* Edit Tune Button - Only show if user can edit and not in edit mode */}
               {canEditTune() && !isEditMode && (
                 <button
@@ -1082,19 +1094,9 @@ const TuneProfile: React.FC = () => {
             </div>
           </div>
           
-          <div className="card flex flex-col md:flex-row items-start relative">
-            {/* Claim Tune Button - Top Right */}
-            <button
-              onClick={handleClaimTune}
-              className="self-end mb-4 md:mb-0 absolute md:top-6 md:right-6 px-3 py-2 md:px-4 md:py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-xs md:text-base z-10"
-            >
-              <Award className="h-3 w-3 md:h-4 md:w-4" />
-              <span className="hidden sm:inline">Claim Tune</span>
-              <span className="sm:hidden">Claim</span>
-            </button>
-
+          <div className="card p-4 md:p-6 flex flex-col md:flex-row items-start relative">
             {/* Album Art with Play Button Overlay */}
-            <div className="w-full md:w-auto flex justify-center md:justify-start mb-6 md:mb-0 md:mr-6 relative group">
+            <div className="w-full md:w-auto flex justify-center md:justify-start mb-2 md:mr-6 relative group">
               <img
                 src={media.coverArt || DEFAULT_COVER_ART}
                 alt={`${media.title} cover`}
@@ -1113,13 +1115,13 @@ const TuneProfile: React.FC = () => {
             
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
-              <h1 className="text-2xl md:text-4xl font-bold mb-2 text-center md:text-left px-2 md:px-4">{media.title}</h1>
-              <p className="text-lg md:text-3xl text-purple-300 mb-4 text-center md:text-left px-2 md:px-4">
+              <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2 md:px-4">{media.title}</h1>
+              <p className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2 md:px-4">
                 {getCreatorDisplay(media)}
               </p>
               
               {/* Bid Metrics Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 px-2 md:px-0">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 gap-y-2 md:gap-4 px-2 md:px-0">
                 {/* Bid Total */}
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
                   <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
@@ -1171,7 +1173,7 @@ const TuneProfile: React.FC = () => {
 
               {/* External Source Links - Desktop only */}
               {getExternalLinks().length > 0 && (
-                <div className="hidden md:block mb-4 px-4">
+                <div className="hidden md:block my-4">
                   <div className="flex flex-wrap gap-2">
                     {getExternalLinks().map((link) => (
                       <a
@@ -1266,7 +1268,7 @@ const TuneProfile: React.FC = () => {
                   Boost this tune's global ranking and support the artist
                 </p>
                 
-                <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
+                <div className="flex flex-row items-center justify-center space-y-0 space-x-3 mb-4">
                   <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
                     <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
                     <input
@@ -1281,7 +1283,7 @@ const TuneProfile: React.FC = () => {
                   <button
                     onClick={handleGlobalBid}
                     disabled={isPlacingGlobalBid || globalBidAmount < minimumBid}
-                    className="w-full md:w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
+                    className="w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
                   >
                     {isPlacingGlobalBid ? (
                       <>
@@ -1320,8 +1322,8 @@ const TuneProfile: React.FC = () => {
 
         {/* Top Supporters */}
         {media.bids && media.bids.length > 0 && (
-          <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+          <div className="mb-6 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
               <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400" />
               Top Supporters
             </h2>
@@ -1333,8 +1335,8 @@ const TuneProfile: React.FC = () => {
 
         {/* Top Bids */}
         {media.bids && media.bids.length > 0 && (
-          <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+          <div className="mb-6 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
               <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
               Top Bids
             </h2>
@@ -1345,8 +1347,8 @@ const TuneProfile: React.FC = () => {
         )}
 
         {/* Top Parties */}
-        <div className="mb-8 px-2 md:px-0">
-          <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+        <div className="mb-6 px-2 md:px-0">
+          <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
             <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
             Top Parties {topParties.length > 0 && `(${topParties.length})`}
           </h2>
@@ -1404,7 +1406,7 @@ const TuneProfile: React.FC = () => {
         {/* Tag Rankings */}
         {tagRankings.length > 0 && (
           <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
               <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
               Tag Rankings
             </h2>
@@ -1755,7 +1757,7 @@ const TuneProfile: React.FC = () => {
               <div className="space-y-8">
                 {/* Global Bid Section - Support This Tune */}
                 {user && (
-                  <div className="mb-8 px-2 md:px-0">
+                  <div className="mb-6 px-2 md:px-0">
                     <div className="max-w-2xl mx-auto">
                       <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
                         <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
