@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -99,6 +99,87 @@ const Dashboard: React.FC = () => {
     admin: boolean;
     member: boolean;
   }>({ owned: false, admin: false, member: false });
+
+  const inviteLink = useMemo(() => {
+    if (!user?.personalInviteCode) {
+      return window.location.origin;
+    }
+    return `${window.location.origin}/register?code=${user.personalInviteCode}`;
+  }, [user?.personalInviteCode]);
+
+  const inviteMessage = useMemo(() => {
+    const codeLine = user?.personalInviteCode ? `Use my invite code ${user.personalInviteCode} when you sign up.` : '';
+    return `Hey! I'm inviting you to try Tuneable, the social music platform for bidding on beats.
+
+${codeLine}
+
+Join here: ${inviteLink}`.trim();
+  }, [inviteLink, user?.personalInviteCode]);
+
+  const instagramStoryAsset = useMemo(() => {
+    return `${window.location.origin}/share/tuneable-invite-story.png`;
+  }, []);
+
+  const handleCopyInvite = useCallback(async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(inviteMessage);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = inviteMessage;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success('Invite message copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy invite message:', error);
+      toast.error('Could not copy invite. Please try again.');
+    }
+  }, [inviteMessage]);
+
+  const handleEmailInvite = useCallback(() => {
+    const subject = 'Join me on Tuneable';
+    const body = inviteMessage;
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }, [inviteMessage]);
+
+  const handleFacebookShare = useCallback(() => {
+    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}`;
+    window.open(shareUrl, '_blank', 'noopener');
+  }, [inviteLink]);
+
+  const handleInstagramShare = useCallback(() => {
+    if (!instagramStoryAsset) {
+      toast.info('Instagram story asset coming soon.');
+      return;
+    }
+    const url = `https://www.instagram.com/stories/create/?assetPath=${encodeURIComponent(instagramStoryAsset)}`;
+    window.open(url, '_blank');
+  }, [instagramStoryAsset]);
+
+  const handleSystemShare = useCallback(() => {
+    const sharePayload = {
+      title: 'Tuneable Invite',
+      text: inviteMessage,
+      url: inviteLink,
+    };
+
+    if (navigator.share) {
+      navigator.share(sharePayload).catch((error) => {
+        if (error && error.name !== 'AbortError') {
+          console.error('Share failed:', error);
+          toast.error('Unable to open share sheet.');
+        }
+      });
+    } else {
+      toast.info('Sharing not supported on this device. Try copying the invite instead.');
+    }
+  }, [inviteLink, inviteMessage]);
 
   // Helper function to detect YouTube URLs
   const isYouTubeUrl = (query: string) => {
@@ -2217,6 +2298,53 @@ const Dashboard: React.FC = () => {
         )}
         {!isLoadingInvited && invitedUsers.length > 0 && (
           <div className="space-y-3">
+            <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div>
+                  <p className="text-sm text-gray-300">Share your invite link</p>
+                  <p className="text-xs text-gray-500 mt-1 break-all">
+                    {inviteLink}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleCopyInvite}
+                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy Invite
+                  </button>
+                  <button
+                    onClick={handleEmailInvite}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </button>
+                  <button
+                    onClick={handleFacebookShare}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Facebook className="h-4 w-4" />
+                    Facebook
+                  </button>
+                  <button
+                    onClick={handleInstagramShare}
+                    className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Instagram className="h-4 w-4" />
+                    Instagram Story
+                  </button>
+                  <button
+                    onClick={handleSystemShare}
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Share
+                  </button>
+                </div>
+              </div>
+            </div>
             {(showAllInvitedUsers ? invitedUsers : invitedUsers.slice(0, 3)).map((invitedUser) => {
               const userName = (invitedUser.givenName || invitedUser.familyName) 
                 ? `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
