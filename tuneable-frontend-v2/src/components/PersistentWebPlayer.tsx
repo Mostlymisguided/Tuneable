@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -157,6 +157,41 @@ const PersistentWebPlayer: React.FC = () => {
     setCurrentMedia,
     setGlobalPlayerActive,
   } = useWebPlayerStore();
+
+  const handleGlobalKeydown = useCallback((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    const isTypingTarget = target && (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable ||
+      (target as HTMLInputElement).type === 'text' ||
+      (target as HTMLInputElement).type === 'password' ||
+      (target as HTMLInputElement).type === 'email' ||
+      (target as HTMLInputElement).type === 'number'
+    );
+
+    if (isTypingTarget) {
+      return;
+    }
+
+    if (event.code === 'Space' || event.key === ' ') {
+      event.preventDefault();
+      togglePlayPause();
+    } else if (event.code === 'ArrowRight') {
+      event.preventDefault();
+      next();
+    } else if (event.code === 'ArrowLeft') {
+      event.preventDefault();
+      previous();
+    }
+  }, [togglePlayPause, next, previous]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleGlobalKeydown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeydown);
+    };
+  }, [handleGlobalKeydown]);
 
   // Clear player state if user is not authenticated
   useEffect(() => {

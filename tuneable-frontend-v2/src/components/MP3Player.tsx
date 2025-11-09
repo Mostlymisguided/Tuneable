@@ -72,6 +72,57 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
   // Initialize audio player - only when media changes
   useEffect(() => {
+    const handleKeydown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTypingTarget = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        (target as HTMLInputElement).type === 'text' ||
+        (target as HTMLInputElement).type === 'password' ||
+        (target as HTMLInputElement).type === 'email' ||
+        (target as HTMLInputElement).type === 'number'
+      );
+
+      if (isTypingTarget) {
+        return;
+      }
+
+      if (event.code === 'Space' || event.key === ' ') {
+        const target = event.target as HTMLElement | null;
+        if (
+          target &&
+          (
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable ||
+            (target as HTMLInputElement).type === 'text' ||
+            (target as HTMLInputElement).type === 'password' ||
+            (target as HTMLInputElement).type === 'email' ||
+            (target as HTMLInputElement).type === 'number'
+          )
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        togglePlayPause();
+      } else if (event.code === 'ArrowRight') {
+        event.preventDefault();
+        next();
+      } else if (event.code === 'ArrowLeft') {
+        event.preventDefault();
+        previous();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => {
+      window.removeEventListener('keydown', handleKeydown);
+    };
+  }, [togglePlayPause, next, previous]);
+
+  useEffect(() => {
     if (!media) return;
 
     const audioUrl = getAudioUrl(media);
