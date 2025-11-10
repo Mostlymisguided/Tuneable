@@ -795,6 +795,23 @@ const TuneProfile: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Helper functions to convert between MM:SS format and seconds
+  const secondsToMMSS = (seconds: number): string => {
+    if (!seconds || seconds <= 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const mmssToSeconds = (mmss: string): number => {
+    if (!mmss || !mmss.trim()) return 0;
+    const parts = mmss.trim().split(':');
+    if (parts.length !== 2) return 0;
+    const mins = parseInt(parts[0], 10) || 0;
+    const secs = parseInt(parts[1], 10) || 0;
+    return mins * 60 + secs;
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleDateString();
@@ -1205,7 +1222,7 @@ const TuneProfile: React.FC = () => {
 
               {/* Add External Links - Only for admin/verified creators */}
               {canEditTune() && getMissingPlatforms().length > 0 && (
-                <div className="mb-6 px-4">
+                <div className="my-4">
                   <div className="text-xs text-gray-400 mb-2">Add external links:</div>
                   <div className="flex flex-wrap gap-2">
                     {getMissingPlatforms().map((platform) => (
@@ -1647,7 +1664,7 @@ const TuneProfile: React.FC = () => {
 
         {/* Links Section */}
         {media.sources && Object.keys(media.sources).length > 0 && (
-          <div className="mb-8 md:hidden px-2">
+          <div className="mb-8 hidden px-2">
             <h2 className="text-xl font-bold text-white mb-3">Links</h2>
             <div className="bg-black/20 rounded-lg p-4">
               <div className="flex flex-wrap gap-3 justify-center">

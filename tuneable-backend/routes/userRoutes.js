@@ -2547,4 +2547,43 @@ router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
   }
 });
 
+// Search users by username, email, or artist name (authenticated users only)
+router.get('/search', authMiddleware, async (req, res) => {
+  try {
+    const { search, limit = 10 } = req.query;
+    
+    if (!search || search.trim().length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+    }
+    
+    const searchRegex = new RegExp(search.trim(), 'i');
+    const users = await User.find({
+      $or: [
+        { username: searchRegex },
+        { email: searchRegex },
+        { 'creatorProfile.artistName': searchRegex }
+      ],
+      isActive: true
+    })
+    .select('_id username profilePic uuid creatorProfile.artistName')
+    .limit(parseInt(limit))
+    .lean();
+    
+    // Format response - include artistName if available, but don't expose email
+    const formattedUsers = users.map(user => ({
+      _id: user._id,
+      id: user._id,
+      username: user.username,
+      profilePic: user.profilePic,
+      uuid: user.uuid,
+      artistName: user.creatorProfile?.artistName || null
+    }));
+    
+    res.json({ users: formattedUsers });
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ error: 'Failed to search users', details: error.message });
+  }
+});
+
 module.exports = router;

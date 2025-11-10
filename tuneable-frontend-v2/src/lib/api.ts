@@ -638,6 +638,15 @@ export const userAPI = {
     const response = await api.get('/users/admin/bids/vetoed', { params });
     return response.data;
   },
+
+  // Search users by username or email
+  searchUsers: async (params?: {
+    search?: string;
+    limit?: number;
+  }) => {
+    const response = await api.get('/users/search', { params });
+    return response.data;
+  },
 };
 
 export const labelAPI = {
@@ -681,6 +690,18 @@ export const labelAPI = {
   // Get label team roster (owners/admins/members)
   getTeam: async (slug: string) => {
     const response = await api.get(`/labels/${slug}/team`);
+    return response.data;
+  },
+
+  // Invite admin to label (owners only)
+  inviteAdmin: async (slug: string, data: { userId?: string; email?: string }) => {
+    const response = await api.post(`/labels/${slug}/invite-admin`, data);
+    return response.data;
+  },
+
+  // Invite artist to label (owners and admins)
+  inviteArtist: async (slug: string, data: { userId?: string; email?: string; role?: 'artist' | 'producer' | 'manager' | 'staff' }) => {
+    const response = await api.post(`/labels/${slug}/invite-artist`, data);
     return response.data;
   },
 

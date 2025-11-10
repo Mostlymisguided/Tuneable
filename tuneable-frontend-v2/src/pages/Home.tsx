@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Music, Users, Coins, Zap, Heart, Globe, Waves, Shield, Users2, Eye, Target } from 'lucide-react';
 
 const Home: React.FC = () => {
-  const aims = [
+  const aims: Array<{ icon: React.ReactElement; title: string }> = [
     {
       icon: <Globe className="h-8 w-8 text-blue-400" />,
       title: "Democratically + Transparently Chart The Global Music Catalogue",

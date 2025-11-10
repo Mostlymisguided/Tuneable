@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, ArrowLeft, Flag, X, Save, Loader2 } from 'lucide-react';
+import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, ArrowLeft, Flag, X, Save, Loader2, UserPlus } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
+import InviteMemberModal from '../components/labels/InviteMemberModal';
 
 interface Label {
   _id: string;
@@ -87,6 +88,8 @@ const LabelProfile: React.FC = () => {
   const [isLoadingTeam, setIsLoadingTeam] = useState(false);
   const [hasLoadedTeam, setHasLoadedTeam] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteType, setInviteType] = useState<'admin' | 'artist'>('artist');
   
   // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -158,6 +161,25 @@ const LabelProfile: React.FC = () => {
     });
     
     return !!isLabelAdmin;
+  };
+
+  // Check if user is label owner
+  const isLabelOwner = () => {
+    if (!currentUser || !label) return false;
+    
+    // Check if user is admin
+    const isAdmin = currentUser.role && currentUser.role.includes('admin');
+    if (isAdmin) return true;
+    
+    const userLabelId = (currentUser as any)._id || currentUser.id || currentUser.uuid;
+    const isOwner = label.admins?.some((admin) => {
+      const adminId = typeof admin.userId === 'string' 
+        ? admin.userId 
+        : (admin.userId._id || admin.userId.uuid || admin.userId);
+      return (adminId === userLabelId || adminId === currentUser.uuid) && admin.role === 'owner';
+    });
+    
+    return !!isOwner;
   };
 
   useEffect(() => {
@@ -1086,17 +1108,43 @@ const LabelProfile: React.FC = () => {
                       Owners and administrators with management access to this label.
                     </p>
                   </div>
-                  {slug && (
-                    <button
-                      onClick={() => fetchLabelTeam(slug)}
-                      disabled={isLoadingTeam}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <Loader2 className={`h-4 w-4 ${isLoadingTeam ? 'animate-spin' : 'hidden'}`} />
-                      {!isLoadingTeam && 'Refresh'}
-                      {isLoadingTeam && 'Refreshing...'}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isLabelOwner() && (
+                      <button
+                        onClick={() => {
+                          setInviteType('admin');
+                          setShowInviteModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-sm text-white transition-colors"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Invite Admin
+                      </button>
+                    )}
+                    {canEditLabel() && (
+                      <button
+                        onClick={() => {
+                          setInviteType('artist');
+                          setShowInviteModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm text-white transition-colors"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Invite Artist
+                      </button>
+                    )}
+                    {slug && (
+                      <button
+                        onClick={() => fetchLabelTeam(slug)}
+                        disabled={isLoadingTeam}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Loader2 className={`h-4 w-4 ${isLoadingTeam ? 'animate-spin' : 'hidden'}`} />
+                        {!isLoadingTeam && 'Refresh'}
+                        {isLoadingTeam && 'Refreshing...'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {isLoadingTeam && !hasLoadedTeam ? (
@@ -1121,6 +1169,21 @@ const LabelProfile: React.FC = () => {
           reportType="label"
           targetId={label._id}
           targetTitle={label.name}
+        />
+      )}
+
+      {/* Invite Member Modal */}
+      {slug && (
+        <InviteMemberModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          labelSlug={slug}
+          inviteType={inviteType}
+          onSuccess={() => {
+            if (slug) {
+              fetchLabelTeam(slug);
+            }
+          }}
         />
       )}
     </div>

@@ -7,6 +7,23 @@ import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
 import { labelAPI } from '../lib/api';
 import axios from 'axios';
 
+// Helper functions to convert between MM:SS format and seconds
+const secondsToMMSS = (seconds: number): string => {
+  if (!seconds || seconds <= 0) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const mmssToSeconds = (mmss: string): number => {
+  if (!mmss || !mmss.trim()) return 0;
+  const parts = mmss.trim().split(':');
+  if (parts.length !== 2) return 0;
+  const mins = parseInt(parts[0], 10) || 0;
+  const secs = parseInt(parts[1], 10) || 0;
+  return mins * 60 + secs;
+};
+
 const CreatorUpload: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -111,7 +128,7 @@ const CreatorUpload: React.FC = () => {
         artistName: extractedMetadata.artist || prev.artistName,
         album: extractedMetadata.album || prev.album,
         genre: extractedMetadata.genre?.[0] || prev.genre,
-        duration: extractedMetadata.duration?.toString() || prev.duration,
+        duration: extractedMetadata.duration ? secondsToMMSS(extractedMetadata.duration) : prev.duration,
         explicit: extractedMetadata.explicit || prev.explicit,
         bpm: extractedMetadata.bpm?.toString() || prev.bpm,
         key: extractedMetadata.key || prev.key,
@@ -276,7 +293,12 @@ const CreatorUpload: React.FC = () => {
       if (formData.album) uploadData.append('album', formData.album.trim());
       if (formData.genre) uploadData.append('genre', formData.genre);
       if (formData.releaseDate) uploadData.append('releaseDate', formData.releaseDate);
-      if (formData.duration) uploadData.append('duration', formData.duration);
+      if (formData.duration) {
+        const durationSeconds = mmssToSeconds(formData.duration);
+        if (durationSeconds > 0) {
+          uploadData.append('duration', durationSeconds.toString());
+        }
+      }
       uploadData.append('explicit', formData.explicit.toString());
       if (formData.tags) uploadData.append('tags', formData.tags);
       if (formData.description) uploadData.append('description', formData.description.trim());
@@ -592,16 +614,20 @@ const CreatorUpload: React.FC = () => {
               <div>
                 <label className="block text-white font-medium mb-2 flex items-center">
                   <Clock className="h-4 w-4 mr-2 text-purple-400" />
-                  Duration (seconds)
+                  Duration (MM:SS)
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   name="duration"
                   value={formData.duration}
                   onChange={handleChange}
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                  placeholder="180"
+                  placeholder="3:00"
+                  pattern="[0-9]+:[0-5][0-9]"
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Format: minutes:seconds (e.g., 3:45 for 3 minutes 45 seconds)
+                </p>
               </div>
             </div>
 

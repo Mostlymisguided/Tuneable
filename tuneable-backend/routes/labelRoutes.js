@@ -166,6 +166,123 @@ router.get('/:slug/team', authMiddleware, async (req, res) => {
   }
 });
 
+// Invite admin to label (owners only)
+router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { userId, email } = req.body;
+    const inviterId = req.user._id;
+    
+    const label = await Label.findBySlug(slug);
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+    
+    // Check if inviter is owner
+    const isOwner = label.isOwner(inviterId);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Only label owners can invite admins' });
+    }
+    
+    let targetUser;
+    if (userId) {
+      targetUser = await User.findById(userId);
+    } else if (email) {
+      targetUser = await User.findOne({ email: email.toLowerCase().trim() });
+    } else {
+      return res.status(400).json({ error: 'Either userId or email is required' });
+    }
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user is already an admin
+    if (label.isAdmin(targetUser._id)) {
+      return res.status(400).json({ error: 'User is already an admin of this label' });
+    }
+    
+    // Add as admin
+    await label.addAdmin(targetUser._id, 'admin', inviterId);
+    
+    res.json({ success: true, message: 'Admin invited successfully' });
+  } catch (error) {
+    console.error('Error inviting admin:', error);
+    res.status(500).json({ error: 'Failed to invite admin', details: error.message });
+  }
+});
+
+// Invite artist to label (owners and admins)
+router.post('/:slug/invite-artist', authMiddleware, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { userId, email, role = 'artist' } = req.body;
+    const inviterId = req.user._id;
+    
+    if (!['artist', 'producer', 'manager', 'staff'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be artist, producer, manager, or staff' });
+    }
+    
+    const label = await Label.findBySlug(slug);
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+    
+    // Check if inviter is owner or admin
+    const isLabelEditor = label.isAdmin(inviterId);
+    if (!isLabelEditor) {
+      return res.status(403).json({ error: 'Only label owners and admins can invite artists' });
+    }
+    
+    let targetUser;
+    if (userId) {
+      targetUser = await User.findById(userId);
+    } else if (email) {
+      targetUser = await User.findOne({ email: email.toLowerCase().trim() });
+    } else {
+      return res.status(400).json({ error: 'Either userId or email is required' });
+    }
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user already has an affiliation (pending or active)
+    const existingAffiliation = targetUser.labelAffiliations?.find(
+      aff => aff.labelId && aff.labelId.toString() === label._id.toString()
+    );
+    
+    if (existingAffiliation) {
+      if (existingAffiliation.status === 'pending') {
+        return res.status(400).json({ error: 'User already has a pending invitation' });
+      }
+      if (existingAffiliation.status === 'active') {
+        return res.status(400).json({ error: 'User is already affiliated with this label' });
+      }
+    }
+    
+    // Add affiliation
+    if (!targetUser.labelAffiliations) {
+      targetUser.labelAffiliations = [];
+    }
+    
+    targetUser.labelAffiliations.push({
+      labelId: label._id,
+      role: role,
+      status: 'pending',
+      joinedAt: new Date(),
+      invitedBy: inviterId
+    });
+    
+    await targetUser.save();
+    
+    res.json({ success: true, message: 'Artist invited successfully' });
+  } catch (error) {
+    console.error('Error inviting artist:', error);
+    res.status(500).json({ error: 'Failed to invite artist', details: error.message });
+  }
+});
+
 // Get label by slug (public)
 router.get('/:slug', async (req, res) => {
   try {
