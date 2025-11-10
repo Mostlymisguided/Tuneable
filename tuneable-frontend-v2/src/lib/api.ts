@@ -837,6 +837,18 @@ export const collectiveAPI = {
     return response.data;
   },
 
+  // Invite admin to collective (founders only)
+  inviteAdmin: async (slug: string, data: { userId?: string; email?: string }) => {
+    const response = await api.post(`/collectives/${slug}/invite-admin`, data);
+    return response.data;
+  },
+
+  // Invite member to collective (founders and admins)
+  inviteMember: async (slug: string, data: { userId?: string; email?: string; role?: 'member' | 'admin'; instrument?: string }) => {
+    const response = await api.post(`/collectives/${slug}/invite-member`, data);
+    return response.data;
+  },
+
   // Get collective's media (public)
   getCollectiveMedia: async (slug: string, params?: {
     page?: number;

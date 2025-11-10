@@ -139,6 +139,115 @@ router.get('/:slug/team', authMiddleware, async (req, res) => {
   }
 });
 
+// Invite admin to collective (founders only)
+router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { userId, email } = req.body;
+    const inviterId = req.user._id;
+    
+    const collective = await Collective.findBySlug(slug);
+    if (!collective) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+    
+    // Check if inviter is founder
+    const isFounder = collective.isFounder(inviterId);
+    if (!isFounder) {
+      return res.status(403).json({ error: 'Only collective founders can invite admins' });
+    }
+    
+    let targetUser;
+    if (userId) {
+      targetUser = await User.findById(userId);
+    } else if (email) {
+      targetUser = await User.findOne({ email: email.toLowerCase().trim() });
+    } else {
+      return res.status(400).json({ error: 'Either userId or email is required' });
+    }
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user is already a member
+    if (collective.isMember(targetUser._id)) {
+      const existingMember = collective.members.find(
+        m => m.userId.toString() === targetUser._id.toString() && !m.leftAt
+      );
+      if (existingMember && (existingMember.role === 'admin' || existingMember.role === 'founder')) {
+        return res.status(400).json({ error: 'User is already an admin or founder of this collective' });
+      }
+    }
+    
+    // Add as admin
+    await collective.addMember(targetUser._id, 'admin', inviterId);
+    
+    res.json({ success: true, message: 'Admin invited successfully' });
+  } catch (error) {
+    console.error('Error inviting admin:', error);
+    res.status(500).json({ error: 'Failed to invite admin', details: error.message });
+  }
+});
+
+// Invite member to collective (founders and admins)
+router.post('/:slug/invite-member', authMiddleware, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { userId, email, role = 'member', instrument } = req.body;
+    const inviterId = req.user._id;
+    
+    if (!['member', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be member or admin' });
+    }
+    
+    const collective = await Collective.findBySlug(slug);
+    if (!collective) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+    
+    // Check if inviter is founder or admin
+    const isCollectiveEditor = collective.isAdmin(inviterId);
+    if (!isCollectiveEditor) {
+      return res.status(403).json({ error: 'Only collective founders and admins can invite members' });
+    }
+    
+    let targetUser;
+    if (userId) {
+      targetUser = await User.findById(userId);
+    } else if (email) {
+      targetUser = await User.findOne({ email: email.toLowerCase().trim() });
+    } else {
+      return res.status(400).json({ error: 'Either userId or email is required' });
+    }
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user is already a member
+    if (collective.isMember(targetUser._id)) {
+      const existingMember = collective.members.find(
+        m => m.userId.toString() === targetUser._id.toString() && !m.leftAt
+      );
+      if (existingMember) {
+        if (existingMember.role === role) {
+          return res.status(400).json({ error: 'User is already a member with this role' });
+        }
+        // If they're already a member with a different role, we'll update it
+      }
+    }
+    
+    // Add member
+    await collective.addMember(targetUser._id, role, inviterId, instrument || null);
+    
+    res.json({ success: true, message: 'Member invited successfully' });
+  } catch (error) {
+    console.error('Error inviting member:', error);
+    res.status(500).json({ error: 'Failed to invite member', details: error.message });
+  }
+});
+
 // Get collective by slug (public)
 router.get('/:slug', async (req, res) => {
   try {
