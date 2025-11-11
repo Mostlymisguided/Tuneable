@@ -2161,7 +2161,7 @@ Join here: ${inviteLink}`.trim();
                     handleAddTuneSearch();
                   }
                 }}
-                placeholder="Search our database or paste a YouTube URL..."
+                placeholder="Search or paste YouTube URL..."
                 className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
               />
             </div>
@@ -2258,95 +2258,97 @@ Join here: ${inviteLink}`.trim();
       </div>
 
       {/* User Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="card">
-          <div className="flex items-center">
-            <div className="bg-primary-100 p-3 rounded-lg">
-              <Coins className="h-6 w-6 text-primary-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Balance</p>
-              <p className="text-base md:text-2xl font-semibold text-white">
-                {penceToPounds(user?.balance || 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center">
-            <div className="bg-green-100 p-3 rounded-lg">
-              <Globe className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Global Rank</p>
-              <p className="text-base md:text-2xl font-semibold text-white">
-                #{user?.globalUserAggregateRank || 'N/A'}
-              </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="card grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="bg-primary-100 p-3 rounded-lg">
+                <Coins className="h-6 w-6 text-primary-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-white">Balance</p>
+                <p className="text-base md:text-2xl font-semibold text-white">
+                  {penceToPounds(user?.balance || 0)}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="card">
-          <div className="flex items-center">
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <Gift className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">TuneBytes</p>
-              <p className="text-base md:text-2xl font-semibold text-white">
-                {(user as any)?.tuneBytes?.toFixed(0) || '0'}
-              </p>
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="bg-green-100 p-3 rounded-lg">
+                <Globe className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-white">Global Rank</p>
+                <p className="text-base md:text-2xl font-semibold text-white">
+                  #{user?.globalUserAggregateRank || 'N/A'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="card">
-          <div className="flex items-center">
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <Coins className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Avg Bid</p>
-              <p className="text-base md:text-2xl font-semibold text-white">
-                {penceToPounds(user?.globalUserBidAvg || 0)}
-              </p>
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="bg-purple-100 p-3 rounded-lg">
+                <Gift className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-white">TuneBytes</p>
+                <p className="text-base md:text-2xl font-semibold text-white">
+                  {(user as any)?.tuneBytes?.toFixed(0) || '0'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="card">
-          <div className="flex items-center">
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <AudioLines className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Total Bids</p>
-              <p className="text-base md:text-2xl font-semibold text-white">
-                {user?.globalUserBids || 0}
-              </p>
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <Coins className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-white">Avg Bid</p>
+                <p className="text-base md:text-2xl font-semibold text-white">
+                  {penceToPounds(user?.globalUserBidAvg || 0)}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="card">
-          <div className="flex items-center">
-            <div className="bg-orange-100 p-3 rounded-lg">
-              <UserPlus className="h-6 w-6 text-orange-600" />
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="bg-purple-100 p-3 rounded-lg">
+                <AudioLines className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-white">Total Bids</p>
+                <p className="text-base md:text-2xl font-semibold text-white">
+                  {user?.globalUserBids || 0}
+                </p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Invite Credits</p>
-              <p className="text-base md:text-2xl font-semibold text-white">
-                {user?.inviteCredits ?? 10}
-              </p>
+          </div>
+
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="bg-orange-100 p-3 rounded-lg">
+                <UserPlus className="h-6 w-6 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-white">Invite Credits</p>
+                <p className="text-base md:text-2xl font-semibold text-white">
+                  {user?.inviteCredits ?? 10}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Invited Users Section */}
-      <div className="card mt-8">
-        <div className="flex items-center mb-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-8">
+        <div className="card flex items-center mb-4">
           <Users className="h-6 w-6 text-purple-400 mr-2" />
           <h2 className="text-2xl font-semibold text-white">Invited Users</h2>
           <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
@@ -2464,8 +2466,8 @@ Join here: ${inviteLink}`.trim();
       </div>
 
       {/* Tune Library Section */}
-      <div className="card mt-8">
-        <div className="flex items-center mb-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="card flex items-center mb-4">
           <Music className="h-6 w-6 text-purple-400 mr-2" />
           <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
           <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
