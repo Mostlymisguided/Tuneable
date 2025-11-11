@@ -151,6 +151,7 @@ const PersistentWebPlayer: React.FC = () => {
     next,
     previous,
     toggleMute,
+    setVolume,
     setCurrentTime,
     setDuration,
     setQueue,
@@ -771,10 +772,12 @@ const PersistentWebPlayer: React.FC = () => {
               </button>
             </div>
 
+              {/* Volume Control */}
+            <div className="flex items-center space-x-2 group">
               {/* Mute Toggle */}
-            <button
+              <button
                 onClick={toggleMute}
-              className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (
@@ -782,7 +785,36 @@ const PersistentWebPlayer: React.FC = () => {
                 ) : (
                   <Volume2 className="h-3 w-3 md:h-4 md:w-4" />
                 )}
-            </button>
+              </button>
+              
+              {/* Volume Slider */}
+              <div className="hidden md:flex items-center w-24 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    const newVolume = parseInt(e.target.value);
+                    setVolume(newVolume);
+                    if (newVolume > 0 && isMuted) {
+                      toggleMute(); // Unmute if volume is increased
+                    }
+                  }}
+                  onClick={() => {
+                    // Unmute if clicking on slider
+                    if (isMuted) {
+                      toggleMute();
+                    }
+                  }}
+                  className="w-full h-2 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb"
+                  style={{
+                    background: `linear-gradient(to right, #9333ea 0%, #9333ea ${isMuted ? 0 : volume}%, rgba(75, 85, 99, 0.5) ${isMuted ? 0 : volume}%, rgba(75, 85, 99, 0.5) 100%)`
+                  }}
+                  title={`Volume: ${volume}%`}
+                />
+              </div>
+            </div>
 
               {/* YouTube Fullscreen Button */}
               {playerType === 'youtube' && (
