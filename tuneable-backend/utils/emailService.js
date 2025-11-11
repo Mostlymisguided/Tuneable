@@ -774,12 +774,12 @@ async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, invi
           
           <p>Hi there,</p>
           
-          <p><strong>${inviterUsername}</strong> has invited you to join Tuneable, the social music platform for bidding on beats.</p>
+          <p><strong>${inviterUsername}</strong> has invited you to join Tuneable, the social music platform for supporting your favourite artists.</p>
           
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">What is Tuneable?</h3>
             <p style="color: #4b5563; margin-bottom: 0;">
-              Tuneable is a platform where you can discover new music, bid on beats, and connect with artists and music lovers. Join the community and start exploring amazing tracks!
+              Tuneable is a platform where you can discover new music, bid on beats, and connect with artists and music lovers. Join the community and start exploring!
             </p>
           </div>
           

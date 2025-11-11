@@ -122,9 +122,6 @@ ${codeLine}
 Join here: ${inviteLink}`.trim();
   }, [inviteLink, user?.personalInviteCode]);
 
-  const instagramStoryAsset = useMemo(() => {
-    return `${window.location.origin}/share/tuneable-invite-story.png`;
-  }, []);
 
   const handleCopyInvite = useCallback(async () => {
     try {
@@ -162,14 +159,76 @@ Join here: ${inviteLink}`.trim();
     window.open(shareUrl, '_blank', 'noopener');
   }, [inviteLink, user?.personalInviteCode]);
 
-  const handleInstagramShare = useCallback(() => {
-    if (!instagramStoryAsset) {
-      toast.info('Instagram story asset coming soon.');
+  const handleInstagramShare = useCallback(async () => {
+    if (!user?.personalInviteCode) {
+      toast.error('You need an invite code to share on Instagram');
       return;
     }
-    const url = `https://www.instagram.com/stories/create/?assetPath=${encodeURIComponent(instagramStoryAsset)}`;
-    window.open(url, '_blank');
-  }, [instagramStoryAsset]);
+
+    // Create Instagram-friendly invite message
+    const instagramMessage = `Support your favourite Artists on Tuneable! 🎵\n\nJoin with this invite code: ${user.personalInviteCode}\n\n${inviteLink}`;
+
+    try {
+      // Copy message to clipboard first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(instagramMessage);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = instagramMessage;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Use Instagram Stories URL scheme (works on mobile browsers when app is installed)
+        const instagramStoriesUrl = 'instagram-stories://share';
+        
+        // Try to open Instagram Stories
+        window.location.href = instagramStoriesUrl;
+        
+        // Show success message
+        toast.success(
+          <div>
+            <div className="font-semibold mb-1">Opening Instagram Stories...</div>
+            <div className="text-sm">
+              The invite message is copied. Paste it as a text sticker in your story!
+            </div>
+          </div>,
+          { autoClose: 5000 }
+        );
+        
+        // Fallback: if Instagram app doesn't open, try regular Instagram app
+        setTimeout(() => {
+          // Check if we're still on the page (Instagram didn't open)
+          if (document.hasFocus()) {
+            window.location.href = 'instagram://';
+          }
+        }, 1000);
+      } else {
+        // Desktop - open Instagram web
+        window.open('https://www.instagram.com/', '_blank');
+        toast.success(
+          <div>
+            <div className="font-semibold mb-1">Invite message copied!</div>
+            <div className="text-sm">
+              Open Instagram and paste the message in your story or DM. The link includes your invite code.
+            </div>
+          </div>,
+          { autoClose: 5000 }
+        );
+      }
+    } catch (error) {
+      console.error('Failed to share to Instagram:', error);
+      toast.error('Could not share to Instagram. Please try again.');
+    }
+  }, [user?.personalInviteCode, inviteLink]);
 
   const handleSystemShare = useCallback(() => {
     const sharePayload = {
@@ -2398,7 +2457,7 @@ Join here: ${inviteLink}`.trim();
                   className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
                 >
                   <Instagram className="h-4 w-4" />
-                  Instagram Story
+                  Instagram
                 </button>
                 <button
                   onClick={handleSystemShare}
