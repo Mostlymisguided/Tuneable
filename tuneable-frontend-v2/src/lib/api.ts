@@ -937,17 +937,6 @@ export const collectiveAPI = {
     return response.data;
   },
 
-  // Add member to collective (authenticated, admin/founder only)
-  addMember: async (collectiveId: string, userId: string, role: 'founder' | 'member' | 'admin', instrument?: string) => {
-    const response = await api.post(`/collectives/${collectiveId}/members`, { userId, role, instrument });
-    return response.data;
-  },
-
-  // Remove member from collective (authenticated, admin/founder only)
-  removeMember: async (collectiveId: string, userId: string) => {
-    const response = await api.delete(`/collectives/${collectiveId}/members/${userId}`);
-    return response.data;
-  },
 
   // Upload collective profile picture (authenticated, collective admin/founder only)
   uploadProfilePicture: async (collectiveId: string, file: File) => {

@@ -170,7 +170,7 @@ const CollectiveProfile: React.FC = () => {
   };
 
   // Handle removing a member
-  const handleRemoveMember = async (memberId: string, memberRole: string) => {
+  const handleRemoveMember = async (memberId: string, _memberRole?: string) => {
     if (!slug || !memberId) return;
     
     try {

@@ -160,27 +160,27 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
                       
                       if (isLabelContext) {
                         // Label logic: owner can change admin roles, owner can remove admins, admin/owner can remove artists
-                        canChangeRole = onChangeRole && 
+                        canChangeRole = !!(onChangeRole && 
                           currentUserRole === 'owner' && 
-                          (member.role === 'owner' || member.role === 'admin');
+                          (member.role === 'owner' || member.role === 'admin'));
                         
-                        canRemove = onRemove && (
+                        canRemove = !!(onRemove && (
                           isCurrentUser || // Always allow self-removal
                           (currentUserRole === 'owner' && isLabelAdmin) || // Owner can remove admins
                           (currentUserRole === 'admin' && isLabelArtist) || // Admin can remove artists
                           (currentUserRole === 'owner' && isLabelArtist) // Owner can remove artists
-                        );
+                        ));
                       } else if (isCollectiveContext) {
                         // Collective logic: founder can change roles, founder/admin can remove others
-                        canChangeRole = onChangeRole && 
+                        canChangeRole = !!(onChangeRole && 
                           currentUserRole === 'founder' && 
-                          (member.role === 'founder' || member.role === 'admin' || member.role === 'member');
+                          (member.role === 'founder' || member.role === 'admin' || member.role === 'member'));
                         
-                        canRemove = onRemove && (
+                        canRemove = !!(onRemove && (
                           isCurrentUser || // Always allow self-removal
                           (currentUserRole === 'founder' && (isCollectiveAdmin || isCollectiveMember)) || // Founder can remove anyone
                           (currentUserRole === 'admin' && isCollectiveMember) // Admin can remove members
-                        );
+                        ));
                       }
 
                       if (!canChangeRole && !canRemove) {
