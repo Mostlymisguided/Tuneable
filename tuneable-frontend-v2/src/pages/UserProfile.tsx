@@ -29,7 +29,7 @@ import {
   Flag,
   Users
 } from 'lucide-react';
-import { userAPI, authAPI } from '../lib/api';
+import { userAPI, authAPI, creatorAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import ReportModal from '../components/ReportModal';
@@ -165,7 +165,7 @@ const UserProfile: React.FC = () => {
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
-  const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications') || 'profile';
+  const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
   
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -221,6 +221,28 @@ const UserProfile: React.FC = () => {
     currentUrl: undefined
   });
 
+  // Creator profile edit state
+  const [creatorProfileForm, setCreatorProfileForm] = useState({
+    artistName: '',
+    bio: '',
+    genres: [] as string[],
+    roles: [] as string[],
+    website: '',
+    socialMedia: {
+      instagram: '',
+      facebook: '',
+      soundcloud: '',
+      youtube: '',
+      twitter: ''
+    },
+    label: '',
+    management: '',
+    distributor: ''
+  });
+  const [genreInput, setGenreInput] = useState('');
+  const [roleInput, setRoleInput] = useState('');
+  const [isSavingCreatorProfile, setIsSavingCreatorProfile] = useState(false);
+
   // Label creation modal state
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isCollectiveModalOpen, setIsCollectiveModalOpen] = useState(false);
@@ -260,7 +282,7 @@ const UserProfile: React.FC = () => {
     setSearchParams({ settings: 'true', tab: 'profile' });
   };
 
-  const handleSettingsTabChange = (tab: 'profile' | 'notifications') => {
+  const handleSettingsTabChange = (tab: 'profile' | 'notifications' | 'creator') => {
     setSearchParams({ settings: 'true', tab });
   };
 
@@ -303,6 +325,28 @@ const UserProfile: React.FC = () => {
           instagram: user.socialMedia?.instagram || ''
         }
       });
+
+      // Populate creator profile form if user has a creator profile
+      if ((user as any).creatorProfile) {
+        const cp = (user as any).creatorProfile;
+        setCreatorProfileForm({
+          artistName: cp.artistName || '',
+          bio: cp.bio || '',
+          genres: cp.genres || [],
+          roles: cp.roles || [],
+          website: cp.website || '',
+          socialMedia: {
+            instagram: cp.socialMedia?.instagram || '',
+            facebook: cp.socialMedia?.facebook || '',
+            soundcloud: cp.socialMedia?.soundcloud || '',
+            youtube: cp.socialMedia?.youtube || '',
+            twitter: cp.socialMedia?.twitter || ''
+          },
+          label: cp.label || '',
+          management: cp.management || '',
+          distributor: cp.distributor || ''
+        });
+      }
     }
   }, [user, currentUser]);
 
@@ -650,6 +694,25 @@ const UserProfile: React.FC = () => {
     // Legacy modal behavior (keep for potential revert)
     await handleSaveProfileInternal();
     setIsEditingProfile(false);
+  };
+
+  // Save creator profile
+  const handleSaveCreatorProfile = async () => {
+    try {
+      setIsSavingCreatorProfile(true);
+      await creatorAPI.updateProfile(creatorProfileForm);
+      toast.success('Creator profile updated successfully!');
+      
+      // Refresh user data
+      if (userId) {
+        await fetchUserProfile();
+      }
+    } catch (error: any) {
+      console.error('Error updating creator profile:', error);
+      toast.error(error.response?.data?.error || 'Failed to update creator profile');
+    } finally {
+      setIsSavingCreatorProfile(false);
+    }
   };
 
   const handleSaveProfileInternal = async () => {
@@ -1246,6 +1309,18 @@ const UserProfile: React.FC = () => {
                 >
                   Edit Profile
                 </button>
+                {user && (user as any).creatorProfile && (
+                  <button
+                    onClick={() => handleSettingsTabChange('creator')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      settingsTab === 'creator'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Edit Creator Profile
+                  </button>
+                )}
                 <button
                   onClick={() => handleSettingsTabChange('notifications')}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -1501,6 +1576,280 @@ const UserProfile: React.FC = () => {
                   >
                     <Save className="h-4 w-4" />
                     <span>Save Changes</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {settingsTab === 'creator' && (
+              <div className="card p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Edit Creator Profile</h2>
+                
+                {/* Artist Name */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Artist Name *</label>
+                  <input
+                    type="text"
+                    value={creatorProfileForm.artistName}
+                    onChange={(e) => setCreatorProfileForm({ ...creatorProfileForm, artistName: e.target.value })}
+                    className="input"
+                    placeholder="Enter artist name"
+                  />
+                </div>
+
+                {/* Bio */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Bio</label>
+                  <textarea
+                    value={creatorProfileForm.bio}
+                    onChange={(e) => setCreatorProfileForm({ ...creatorProfileForm, bio: e.target.value })}
+                    className="input"
+                    placeholder="Tell us about yourself..."
+                    rows={4}
+                    maxLength={500}
+                  />
+                  <p className="text-gray-400 text-sm mt-1">{creatorProfileForm.bio.length}/500</p>
+                </div>
+
+                {/* Genres */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Genres</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {creatorProfileForm.genres.map((genre, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-purple-600/40 text-white rounded-full text-sm flex items-center space-x-2"
+                      >
+                        <span>{genre}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newGenres = creatorProfileForm.genres.filter((_, i) => i !== index);
+                            setCreatorProfileForm({ ...creatorProfileForm, genres: newGenres });
+                          }}
+                          className="hover:text-red-400"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={genreInput}
+                      onChange={(e) => setGenreInput(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && genreInput.trim()) {
+                          e.preventDefault();
+                          if (!creatorProfileForm.genres.includes(genreInput.trim())) {
+                            setCreatorProfileForm({
+                              ...creatorProfileForm,
+                              genres: [...creatorProfileForm.genres, genreInput.trim()]
+                            });
+                            setGenreInput('');
+                          }
+                        }
+                      }}
+                      className="input flex-1"
+                      placeholder="Type genre and press Enter"
+                    />
+                  </div>
+                  <p className="text-gray-400 text-sm mt-1">Available: Pop, Rock, Hip Hop, R&B, Electronic, Country, Jazz, Classical, Reggae, Metal, Indie, Folk, Blues, Soul, Funk, Punk, Alternative, Dance, Latin, World, Techno, House, Minimal, D&B, Jungle, Trance</p>
+                </div>
+
+                {/* Roles */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Roles</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {creatorProfileForm.roles.map((role, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-blue-600/40 text-white rounded-full text-sm flex items-center space-x-2"
+                      >
+                        <span>{role}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newRoles = creatorProfileForm.roles.filter((_, i) => i !== index);
+                            setCreatorProfileForm({ ...creatorProfileForm, roles: newRoles });
+                          }}
+                          className="hover:text-red-400"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={roleInput}
+                      onChange={(e) => setRoleInput(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && roleInput.trim()) {
+                          e.preventDefault();
+                          if (!creatorProfileForm.roles.includes(roleInput.trim())) {
+                            setCreatorProfileForm({
+                              ...creatorProfileForm,
+                              roles: [...creatorProfileForm.roles, roleInput.trim()]
+                            });
+                            setRoleInput('');
+                          }
+                        }
+                      }}
+                      className="input flex-1"
+                      placeholder="Type role and press Enter"
+                    />
+                  </div>
+                  <p className="text-gray-400 text-sm mt-1">Available: artist, producer, songwriter, composer, DJ, vocalist, instrumentalist</p>
+                </div>
+
+                {/* Website */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Website</label>
+                  <input
+                    type="url"
+                    value={creatorProfileForm.website}
+                    onChange={(e) => setCreatorProfileForm({ ...creatorProfileForm, website: e.target.value })}
+                    className="input"
+                    placeholder="https://yourwebsite.com"
+                  />
+                </div>
+
+                {/* Social Media */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-3">Social Media</label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-white text-sm mb-1">Instagram</label>
+                      <input
+                        type="url"
+                        value={creatorProfileForm.socialMedia.instagram}
+                        onChange={(e) => setCreatorProfileForm({
+                          ...creatorProfileForm,
+                          socialMedia: { ...creatorProfileForm.socialMedia, instagram: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="https://instagram.com/yourhandle"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-1">Facebook</label>
+                      <input
+                        type="url"
+                        value={creatorProfileForm.socialMedia.facebook}
+                        onChange={(e) => setCreatorProfileForm({
+                          ...creatorProfileForm,
+                          socialMedia: { ...creatorProfileForm.socialMedia, facebook: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="https://facebook.com/yourpage"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-1">SoundCloud</label>
+                      <input
+                        type="url"
+                        value={creatorProfileForm.socialMedia.soundcloud}
+                        onChange={(e) => setCreatorProfileForm({
+                          ...creatorProfileForm,
+                          socialMedia: { ...creatorProfileForm.socialMedia, soundcloud: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="https://soundcloud.com/yourhandle"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-1">YouTube</label>
+                      <input
+                        type="url"
+                        value={creatorProfileForm.socialMedia.youtube}
+                        onChange={(e) => setCreatorProfileForm({
+                          ...creatorProfileForm,
+                          socialMedia: { ...creatorProfileForm.socialMedia, youtube: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="https://youtube.com/@yourchannel"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white text-sm mb-1">Twitter/X</label>
+                      <input
+                        type="url"
+                        value={creatorProfileForm.socialMedia.twitter}
+                        onChange={(e) => setCreatorProfileForm({
+                          ...creatorProfileForm,
+                          socialMedia: { ...creatorProfileForm.socialMedia, twitter: e.target.value }
+                        })}
+                        className="input"
+                        placeholder="https://twitter.com/yourhandle"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Label */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Label</label>
+                  <input
+                    type="text"
+                    value={creatorProfileForm.label}
+                    onChange={(e) => setCreatorProfileForm({ ...creatorProfileForm, label: e.target.value })}
+                    className="input"
+                    placeholder="Enter label name"
+                  />
+                </div>
+
+                {/* Management */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Management</label>
+                  <input
+                    type="text"
+                    value={creatorProfileForm.management}
+                    onChange={(e) => setCreatorProfileForm({ ...creatorProfileForm, management: e.target.value })}
+                    className="input"
+                    placeholder="Enter management company"
+                  />
+                </div>
+
+                {/* Distributor */}
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">Distributor</label>
+                  <input
+                    type="text"
+                    value={creatorProfileForm.distributor}
+                    onChange={(e) => setCreatorProfileForm({ ...creatorProfileForm, distributor: e.target.value })}
+                    className="input"
+                    placeholder="Enter distributor name"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={exitSettings}
+                    className="px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white rounded-lg transition-colors"
+                    disabled={isSavingCreatorProfile}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveCreatorProfile}
+                    disabled={isSavingCreatorProfile || !creatorProfileForm.artistName.trim()}
+                    className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSavingCreatorProfile ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        <span>Save Changes</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
