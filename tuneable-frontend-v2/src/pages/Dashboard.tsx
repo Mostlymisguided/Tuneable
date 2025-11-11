@@ -13,6 +13,7 @@ import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import TagInputModal from '../components/TagInputModal';
+import EmailInviteModal from '../components/EmailInviteModal';
 
 interface LibraryItem {
   mediaId: string;
@@ -71,6 +72,7 @@ const Dashboard: React.FC = () => {
   const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels' | 'collectives'>('overview');
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isCollectiveModalOpen, setIsCollectiveModalOpen] = useState(false);
+  const [isEmailInviteModalOpen, setIsEmailInviteModalOpen] = useState(false);
   
   // My Media state
   const [myMedia, setMyMedia] = useState<any[]>([]);
@@ -108,7 +110,7 @@ const Dashboard: React.FC = () => {
     if (!user?.personalInviteCode) {
       return window.location.origin;
     }
-    return `${window.location.origin}/register?code=${user.personalInviteCode}`;
+    return `${window.location.origin}/register?invite=${user.personalInviteCode}`;
   }, [user?.personalInviteCode]);
 
   const inviteMessage = useMemo(() => {
@@ -147,10 +149,8 @@ Join here: ${inviteLink}`.trim();
   }, [inviteMessage]);
 
   const handleEmailInvite = useCallback(() => {
-    const subject = 'Join me on Tuneable';
-    const body = inviteMessage;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  }, [inviteMessage]);
+    setIsEmailInviteModalOpen(true);
+  }, []);
 
   const handleFacebookShare = useCallback(() => {
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}`;
@@ -2356,6 +2356,57 @@ Join here: ${inviteLink}`.trim();
           </span>
         </div>
         
+        {/* Invite Sharing Section - Always visible */}
+        {!isLoadingInvited && (
+          <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4 mb-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <div>
+                <p className="text-sm text-gray-300">Share your invite link</p>
+                <p className="text-xs text-gray-500 mt-1 break-all">
+                  {inviteLink}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleCopyInvite}
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy Invite
+                </button>
+                <button
+                  onClick={handleEmailInvite}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Mail className="h-4 w-4" />
+                  Email
+                </button>
+                <button
+                  onClick={handleFacebookShare}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Facebook className="h-4 w-4" />
+                  Facebook
+                </button>
+                <button
+                  onClick={handleInstagramShare}
+                  className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Instagram Story
+                </button>
+                <button
+                  onClick={handleSystemShare}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isLoadingInvited && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
@@ -2370,53 +2421,6 @@ Join here: ${inviteLink}`.trim();
         )}
         {!isLoadingInvited && invitedUsers.length > 0 && (
           <div className="space-y-3">
-            <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                <div>
-                  <p className="text-sm text-gray-300">Share your invite link</p>
-                  <p className="text-xs text-gray-500 mt-1 break-all">
-                    {inviteLink}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleCopyInvite}
-                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <Copy className="h-4 w-4" />
-                    Copy Invite
-                  </button>
-                  <button
-                    onClick={handleEmailInvite}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </button>
-                  <button
-                    onClick={handleFacebookShare}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <Facebook className="h-4 w-4" />
-                    Facebook
-                  </button>
-                  <button
-                    onClick={handleInstagramShare}
-                    className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <Instagram className="h-4 w-4" />
-                    Instagram Story
-                  </button>
-                  <button
-                    onClick={handleSystemShare}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    Share
-                  </button>
-                </div>
-              </div>
-            </div>
             {(showAllInvitedUsers ? invitedUsers : invitedUsers.slice(0, 3)).map((invitedUser) => {
               const userName = (invitedUser.givenName || invitedUser.familyName) 
                 ? `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
@@ -2659,6 +2663,13 @@ Join here: ${inviteLink}`.trim();
         }}
         mediaTitle={pendingAddTuneResult?.title}
         mediaArtist={pendingAddTuneResult?.artist}
+      />
+
+      <EmailInviteModal
+        isOpen={isEmailInviteModalOpen}
+        onClose={() => setIsEmailInviteModalOpen(false)}
+        inviteCode={user?.personalInviteCode || ''}
+        inviterUsername={user?.username || ''}
       />
     </React.Fragment>
   );

@@ -7,7 +7,8 @@ const {
   sendPasswordReset, 
   sendWelcomeEmail,
   sendOwnershipNotification,
-  sendClaimStatusNotification
+  sendClaimStatusNotification,
+  sendInviteEmail
 } = require('../utils/emailService');
 
 const router = express.Router();
@@ -252,6 +253,74 @@ router.post('/claim-status/notify', authMiddleware, async (req, res) => {
     res.json({ message: 'Claim status notification sent successfully' });
   } catch (error) {
     console.error('Error sending claim status notification:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// @route   POST /api/email/invite
+// @desc    Send invite emails to recipients
+// @access  Private
+router.post('/invite', authMiddleware, [
+  body('emails').isArray().withMessage('Emails must be an array'),
+  body('emails.*').isEmail().withMessage('Each email must be valid')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { emails } = req.body;
+    const inviter = await User.findById(req.user.userId);
+    
+    if (!inviter) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!inviter.personalInviteCode) {
+      return res.status(400).json({ error: 'You do not have an invite code' });
+    }
+
+    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?invite=${inviter.personalInviteCode}`;
+    const results = [];
+    const errors_occurred = [];
+
+    // Send emails to all recipients
+    for (const email of emails) {
+      try {
+        const emailSent = await sendInviteEmail(
+          email,
+          inviter.username,
+          inviter.personalInviteCode,
+          inviteLink
+        );
+        
+        if (emailSent) {
+          results.push({ email, success: true });
+        } else {
+          errors_occurred.push({ email, error: 'Failed to send email' });
+        }
+      } catch (error) {
+        console.error(`Error sending invite to ${email}:`, error);
+        errors_occurred.push({ email, error: error.message });
+      }
+    }
+
+    if (errors_occurred.length > 0 && results.length === 0) {
+      return res.status(500).json({ 
+        error: 'Failed to send all invite emails',
+        results,
+        errors: errors_occurred
+      });
+    }
+
+    res.json({ 
+      message: `Successfully sent ${results.length} invite email(s)`,
+      results,
+      errors: errors_occurred.length > 0 ? errors_occurred : undefined
+    });
+  } catch (error) {
+    console.error('Error sending invite emails:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

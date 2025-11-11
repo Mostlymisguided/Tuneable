@@ -1074,6 +1074,11 @@ export const emailAPI = {
     const response = await api.post('/email/verify/send');
     return response.data;
   },
+
+  sendInvite: async (emails: string[]) => {
+    const response = await api.post('/email/invite', { emails });
+    return response.data;
+  },
 };
 
 // TuneBytes API functions

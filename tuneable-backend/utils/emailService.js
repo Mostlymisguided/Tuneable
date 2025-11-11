@@ -761,6 +761,64 @@ async function sendInviteRejectionEmail(request, reason) {
   }
 }
 
+// Send invite email to recipients
+async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, inviteLink) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: recipientEmail,
+      subject: `${inviterUsername} invited you to join Tuneable`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">🎵 You've been invited to Tuneable!</h2>
+          
+          <p>Hi there,</p>
+          
+          <p><strong>${inviterUsername}</strong> has invited you to join Tuneable, the social music platform for bidding on beats.</p>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">What is Tuneable?</h3>
+            <p style="color: #4b5563; margin-bottom: 0;">
+              Tuneable is a platform where you can discover new music, bid on beats, and connect with artists and music lovers. Join the community and start exploring amazing tracks!
+            </p>
+          </div>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${inviteLink}" 
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+              Join Tuneable Now
+            </a>
+          </div>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+            <strong>Your invite code:</strong> <span style="font-family: monospace; background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">${inviteCode}</span>
+          </p>
+          
+          <p style="color: #6b7280; font-size: 14px;">
+            The invite code will be automatically filled when you click the button above, or you can enter it manually when you sign up.
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This invite was sent by ${inviterUsername}. If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending invite email:', error);
+      return false;
+    }
+
+    console.log('✅ Invite email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending invite email:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -774,5 +832,6 @@ module.exports = {
   sendOwnershipNotification,
   sendClaimStatusNotification,
   sendInviteApprovalEmail,
-  sendInviteRejectionEmail
+  sendInviteRejectionEmail,
+  sendInviteEmail
 };
