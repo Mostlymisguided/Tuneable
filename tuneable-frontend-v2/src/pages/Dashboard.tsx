@@ -153,9 +153,14 @@ Join here: ${inviteLink}`.trim();
   }, []);
 
   const handleFacebookShare = useCallback(() => {
-    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}`;
+    const quote = user?.personalInviteCode 
+      ? `Join me on Tuneable! Use my invite code ${user.personalInviteCode} when you sign up.`
+      : 'Join me on Tuneable, the social music platform for bidding on beats!';
+    const hashtag = 'Tuneable';
+    
+    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;
     window.open(shareUrl, '_blank', 'noopener');
-  }, [inviteLink]);
+  }, [inviteLink, user?.personalInviteCode]);
 
   const handleInstagramShare = useCallback(() => {
     if (!instagramStoryAsset) {
@@ -530,7 +535,7 @@ Join here: ${inviteLink}`.trim();
       toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
       return;
     }
-
+    
     if ((user as any)?.balance < bidAmount) {
       toast.error('Insufficient balance');
       return;
@@ -604,171 +609,171 @@ Join here: ${inviteLink}`.trim();
 
   return (
     <React.Fragment>
-      <div className="min-h-screen bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Beta Warning Banner */}
-          <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
-          
+    <div className="min-h-screen bg-gray-900">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Beta Warning Banner */}
+      <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
+      
+      <div className="mb-8">
+        <h1 className="text-3xl text-center font-bold text-gray-300">
+          Welcome back, {user?.username}!
+        </h1>
+        <p className="text-center text-gray-400 mt-2">
+          Ready to create some amazing music experiences?
+        </p>
+      </div>
+
+        {/* Creator Dashboard */}
+        {showCreatorDashboard(user) && (
           <div className="mb-8">
-            <h1 className="text-3xl text-center font-bold text-gray-300">
-              Welcome back, {user?.username}!
-            </h1>
-            <p className="text-center text-gray-400 mt-2">
-              Ready to create some amazing music experiences?
-            </p>
-          </div>
-
-            {/* Creator Dashboard */}
-            {showCreatorDashboard(user) && (
-              <div className="mb-8">
-                {/* Header */}
-                <div className="bg-gray-800 border-b border-gray-700 rounded-t-lg">
-                  <div className="px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Award className="hidden md:inline h-6 w-6 text-purple-400 mr-3" />
-                        <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
-                      </div>
+            {/* Header */}
+            <div className="bg-gray-800 border-b border-gray-700 rounded-t-lg">
+              <div className="px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Award className="hidden md:inline h-6 w-6 text-purple-400 mr-3" />
+                    <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
+                  </div>
                      
-                    </div>
-                  </div>
                 </div>
+              </div>
+            </div>
 
-                {/* Navigation Tabs */}
-                <div className="bg-gray-800 border-b border-gray-700">
-                  <div className="px-4 sm:px-6 lg:px-8">
-                    <nav className="flex space-x-8">
-                      <button
-                        onClick={() => setCreatorActiveTab('overview')}
-                        className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                          creatorActiveTab === 'overview'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                        }`}
-                      >
-                        <TrendingUp className="hidden md:inline h-4 w-4 mr-2" />
-                        Overview
-                      </button>
-                      <button
-                        onClick={() => setCreatorActiveTab('media')}
-                        className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                          creatorActiveTab === 'media'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                        }`}
-                      >
-                        <Music className="hidden md:inline h-4 w-4 mr-2" />
-                        My Media
-                      </button>
-                      <button
-                        onClick={() => setCreatorActiveTab('labels')}
-                        className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                          creatorActiveTab === 'labels'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                        }`}
-                      >
-                        <Building className="hidden md:inline h-4 w-4 mr-2" />
-                        Labels
-                      </button>
-                      <button
-                        onClick={() => setCreatorActiveTab('collectives')}
-                        className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                          creatorActiveTab === 'collectives'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                        }`}
-                      >
-                        <Users className="hidden md:inline h-4 w-4 mr-2" />
-                        Collectives
-                      </button>
-                    </nav>
-                  </div>
+            {/* Navigation Tabs */}
+            <div className="bg-gray-800 border-b border-gray-700">
+              <div className="px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-8">
+                  <button
+                    onClick={() => setCreatorActiveTab('overview')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'overview'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <TrendingUp className="hidden md:inline h-4 w-4 mr-2" />
+                    Overview
+                  </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('media')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'media'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Music className="hidden md:inline h-4 w-4 mr-2" />
+                    My Media
+                  </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('labels')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'labels'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Building className="hidden md:inline h-4 w-4 mr-2" />
+                    Labels
+                  </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('collectives')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'collectives'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="hidden md:inline h-4 w-4 mr-2" />
+                    Collectives
+                  </button>
+                </nav>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="bg-gray-800 rounded-b-lg p-6">
+              {isLoadingCreatorStats ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                  <p className="text-gray-400 mt-2">Loading creator stats...</p>
                 </div>
-
-                {/* Content */}
-                <div className="bg-gray-800 rounded-b-lg p-6">
-                  {isLoadingCreatorStats ? (
-                    <div className="text-center py-8">
-                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
-                      <p className="text-gray-400 mt-2">Loading creator stats...</p>
-                    </div>
-                  ) : creatorStats ? (
-                    <>
-                      {creatorActiveTab === 'overview' && (
-                        <div className="space-y-6">
-                          {/* Stats Grid */}
+              ) : creatorStats ? (
+                <>
+                  {creatorActiveTab === 'overview' && (
+                    <div className="space-y-6">
+                      {/* Stats Grid */}
                           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-gray-900 rounded-lg p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm text-gray-400">Total Media</p>
-                                  <p className="text-2xl font-bold text-white mt-1">
-                                    {creatorStats.stats?.totalMedia || 0}
-                                  </p>
-                                </div>
-                                <Music className="h-8 w-8 text-purple-400 opacity-50" />
-                              </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Total Media</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {creatorStats.stats?.totalMedia || 0}
+                              </p>
                             </div>
-                            <div className="bg-gray-900 rounded-lg p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm text-gray-400">Total Bid Amount</p>
-                                  <p className="text-2xl font-bold text-white mt-1">
-                                    {penceToPounds(creatorStats.stats?.totalBidAmount || 0)}
-                                  </p>
-                                </div>
-                                <Coins className="h-8 w-8 text-green-400 opacity-50" />
-                              </div>
-                            </div>
-                            <div className="bg-gray-900 rounded-lg p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm text-gray-400">Labels Owned</p>
-                                  <p className="text-2xl font-bold text-white mt-1">
-                                    {creatorStats.stats?.labelsOwned || 0}
-                                  </p>
-                                </div>
-                                <Building className="h-8 w-8 text-blue-400 opacity-50" />
-                              </div>
-                            </div>
-                            <div className="bg-gray-900 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-                                <p className="text-sm text-gray-400">Labels Admin</p>
-                                <p className="text-2xl font-bold text-white mt-1">
-                                  {creatorStats.stats?.labelsAdmin || 0}
-                                </p>
-                              </div>
-                              <Users className="h-8 w-8 text-orange-400 opacity-50" />
-                            </div>
+                            <Music className="h-8 w-8 text-purple-400 opacity-50" />
                           </div>
                         </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Total Bid Amount</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {penceToPounds(creatorStats.stats?.totalBidAmount || 0)}
+                              </p>
+                            </div>
+                            <Coins className="h-8 w-8 text-green-400 opacity-50" />
+                          </div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-400">Labels Owned</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {creatorStats.stats?.labelsOwned || 0}
+                              </p>
+                            </div>
+                            <Building className="h-8 w-8 text-blue-400 opacity-50" />
+                          </div>
+                        </div>
+                        <div className="bg-gray-900 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+                              <p className="text-sm text-gray-400">Labels Admin</p>
+                              <p className="text-2xl font-bold text-white mt-1">
+                                {creatorStats.stats?.labelsAdmin || 0}
+                              </p>
+                            </div>
+                            <Users className="h-8 w-8 text-orange-400 opacity-50" />
+                          </div>
+                        </div>
+                      </div>
 
-                        {/* Quick Actions */}
-                        <div className="bg-gray-900 rounded-lg p-6">
-                          <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button
-                              onClick={() => navigate('/creator/upload')}
-                              className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                            >
-                              <div className="flex items-center">
-                                <Upload className="h-5 w-5 text-white mr-3" />
-                                <span className="text-white font-medium">Upload Media</span>
-                              </div>
-                              <ArrowUp className="h-4 w-4 text-white" />
-                            </button>
-                            <button
+                      {/* Quick Actions */}
+                      <div className="bg-gray-900 rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <button
+                            onClick={() => navigate('/creator/upload')}
+                            className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Upload className="h-5 w-5 text-white mr-3" />
+                              <span className="text-white font-medium">Upload Media</span>
+                            </div>
+                            <ArrowUp className="h-4 w-4 text-white" />
+                          </button>
+                          <button
                               onClick={() => setIsLabelModalOpen(true)}
-                              className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                            >
-                              <div className="flex items-center">
-                                <Building className="h-5 w-5 text-white mr-3" />
-                                <span className="text-white font-medium">Create Label</span>
-                              </div>
-                              <Plus className="h-4 w-4 text-white" />
-                            </button>
+                            className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Building className="h-5 w-5 text-white mr-3" />
+                              <span className="text-white font-medium">Create Label</span>
+                            </div>
+                            <Plus className="h-4 w-4 text-white" />
+                          </button>
                             <button
                               onClick={() => setIsCollectiveModalOpen(true)}
                               className="flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
@@ -779,385 +784,996 @@ Join here: ${inviteLink}`.trim();
                               </div>
                               <Plus className="h-4 w-4 text-white" />
                             </button>
+                        </div>
+                      </div>
+
+                      {/* Recent Media */}
+                      {creatorStats.recentMedia && creatorStats.recentMedia.length > 0 && (
+                        <div className="bg-gray-900 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-white mb-4">Recent Media</h3>
+                          <div className="space-y-3">
+                            {creatorStats.recentMedia.map((media: any) => (
+                              <div
+                                key={media._id}
+                                onClick={() => navigate(`/tune/${media._id || media.uuid}`)}
+                                className="flex items-center gap-3 p-3 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
+                              >
+                                {media.coverArt && (
+                                  <img
+                                    src={media.coverArt}
+                                    alt={media.title}
+                                    className="h-12 w-12 rounded object-cover"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white font-medium truncate">{media.title}</p>
+                                  <p className="text-gray-400 text-sm truncate">
+                                    {Array.isArray(media.artist) && media.artist.length > 0
+                                      ? media.artist[0].name || media.artist[0]
+                                      : 'Unknown Artist'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-purple-400 font-medium">
+                                    {penceToPounds(media.globalMediaAggregate || 0)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
+                      )}
+                    </div>
+                  )}
 
-                        {/* Recent Media */}
-                        {creatorStats.recentMedia && creatorStats.recentMedia.length > 0 && (
-                          <div className="bg-gray-900 rounded-lg p-6">
-                            <h3 className="text-lg font-semibold text-white mb-4">Recent Media</h3>
-                            <div className="space-y-3">
-                              {creatorStats.recentMedia.map((media: any) => (
-                                <div
-                                  key={media._id}
-                                  onClick={() => navigate(`/tune/${media._id || media.uuid}`)}
-                                  className="flex items-center gap-3 p-3 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                                >
-                                  {media.coverArt && (
-                                    <img
-                                      src={media.coverArt}
-                                      alt={media.title}
-                                      className="h-12 w-12 rounded object-cover"
-                                    />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-white font-medium truncate">{media.title}</p>
-                                    <p className="text-gray-400 text-sm truncate">
-                                      {Array.isArray(media.artist) && media.artist.length > 0
-                                        ? media.artist[0].name || media.artist[0]
-                                        : 'Unknown Artist'}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-purple-400 font-medium">
-                                      {penceToPounds(media.globalMediaAggregate || 0)}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                  {creatorActiveTab === 'media' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-white">My Media</h3>
+                        <button
+                          onClick={() => navigate('/creator/upload')}
+                          className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Media
+                        </button>
                       </div>
-                    )}
 
-                    {creatorActiveTab === 'media' && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-semibold text-white">My Media</h3>
+                      {isLoadingMyMedia ? (
+                        <div className="text-center py-8">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                          <p className="text-gray-400 mt-2">Loading your media...</p>
+                        </div>
+                      ) : myMedia.length === 0 ? (
+                        <div className="text-center py-8 bg-gray-900 rounded-lg">
+                          <Music className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                          <p className="text-gray-400 mb-2">No media found</p>
+                          <p className="text-gray-500 text-sm mb-4">Upload your first track to get started!</p>
                           <button
                             onClick={() => navigate('/creator/upload')}
-                            className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                           >
-                            <Upload className="h-4 w-4 mr-2" />
                             Upload Media
                           </button>
                         </div>
-
-                        {isLoadingMyMedia ? (
-                          <div className="text-center py-8">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
-                            <p className="text-gray-400 mt-2">Loading your media...</p>
-                          </div>
-                        ) : myMedia.length === 0 ? (
-                          <div className="text-center py-8 bg-gray-900 rounded-lg">
-                            <Music className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-                            <p className="text-gray-400 mb-2">No media found</p>
-                            <p className="text-gray-500 text-sm mb-4">Upload your first track to get started!</p>
-                            <button
-                              onClick={() => navigate('/creator/upload')}
-                              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                            >
-                              Upload Media
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="bg-gray-900 rounded-lg overflow-hidden">
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="bg-gray-800">
-                                  <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                      <button
-                                        onClick={() => {
-                                          if (myMediaSortField === 'title') {
-                                            setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
-                                          } else {
-                                            setMyMediaSortField('title');
-                                            setMyMediaSortDirection('asc');
-                                          }
-                                        }}
-                                        className="flex items-center hover:text-purple-400 transition-colors"
-                                      >
-                                        Title
-                                        {myMediaSortField === 'title' ? (
-                                          myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                      ) : (
+                        <div className="bg-gray-900 rounded-lg overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-800">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        if (myMediaSortField === 'title') {
+                                          setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                        } else {
+                                          setMyMediaSortField('title');
+                                          setMyMediaSortDirection('asc');
+                                        }
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Title
+                                      {myMediaSortField === 'title' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Artist
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        if (myMediaSortField === 'globalMediaAggregate') {
+                                          setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                        } else {
+                                          setMyMediaSortField('globalMediaAggregate');
+                                          setMyMediaSortDirection('desc');
+                                        }
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Total Bids
+                                      {myMediaSortField === 'globalMediaAggregate' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Ownership
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <button
+                                      onClick={() => {
+                                        if (myMediaSortField === 'createdAt') {
+                                          setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
+                                        } else {
+                                          setMyMediaSortField('createdAt');
+                                          setMyMediaSortDirection('desc');
+                                        }
+                                      }}
+                                      className="flex items-center hover:text-purple-400 transition-colors"
+                                    >
+                                      Uploaded
+                                      {myMediaSortField === 'createdAt' ? (
+                                        myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                      ) : (
+                                        <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                      )}
+                                    </button>
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    Actions
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-800">
+                                {myMedia.map((item: any) => (
+                                  <tr key={item._id} className="hover:bg-gray-800/50 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-3">
+                                        {item.coverArt ? (
+                                          <img
+                                            src={item.coverArt}
+                                            alt={item.title}
+                                            className="h-10 w-10 rounded object-cover"
+                                          />
                                         ) : (
-                                          <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                          <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
+                                            <Music className="h-5 w-5 text-gray-500" />
+                                          </div>
                                         )}
-                                      </button>
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                      Artist
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                      <button
-                                        onClick={() => {
-                                          if (myMediaSortField === 'globalMediaAggregate') {
-                                            setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
-                                          } else {
-                                            setMyMediaSortField('globalMediaAggregate');
-                                            setMyMediaSortDirection('desc');
-                                          }
-                                        }}
-                                        className="flex items-center hover:text-purple-400 transition-colors"
-                                      >
-                                        Total Bids
-                                        {myMediaSortField === 'globalMediaAggregate' ? (
-                                          myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                        ) : (
-                                          <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                        )}
-                                      </button>
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                      Ownership
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                      <button
-                                        onClick={() => {
-                                          if (myMediaSortField === 'createdAt') {
-                                            setMyMediaSortDirection(myMediaSortDirection === 'asc' ? 'desc' : 'asc');
-                                          } else {
-                                            setMyMediaSortField('createdAt');
-                                            setMyMediaSortDirection('desc');
-                                          }
-                                        }}
-                                        className="flex items-center hover:text-purple-400 transition-colors"
-                                      >
-                                        Uploaded
-                                        {myMediaSortField === 'createdAt' ? (
-                                          myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                        ) : (
-                                          <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                        )}
-                                      </button>
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                      Actions
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-800">
-                                  {myMedia.map((item: any) => (
-                                    <tr key={item._id} className="hover:bg-gray-800/50 transition-colors">
-                                      <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                          {item.coverArt ? (
-                                            <img
-                                              src={item.coverArt}
-                                              alt={item.title}
-                                              className="h-10 w-10 rounded object-cover"
-                                            />
-                                          ) : (
-                                            <div className="h-10 w-10 rounded bg-gray-700 flex items-center justify-center">
-                                              <Music className="h-5 w-5 text-gray-500" />
-                                            </div>
-                                          )}
-                                          <button
-                                            onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
-                                            className="text-white font-medium hover:text-purple-400 transition-colors text-left"
-                                          >
-                                            {item.title}
-                                          </button>
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3 text-gray-300">
-                                        {item.artist}
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <div className="text-white font-medium">
-                                          {penceToPounds(item.globalMediaAggregate || 0)}
-                                        </div>
-                                        <div className="text-xs text-gray-400">
-                                          {item.bidCount || 0} bids
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <div className="text-white font-medium">
-                                          {item.ownershipPercentage}%
-                                        </div>
-                                        <div className="text-xs text-gray-400 capitalize">
-                                          {item.ownershipRole}
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3 text-gray-400 text-sm">
-                                        {new Date(item.uploadedAt || item.createdAt).toLocaleDateString()}
-                                      </td>
-                                      <td className="px-4 py-3">
                                         <button
                                           onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
-                                          className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                          className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                         >
-                                          View
+                                          {item.title}
                                         </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-300">
+                                      {item.artist}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-white font-medium">
+                                        {penceToPounds(item.globalMediaAggregate || 0)}
+                                      </div>
+                                      <div className="text-xs text-gray-400">
+                                        {item.bidCount || 0} bids
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-white font-medium">
+                                        {item.ownershipPercentage}%
+                                      </div>
+                                      <div className="text-xs text-gray-400 capitalize">
+                                        {item.ownershipRole}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-400 text-sm">
+                                      {new Date(item.uploadedAt || item.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <button
+                                        onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
+                                        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                      >
+                                        View
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          
+                          {/* Pagination */}
+                          {myMediaTotal > 20 && (
+                            <div className="px-4 py-3 bg-gray-800 border-t border-gray-700 flex items-center justify-between">
+                              <div className="text-sm text-gray-400">
+                                Showing {(myMediaPage - 1) * 20 + 1} to {Math.min(myMediaPage * 20, myMediaTotal)} of {myMediaTotal} media
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setMyMediaPage(prev => Math.max(1, prev - 1))}
+                                  disabled={myMediaPage === 1}
+                                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                >
+                                  Previous
+                                </button>
+                                <span className="text-sm text-gray-400">
+                                  Page {myMediaPage} of {Math.ceil(myMediaTotal / 20)}
+                                </span>
+                                <button
+                                  onClick={() => setMyMediaPage(prev => prev + 1)}
+                                  disabled={myMediaPage >= Math.ceil(myMediaTotal / 20)}
+                                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                                >
+                                  Next
+                                </button>
+                              </div>
                             </div>
-                            
-                            {/* Pagination */}
-                            {myMediaTotal > 20 && (
-                              <div className="px-4 py-3 bg-gray-800 border-t border-gray-700 flex items-center justify-between">
-                                <div className="text-sm text-gray-400">
-                                  Showing {(myMediaPage - 1) * 20 + 1} to {Math.min(myMediaPage * 20, myMediaTotal)} of {myMediaTotal} media
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {creatorActiveTab === 'labels' && (() => {
+                    // Helper functions
+                    const getRoleBadgeColor = (role: string, relationshipType: string) => {
+                      if (relationshipType === 'admin') {
+                        return role === 'owner' ? 'bg-purple-600' : 'bg-blue-600';
+                      }
+                      return 'bg-gray-600';
+                    };
+
+                    const getRoleLabel = (role: string, relationshipType: string) => {
+                      if (relationshipType === 'admin') {
+                        return role === 'owner' ? 'Owner' : 'Admin';
+                      }
+                      return role.charAt(0).toUpperCase() + role.slice(1);
+                    };
+
+                    // Filter and sort labels
+                    const filteredLabels = (creatorStats.labels || []).filter((label: any) => {
+                      // Filter by role
+                      if (labelsFilterRole !== 'all') {
+                        if (labelsFilterRole === 'owner' && !(label.relationshipType === 'admin' && label.role === 'owner')) {
+                          return false;
+                        }
+                        if (labelsFilterRole === 'admin' && !(label.relationshipType === 'admin' && label.role === 'admin')) {
+                          return false;
+                        }
+                        if (labelsFilterRole === 'affiliation' && label.relationshipType !== 'affiliation') {
+                          return false;
+                        }
+                      }
+
+                      // Filter by verification status
+                      if (labelsFilterVerification !== 'all') {
+                        if (labelsFilterVerification === 'verified' && label.verificationStatus !== 'verified') {
+                          return false;
+                        }
+                        if (labelsFilterVerification === 'pending' && label.verificationStatus !== 'pending') {
+                          return false;
+                        }
+                        if (labelsFilterVerification === 'unverified' && label.verificationStatus === 'verified') {
+                          return false;
+                        }
+                      }
+
+                      return true;
+                    });
+
+                    // Sort labels
+                    const sortedLabels = [...filteredLabels].sort((a: any, b: any) => {
+                      let comparison = 0;
+                      
+                      if (labelsSortField === 'name') {
+                        comparison = a.name.localeCompare(b.name);
+                      } else if (labelsSortField === 'totalBids') {
+                        comparison = (a.totalBidAmount || 0) - (b.totalBidAmount || 0);
+                      } else if (labelsSortField === 'artistCount') {
+                        comparison = (a.artistCount || 0) - (b.artistCount || 0);
+                      } else if (labelsSortField === 'releaseCount') {
+                        comparison = (a.releaseCount || 0) - (b.releaseCount || 0);
+                      } else if (labelsSortField === 'verificationStatus') {
+                        comparison = (a.verificationStatus || 'unverified').localeCompare(b.verificationStatus || 'unverified');
+                      }
+
+                      return labelsSortDirection === 'asc' ? comparison : -comparison;
+                    });
+
+                    // Group labels by role
+                    const ownedLabels = sortedLabels.filter((label: any) => 
+                      label.relationshipType === 'admin' && label.role === 'owner'
+                    );
+                    const adminLabels = sortedLabels.filter((label: any) => 
+                      label.relationshipType === 'admin' && label.role === 'admin'
+                    );
+                    const affiliatedLabels = sortedLabels.filter((label: any) => 
+                      label.relationshipType === 'affiliation'
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white">My Labels</h3>
+                          <button
+                            onClick={() => setIsLabelModalOpen(true)}
+                            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Label
+                          </button>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-4 items-center bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-400">Filter by:</span>
+                          </div>
+                          <select
+                            value={labelsFilterRole}
+                            onChange={(e) => setLabelsFilterRole(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Roles</option>
+                            <option value="owner">Owner</option>
+                            <option value="admin">Admin</option>
+                            <option value="affiliation">Affiliated</option>
+                          </select>
+                          <select
+                            value={labelsFilterVerification}
+                            onChange={(e) => setLabelsFilterVerification(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Status</option>
+                            <option value="verified">Verified</option>
+                            <option value="pending">Pending</option>
+                            <option value="unverified">Unverified</option>
+                          </select>
+                        </div>
+
+                        {sortedLabels.length > 0 ? (
+                          <div className="space-y-6">
+                            {/* Owned Labels Section */}
+                            {ownedLabels.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedSections(prev => ({ ...prev, owned: !prev.owned }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Building className="h-5 w-5 text-purple-400" />
+                                    Labels You Own ({ownedLabels.length})
+                                  </h4>
+                                  {collapsedSections.owned ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedSections.owned && (
+                                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-gray-800">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
+                                                setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Label
+                                              {labelsSortField === 'name' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
+                                                setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Total Bids
+                                              {labelsSortField === 'totalBids' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-800">
+                                        {ownedLabels.map((label: any) => (
+                                          <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-3">
+                                                <img 
+                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                  alt={label.name} 
+                                                  className="h-10 w-10 rounded object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                  }}
+                                                />
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                >
+                                                  {label.name}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
+                                            <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {label.verificationStatus === 'verified' ? (
+                                                <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                              ) : (
+                                                <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                  {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                >
+                                                  View
+                                                </button>
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                >
+                                                  <Settings className="h-3 w-3" />
+                                                  Manage
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => setMyMediaPage(prev => Math.max(1, prev - 1))}
-                                    disabled={myMediaPage === 1}
-                                    className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                                  >
-                                    Previous
-                                  </button>
-                                  <span className="text-sm text-gray-400">
-                                    Page {myMediaPage} of {Math.ceil(myMediaTotal / 20)}
-                                  </span>
-                                  <button
-                                    onClick={() => setMyMediaPage(prev => prev + 1)}
-                                    disabled={myMediaPage >= Math.ceil(myMediaTotal / 20)}
-                                    className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                                  >
-                                    Next
-                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Admin Labels Section */}
+                            {adminLabels.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedSections(prev => ({ ...prev, admin: !prev.admin }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Users className="h-5 w-5 text-blue-400" />
+                                    Labels You Admin ({adminLabels.length})
+                                  </h4>
+                                  {collapsedSections.admin ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedSections.admin && (
+                                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-gray-800">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
+                                                setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Label
+                                              {labelsSortField === 'name' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'artistCount' ? '' : 'artistCount');
+                                                setLabelsSortDirection(labelsSortField === 'artistCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Artists
+                                              {labelsSortField === 'artistCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'releaseCount' ? '' : 'releaseCount');
+                                                setLabelsSortDirection(labelsSortField === 'releaseCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Releases
+                                              {labelsSortField === 'releaseCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
+                                                setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Total Bids
+                                              {labelsSortField === 'totalBids' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'verificationStatus' ? '' : 'verificationStatus');
+                                                setLabelsSortDirection(labelsSortField === 'verificationStatus' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Status
+                                              {labelsSortField === 'verificationStatus' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-800">
+                                        {adminLabels.map((label: any) => (
+                                          <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-3">
+                                                <img 
+                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                  alt={label.name} 
+                                                  className="h-10 w-10 rounded object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                  }}
+                                                />
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                >
+                                                  {label.name}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
+                                            <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {label.verificationStatus === 'verified' ? (
+                                                <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                              ) : (
+                                                <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                  {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                >
+                                                  View
+                                                </button>
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                >
+                                                  <Settings className="h-3 w-3" />
+                                                  Manage
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Affiliated Labels Section */}
+                            {affiliatedLabels.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedSections(prev => ({ ...prev, affiliated: !prev.affiliated }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Music className="h-5 w-5 text-gray-400" />
+                                    Labels You're Affiliated With ({affiliatedLabels.length})
+                                  </h4>
+                                  {collapsedSections.affiliated ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedSections.affiliated && (
+                                <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead className="bg-gray-800">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
+                                                setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Label
+                                              {labelsSortField === 'name' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Your Role</th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'artistCount' ? '' : 'artistCount');
+                                                setLabelsSortDirection(labelsSortField === 'artistCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Artists
+                                              {labelsSortField === 'artistCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'releaseCount' ? '' : 'releaseCount');
+                                                setLabelsSortDirection(labelsSortField === 'releaseCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Releases
+                                              {labelsSortField === 'releaseCount' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
+                                                setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Total Bids
+                                              {labelsSortField === 'totalBids' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            <button
+                                              onClick={() => {
+                                                setLabelsSortField(labelsSortField === 'verificationStatus' ? '' : 'verificationStatus');
+                                                setLabelsSortDirection(labelsSortField === 'verificationStatus' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                              }}
+                                              className="flex items-center hover:text-purple-400 transition-colors"
+                                            >
+                                              Status
+                                              {labelsSortField === 'verificationStatus' ? (
+                                                labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                              ) : (
+                                                <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                              )}
+                                            </button>
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-800">
+                                        {affiliatedLabels.map((label: any) => (
+                                          <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center gap-3">
+                                                <img 
+                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                  alt={label.name} 
+                                                  className="h-10 w-10 rounded object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                  }}
+                                                />
+                                                <button
+                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                >
+                                                  {label.name}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <span className={`px-2 py-1 ${getRoleBadgeColor(label.role || 'artist', label.relationshipType || 'affiliation')} text-white text-xs rounded capitalize`}>
+                                                {getRoleLabel(label.role || 'artist', label.relationshipType || 'affiliation')}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
+                                            <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              {label.verificationStatus === 'verified' ? (
+                                                <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                              ) : (
+                                                <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                  {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <button
+                                                onClick={() => navigate(`/label/${label.slug}`)}
+                                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                              >
+                                                View
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    {creatorActiveTab === 'labels' && (() => {
-                      // Helper functions
-                      const getRoleBadgeColor = (role: string, relationshipType: string) => {
-                        if (relationshipType === 'admin') {
-                          return role === 'owner' ? 'bg-purple-600' : 'bg-blue-600';
-                        }
-                        return 'bg-gray-600';
-                      };
-
-                      const getRoleLabel = (role: string, relationshipType: string) => {
-                        if (relationshipType === 'admin') {
-                          return role === 'owner' ? 'Owner' : 'Admin';
-                        }
-                        return role.charAt(0).toUpperCase() + role.slice(1);
-                      };
-
-                      // Filter and sort labels
-                      const filteredLabels = (creatorStats.labels || []).filter((label: any) => {
-                        // Filter by role
-                        if (labelsFilterRole !== 'all') {
-                          if (labelsFilterRole === 'owner' && !(label.relationshipType === 'admin' && label.role === 'owner')) {
-                            return false;
-                          }
-                          if (labelsFilterRole === 'admin' && !(label.relationshipType === 'admin' && label.role === 'admin')) {
-                            return false;
-                          }
-                          if (labelsFilterRole === 'affiliation' && label.relationshipType !== 'affiliation') {
-                            return false;
-                          }
-                        }
-
-                        // Filter by verification status
-                        if (labelsFilterVerification !== 'all') {
-                          if (labelsFilterVerification === 'verified' && label.verificationStatus !== 'verified') {
-                            return false;
-                          }
-                          if (labelsFilterVerification === 'pending' && label.verificationStatus !== 'pending') {
-                            return false;
-                          }
-                          if (labelsFilterVerification === 'unverified' && label.verificationStatus === 'verified') {
-                            return false;
-                          }
-                        }
-
-                        return true;
-                      });
-
-                      // Sort labels
-                      const sortedLabels = [...filteredLabels].sort((a: any, b: any) => {
-                        let comparison = 0;
-                        
-                        if (labelsSortField === 'name') {
-                          comparison = a.name.localeCompare(b.name);
-                        } else if (labelsSortField === 'totalBids') {
-                          comparison = (a.totalBidAmount || 0) - (b.totalBidAmount || 0);
-                        } else if (labelsSortField === 'artistCount') {
-                          comparison = (a.artistCount || 0) - (b.artistCount || 0);
-                        } else if (labelsSortField === 'releaseCount') {
-                          comparison = (a.releaseCount || 0) - (b.releaseCount || 0);
-                        } else if (labelsSortField === 'verificationStatus') {
-                          comparison = (a.verificationStatus || 'unverified').localeCompare(b.verificationStatus || 'unverified');
-                        }
-
-                        return labelsSortDirection === 'asc' ? comparison : -comparison;
-                      });
-
-                      // Group labels by role
-                      const ownedLabels = sortedLabels.filter((label: any) => 
-                        label.relationshipType === 'admin' && label.role === 'owner'
-                      );
-                      const adminLabels = sortedLabels.filter((label: any) => 
-                        label.relationshipType === 'admin' && label.role === 'admin'
-                      );
-                      const affiliatedLabels = sortedLabels.filter((label: any) => 
-                        label.relationshipType === 'affiliation'
-                      );
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-white">My Labels</h3>
+                        ) : (
+                          <div className="text-center py-8 bg-gray-900 rounded-lg">
+                            <Building className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                            <p className="text-gray-400 mb-2">No labels found</p>
+                            <p className="text-gray-500 text-sm mb-4">
+                              {labelsFilterRole !== 'all' || labelsFilterVerification !== 'all' 
+                                ? 'Try adjusting your filters' 
+                                : 'Create your first label or join an existing one!'}
+                            </p>
+                            {(labelsFilterRole !== 'all' || labelsFilterVerification !== 'all') && (
+                              <button
+                                onClick={() => {
+                                  setLabelsFilterRole('all');
+                                  setLabelsFilterVerification('all');
+                                }}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors mr-2"
+                              >
+                                Clear Filters
+                              </button>
+                            )}
                             <button
                               onClick={() => setIsLabelModalOpen(true)}
-                              className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                             >
-                              <Plus className="h-4 w-4 mr-2" />
                               Create Label
                             </button>
                           </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
-                          {/* Filters */}
-                          <div className="flex flex-wrap gap-4 items-center bg-gray-900 rounded-lg p-4">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-gray-400" />
-                              <span className="text-sm text-gray-400">Filter by:</span>
-                            </div>
-                            <select
-                              value={labelsFilterRole}
-                              onChange={(e) => setLabelsFilterRole(e.target.value)}
-                              className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                            >
-                              <option value="all">All Roles</option>
-                              <option value="owner">Owner</option>
-                              <option value="admin">Admin</option>
-                              <option value="affiliation">Affiliated</option>
-                            </select>
-                            <select
-                              value={labelsFilterVerification}
-                              onChange={(e) => setLabelsFilterVerification(e.target.value)}
-                              className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                            >
-                              <option value="all">All Status</option>
-                              <option value="verified">Verified</option>
-                              <option value="pending">Pending</option>
-                              <option value="unverified">Unverified</option>
-                            </select>
+                  {creatorActiveTab === 'collectives' && (() => {
+                    // Helper functions for collectives
+                    const getCollectiveRoleBadgeColor = (role: string) => {
+                      if (role === 'founder') return 'bg-purple-600';
+                      if (role === 'admin') return 'bg-blue-600';
+                      return 'bg-gray-600';
+                    };
+
+                    const getCollectiveRoleLabel = (role: string) => {
+                      if (role === 'founder') return 'Founder';
+                      if (role === 'admin') return 'Admin';
+                      return 'Member';
+                    };
+
+                    // Filter and sort collectives
+                    const filteredCollectives = collectives.filter((collective: any) => {
+                      // Filter by role
+                      if (collectivesFilterRole !== 'all') {
+                        if (collectivesFilterRole === 'founder' && collective.role !== 'founder') {
+                          return false;
+                        }
+                        if (collectivesFilterRole === 'admin' && collective.role !== 'admin') {
+                          return false;
+                        }
+                        if (collectivesFilterRole === 'member' && collective.role !== 'member') {
+                          return false;
+                        }
+                      }
+
+                      // Filter by verification status
+                      if (collectivesFilterVerification !== 'all') {
+                        if (collectivesFilterVerification === 'verified' && collective.verificationStatus !== 'verified') {
+                          return false;
+                        }
+                        if (collectivesFilterVerification === 'pending' && collective.verificationStatus !== 'pending') {
+                          return false;
+                        }
+                        if (collectivesFilterVerification === 'unverified' && collective.verificationStatus === 'verified') {
+                          return false;
+                        }
+                      }
+
+                      return true;
+                    });
+
+                    // Sort collectives
+                    const sortedCollectives = [...filteredCollectives].sort((a: any, b: any) => {
+                      let comparison = 0;
+                      
+                      if (collectivesSortField === 'name') {
+                        comparison = a.name.localeCompare(b.name);
+                      } else if (collectivesSortField === 'totalBids') {
+                        comparison = (a.globalCollectiveAggregate || 0) - (b.globalCollectiveAggregate || 0);
+                      } else if (collectivesSortField === 'memberCount') {
+                        comparison = (a.memberCount || 0) - (b.memberCount || 0);
+                      } else if (collectivesSortField === 'releaseCount') {
+                        comparison = (a.releaseCount || 0) - (b.releaseCount || 0);
+                      } else if (collectivesSortField === 'verificationStatus') {
+                        comparison = (a.verificationStatus || 'unverified').localeCompare(b.verificationStatus || 'unverified');
+                      }
+
+                      return collectivesSortDirection === 'asc' ? comparison : -comparison;
+                    });
+
+                    // Group collectives by role
+                    const ownedCollectives = sortedCollectives.filter((collective: any) => 
+                      collective.role === 'founder'
+                    );
+                    const adminCollectives = sortedCollectives.filter((collective: any) => 
+                      collective.role === 'admin'
+                    );
+                    const memberCollectives = sortedCollectives.filter((collective: any) => 
+                      collective.role === 'member'
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white">My Collectives</h3>
+                          <button
+                            onClick={() => setIsCollectiveModalOpen(true)}
+                            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Collective
+                          </button>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-4 items-center bg-gray-900 rounded-lg p-4">
+                          <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-400">Filter by:</span>
                           </div>
+                          <select
+                            value={collectivesFilterRole}
+                            onChange={(e) => setCollectivesFilterRole(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Roles</option>
+                            <option value="founder">Founder</option>
+                            <option value="admin">Admin</option>
+                            <option value="member">Member</option>
+                          </select>
+                          <select
+                            value={collectivesFilterVerification}
+                            onChange={(e) => setCollectivesFilterVerification(e.target.value)}
+                            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="all">All Status</option>
+                            <option value="verified">Verified</option>
+                            <option value="pending">Pending</option>
+                            <option value="unverified">Unverified</option>
+                          </select>
+                        </div>
 
-                          {sortedLabels.length > 0 ? (
-                            <div className="space-y-6">
-                              {/* Owned Labels Section */}
-                              {ownedLabels.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setCollapsedSections(prev => ({ ...prev, owned: !prev.owned }))}
-                                    className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                                  >
-                                    <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                                      <Building className="h-5 w-5 text-purple-400" />
-                                      Labels You Own ({ownedLabels.length})
-                                    </h4>
-                                    {collapsedSections.owned ? (
-                                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                                    ) : (
-                                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </button>
-                                  {!collapsedSections.owned && (
+                        {isLoadingCollectives ? (
+                          <div className="text-center py-8">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                            <p className="text-gray-400 mt-2">Loading collectives...</p>
+                          </div>
+                        ) : sortedCollectives.length > 0 ? (
+                          <div className="space-y-6">
+                            {/* Owned Collectives Section */}
+                            {ownedCollectives.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, owned: !prev.owned }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Award className="h-5 w-5 text-purple-400" />
+                                    Collectives You Own ({ownedCollectives.length})
+                                  </h4>
+                                  {collapsedCollectiveSections.owned ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedCollectiveSections.owned && (
                                   <div className="bg-gray-900 rounded-lg overflow-hidden">
                                     <div className="overflow-x-auto">
                                       <table className="w-full">
@@ -1166,86 +1782,224 @@ Join here: ${inviteLink}`.trim();
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                               <button
                                                 onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
-                                                  setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                                  setCollectivesSortField(collectivesSortField === 'name' ? '' : 'name');
+                                                  setCollectivesSortDirection(collectivesSortField === 'name' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
                                                 }}
                                                 className="flex items-center hover:text-purple-400 transition-colors"
                                               >
-                                                Label
-                                                {labelsSortField === 'name' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                Collective
+                                                {collectivesSortField === 'name' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
                                                 ) : (
                                                   <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
                                                 )}
                                               </button>
                                             </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Artists</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                               <button
                                                 onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
-                                                  setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
+                                                  setCollectivesSortField(collectivesSortField === 'memberCount' ? '' : 'memberCount');
+                                                  setCollectivesSortDirection(collectivesSortField === 'memberCount' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Members
+                                                {collectivesSortField === 'memberCount' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'releaseCount' ? '' : 'releaseCount');
+                                                  setCollectivesSortDirection(collectivesSortField === 'releaseCount' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Releases
+                                                {collectivesSortField === 'releaseCount' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'totalBids' ? '' : 'totalBids');
+                                                  setCollectivesSortDirection(collectivesSortField === 'totalBids' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
                                                 }}
                                                 className="flex items-center hover:text-purple-400 transition-colors"
                                               >
                                                 Total Bids
-                                                {labelsSortField === 'totalBids' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                {collectivesSortField === 'totalBids' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
                                                 ) : (
                                                   <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
                                                 )}
                                               </button>
                                             </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                              <button
+                                                onClick={() => {
+                                                  setCollectivesSortField(collectivesSortField === 'verificationStatus' ? '' : 'verificationStatus');
+                                                  setCollectivesSortDirection(collectivesSortField === 'verificationStatus' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
+                                                }}
+                                                className="flex items-center hover:text-purple-400 transition-colors"
+                                              >
+                                                Status
+                                                {collectivesSortField === 'verificationStatus' ? (
+                                                  collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
+                                                ) : (
+                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
+                                                )}
+                                              </button>
+                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-800">
+                                          {ownedCollectives.map((collective: any) => (
+                                            <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                  <img 
+                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                    alt={collective.name} 
+                                                    className="h-10 w-10 rounded object-cover"
+                                                    onError={(e) => {
+                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                                    }}
+                                                  />
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="text-white font-medium hover:text-purple-400 transition-colors text-left"
+                                                  >
+                                                    {collective.name}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
+                                              <td className="px-4 py-3">
+                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                {collective.verificationStatus === 'verified' ? (
+                                                  <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
+                                                ) : (
+                                                  <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                                                    {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                  >
+                                                    View
+                                                  </button>
+                                                  <button
+                                                    onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
+                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                                  >
+                                                    <Settings className="h-3 w-3" />
+                                                    Manage
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Admin Collectives Section */}
+                            {adminCollectives.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, admin: !prev.admin }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Users className="h-5 w-5 text-blue-400" />
+                                    Collectives You Admin ({adminCollectives.length})
+                                  </h4>
+                                  {collapsedCollectiveSections.admin ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedCollectiveSections.admin && (
+                                  <div className="bg-gray-900 rounded-lg overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full">
+                                        <thead className="bg-gray-800">
+                                          <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Collective</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-800">
-                                          {ownedLabels.map((label: any) => (
-                                            <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                          {adminCollectives.map((collective: any) => (
+                                            <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                   <img 
-                                                    src={label.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                    alt={label.name} 
+                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                    alt={collective.name} 
                                                     className="h-10 w-10 rounded object-cover"
                                                     onError={(e) => {
                                                       e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                     }}
                                                   />
                                                   <button
-                                                    onClick={() => navigate(`/label/${label.slug}`)}
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
                                                     className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                   >
-                                                    {label.name}
+                                                    {collective.name}
                                                   </button>
                                                 </div>
                                               </td>
-                                              <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
-                                              <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
                                               <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
+                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
                                               </td>
                                               <td className="px-4 py-3">
-                                                {label.verificationStatus === 'verified' ? (
+                                                {collective.verificationStatus === 'verified' ? (
                                                   <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
                                                 ) : (
                                                   <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                                    {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                    {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
                                                   </span>
                                                 )}
                                               </td>
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                   <button
-                                                    onClick={() => navigate(`/label/${label.slug}`)}
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
                                                     className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                   >
                                                     View
                                                   </button>
                                                   <button
-                                                    onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                    onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
                                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                                                   >
                                                     <Settings className="h-3 w-3" />
@@ -1259,328 +2013,85 @@ Join here: ${inviteLink}`.trim();
                                       </table>
                                     </div>
                                   </div>
-                                  )}
-                                </div>
-                              )}
+                                )}
+                              </div>
+                            )}
 
-                              {/* Admin Labels Section */}
-                              {adminLabels.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setCollapsedSections(prev => ({ ...prev, admin: !prev.admin }))}
-                                    className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                                  >
-                                    <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                                      <Users className="h-5 w-5 text-blue-400" />
-                                      Labels You Admin ({adminLabels.length})
-                                    </h4>
-                                    {collapsedSections.admin ? (
-                                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                                    ) : (
-                                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </button>
-                                  {!collapsedSections.admin && (
+                            {/* Member Collectives Section */}
+                            {memberCollectives.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, member: !prev.member }))}
+                                  className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                  <h4 className="text-md font-semibold text-white flex items-center gap-2">
+                                    <Music className="h-5 w-5 text-gray-400" />
+                                    Collectives You're a Member Of ({memberCollectives.length})
+                                  </h4>
+                                  {collapsedCollectiveSections.member ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </button>
+                                {!collapsedCollectiveSections.member && (
                                   <div className="bg-gray-900 rounded-lg overflow-hidden">
                                     <div className="overflow-x-auto">
                                       <table className="w-full">
                                         <thead className="bg-gray-800">
                                           <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
-                                                  setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Label
-                                                {labelsSortField === 'name' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'artistCount' ? '' : 'artistCount');
-                                                  setLabelsSortDirection(labelsSortField === 'artistCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Artists
-                                                {labelsSortField === 'artistCount' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'releaseCount' ? '' : 'releaseCount');
-                                                  setLabelsSortDirection(labelsSortField === 'releaseCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Releases
-                                                {labelsSortField === 'releaseCount' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
-                                                  setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Total Bids
-                                                {labelsSortField === 'totalBids' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'verificationStatus' ? '' : 'verificationStatus');
-                                                  setLabelsSortDirection(labelsSortField === 'verificationStatus' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Status
-                                                {labelsSortField === 'verificationStatus' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-800">
-                                          {adminLabels.map((label: any) => (
-                                            <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
-                                              <td className="px-4 py-3">
-                                                <div className="flex items-center gap-3">
-                                                  <img 
-                                                    src={label.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                    alt={label.name} 
-                                                    className="h-10 w-10 rounded object-cover"
-                                                    onError={(e) => {
-                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                    }}
-                                                  />
-                                                  <button
-                                                    onClick={() => navigate(`/label/${label.slug}`)}
-                                                    className="text-white font-medium hover:text-purple-400 transition-colors text-left"
-                                                  >
-                                                    {label.name}
-                                                  </button>
-                                                </div>
-                                              </td>
-                                              <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
-                                              <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
-                                              <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
-                                              </td>
-                                              <td className="px-4 py-3">
-                                                {label.verificationStatus === 'verified' ? (
-                                                  <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
-                                                ) : (
-                                                  <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                                    {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
-                                                  </span>
-                                                )}
-                                              </td>
-                                              <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                  <button
-                                                    onClick={() => navigate(`/label/${label.slug}`)}
-                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                                                  >
-                                                    View
-                                                  </button>
-                                                  <button
-                                                    onClick={() => navigate(`/label/${label.slug}?edit=true`)}
-                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
-                                                  >
-                                                    <Settings className="h-3 w-3" />
-                                                    Manage
-                                                  </button>
-                                                </div>
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Affiliated Labels Section */}
-                              {affiliatedLabels.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setCollapsedSections(prev => ({ ...prev, affiliated: !prev.affiliated }))}
-                                    className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                                  >
-                                    <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                                      <Music className="h-5 w-5 text-gray-400" />
-                                      Labels You're Affiliated With ({affiliatedLabels.length})
-                                    </h4>
-                                    {collapsedSections.affiliated ? (
-                                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                                    ) : (
-                                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </button>
-                                  {!collapsedSections.affiliated && (
-                                  <div className="bg-gray-900 rounded-lg overflow-hidden">
-                                    <div className="overflow-x-auto">
-                                      <table className="w-full">
-                                        <thead className="bg-gray-800">
-                                          <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'name' ? '' : 'name');
-                                                  setLabelsSortDirection(labelsSortField === 'name' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Label
-                                                {labelsSortField === 'name' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Collective</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Your Role</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'artistCount' ? '' : 'artistCount');
-                                                  setLabelsSortDirection(labelsSortField === 'artistCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Artists
-                                                {labelsSortField === 'artistCount' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'releaseCount' ? '' : 'releaseCount');
-                                                  setLabelsSortDirection(labelsSortField === 'releaseCount' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Releases
-                                                {labelsSortField === 'releaseCount' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'totalBids' ? '' : 'totalBids');
-                                                  setLabelsSortDirection(labelsSortField === 'totalBids' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Total Bids
-                                                {labelsSortField === 'totalBids' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                              <button
-                                                onClick={() => {
-                                                  setLabelsSortField(labelsSortField === 'verificationStatus' ? '' : 'verificationStatus');
-                                                  setLabelsSortDirection(labelsSortField === 'verificationStatus' && labelsSortDirection === 'asc' ? 'desc' : 'asc');
-                                                }}
-                                                className="flex items-center hover:text-purple-400 transition-colors"
-                                              >
-                                                Status
-                                                {labelsSortField === 'verificationStatus' ? (
-                                                  labelsSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                  <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                )}
-                                              </button>
-                                            </th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-800">
-                                          {affiliatedLabels.map((label: any) => (
-                                            <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
+                                          {memberCollectives.map((collective: any) => (
+                                            <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                   <img 
-                                                    src={label.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                    alt={label.name} 
+                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
+                                                    alt={collective.name} 
                                                     className="h-10 w-10 rounded object-cover"
                                                     onError={(e) => {
                                                       e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                     }}
                                                   />
                                                   <button
-                                                    onClick={() => navigate(`/label/${label.slug}`)}
+                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
                                                     className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                   >
-                                                    {label.name}
+                                                    {collective.name}
                                                   </button>
                                                 </div>
                                               </td>
                                               <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 ${getRoleBadgeColor(label.role || 'artist', label.relationshipType || 'affiliation')} text-white text-xs rounded capitalize`}>
-                                                  {getRoleLabel(label.role || 'artist', label.relationshipType || 'affiliation')}
+                                                <span className={`px-2 py-1 ${getCollectiveRoleBadgeColor(collective.role || 'member')} text-white text-xs rounded`}>
+                                                  {getCollectiveRoleLabel(collective.role || 'member')}
                                                 </span>
                                               </td>
-                                              <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
-                                              <td className="px-4 py-3 text-gray-300">{label.releaseCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
+                                              <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
                                               <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{penceToPounds(label.globalLabelAggregate || 0)}</div>
+                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
                                               </td>
                                               <td className="px-4 py-3">
-                                                {label.verificationStatus === 'verified' ? (
+                                                {collective.verificationStatus === 'verified' ? (
                                                   <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
                                                 ) : (
                                                   <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                                    {label.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
+                                                    {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
                                                   </span>
                                                 )}
                                               </td>
                                               <td className="px-4 py-3">
                                                 <button
-                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                  onClick={() => navigate(`/collective/${collective.slug}`)}
                                                   className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                 >
                                                   View
@@ -1592,610 +2103,104 @@ Join here: ${inviteLink}`.trim();
                                       </table>
                                     </div>
                                   </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 bg-gray-900 rounded-lg">
-                              <Building className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-                              <p className="text-gray-400 mb-2">No labels found</p>
-                              <p className="text-gray-500 text-sm mb-4">
-                                {labelsFilterRole !== 'all' || labelsFilterVerification !== 'all' 
-                                  ? 'Try adjusting your filters' 
-                                  : 'Create your first label or join an existing one!'}
-                              </p>
-                              {(labelsFilterRole !== 'all' || labelsFilterVerification !== 'all') && (
-                                <button
-                                  onClick={() => {
-                                    setLabelsFilterRole('all');
-                                    setLabelsFilterVerification('all');
-                                  }}
-                                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors mr-2"
-                                >
-                                  Clear Filters
-                                </button>
-                              )}
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-gray-900 rounded-lg">
+                            <Users className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+                            <p className="text-gray-400 mb-2">No collectives found</p>
+                            <p className="text-gray-500 text-sm mb-4">
+                              {collectivesFilterRole !== 'all' || collectivesFilterVerification !== 'all' 
+                                ? 'Try adjusting your filters' 
+                                : 'Create your first collective or join an existing one!'}
+                            </p>
+                            {(collectivesFilterRole !== 'all' || collectivesFilterVerification !== 'all') && (
                               <button
-                                onClick={() => setIsLabelModalOpen(true)}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                onClick={() => {
+                                  setCollectivesFilterRole('all');
+                                  setCollectivesFilterVerification('all');
+                                }}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors mr-2"
                               >
-                                Create Label
+                                Clear Filters
                               </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {creatorActiveTab === 'collectives' && (() => {
-                      // Helper functions for collectives
-                      const getCollectiveRoleBadgeColor = (role: string) => {
-                        if (role === 'founder') return 'bg-purple-600';
-                        if (role === 'admin') return 'bg-blue-600';
-                        return 'bg-gray-600';
-                      };
-
-                      const getCollectiveRoleLabel = (role: string) => {
-                        if (role === 'founder') return 'Founder';
-                        if (role === 'admin') return 'Admin';
-                        return 'Member';
-                      };
-
-                      // Filter and sort collectives
-                      const filteredCollectives = collectives.filter((collective: any) => {
-                        // Filter by role
-                        if (collectivesFilterRole !== 'all') {
-                          if (collectivesFilterRole === 'founder' && collective.role !== 'founder') {
-                            return false;
-                          }
-                          if (collectivesFilterRole === 'admin' && collective.role !== 'admin') {
-                            return false;
-                          }
-                          if (collectivesFilterRole === 'member' && collective.role !== 'member') {
-                            return false;
-                          }
-                        }
-
-                        // Filter by verification status
-                        if (collectivesFilterVerification !== 'all') {
-                          if (collectivesFilterVerification === 'verified' && collective.verificationStatus !== 'verified') {
-                            return false;
-                          }
-                          if (collectivesFilterVerification === 'pending' && collective.verificationStatus !== 'pending') {
-                            return false;
-                          }
-                          if (collectivesFilterVerification === 'unverified' && collective.verificationStatus === 'verified') {
-                            return false;
-                          }
-                        }
-
-                        return true;
-                      });
-
-                      // Sort collectives
-                      const sortedCollectives = [...filteredCollectives].sort((a: any, b: any) => {
-                        let comparison = 0;
-                        
-                        if (collectivesSortField === 'name') {
-                          comparison = a.name.localeCompare(b.name);
-                        } else if (collectivesSortField === 'totalBids') {
-                          comparison = (a.globalCollectiveAggregate || 0) - (b.globalCollectiveAggregate || 0);
-                        } else if (collectivesSortField === 'memberCount') {
-                          comparison = (a.memberCount || 0) - (b.memberCount || 0);
-                        } else if (collectivesSortField === 'releaseCount') {
-                          comparison = (a.releaseCount || 0) - (b.releaseCount || 0);
-                        } else if (collectivesSortField === 'verificationStatus') {
-                          comparison = (a.verificationStatus || 'unverified').localeCompare(b.verificationStatus || 'unverified');
-                        }
-
-                        return collectivesSortDirection === 'asc' ? comparison : -comparison;
-                      });
-
-                      // Group collectives by role
-                      const ownedCollectives = sortedCollectives.filter((collective: any) => 
-                        collective.role === 'founder'
-                      );
-                      const adminCollectives = sortedCollectives.filter((collective: any) => 
-                        collective.role === 'admin'
-                      );
-                      const memberCollectives = sortedCollectives.filter((collective: any) => 
-                        collective.role === 'member'
-                      );
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-white">My Collectives</h3>
+                            )}
                             <button
                               onClick={() => setIsCollectiveModalOpen(true)}
-                              className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                             >
-                              <Plus className="h-4 w-4 mr-2" />
                               Create Collective
                             </button>
                           </div>
-
-                          {/* Filters */}
-                          <div className="flex flex-wrap gap-4 items-center bg-gray-900 rounded-lg p-4">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-gray-400" />
-                              <span className="text-sm text-gray-400">Filter by:</span>
-                            </div>
-                            <select
-                              value={collectivesFilterRole}
-                              onChange={(e) => setCollectivesFilterRole(e.target.value)}
-                              className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                            >
-                              <option value="all">All Roles</option>
-                              <option value="founder">Founder</option>
-                              <option value="admin">Admin</option>
-                              <option value="member">Member</option>
-                            </select>
-                            <select
-                              value={collectivesFilterVerification}
-                              onChange={(e) => setCollectivesFilterVerification(e.target.value)}
-                              className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-                            >
-                              <option value="all">All Status</option>
-                              <option value="verified">Verified</option>
-                              <option value="pending">Pending</option>
-                              <option value="unverified">Unverified</option>
-                            </select>
-                          </div>
-
-                          {isLoadingCollectives ? (
-                            <div className="text-center py-8">
-                              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
-                              <p className="text-gray-400 mt-2">Loading collectives...</p>
-                            </div>
-                          ) : sortedCollectives.length > 0 ? (
-                            <div className="space-y-6">
-                              {/* Owned Collectives Section */}
-                              {ownedCollectives.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, owned: !prev.owned }))}
-                                    className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                                  >
-                                    <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                                      <Award className="h-5 w-5 text-purple-400" />
-                                      Collectives You Own ({ownedCollectives.length})
-                                    </h4>
-                                    {collapsedCollectiveSections.owned ? (
-                                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                                    ) : (
-                                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </button>
-                                  {!collapsedCollectiveSections.owned && (
-                                    <div className="bg-gray-900 rounded-lg overflow-hidden">
-                                      <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                          <thead className="bg-gray-800">
-                                            <tr>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                <button
-                                                  onClick={() => {
-                                                    setCollectivesSortField(collectivesSortField === 'name' ? '' : 'name');
-                                                    setCollectivesSortDirection(collectivesSortField === 'name' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
-                                                  }}
-                                                  className="flex items-center hover:text-purple-400 transition-colors"
-                                                >
-                                                  Collective
-                                                  {collectivesSortField === 'name' ? (
-                                                    collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                  ) : (
-                                                    <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                  )}
-                                                </button>
-                                              </th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                <button
-                                                  onClick={() => {
-                                                    setCollectivesSortField(collectivesSortField === 'memberCount' ? '' : 'memberCount');
-                                                    setCollectivesSortDirection(collectivesSortField === 'memberCount' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
-                                                  }}
-                                                  className="flex items-center hover:text-purple-400 transition-colors"
-                                                >
-                                                  Members
-                                                  {collectivesSortField === 'memberCount' ? (
-                                                    collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                  ) : (
-                                                    <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                  )}
-                                                </button>
-                                              </th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                <button
-                                                  onClick={() => {
-                                                    setCollectivesSortField(collectivesSortField === 'releaseCount' ? '' : 'releaseCount');
-                                                    setCollectivesSortDirection(collectivesSortField === 'releaseCount' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
-                                                  }}
-                                                  className="flex items-center hover:text-purple-400 transition-colors"
-                                                >
-                                                  Releases
-                                                  {collectivesSortField === 'releaseCount' ? (
-                                                    collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                  ) : (
-                                                    <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                  )}
-                                                </button>
-                                              </th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                <button
-                                                  onClick={() => {
-                                                    setCollectivesSortField(collectivesSortField === 'totalBids' ? '' : 'totalBids');
-                                                    setCollectivesSortDirection(collectivesSortField === 'totalBids' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
-                                                  }}
-                                                  className="flex items-center hover:text-purple-400 transition-colors"
-                                                >
-                                                  Total Bids
-                                                  {collectivesSortField === 'totalBids' ? (
-                                                    collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                  ) : (
-                                                    <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                  )}
-                                                </button>
-                                              </th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                <button
-                                                  onClick={() => {
-                                                    setCollectivesSortField(collectivesSortField === 'verificationStatus' ? '' : 'verificationStatus');
-                                                    setCollectivesSortDirection(collectivesSortField === 'verificationStatus' && collectivesSortDirection === 'asc' ? 'desc' : 'asc');
-                                                  }}
-                                                  className="flex items-center hover:text-purple-400 transition-colors"
-                                                >
-                                                  Status
-                                                  {collectivesSortField === 'verificationStatus' ? (
-                                                    collectivesSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
-                                                  ) : (
-                                                    <ArrowUpDown className="h-4 w-4 ml-1 text-gray-500" />
-                                                  )}
-                                                </button>
-                                              </th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-800">
-                                            {ownedCollectives.map((collective: any) => (
-                                              <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
-                                                <td className="px-4 py-3">
-                                                  <div className="flex items-center gap-3">
-                                                    <img 
-                                                      src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                      alt={collective.name} 
-                                                      className="h-10 w-10 rounded object-cover"
-                                                      onError={(e) => {
-                                                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                      }}
-                                                    />
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                      className="text-white font-medium hover:text-purple-400 transition-colors text-left"
-                                                    >
-                                                      {collective.name}
-                                                    </button>
-                                                  </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
-                                                <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
-                                                <td className="px-4 py-3">
-                                                  <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  {collective.verificationStatus === 'verified' ? (
-                                                    <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
-                                                  ) : (
-                                                    <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                                      {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
-                                                    </span>
-                                                  )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  <div className="flex items-center gap-2">
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                                                    >
-                                                      View
-                                                    </button>
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
-                                                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
-                                                    >
-                                                      <Settings className="h-3 w-3" />
-                                                      Manage
-                                                    </button>
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Admin Collectives Section */}
-                              {adminCollectives.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, admin: !prev.admin }))}
-                                    className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                                  >
-                                    <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                                      <Users className="h-5 w-5 text-blue-400" />
-                                      Collectives You Admin ({adminCollectives.length})
-                                    </h4>
-                                    {collapsedCollectiveSections.admin ? (
-                                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                                    ) : (
-                                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </button>
-                                  {!collapsedCollectiveSections.admin && (
-                                    <div className="bg-gray-900 rounded-lg overflow-hidden">
-                                      <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                          <thead className="bg-gray-800">
-                                            <tr>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Collective</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-800">
-                                            {adminCollectives.map((collective: any) => (
-                                              <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
-                                                <td className="px-4 py-3">
-                                                  <div className="flex items-center gap-3">
-                                                    <img 
-                                                      src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                      alt={collective.name} 
-                                                      className="h-10 w-10 rounded object-cover"
-                                                      onError={(e) => {
-                                                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                      }}
-                                                    />
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                      className="text-white font-medium hover:text-purple-400 transition-colors text-left"
-                                                    >
-                                                      {collective.name}
-                                                    </button>
-                                                  </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
-                                                <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
-                                                <td className="px-4 py-3">
-                                                  <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  {collective.verificationStatus === 'verified' ? (
-                                                    <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
-                                                  ) : (
-                                                    <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                                      {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
-                                                    </span>
-                                                  )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  <div className="flex items-center gap-2">
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                                                    >
-                                                      View
-                                                    </button>
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
-                                                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
-                                                    >
-                                                      <Settings className="h-3 w-3" />
-                                                      Manage
-                                                    </button>
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Member Collectives Section */}
-                              {memberCollectives.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setCollapsedCollectiveSections(prev => ({ ...prev, member: !prev.member }))}
-                                    className="w-full flex items-center justify-between mb-3 p-2 hover:bg-gray-800 rounded-lg transition-colors"
-                                  >
-                                    <h4 className="text-md font-semibold text-white flex items-center gap-2">
-                                      <Music className="h-5 w-5 text-gray-400" />
-                                      Collectives You're a Member Of ({memberCollectives.length})
-                                    </h4>
-                                    {collapsedCollectiveSections.member ? (
-                                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                                    ) : (
-                                      <ChevronUp className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </button>
-                                  {!collapsedCollectiveSections.member && (
-                                    <div className="bg-gray-900 rounded-lg overflow-hidden">
-                                      <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                          <thead className="bg-gray-800">
-                                            <tr>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Collective</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Your Role</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Releases</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Bids</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-800">
-                                            {memberCollectives.map((collective: any) => (
-                                              <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
-                                                <td className="px-4 py-3">
-                                                  <div className="flex items-center gap-3">
-                                                    <img 
-                                                      src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                      alt={collective.name} 
-                                                      className="h-10 w-10 rounded object-cover"
-                                                      onError={(e) => {
-                                                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                      }}
-                                                    />
-                                                    <button
-                                                      onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                      className="text-white font-medium hover:text-purple-400 transition-colors text-left"
-                                                    >
-                                                      {collective.name}
-                                                    </button>
-                                                  </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  <span className={`px-2 py-1 ${getCollectiveRoleBadgeColor(collective.role || 'member')} text-white text-xs rounded`}>
-                                                    {getCollectiveRoleLabel(collective.role || 'member')}
-                                                  </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
-                                                <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
-                                                <td className="px-4 py-3">
-                                                  <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  {collective.verificationStatus === 'verified' ? (
-                                                    <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded">Verified</span>
-                                                  ) : (
-                                                    <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
-                                                      {collective.verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
-                                                    </span>
-                                                  )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                                                  >
-                                                    View
-                                                  </button>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 bg-gray-900 rounded-lg">
-                              <Users className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-                              <p className="text-gray-400 mb-2">No collectives found</p>
-                              <p className="text-gray-500 text-sm mb-4">
-                                {collectivesFilterRole !== 'all' || collectivesFilterVerification !== 'all' 
-                                  ? 'Try adjusting your filters' 
-                                  : 'Create your first collective or join an existing one!'}
-                              </p>
-                              {(collectivesFilterRole !== 'all' || collectivesFilterVerification !== 'all') && (
-                                <button
-                                  onClick={() => {
-                                    setCollectivesFilterRole('all');
-                                    setCollectivesFilterVerification('all');
-                                  }}
-                                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors mr-2"
-                                >
-                                  Clear Filters
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setIsCollectiveModalOpen(true)}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                              >
-                                Create Collective
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </>
-                ) : null}
-              </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : null}
             </div>
-          )}
-
-        {/* Add Tune Section */}
-        <div className="card mb-8">
-          <div className="flex items-center mb-4">
-            <Music className="h-6 w-6 text-purple-400 mr-2" />
-            <h2 className="text-2xl font-semibold text-white">Add Tune</h2>
           </div>
-          
-          <QuotaWarningBanner className="mb-4" />
-          
-          <div className="flex flex-col sm:flex-row gap-2 mb-4">
-            <div className="flex-1 relative">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                value={addTuneQuery}
-                onChange={(e) => setAddTuneQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddTuneSearch();
-                  }
-                }}
+        )}
+
+      {/* Add Tune Section */}
+      <div className="card mb-8">
+        <div className="flex items-center mb-4">
+          <Music className="h-6 w-6 text-purple-400 mr-2" />
+          <h2 className="text-2xl font-semibold text-white">Add Tune</h2>
+        </div>
+        
+        <QuotaWarningBanner className="mb-4" />
+        
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="flex-1 relative">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              value={addTuneQuery}
+              onChange={(e) => setAddTuneQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddTuneSearch();
+                }
+              }}
                 placeholder="Search or paste YouTube URL..."
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-            <button
-              onClick={handleAddTuneSearch}
-              disabled={isSearchingTune || !addTuneQuery.trim()}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              {isSearchingTune ? 'Searching...' : 'Search'}
-            </button>
+              className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+            />
           </div>
+          <button
+            onClick={handleAddTuneSearch}
+            disabled={isSearchingTune || !addTuneQuery.trim()}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {isSearchingTune ? 'Searching...' : 'Search'}
+          </button>
+        </div>
 
-          {addTuneQuery && (
-            <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
-              <LinkIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-              <span>
-                💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
-              </span>
-            </div>
-          )}
-          
-          {/* Search Results */}
-          {addTuneResults.length > 0 && (
-          <div className="mt-4 space-y-2">
-              {addTuneResults.map((result) => (
+        {addTuneQuery && (
+          <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
+            <LinkIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+            <span>
+              💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
+            </span>
+          </div>
+        )}
+        
+        {/* Search Results */}
+        {addTuneResults.length > 0 && (
+        <div className="mt-4 space-y-2">
+            {addTuneResults.map((result) => (
                 <div
                   key={result._id || result.id}
                   className="bg-black/20 rounded px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                 >
                   <div className="flex items-start md:items-center gap-3 flex-1 min-w-0">
-                    {result.coverArt && (
-                      <img 
-                        src={result.coverArt} 
-                        alt={result.title}
+                  {result.coverArt && (
+                    <img 
+                      src={result.coverArt} 
+                      alt={result.title}
                         className="h-14 w-14 rounded object-cover flex-shrink-0"
                       />
                     )}
@@ -2206,33 +2211,33 @@ Join here: ${inviteLink}`.trim();
                       <div className="text-gray-400 text-xs md:text-sm truncate">
                         {result.artist}
                       </div>
-                      {result.isLocal && (
+                    {result.isLocal && (
                         <span className="inline-block px-2 py-0.5 bg-purple-900 text-purple-200 text-xs rounded">
-                          In Database
-                        </span>
-                      )}
-                    </div>
+                        In Database
+                      </span>
+                    )}
                   </div>
+                </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <div>
                       <div className="text-gray-400 text-xs mb-1">Bid Amount</div>
-                      <input
-                        type="number"
-                        min={minimumBid}
-                        step="0.01"
+                    <input
+                      type="number"
+                      min={minimumBid}
+                      step="0.01"
                         value={addTuneBidAmounts[result._id || result.id || ''] ?? ''}
-                        onChange={(e) => {
+                      onChange={(e) => {
                           const value = e.target.value;
                           setAddTuneBidAmounts((prev) => ({
-                            ...prev,
+                          ...prev,
                             [result._id || result.id || '']: value
-                          }));
-                        }}
+                        }));
+                      }}
                         className="w-full sm:w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
-                      />
-                    </div>
-                    <button
-                      disabled={isAddingTune}
+                    />
+                  </div>
+                  <button
+                    disabled={isAddingTune}
                       onClick={() => startAddTune(result)}
                       className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                     >
@@ -2247,99 +2252,99 @@ Join here: ${inviteLink}`.trim();
                           return `Bid £${parsed.toFixed(2)}`;
                         })()}
                       </span>
-                    </button>
-                  </div>
+                  </button>
                 </div>
-              ))}
             </div>
+          ))}
+        </div>
         )}
       </div>
 
       </div>
 
-      {/* User Stats */}
+{/* User Stats */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="card grid grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="bg-primary-100 p-3 rounded-lg">
-                <Coins className="h-6 w-6 text-primary-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-white">Balance</p>
+          <div className="flex items-center">
+            <div className="bg-primary-100 p-3 rounded-lg">
+              <Coins className="h-6 w-6 text-primary-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">Balance</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                  {penceToPounds(user?.balance || 0)}
-                </p>
-              </div>
+                {penceToPounds(user?.balance || 0)}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="bg-green-100 p-3 rounded-lg">
-                <Globe className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-white">Global Rank</p>
+          <div className="flex items-center">
+            <div className="bg-green-100 p-3 rounded-lg">
+              <Globe className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">Global Rank</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                  #{user?.globalUserAggregateRank || 'N/A'}
-                </p>
-              </div>
+                #{user?.globalUserAggregateRank || 'N/A'}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="bg-purple-100 p-3 rounded-lg">
-                <Gift className="h-6 w-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-white">TuneBytes</p>
+          <div className="flex items-center">
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <Gift className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">TuneBytes</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                  {(user as any)?.tuneBytes?.toFixed(0) || '0'}
-                </p>
-              </div>
+                {(user as any)?.tuneBytes?.toFixed(0) || '0'}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="bg-blue-100 p-3 rounded-lg">
-                <Coins className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-white">Avg Bid</p>
+          <div className="flex items-center">
+            <div className="bg-blue-100 p-3 rounded-lg">
+              <Coins className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">Avg Bid</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                  {penceToPounds(user?.globalUserBidAvg || 0)}
-                </p>
-              </div>
+                {penceToPounds(user?.globalUserBidAvg || 0)}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="bg-purple-100 p-3 rounded-lg">
-                <AudioLines className="h-6 w-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-white">Total Bids</p>
+          <div className="flex items-center">
+            <div className="bg-purple-100 p-3 rounded-lg">
+              <AudioLines className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">Total Bids</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                  {user?.globalUserBids || 0}
-                </p>
-              </div>
+                {user?.globalUserBids || 0}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="bg-orange-100 p-3 rounded-lg">
-                <UserPlus className="h-6 w-6 text-orange-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-white">Invite Credits</p>
+          <div className="flex items-center">
+            <div className="bg-orange-100 p-3 rounded-lg">
+              <UserPlus className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-white">Invite Credits</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                  {user?.inviteCredits ?? 10}
-                </p>
+                {user?.inviteCredits ?? 10}
+              </p>
               </div>
             </div>
           </div>
@@ -2406,7 +2411,7 @@ Join here: ${inviteLink}`.trim();
             </div>
           </div>
         )}
-
+        
         {isLoadingInvited && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
@@ -2634,20 +2639,20 @@ Join here: ${inviteLink}`.trim();
           </div>
         )}
 
-        {/* Create Label Modal */}
-        <LabelCreateModal
-          isOpen={isLabelModalOpen}
-          onClose={() => setIsLabelModalOpen(false)}
-        />
-        
-        {/* Create Collective Modal */}
-        <CollectiveCreateModal
-          isOpen={isCollectiveModalOpen}
-          onClose={() => setIsCollectiveModalOpen(false)}
-        />
+      {/* Create Label Modal */}
+      <LabelCreateModal
+        isOpen={isLabelModalOpen}
+        onClose={() => setIsLabelModalOpen(false)}
+      />
+      
+      {/* Create Collective Modal */}
+      <CollectiveCreateModal
+        isOpen={isCollectiveModalOpen}
+        onClose={() => setIsCollectiveModalOpen(false)}
+      />
 
 
-        </div>
+    </div>
       </div>
 
       <TagInputModal
