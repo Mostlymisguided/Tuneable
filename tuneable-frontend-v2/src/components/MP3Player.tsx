@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-react';
 import { partyAPI } from '../lib/api';
+import ClickableArtistDisplay from './ClickableArtistDisplay';
 
 interface PlayerMedia {
   id: string;
@@ -374,7 +375,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
                 {media.title}
               </h3>
               <p className="text-xs text-gray-400 truncate">
-                {media.artist}
+                <ClickableArtistDisplay media={media} />
               </p>
             </div>
 

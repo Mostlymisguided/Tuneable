@@ -39,6 +39,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds } from '../utils/currency';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -519,6 +520,9 @@ const UserProfile: React.FC = () => {
       id: mediaId,
       title: media.title,
       artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
+      artists: Array.isArray(media.artist) ? media.artist : (media.artists || []), // Preserve full artist array with userIds
+      featuring: media.featuring || [],
+      creatorDisplay: media.creatorDisplay,
       duration: media.duration,
       coverArt: media.coverArt,
       sources: sources,
@@ -1198,7 +1202,13 @@ const UserProfile: React.FC = () => {
                         </h3>
                         <div className="flex items-center text-sm text-gray-400">
                           <span className="hidden sm:inline mr-1">by</span>
-                          <span className="text-purple-300">{mediaData.media?.artist || 'Unknown Artist'}</span>
+                          <span className="text-purple-300">
+                            {mediaData.media ? (
+                              <ClickableArtistDisplay media={mediaData.media} />
+                            ) : (
+                              'Unknown Artist'
+                            )}
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-gray-400">

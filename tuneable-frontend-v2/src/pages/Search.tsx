@@ -7,6 +7,7 @@ import EpisodeCard from '../components/EpisodeCard';
 import TagInputModal from '../components/TagInputModal';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { penceToPounds } from '../utils/currency';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 // Define types directly to avoid import issues
 interface SearchResult {
@@ -655,7 +656,7 @@ const SearchPage: React.FC = () => {
                           {song.title}
                         </h3>
                         <p className="text-sm text-gray-600 truncate">
-                          {song.artist}
+                          <ClickableArtistDisplay media={song} />
                         </p>
                         <div className="flex items-center space-x-2 mt-1">
                           <Clock className="h-3 w-3 text-gray-400" />

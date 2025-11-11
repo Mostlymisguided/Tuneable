@@ -11,6 +11,7 @@ import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
@@ -379,6 +380,9 @@ const Party: React.FC = () => {
           id: item._id || item.id || item.uuid, // Prefer ObjectId first
           title: item.title,
           artist: Array.isArray(item.artist) ? item.artist[0]?.name || 'Unknown Artist' : item.artist,
+          artists: Array.isArray(item.artist) ? item.artist : (item.artists || []), // Preserve full artist array with userIds
+          featuring: item.featuring || [],
+          creatorDisplay: item.creatorDisplay,
           duration: item.duration,
           coverArt: item.coverArt,
           sources: sources,
@@ -1638,7 +1642,9 @@ const Party: React.FC = () => {
                                       >
                                         {media.title}
                                       </p>
-                                      <p className="text-gray-400 text-xs md:text-sm truncate">{media.artist}</p>
+                                      <p className="text-gray-400 text-xs md:text-sm truncate">
+                                        <ClickableArtistDisplay media={media} />
+                                      </p>
                                       {media.duration && (
                                         <div className="flex items-center space-x-1 mt-1">
                                           <Clock className="h-3 w-3 text-gray-500" />
@@ -1698,7 +1704,9 @@ const Party: React.FC = () => {
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p className="text-white font-medium truncate text-sm md:text-base">{media.title}</p>
-                                      <p className="text-gray-400 text-xs md:text-sm truncate">{media.artist}</p>
+                                      <p className="text-gray-400 text-xs md:text-sm truncate">
+                                        <ClickableArtistDisplay media={media} />
+                                      </p>
                                       {media.duration && (
                                         <div className="flex items-center space-x-1 mt-1">
                                           <Clock className="h-3 w-3 text-gray-500" />

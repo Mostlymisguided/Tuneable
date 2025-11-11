@@ -7,6 +7,7 @@ import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { type YouTubePlayerRef } from './YouTubePlayer';
+import ClickableArtistDisplay from './ClickableArtistDisplay';
 
 // Helper function to format time (seconds to MM:SS)
 const formatTime = (seconds: number): string => {
@@ -659,13 +660,7 @@ const PersistentWebPlayer: React.FC = () => {
                   </h4>
                 </Link>
                 <p className="text-sm text-gray-300 leading-tight mt-1">
-                  {currentMedia.creatorDisplay || 
-                   (Array.isArray(currentMedia.artist) 
-                     ? currentMedia.artist.map((a: any) => a.name || a).join(' & ') + 
-                       (currentMedia.featuring && currentMedia.featuring.length > 0 
-                         ? ' ft. ' + currentMedia.featuring.map((f: any) => f.name || f).join(', ') 
-                         : '')
-                     : currentMedia.artist || 'Unknown Artist')}
+                  <ClickableArtistDisplay media={currentMedia} />
                 </p>
               </div>
             ) : (

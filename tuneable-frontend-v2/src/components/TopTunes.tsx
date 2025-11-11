@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds } from '../utils/currency';
+import ClickableArtistDisplay from './ClickableArtistDisplay';
 
 interface TopTunesSong {
   id: string;
@@ -264,7 +265,9 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                   {song.title}
                 </h3>
                 <div className="flex items-center space-x-2 text-sm text-gray-400">
-                  <p className="truncate">{song.artist}</p>
+                  <p className="truncate">
+                    <ClickableArtistDisplay media={song} />
+                  </p>
                   {song.duration && (
                     <>
                       <span>•</span>

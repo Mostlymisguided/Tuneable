@@ -14,6 +14,7 @@ import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import TagInputModal from '../components/TagInputModal';
 import EmailInviteModal from '../components/EmailInviteModal';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface LibraryItem {
   mediaId: string;
@@ -867,9 +868,7 @@ Join here: ${inviteLink}`.trim();
                                 <div className="flex-1 min-w-0">
                                   <p className="text-white font-medium truncate">{media.title}</p>
                                   <p className="text-gray-400 text-sm truncate">
-                                    {Array.isArray(media.artist) && media.artist.length > 0
-                                      ? media.artist[0].name || media.artist[0]
-                                      : 'Unknown Artist'}
+                                    <ClickableArtistDisplay media={media} />
                                   </p>
                                 </div>
                                 <div className="text-right">
@@ -1017,7 +1016,7 @@ Join here: ${inviteLink}`.trim();
                                       </div>
                                     </td>
                                     <td className="px-4 py-3 text-gray-300">
-                                      {item.artist}
+                                      <ClickableArtistDisplay media={item} />
                                     </td>
                                     <td className="px-4 py-3">
                                       <div className="text-white font-medium">
@@ -2652,7 +2651,9 @@ Join here: ${inviteLink}`.trim();
                       </button>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">{item.artist}</div>
+                      <div className="text-sm text-gray-300">
+                        <ClickableArtistDisplay media={item} />
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
