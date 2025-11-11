@@ -227,8 +227,15 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
         // If approved, add user to media's owners and assign ownership percentage
         if (status === 'approved') {
 
-          // Add ownership with default percentage (admin can specify in request)
-          const ownershipPercentage = req.body.ownershipPercentage || 50; // Default 50%
+          // Determine ownership percentage:
+          // - If admin specifies a percentage, use that
+          // - If there are no existing owners, default to 100%
+          // - Otherwise, default to 50%
+          const hasExistingOwners = media.mediaOwners && media.mediaOwners.length > 0;
+          const ownershipPercentage = req.body.ownershipPercentage 
+            ? Number(req.body.ownershipPercentage)
+            : (hasExistingOwners ? 50 : 100);
+          
           try {
             media.addMediaOwner(
               claim.userId,

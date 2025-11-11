@@ -62,9 +62,16 @@ function isMediaOwner(user, media) {
   const userId = user._id?.toString() || user.id?.toString();
   if (!userId) return false;
   
-  return media.mediaOwners.some(
-    owner => owner.userId?.toString() === userId
-  );
+  return media.mediaOwners.some(owner => {
+    if (!owner.userId) return false;
+    
+    // Handle both ObjectId and populated User object cases
+    const ownerUserId = owner.userId._id 
+      ? owner.userId._id.toString() 
+      : owner.userId.toString();
+    
+    return ownerUserId === userId;
+  });
 }
 
 /**
