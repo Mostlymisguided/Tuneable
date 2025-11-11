@@ -140,32 +140,11 @@ const reportCategoriesByType = {
       priority: true
     },
     {
-      value: 'collective_impersonation',
-      label: 'Impersonation',
-      description: 'Someone is impersonating or falsely representing this collective',
-      requiresEmail: false,
-      priority: true
-    },
-    {
       value: 'collective_incorrect_info',
       label: 'Incorrect Information',
       description: 'Collective name, location, contact info, or other details are incorrect',
       requiresEmail: false,
       priority: false
-    },
-    {
-      value: 'collective_spam',
-      label: 'Spam/Scam',
-      description: 'This collective is posting spam or scam content',
-      requiresEmail: false,
-      priority: false
-    },
-    {
-      value: 'unauthorized_claim',
-      label: 'Unauthorized Use/False Claim',
-      description: 'Someone is claiming to represent this collective without authorization',
-      requiresEmail: false,
-      priority: true
     },
     {
       value: 'inappropriate',
