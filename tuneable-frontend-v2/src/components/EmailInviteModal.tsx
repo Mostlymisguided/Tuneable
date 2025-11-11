@@ -14,7 +14,7 @@ const EmailInviteModal: React.FC<EmailInviteModalProps> = ({
   isOpen,
   onClose,
   inviteCode,
-  inviterUsername
+  inviterUsername: _inviterUsername
 }) => {
   const [emailInput, setEmailInput] = useState('');
   const [emails, setEmails] = useState<string[]>([]);
