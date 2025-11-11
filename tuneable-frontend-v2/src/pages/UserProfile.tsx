@@ -27,7 +27,8 @@ import {
   Building,
   CheckCircle,
   Flag,
-  Users
+  Users,
+  Award
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
@@ -936,6 +937,19 @@ const UserProfile: React.FC = () => {
               
               <div className="mb-2"></div>
 
+              {/* Become a Creator Button - Only show if user doesn't have creator role or profile */}
+              {isOwnProfile && currentUser && !currentUser.role?.includes('creator') && !(user as any).creatorProfile && (
+                <div className="mb-2">
+                  <button
+                    onClick={() => navigate('/creator/register')}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>Become a Creator</span>
+                  </button>
+                </div>
+              )}
+
               {/* Add Label & Collective Buttons - Only for creators/admins viewing own profile */}
               {isOwnProfile && currentUser && (currentUser.role?.includes('creator') || currentUser.role?.includes('admin')) && (
                 <div className="mb-2 flex items-center space-x-2">
@@ -1309,17 +1323,30 @@ const UserProfile: React.FC = () => {
                 >
                   Edit Profile
                 </button>
-                {user && (user as any).creatorProfile && (
-                  <button
-                    onClick={() => handleSettingsTabChange('creator')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                      settingsTab === 'creator'
-                        ? 'border-purple-500 text-purple-400'
-                        : 'border-transparent text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Edit Creator Profile
-                  </button>
+                {user && (
+                  (user as any).creatorProfile ? (
+                    <button
+                      onClick={() => handleSettingsTabChange('creator')}
+                      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                        settingsTab === 'creator'
+                          ? 'border-purple-500 text-purple-400'
+                          : 'border-transparent text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Edit Creator Profile
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleSettingsTabChange('creator')}
+                      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                        settingsTab === 'creator'
+                          ? 'border-purple-500 text-purple-400'
+                          : 'border-transparent text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Become a Creator
+                    </button>
+                  )
                 )}
                 <button
                   onClick={() => handleSettingsTabChange('notifications')}
@@ -1583,10 +1610,12 @@ const UserProfile: React.FC = () => {
 
             {settingsTab === 'creator' && (
               <div className="card p-6">
-                <h2 className="text-2xl font-bold text-white mb-6">Edit Creator Profile</h2>
-                
-                {/* Artist Name */}
-                <div className="mb-4">
+                {user && (user as any).creatorProfile ? (
+                  <>
+                    <h2 className="text-2xl font-bold text-white mb-6">Edit Creator Profile</h2>
+                    
+                    {/* Artist Name */}
+                    <div className="mb-4">
                   <label className="block text-white font-medium mb-2">Artist Name *</label>
                   <input
                     type="text"
@@ -1852,6 +1881,23 @@ const UserProfile: React.FC = () => {
                     )}
                   </button>
                 </div>
+              </>
+                ) : (
+                  <div className="text-center py-12">
+                    <Award className="h-16 w-16 text-purple-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-4">Become a Creator</h2>
+                    <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                      Join our community of verified creators and artists. Apply to get verified and start sharing your music on Tuneable.
+                    </p>
+                    <button
+                      onClick={() => navigate('/creator/register')}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
+                    >
+                      <Award className="w-5 h-5" />
+                      <span>Apply to Become a Creator</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

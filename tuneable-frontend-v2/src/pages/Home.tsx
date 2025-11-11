@@ -215,6 +215,12 @@ const Home: React.FC = () => {
               Get Started
             </Link>
             <Link
+              to="/creator/register"
+              className="bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-800 transition-colors border-2 border-purple-500"
+            >
+              Become a Creator
+            </Link>
+            <Link
               to="/parties"
               className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors"
             >
