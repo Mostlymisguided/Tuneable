@@ -18,7 +18,7 @@ const router = express.Router();
 // @access  Private
 router.post('/verify/send', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -166,7 +166,7 @@ router.post('/password-reset/confirm', [
 router.post('/ownership/notify', authMiddleware, async (req, res) => {
   try {
     // Check if user is admin
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user._id);
     if (!user || !user.role.includes('admin')) {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -210,7 +210,7 @@ router.post('/ownership/notify', authMiddleware, async (req, res) => {
 router.post('/claim-status/notify', authMiddleware, async (req, res) => {
   try {
     // Check if user is admin
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user._id);
     if (!user || !user.role.includes('admin')) {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -271,7 +271,7 @@ router.post('/invite', authMiddleware, [
     }
 
     const { emails } = req.body;
-    const inviter = await User.findById(req.user.userId);
+    const inviter = await User.findById(req.user._id);
     
     if (!inviter) {
       return res.status(404).json({ error: 'User not found' });
