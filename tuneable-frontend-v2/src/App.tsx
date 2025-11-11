@@ -16,6 +16,7 @@ import AuthCallback from './pages/AuthCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
+import Help from './pages/Help';
 import Dashboard from './pages/Dashboard';
 import Parties from './pages/Parties';
 import Party from './pages/Party';
@@ -144,6 +145,7 @@ const AppContent = () => {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
+            <Route path="/help" element={<Help />} />
             <Route 
               path="/dashboard" 
               element={

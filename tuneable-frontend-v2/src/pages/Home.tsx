@@ -233,6 +233,12 @@ const Home: React.FC = () => {
             </div>
             <div className="flex space-x-6">
               <Link 
+                to="/help" 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Help
+              </Link>
+              <Link 
                 to="/privacy-policy" 
                 className="text-gray-400 hover:text-white transition-colors"
               >
