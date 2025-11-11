@@ -1581,7 +1581,7 @@ const Party: React.FC = () => {
                                             type="number"
                                             step="0.01"
                                             min={party?.minimumBid || 0.01}
-                                            value={queueBidAmounts[mediaData._id || mediaData.id] ?? ''}
+                                            value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
                                             onChange={(e) => setQueueBidAmounts({
                                               ...queueBidAmounts,
                                               [mediaData._id || mediaData.id]: e.target.value
@@ -1595,7 +1595,8 @@ const Party: React.FC = () => {
                                             className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                           >
                                             {(() => {
-                                              const raw = queueBidAmounts[mediaData._id || mediaData.id] ?? '';
+                                              const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                              const raw = queueBidAmounts[mediaData._id || mediaData.id] ?? defaultBid.toFixed(2);
                                               const parsed = parseFloat(raw);
                                               if (!Number.isFinite(parsed)) {
                                                 return 'Place Bid';
@@ -1651,7 +1652,7 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.01}
-                                      value={newMediaBidAmounts[media._id || media.id] ?? ''}
+                                      value={newMediaBidAmounts[media._id || media.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
                                       onChange={(e) => setNewMediaBidAmounts(prev => ({
                                         ...prev,
                                         [media._id || media.id]: e.target.value
@@ -1663,7 +1664,8 @@ const Party: React.FC = () => {
                                       className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
                                     >
                                       {(() => {
-                                        const raw = newMediaBidAmounts[media._id || media.id] ?? '';
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
                                         const parsed = parseFloat(raw);
                                         if (!Number.isFinite(parsed)) {
                                           return 'Add';
@@ -1710,7 +1712,7 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.01}
-                                      value={newMediaBidAmounts[media._id || media.id] ?? ''}
+                                      value={newMediaBidAmounts[media._id || media.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
                                       onChange={(e) => setNewMediaBidAmounts(prev => ({
                                         ...prev,
                                         [media._id || media.id]: e.target.value
@@ -1722,7 +1724,8 @@ const Party: React.FC = () => {
                                       className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                                     >
                                       {(() => {
-                                        const raw = newMediaBidAmounts[media._id || media.id] ?? '';
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
                                         const parsed = parseFloat(raw);
                                         if (!Number.isFinite(parsed)) {
                                           return 'Add';
@@ -1928,7 +1931,7 @@ const Party: React.FC = () => {
                                     type="number"
                                     step="0.01"
                                     min={party?.minimumBid || 0.01}
-                                    value={queueBidAmounts[mediaData._id || mediaData.id] ?? ''}
+                                    value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
                                     onChange={(e) => setQueueBidAmounts({
                                       ...queueBidAmounts,
                                       [mediaData._id || mediaData.id]: e.target.value
@@ -1942,7 +1945,8 @@ const Party: React.FC = () => {
                                     className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                   >
                                     {(() => {
-                                      const raw = queueBidAmounts[mediaData._id || mediaData.id] ?? '';
+                                      const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                      const raw = queueBidAmounts[mediaData._id || mediaData.id] ?? defaultBid.toFixed(2);
                                       const parsed = parseFloat(raw);
                                       if (!Number.isFinite(parsed)) {
                                         return 'Place Bid';
