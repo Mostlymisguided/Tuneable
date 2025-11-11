@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
@@ -31,7 +31,7 @@ import {
   Users,
   Upload
 } from 'lucide-react';
-import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI } from '../lib/api';
+import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
@@ -176,6 +176,13 @@ const TuneProfile: React.FC = () => {
   const [showCollectiveDropdown, setShowCollectiveDropdown] = useState(false);
   const [collectiveSearchQuery, setCollectiveSearchQuery] = useState('');
   const [collectiveSearchField, setCollectiveSearchField] = useState<'artist' | 'producer' | 'featuring' | null>(null);
+  
+  // Creator/Artist autocomplete state
+  const [artistSearchResults, setArtistSearchResults] = useState<any[]>([]);
+  const [isSearchingArtists, setIsSearchingArtists] = useState(false);
+  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState<{ _id: string; artistName: string; username: string; uuid: string } | null>(null);
+  const artistSearchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   
   const editFormRef = useRef<HTMLDivElement>(null);
   const [editForm, setEditForm] = useState({
@@ -377,6 +384,37 @@ const TuneProfile: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [collectiveSearchQuery, collectiveSearchField]);
 
+  // Search creators/artists by artistName
+  const searchArtists = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setArtistSearchResults([]);
+      setShowArtistDropdown(false);
+      return;
+    }
+    
+    // Clear previous debounce
+    if (artistSearchDebounceRef.current) {
+      clearTimeout(artistSearchDebounceRef.current);
+    }
+    
+    artistSearchDebounceRef.current = setTimeout(async () => {
+      setIsSearchingArtists(true);
+      try {
+        const response = await userAPI.searchUsers({ search: query.trim(), limit: 10 });
+        // Filter to only show users with artistName (creators)
+        const creators = (response.users || []).filter((user: any) => user.artistName);
+        setArtistSearchResults(creators);
+        setShowArtistDropdown(creators.length > 0);
+      } catch (error) {
+        console.error('Error searching artists:', error);
+        setArtistSearchResults([]);
+        setShowArtistDropdown(false);
+      } finally {
+        setIsSearchingArtists(false);
+      }
+    }, 300);
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -481,8 +519,27 @@ const TuneProfile: React.FC = () => {
         setLabelSearchQuery('');
       }
       
-      // Set selected collective if artist has collectiveId
+      // Set selected artist/creator if artist has userId
       const existingArtist = (media as any).artist?.[0];
+      if (existingArtist && existingArtist.userId) {
+        // If userId is an object (populated), use it directly
+        const user = existingArtist.userId;
+        if (typeof user === 'object' && user._id) {
+          setSelectedArtist({
+            _id: user._id,
+            artistName: user.creatorProfile?.artistName || existingArtist.name || '',
+            username: user.username || '',
+            uuid: user.uuid || ''
+          });
+        } else if (typeof user === 'string') {
+          // If it's just an ID, we'd need to fetch it, but for now just set the name
+          // The userId will be preserved when saving
+        }
+      } else {
+        setSelectedArtist(null);
+      }
+      
+      // Set selected collective if artist has collectiveId
       if (existingArtist && existingArtist.collectiveId) {
         // If collectiveId is an object (populated), use it directly
         const collective = existingArtist.collectiveId;
@@ -533,6 +590,26 @@ const TuneProfile: React.FC = () => {
         updateData.artistCollectiveId = selectedCollective._id;
       } else {
         updateData.artistCollectiveId = null;
+      }
+      
+      // Add userId for artist if creator is selected
+      if (selectedArtist) {
+        updateData.artistUserId = selectedArtist._id;
+        // Format artist as array with userId
+        updateData.artist = [{
+          name: editForm.artist,
+          userId: selectedArtist._id,
+          collectiveId: null,
+          verified: false
+        }];
+      } else if (editForm.artist) {
+        // If no creator selected, just send the name
+        updateData.artist = [{
+          name: editForm.artist,
+          userId: null,
+          collectiveId: collectiveSearchField === 'artist' && selectedCollective ? selectedCollective._id : null,
+          verified: false
+        }];
       }
       
       await mediaAPI.updateMedia(media?._id || mediaId, updateData);
@@ -1149,9 +1226,42 @@ const TuneProfile: React.FC = () => {
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
               <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2 md:px-4">{media.title}</h1>
-              <p className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2 md:px-4">
-                {getCreatorDisplay(media)}
-              </p>
+              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2 md:px-4">
+                {(() => {
+                  // Check if artist has userId for linking
+                  const artistArray = (media as any).artist;
+                  if (Array.isArray(artistArray) && artistArray.length > 0) {
+                    const firstArtist = artistArray[0];
+                    if (firstArtist.userId) {
+                      // Get userId - handle both populated object and ObjectId string
+                      const userId = typeof firstArtist.userId === 'object' && firstArtist.userId._id
+                        ? firstArtist.userId._id
+                        : typeof firstArtist.userId === 'string'
+                        ? firstArtist.userId
+                        : firstArtist.userId;
+                      
+                      const uuid = typeof firstArtist.userId === 'object' && firstArtist.userId.uuid
+                        ? firstArtist.userId.uuid
+                        : null;
+                      
+                      const linkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
+                      
+                      if (linkPath) {
+                        return (
+                          <Link 
+                            to={linkPath}
+                            className="hover:text-purple-200 hover:underline transition-colors"
+                          >
+                            {getCreatorDisplay(media)}
+                          </Link>
+                        );
+                      }
+                    }
+                  }
+                  // Fallback to plain text if no userId
+                  return <span>{getCreatorDisplay(media)}</span>;
+                })()}
+              </div>
               
               {/* Bid Metrics Grid */}
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 gap-y-2 md:gap-4 px-2 md:px-0">
@@ -1484,13 +1594,44 @@ const TuneProfile: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               {visibleFields.map((field, index) => {
                 const IconComponent = field.icon;
+                // Special handling for Artist field to make it clickable if userId exists
+                const isArtistField = field.label === 'Artist';
+                const artistArray = isArtistField ? (media as any).artist : null;
+                const firstArtist = artistArray && Array.isArray(artistArray) && artistArray.length > 0 ? artistArray[0] : null;
+                const hasUserId = firstArtist && firstArtist.userId;
+                
+                // Get link path for artist
+                let artistLinkPath: string | null = null;
+                if (hasUserId) {
+                  const userId = typeof firstArtist.userId === 'object' && firstArtist.userId._id
+                    ? firstArtist.userId._id
+                    : typeof firstArtist.userId === 'string'
+                    ? firstArtist.userId
+                    : firstArtist.userId;
+                  
+                  const uuid = typeof firstArtist.userId === 'object' && firstArtist.userId.uuid
+                    ? firstArtist.userId.uuid
+                    : null;
+                  
+                  artistLinkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
+                }
+                
                 return (
                   <div key={index} className="flex items-start space-x-3">
                     <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
                     <div>
                       <div className="text-sm text-gray-300">{field.label}</div>
                       <div className="text-white font-medium">
-                        {getFieldValue(field.value, (field as any).fieldName)}
+                        {isArtistField && artistLinkPath ? (
+                          <Link 
+                            to={artistLinkPath}
+                            className="hover:text-purple-200 hover:underline transition-colors"
+                          >
+                            {getFieldValue(field.value, (field as any).fieldName)}
+                          </Link>
+                        ) : (
+                          getFieldValue(field.value, (field as any).fieldName)
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1886,22 +2027,79 @@ const TuneProfile: React.FC = () => {
                       onChange={(e) => {
                         const value = e.target.value;
                         setEditForm({ ...editForm, artist: value });
-                        // If user types, clear collective selection for artist
+                        // Clear selections when user types
                         if (collectiveSearchField === 'artist') {
                           setSelectedCollective(null);
                           setCollectiveSearchQuery('');
                           setShowCollectiveDropdown(false);
                         }
+                        if (selectedArtist) {
+                          setSelectedArtist(null);
+                        }
+                        // Search for creators/artists
+                        if (value.length >= 2) {
+                          searchArtists(value);
+                        } else {
+                          setArtistSearchResults([]);
+                          setShowArtistDropdown(false);
+                        }
                       }}
                       onFocus={() => {
+                        // Show artist dropdown if there are results
+                        if (artistSearchResults.length > 0) {
+                          setShowArtistDropdown(true);
+                        }
                         // Optionally show collective search if query exists
                         if (collectiveSearchField === 'artist' && collectiveSearchQuery) {
                           setShowCollectiveDropdown(true);
                         }
                       }}
-                      className="input pr-10"
-                      placeholder="Artist name or search for collective"
+                      className="input pr-20"
+                      placeholder="Artist name (autocomplete by artist name)"
                     />
+                    {/* Artist autocomplete dropdown */}
+                    {showArtistDropdown && artistSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ top: '100%', left: 0 }}>
+                        {artistSearchResults.map((creator) => (
+                          <button
+                            key={creator._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedArtist({
+                                _id: creator._id,
+                                artistName: creator.artistName || '',
+                                username: creator.username,
+                                uuid: creator.uuid
+                              });
+                              setEditForm({ ...editForm, artist: creator.artistName || creator.username });
+                              setShowArtistDropdown(false);
+                              setArtistSearchResults([]);
+                            }}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
+                          >
+                            <img
+                              src={creator.profilePic || DEFAULT_PROFILE_PIC}
+                              alt={creator.username}
+                              className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{creator.artistName || creator.username}</div>
+                              {creator.artistName && creator.username !== creator.artistName && (
+                                <div className="text-sm text-gray-400 truncate">@{creator.username}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {isSearchingArtists && (
+                      <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -1925,6 +2123,12 @@ const TuneProfile: React.FC = () => {
                       <Users className="h-4 w-4" />
                     </button>
                   </div>
+                  {selectedArtist && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <span>Linked to: {selectedArtist.artistName} (@{selectedArtist.username})</span>
+                    </div>
+                  )}
                   {collectiveSearchField === 'artist' && showCollectiveDropdown && collectiveSearchResults.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ top: '100%', left: 0 }}>
                       {collectiveSearchResults.map((collective) => (

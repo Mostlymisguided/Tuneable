@@ -1001,6 +1001,11 @@ router.get('/:mediaId/profile', async (req, res) => {
         select: 'name slug logo verificationStatus stats.artistCount stats.releaseCount stats.globalLabelAggregate'
       })
       .populate({
+        path: 'artist.userId',
+        model: 'User',
+        select: 'username profilePic uuid creatorProfile.artistName'
+      })
+      .populate({
         path: 'artist.collectiveId',
         model: 'Collective',
         select: 'name slug profilePicture verificationStatus'
@@ -1314,18 +1319,40 @@ router.put('/:id', authMiddleware, async (req, res) => {
     
     // Special handling for creator fields (convert strings/arrays to subdocument format)
     
-    // Artist field (string -> array of subdocuments)
+    // Artist field (string or array -> array of subdocuments)
     // Parse artist string to extract primary artists and featuring artists
     if (req.body.artist !== undefined) {
-      if (typeof req.body.artist === 'string' && req.body.artist.trim()) {
+      // Handle array format (from autocomplete selection with userId)
+      if (Array.isArray(req.body.artist) && req.body.artist.length > 0) {
+        media.artist = req.body.artist.map(artist => {
+          // If artist is already in subdocument format
+          if (typeof artist === 'object' && artist.name) {
+            return {
+              name: artist.name.trim(),
+              userId: artist.userId || null,
+              collectiveId: artist.collectiveId || req.body.artistCollectiveId || null,
+              verified: artist.verified || false
+            };
+          }
+          // If it's just a string in the array
+          return {
+            name: typeof artist === 'string' ? artist.trim() : '',
+            userId: null,
+            collectiveId: req.body.artistCollectiveId || null,
+            verified: false
+          };
+        });
+      } else if (typeof req.body.artist === 'string' && req.body.artist.trim()) {
         const parsedArtist = parseArtistString(req.body.artist.trim());
         
         // Build artist array from parsed primary artists
-        // Check if artistCollectiveId is provided
+        // Check if artistUserId or artistCollectiveId is provided
+        const artistUserId = req.body.artistUserId || null;
         const artistCollectiveId = req.body.artistCollectiveId || null;
+        
         media.artist = parsedArtist.artists.map(name => ({
           name: name.trim(),
-          userId: null,
+          userId: artistUserId,
           collectiveId: artistCollectiveId,
           verified: false
         }));
