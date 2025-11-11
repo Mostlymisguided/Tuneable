@@ -188,7 +188,7 @@ const TuneProfile: React.FC = () => {
     genres: [] as string[],
     genre: '', // Keep for backward compatibility
     releaseDate: '',
-    duration: 0,
+    duration: '0:00', // Store as MM:SS string
     explicit: false,
     isrc: '',
     upc: '',
@@ -436,7 +436,7 @@ const TuneProfile: React.FC = () => {
         genres: genresArray,
         genre: genreValue,
         releaseDate: releaseDateFormatted,
-        duration: media.duration || 0,
+        duration: media.duration ? secondsToMMSS(media.duration) : '0:00',
         explicit: media.explicit || false,
         isrc: media.isrc || '',
         upc: media.upc || '',
@@ -515,8 +515,12 @@ const TuneProfile: React.FC = () => {
       const elements = elementsInput.split(',').map(el => el.trim()).filter(el => el.length > 0);
       const featuring = featuringInput.split(',').map(f => f.trim()).filter(f => f.length > 0);
       
+      // Convert duration from MM:SS to seconds
+      const durationInSeconds = mmssToSeconds(editForm.duration);
+      
       const updateData: any = {
         ...editForm,
+        duration: durationInSeconds,
         tags,
         genres,
         elements,
@@ -2085,14 +2089,18 @@ const TuneProfile: React.FC = () => {
               {/* Duration and Explicit */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-white font-medium mb-2">Duration (seconds)</label>
+                  <label className="block text-white font-medium mb-2">Duration (MM:SS)</label>
                   <input
-                    type="number"
+                    type="text"
                     value={editForm.duration}
-                    onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setEditForm({ ...editForm, duration: e.target.value })}
                     className="input"
-                    placeholder="Duration in seconds"
+                    placeholder="3:00"
+                    pattern="[0-9]+:[0-5][0-9]"
                   />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Format: minutes:seconds (e.g., 3:45 for 3 minutes 45 seconds)
+                  </p>
                 </div>
                 <div className="flex items-center mt-8">
                   <input

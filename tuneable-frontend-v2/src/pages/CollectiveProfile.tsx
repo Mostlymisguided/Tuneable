@@ -8,7 +8,6 @@ import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
-import InviteMemberModal from '../components/labels/InviteMemberModal';
 
 interface Collective {
   _id: string;
