@@ -154,8 +154,8 @@ Join here: ${inviteLink}`.trim();
 
   const handleFacebookShare = useCallback(() => {
     const quote = user?.personalInviteCode 
-      ? `Join me on Tuneable! Use my invite code ${user.personalInviteCode} when you sign up.`
-      : 'Join me on Tuneable, the social music platform for bidding on beats!';
+      ? `Support your favourite Artists on Tuneable! Join with this invite code: ${user.personalInviteCode}`
+      : 'Support your favourite Artists on Tuneable! Join the social music platform for bidding on beats.';
     const hashtag = 'Tuneable';
     
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;

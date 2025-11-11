@@ -14,8 +14,8 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">What is Tuneable?</h3>
             <p className="text-gray-300">
               Tuneable is a music discovery and bidding platform where you can bid on songs, join parties, 
-              and discover new music. Your bids help determine what gets played, and you earn credits when 
-              others bid on your favorite tracks.
+              and discover new music. Your bids help determine what gets played, and you earn TuneByte Tokens when 
+              others bid on tunes you've bid on.
             </p>
           </div>
           <div>
@@ -38,15 +38,15 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">How Bidding Works</h3>
             <p className="text-gray-300">
-              When you bid on a song, you're voting for it to be played. Higher bids give songs more weight 
-              in the queue. The minimum bid is usually £0.33, but party hosts can set their own minimum.
+              When you bid on a song, you're voting for it to be moved up the charts. Higher bids give songs more weight 
+              in the charts. The minimum bid is usually £0.01, but party hosts can set their own minimum.
             </p>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Earning Credits</h3>
             <p className="text-gray-300">
-              You earn credits when other users bid on songs you've bid on. The more your songs get bid on, 
-              the more you earn. Credits can be used to bid on more songs or withdrawn to your account.
+              You earn TuneByte Tokens when other users bid on tunes you've bid on. The more your tunes get bid on, 
+              the more you earn. TuneByte Tokens will be able to be exchanged for perks and Artist rewards in the future.
             </p>
           </div>
           <div>
@@ -109,7 +109,7 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Labels</h3>
             <p className="text-gray-300">
               Labels represent record companies or music collectives. Label owners can invite admins and 
-              artists, manage their catalog, and view analytics. You can create multiple labels if needed.
+              artists, manage their catalog, and view analytics.
             </p>
           </div>
           <div>
