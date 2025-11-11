@@ -24,6 +24,8 @@ const notificationSchema = new mongoose.Schema({
       'tune_bytes_earned',       // Earned TuneBytes
       'party_media_played',      // Your media played in party
       'media_claimed',           // Your uploaded media was claimed
+      'label_invite',            // Invited to label
+      'collective_invite',       // Invited to collective
     ],
     required: true
   },

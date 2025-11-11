@@ -7,6 +7,7 @@ const Bid = require('../models/Bid');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createNotification } = require('../services/notificationService');
 
 // Configure upload for collective profile pictures (reuse label upload config)
 const profilePictureUpload = createLabelProfilePictureUpload();
@@ -183,6 +184,23 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
     // Add as admin
     await collective.addMember(targetUser._id, 'admin', inviterId);
     
+    // Create notification for the invited user
+    try {
+      const inviter = await User.findById(inviterId).select('username');
+      await createNotification({
+        userId: targetUser._id,
+        type: 'collective_invite',
+        title: 'Collective Invitation',
+        message: `${inviter?.username || 'Someone'} invited you to join "${collective.name}" as an admin`,
+        link: `/collective/${collective.slug}`,
+        linkText: 'View Collective',
+        relatedUserId: inviterId
+      });
+    } catch (notifError) {
+      console.error('Error creating collective invite notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
     res.json({ success: true, message: 'Admin invited successfully' });
   } catch (error) {
     console.error('Error inviting admin:', error);
@@ -240,6 +258,23 @@ router.post('/:slug/invite-member', authMiddleware, async (req, res) => {
     
     // Add member
     await collective.addMember(targetUser._id, role, inviterId, instrument || null);
+    
+    // Create notification for the invited user
+    try {
+      const inviter = await User.findById(inviterId).select('username');
+      await createNotification({
+        userId: targetUser._id,
+        type: 'collective_invite',
+        title: 'Collective Invitation',
+        message: `${inviter?.username || 'Someone'} invited you to join "${collective.name}" as a ${role}${instrument ? ` (${instrument})` : ''}`,
+        link: `/collective/${collective.slug}`,
+        linkText: 'View Collective',
+        relatedUserId: inviterId
+      });
+    } catch (notifError) {
+      console.error('Error creating collective invite notification:', notifError);
+      // Don't fail the request if notification fails
+    }
     
     res.json({ success: true, message: 'Member invited successfully' });
   } catch (error) {

@@ -7,6 +7,7 @@ const Bid = require('../models/Bid');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createNotification } = require('../services/notificationService');
 
 // Configure upload for label profile pictures
 const profilePictureUpload = createLabelProfilePictureUpload();
@@ -205,6 +206,23 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
     // Add as admin
     await label.addAdmin(targetUser._id, 'admin', inviterId);
     
+    // Create notification for the invited user
+    try {
+      const inviter = await User.findById(inviterId).select('username');
+      await createNotification({
+        userId: targetUser._id,
+        type: 'label_invite',
+        title: 'Label Invitation',
+        message: `${inviter?.username || 'Someone'} invited you to join "${label.name}" as an admin`,
+        link: `/label/${label.slug}`,
+        linkText: 'View Label',
+        relatedUserId: inviterId
+      });
+    } catch (notifError) {
+      console.error('Error creating label invite notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
     res.json({ success: true, message: 'Admin invited successfully' });
   } catch (error) {
     console.error('Error inviting admin:', error);
@@ -275,6 +293,23 @@ router.post('/:slug/invite-artist', authMiddleware, async (req, res) => {
     });
     
     await targetUser.save();
+    
+    // Create notification for the invited user
+    try {
+      const inviter = await User.findById(inviterId).select('username');
+      await createNotification({
+        userId: targetUser._id,
+        type: 'label_invite',
+        title: 'Label Invitation',
+        message: `${inviter?.username || 'Someone'} invited you to join "${label.name}" as an ${role}`,
+        link: `/label/${label.slug}`,
+        linkText: 'View Label',
+        relatedUserId: inviterId
+      });
+    } catch (notifError) {
+      console.error('Error creating label invite notification:', notifError);
+      // Don't fail the request if notification fails
+    }
     
     res.json({ success: true, message: 'Artist invited successfully' });
   } catch (error) {
