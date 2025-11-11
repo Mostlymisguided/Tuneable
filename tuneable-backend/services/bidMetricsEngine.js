@@ -251,10 +251,31 @@ class BidMetricsEngine {
 
     if (config.description.includes('Aggregate')) {
       // For aggregate top metrics, we need to compute aggregates first
+      // Determine grouping: if entities includes 'user' but params.userId is not provided,
+      // we're finding the top user across all users (group by userId)
+      // If params.userId is provided, we're filtering to that user (group by null to get their total)
+      // If entities doesn't include 'user', we're finding top across other dimensions
+      let groupById = null;
+      if (config.entities.includes('user') && !params.userId) {
+        // Finding top user aggregate - group by userId to get each user's total
+        groupById = '$userId';
+      } else if (params.userId) {
+        // Filtering to specific user - group by null to get their total
+        groupById = null;
+      } else {
+        // Other aggregate top metrics - group by the relevant entity
+        // For media aggregate top, we want to group by userId to find top user
+        if (config.entities.includes('media') && !config.entities.includes('user')) {
+          groupById = '$userId';
+        } else {
+          groupById = null;
+        }
+      }
+      
       const aggregationPipeline = [
         { $match: query },
         { $group: { 
-            _id: params.userId ? '$userId' : null, 
+            _id: groupById, 
             total: { $sum: "$amount" } 
         }},
         { $sort: { total: -1 } },
