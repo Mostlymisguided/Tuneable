@@ -793,31 +793,124 @@ router.post('/:id/admins', authMiddleware, async (req, res) => {
   }
 });
 
-// Remove admin from label (owner only)
-router.delete('/:id/admins/:userId', authMiddleware, async (req, res) => {
+// Remove admin from label (owner only, or self-removal)
+router.delete('/:slug/admins/:userId', authMiddleware, async (req, res) => {
   try {
-    const label = await Label.findById(req.params.id);
+    const { slug, userId } = req.params;
+    const requesterId = req.user._id;
+    
+    const label = await Label.findBySlug(slug);
     
     if (!label) {
       return res.status(404).json({ error: 'Label not found' });
     }
 
-    // Check if user is owner
-    if (!label.isOwner(req.user.id)) {
-      return res.status(403).json({ error: 'Only label owners can remove admins' });
+    const isSelfRemoval = userId === requesterId.toString();
+    const isOwner = label.isOwner(requesterId);
+
+    // Allow self-removal OR owner removing others
+    if (!isSelfRemoval && !isOwner) {
+      return res.status(403).json({ error: 'Only label owners can remove other admins' });
     }
 
-    // Can't remove yourself
-    if (req.params.userId === req.user.id) {
-      return res.status(400).json({ error: 'Cannot remove yourself as admin' });
+    // Prevent removing the last owner
+    if (!isSelfRemoval) {
+      const targetAdmin = label.admins.find(a => a.userId.toString() === userId);
+      if (targetAdmin && targetAdmin.role === 'owner') {
+        const ownerCount = label.admins.filter(a => a.role === 'owner').length;
+        if (ownerCount <= 1) {
+          return res.status(400).json({ error: 'Cannot remove the last owner' });
+        }
+      }
     }
 
-    await label.removeAdmin(req.params.userId);
+    await label.removeAdmin(userId);
 
     res.json({ message: 'Admin removed successfully' });
   } catch (error) {
     console.error('Error removing admin:', error);
     res.status(500).json({ error: 'Failed to remove admin' });
+  }
+});
+
+// Remove artist affiliation from label (admin/owner only, or self-removal)
+router.delete('/:slug/artists/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { slug, userId } = req.params;
+    const requesterId = req.user._id;
+    
+    const label = await Label.findBySlug(slug);
+    
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    const isSelfRemoval = userId === requesterId.toString();
+    const isLabelEditor = label.isAdmin(requesterId);
+
+    // Allow self-removal OR admin/owner removing others
+    if (!isSelfRemoval && !isLabelEditor) {
+      return res.status(403).json({ error: 'Only label owners and admins can remove artists' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Remove affiliation
+    if (user.labelAffiliations) {
+      user.labelAffiliations = user.labelAffiliations.filter(
+        aff => aff.labelId.toString() !== label._id.toString()
+      );
+      await user.save();
+    }
+
+    res.json({ message: 'Artist removed successfully' });
+  } catch (error) {
+    console.error('Error removing artist:', error);
+    res.status(500).json({ error: 'Failed to remove artist' });
+  }
+});
+
+// Change admin role (owner only)
+router.patch('/:slug/admins/:userId/role', authMiddleware, async (req, res) => {
+  try {
+    const { slug, userId } = req.params;
+    const { role } = req.body;
+    const requesterId = req.user._id;
+    
+    const label = await Label.findBySlug(slug);
+    
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    if (!label.isOwner(requesterId)) {
+      return res.status(403).json({ error: 'Only label owners can change admin roles' });
+    }
+
+    if (!['owner', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be owner or admin' });
+    }
+
+    // Prevent changing the last owner's role
+    if (role === 'admin') {
+      const targetAdmin = label.admins.find(a => a.userId.toString() === userId);
+      if (targetAdmin && targetAdmin.role === 'owner') {
+        const ownerCount = label.admins.filter(a => a.role === 'owner').length;
+        if (ownerCount <= 1) {
+          return res.status(400).json({ error: 'Cannot change the last owner\'s role' });
+        }
+      }
+    }
+
+    await label.addAdmin(userId, role, requesterId);
+
+    res.json({ message: 'Admin role updated successfully' });
+  } catch (error) {
+    console.error('Error changing admin role:', error);
+    res.status(500).json({ error: 'Failed to change admin role' });
   }
 });
 

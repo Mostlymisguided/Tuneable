@@ -82,6 +82,7 @@ const CollectiveProfile: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<LabelTeamMember[]>([]);
   const [isLoadingTeam, setIsLoadingTeam] = useState(false);
   const [hasLoadedTeam, setHasLoadedTeam] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteType, setInviteType] = useState<'admin' | 'member'>('member');
@@ -150,6 +151,55 @@ const CollectiveProfile: React.FC = () => {
       setTeamMembers([]);
     } finally {
       setIsLoadingTeam(false);
+    }
+  };
+
+  // Get current user's role in the collective
+  const getCurrentUserRole = (): 'founder' | 'admin' | 'member' | undefined => {
+    if (!currentUser || !collective || !teamMembers.length) return undefined;
+    
+    const userCollectiveId = (currentUser as any)._id || currentUser.id || currentUser.uuid;
+    const currentMember = teamMembers.find((member) => {
+      const memberId = typeof member.userId === 'object' 
+        ? (member.userId._id || member.userId.uuid) 
+        : member.userId;
+      return memberId?.toString() === userCollectiveId?.toString();
+    });
+    
+    return currentMember?.role as 'founder' | 'admin' | 'member' | undefined;
+  };
+
+  // Handle removing a member
+  const handleRemoveMember = async (memberId: string, memberRole: string) => {
+    if (!slug || !memberId) return;
+    
+    try {
+      setIsRemoving(true);
+      await collectiveAPI.removeMember(slug, memberId);
+      toast.success('Member removed successfully');
+      await fetchCollectiveTeam(slug);
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      toast.error(error.response?.data?.error || 'Failed to remove member');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  // Handle changing a member's role
+  const handleChangeRole = async (memberId: string, newRole: string) => {
+    if (!slug || !memberId) return;
+    
+    try {
+      setIsRemoving(true);
+      await collectiveAPI.changeMemberRole(slug, memberId, newRole as 'founder' | 'admin' | 'member');
+      toast.success('Role updated successfully');
+      await fetchCollectiveTeam(slug);
+    } catch (error: any) {
+      console.error('Error changing role:', error);
+      toast.error(error.response?.data?.error || 'Failed to change role');
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -1217,7 +1267,15 @@ useEffect(() => {
                     Loading ownership roster...
                   </div>
                 ) : (
-                  <LabelTeamTable members={teamMembers} isEditable />
+                  <LabelTeamTable 
+                    members={teamMembers} 
+                    isEditable 
+                    currentUserId={(currentUser as any)?._id || currentUser?.id || currentUser?.uuid}
+                    currentUserRole={getCurrentUserRole()}
+                    onRemove={handleRemoveMember}
+                    onChangeRole={handleChangeRole}
+                    isRemoving={isRemoving}
+                  />
                 )}
               </div>
             )}

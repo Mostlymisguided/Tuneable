@@ -631,31 +631,84 @@ router.post('/:id/members', authMiddleware, async (req, res) => {
   }
 });
 
-// Remove member from collective (founder/admin only)
-router.delete('/:id/members/:userId', authMiddleware, async (req, res) => {
+// Remove member from collective (founder/admin only, or self-removal)
+router.delete('/:slug/members/:userId', authMiddleware, async (req, res) => {
   try {
-    const collective = await Collective.findById(req.params.id);
+    const { slug, userId } = req.params;
+    const requesterId = req.user._id;
+    
+    const collective = await Collective.findBySlug(slug);
     
     if (!collective) {
       return res.status(404).json({ error: 'Collective not found' });
     }
 
-    // Check if user is admin
-    if (!collective.isAdmin(req.user.id)) {
-      return res.status(403).json({ error: 'Only collective founders/admins can remove members' });
+    const isSelfRemoval = userId === requesterId.toString();
+    const isAdmin = collective.isAdmin(requesterId);
+
+    // Allow self-removal OR founder/admin removing others
+    if (!isSelfRemoval && !isAdmin) {
+      return res.status(403).json({ error: 'Only collective founders and admins can remove other members' });
     }
 
-    // Can't remove yourself
-    if (req.params.userId === req.user.id) {
-      return res.status(400).json({ error: 'Cannot remove yourself as member' });
+    // Prevent removing the last founder
+    if (!isSelfRemoval) {
+      const targetMember = collective.members.find(m => m.userId.toString() === userId && !m.leftAt);
+      if (targetMember && targetMember.role === 'founder') {
+        const founderCount = collective.members.filter(m => m.role === 'founder' && !m.leftAt).length;
+        if (founderCount <= 1) {
+          return res.status(400).json({ error: 'Cannot remove the last founder' });
+        }
+      }
     }
 
-    await collective.removeMember(req.params.userId);
+    await collective.removeMember(userId);
 
     res.json({ message: 'Member removed successfully' });
   } catch (error) {
     console.error('Error removing member:', error);
     res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
+// Change member role (founder only)
+router.patch('/:slug/members/:userId/role', authMiddleware, async (req, res) => {
+  try {
+    const { slug, userId } = req.params;
+    const { role } = req.body;
+    const requesterId = req.user._id;
+    
+    const collective = await Collective.findBySlug(slug);
+    
+    if (!collective) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+
+    if (!collective.isFounder(requesterId)) {
+      return res.status(403).json({ error: 'Only collective founders can change member roles' });
+    }
+
+    if (!['founder', 'admin', 'member'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be founder, admin, or member' });
+    }
+
+    // Prevent changing the last founder's role
+    if (role !== 'founder') {
+      const targetMember = collective.members.find(m => m.userId.toString() === userId && !m.leftAt);
+      if (targetMember && targetMember.role === 'founder') {
+        const founderCount = collective.members.filter(m => m.role === 'founder' && !m.leftAt).length;
+        if (founderCount <= 1) {
+          return res.status(400).json({ error: 'Cannot change the last founder\'s role' });
+        }
+      }
+    }
+
+    await collective.addMember(userId, role, requesterId);
+
+    res.json({ message: 'Member role updated successfully' });
+  } catch (error) {
+    console.error('Error changing member role:', error);
+    res.status(500).json({ error: 'Failed to change member role' });
   }
 });
 

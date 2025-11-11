@@ -90,6 +90,7 @@ const LabelProfile: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteType, setInviteType] = useState<'admin' | 'artist'>('artist');
+  const [isRemoving, setIsRemoving] = useState(false);
   
   // Edit mode - controlled by query params (similar to UserProfile and TuneProfile)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -260,6 +261,64 @@ const LabelProfile: React.FC = () => {
       setTeamMembers([]);
     } finally {
       setIsLoadingTeam(false);
+    }
+  };
+
+  // Get current user's role in the label
+  const getCurrentUserRole = (): 'owner' | 'admin' | 'member' | undefined => {
+    if (!currentUser || !label || !teamMembers.length) return undefined;
+    
+    const userLabelId = (currentUser as any)._id || currentUser.id || currentUser.uuid;
+    const currentMember = teamMembers.find((member) => {
+      const memberId = typeof member.userId === 'object' 
+        ? (member.userId._id || member.userId.uuid) 
+        : member.userId;
+      return memberId?.toString() === userLabelId?.toString();
+    });
+    
+    return currentMember?.role as 'owner' | 'admin' | 'member' | undefined;
+  };
+
+  // Handle removing a member
+  const handleRemoveMember = async (memberId: string, memberRole: string) => {
+    if (!slug || !memberId) return;
+    
+    const isAdmin = memberRole === 'admin' || memberRole === 'owner';
+    const isArtist = !isAdmin;
+    
+    try {
+      setIsRemoving(true);
+      
+      if (isAdmin) {
+        await labelAPI.removeAdmin(slug, memberId);
+      } else if (isArtist) {
+        await labelAPI.removeArtist(slug, memberId);
+      }
+      
+      toast.success('Member removed successfully');
+      await fetchLabelTeam(slug);
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      toast.error(error.response?.data?.error || 'Failed to remove member');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  // Handle changing a member's role
+  const handleChangeRole = async (memberId: string, newRole: string) => {
+    if (!slug || !memberId) return;
+    
+    try {
+      setIsRemoving(true);
+      await labelAPI.changeAdminRole(slug, memberId, newRole as 'owner' | 'admin');
+      toast.success('Role updated successfully');
+      await fetchLabelTeam(slug);
+    } catch (error: any) {
+      console.error('Error changing role:', error);
+      toast.error(error.response?.data?.error || 'Failed to change role');
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -1153,7 +1212,15 @@ const LabelProfile: React.FC = () => {
                     Loading ownership roster...
                   </div>
                 ) : (
-                  <LabelTeamTable members={teamMembers} isEditable />
+                  <LabelTeamTable 
+                    members={teamMembers} 
+                    isEditable 
+                    currentUserId={(currentUser as any)?._id || currentUser?.id || currentUser?.uuid}
+                    currentUserRole={getCurrentUserRole()}
+                    onRemove={handleRemoveMember}
+                    onChangeRole={handleChangeRole}
+                    isRemoving={isRemoving}
+                  />
                 )}
               </div>
             )}

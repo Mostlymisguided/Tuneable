@@ -762,9 +762,21 @@ export const labelAPI = {
     return response.data;
   },
 
-  // Remove admin from label (authenticated, owner only)
-  removeAdmin: async (labelId: string, userId: string) => {
-    const response = await api.delete(`/labels/${labelId}/admins/${userId}`);
+  // Remove admin from label (authenticated, owner only, or self-removal)
+  removeAdmin: async (slug: string, userId: string) => {
+    const response = await api.delete(`/labels/${slug}/admins/${userId}`);
+    return response.data;
+  },
+
+  // Remove artist from label (authenticated, admin/owner only, or self-removal)
+  removeArtist: async (slug: string, userId: string) => {
+    const response = await api.delete(`/labels/${slug}/artists/${userId}`);
+    return response.data;
+  },
+
+  // Change admin role (authenticated, owner only)
+  changeAdminRole: async (slug: string, userId: string, role: 'owner' | 'admin') => {
+    const response = await api.patch(`/labels/${slug}/admins/${userId}/role`, { role });
     return response.data;
   },
 
@@ -846,6 +858,18 @@ export const collectiveAPI = {
   // Invite member to collective (founders and admins)
   inviteMember: async (slug: string, data: { userId?: string; email?: string; role?: 'member' | 'admin'; instrument?: string }) => {
     const response = await api.post(`/collectives/${slug}/invite-member`, data);
+    return response.data;
+  },
+
+  // Remove member from collective (authenticated, founder/admin only, or self-removal)
+  removeMember: async (slug: string, userId: string) => {
+    const response = await api.delete(`/collectives/${slug}/members/${userId}`);
+    return response.data;
+  },
+
+  // Change member role (authenticated, founder only)
+  changeMemberRole: async (slug: string, userId: string, role: 'founder' | 'admin' | 'member') => {
+    const response = await api.patch(`/collectives/${slug}/members/${userId}/role`, { role });
     return response.data;
   },
 

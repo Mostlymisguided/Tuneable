@@ -2640,11 +2640,6 @@ Join here: ${inviteLink}`.trim();
           onClose={() => setIsCollectiveModalOpen(false)}
         />
 
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-blue-100">
-          <p className="text-sm">
-            🚀 Coming soon: deep-dive analytics, fan engagement insights, and revenue projections.
-          </p>
-        </div>
 
         </div>
       </div>
