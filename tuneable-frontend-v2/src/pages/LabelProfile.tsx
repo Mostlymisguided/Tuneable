@@ -283,6 +283,18 @@ const LabelProfile: React.FC = () => {
   const handleRemoveMember = async (memberId: string, memberRole: string) => {
     if (!slug || !memberId) return;
     
+    const userLabelId = (currentUser as any)?._id || currentUser?.id || currentUser?.uuid;
+    const isSelfRemoval = memberId === userLabelId?.toString();
+    
+    // Show confirmation dialog
+    const confirmMessage = isSelfRemoval
+      ? 'Are you sure you want to remove yourself from this label?'
+      : `Are you sure you want to remove this ${memberRole === 'admin' || memberRole === 'owner' ? 'admin' : 'artist'} from the label?`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    
     const isAdmin = memberRole === 'admin' || memberRole === 'owner';
     const isArtist = !isAdmin;
     

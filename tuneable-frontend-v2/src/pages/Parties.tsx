@@ -393,7 +393,7 @@ const Parties: React.FC = () => {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Filter Parties by Name, Description or Tags... (Press Enter to Add)"
+              placeholder="Filter Parties by Tags, Name or Description... (Press Enter to Add)"
               className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               value={currentSearchInput}
               onChange={(e) => setCurrentSearchInput(e.target.value)}

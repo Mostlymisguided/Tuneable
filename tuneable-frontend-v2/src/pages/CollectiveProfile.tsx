@@ -173,6 +173,18 @@ const CollectiveProfile: React.FC = () => {
   const handleRemoveMember = async (memberId: string, _memberRole?: string) => {
     if (!slug || !memberId) return;
     
+    const userCollectiveId = (currentUser as any)?._id || currentUser?.id || currentUser?.uuid;
+    const isSelfRemoval = memberId === userCollectiveId?.toString();
+    
+    // Show confirmation dialog
+    const confirmMessage = isSelfRemoval
+      ? 'Are you sure you want to remove yourself from this collective?'
+      : 'Are you sure you want to remove this member from the collective?';
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    
     try {
       setIsRemoving(true);
       await collectiveAPI.removeMember(slug, memberId);

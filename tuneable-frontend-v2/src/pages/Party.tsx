@@ -1623,31 +1623,31 @@ const Party: React.FC = () => {
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                               {addMediaResults.database.map((media: any) => (
-                                <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                                <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
                                       src={media.coverArt || DEFAULT_COVER_ART}
                                       alt={media.title}
-                                      className="h-12 w-12 rounded object-cover flex-shrink-0"
+                                      className="h-12 w-12 md:h-12 md:w-12 rounded object-cover flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p 
-                                        className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                        className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors text-sm md:text-base"
                                         onClick={() => navigate(`/tune/${media._id || media.id}`)}
                                         title="View tune profile"
                                       >
                                         {media.title}
                                       </p>
-                                      <p className="text-gray-400 text-sm truncate">{media.artist}</p>
+                                      <p className="text-gray-400 text-xs md:text-sm truncate">{media.artist}</p>
                                       {media.duration && (
-                                        <div className="flex justify-center items-center space-x-1 mt-1">
+                                        <div className="flex items-center space-x-1 mt-1">
                                           <Clock className="h-3 w-3 text-gray-500" />
                                           <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
                                         </div>
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-2 md:flex-shrink-0">
                                     <input
                                       type="number"
                                       step="0.01"
@@ -1657,11 +1657,11 @@ const Party: React.FC = () => {
                                         ...prev,
                                         [media._id || media.id]: e.target.value
                                       }))}
-                                      className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                      className="w-20 md:w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
-                                      className="z-999 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-sm"
+                                      className="z-999 px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                     >
                                       {(() => {
                                         const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
@@ -1689,25 +1689,25 @@ const Party: React.FC = () => {
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                               {addMediaResults.youtube.map((media: any) => (
-                                <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex items-center justify-between">
+                                <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
                                       src={media.coverArt || DEFAULT_COVER_ART}
                                       alt={media.title}
-                                      className="h-12 w-12 rounded object-cover flex-shrink-0"
+                                      className="h-12 w-12 md:h-12 md:w-12 rounded object-cover flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-white font-medium truncate">{media.title}</p>
-                                      <p className="text-gray-400 text-sm truncate">{media.artist}</p>
+                                      <p className="text-white font-medium truncate text-sm md:text-base">{media.title}</p>
+                                      <p className="text-gray-400 text-xs md:text-sm truncate">{media.artist}</p>
                                       {media.duration && (
-                                        <div className="flex justify-center items-center space-x-1 mt-1">
+                                        <div className="flex items-center space-x-1 mt-1">
                                           <Clock className="h-3 w-3 text-gray-500" />
                                           <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
                                         </div>
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-2 md:flex-shrink-0">
                                     <input
                                       type="number"
                                       step="0.01"
@@ -1717,11 +1717,11 @@ const Party: React.FC = () => {
                                         ...prev,
                                         [media._id || media.id]: e.target.value
                                       }))}
-                                      className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                      className="w-20 md:w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
-                                      className="flex px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                                      className="flex px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                     >
                                       {(() => {
                                         const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
