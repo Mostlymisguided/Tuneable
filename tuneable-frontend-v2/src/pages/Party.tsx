@@ -770,7 +770,7 @@ const Party: React.FC = () => {
     let media;
     if (selectedTimePeriod === 'all-time') {
       // Show regular party media
-      media = getPartyMedia().filter((item: any) => item.status === 'queued');
+      media = getPartyMedia().filter((item: any) => item.status === 'active');
     } else {
       // Show sorted media from the selected time period
       media = sortedMedia.filter((item: any) => item.status === 'active');
@@ -835,7 +835,7 @@ const Party: React.FC = () => {
     
     let media;
     if (selectedTimePeriod === 'all-time') {
-      media = getPartyMedia().filter((item: any) => item.status === 'queued');
+      media = getPartyMedia().filter((item: any) => item.status === 'active');
     } else {
       media = sortedMedia.filter((item: any) => item.status === 'active');
     }
