@@ -49,17 +49,6 @@ interface User {
     google?: boolean;
     instagram?: boolean;
   };
-  homeLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-    countryCode?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-    detectedFromIP?: boolean;
-  };
   creatorProfile?: {
     artistName?: string;
     verificationStatus?: 'pending' | 'verified' | 'rejected';
