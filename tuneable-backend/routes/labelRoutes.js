@@ -167,7 +167,7 @@ router.get('/:slug/team', authMiddleware, async (req, res) => {
   }
 });
 
-// Invite admin to label (owners only)
+// Invite admin to label (owners and admins)
 router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
@@ -179,10 +179,10 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Label not found' });
     }
     
-    // Check if inviter is owner
-    const isOwner = label.isOwner(inviterId);
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Only label owners can invite admins' });
+    // Check if inviter is owner or admin
+    const isLabelEditor = label.isAdmin(inviterId);
+    if (!isLabelEditor) {
+      return res.status(403).json({ error: 'Only label owners and admins can invite admins' });
     }
     
     let targetUser;
