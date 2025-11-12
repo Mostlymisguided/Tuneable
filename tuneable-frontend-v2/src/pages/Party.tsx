@@ -1194,7 +1194,7 @@ const Party: React.FC = () => {
       {/* Metrics Cards */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
         <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-purple-800/50 border border-gray-600 px-3 py-2 rounded-lg backdrop-blur-sm">
+          <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
             <div className="flex items-center space-x-2">
               <Music className="h-6 w-6 text-white" />
               <div>

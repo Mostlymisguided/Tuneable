@@ -824,7 +824,7 @@ Join here: ${inviteLink}`.trim();
                             </div>
                             <ArrowUp className="h-4 w-4 text-white" />
                           </button>
-                          {user?.creatorProfile?.verificationStatus === 'verified' && (
+                          {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
                             <>
                               <button
                                 onClick={() => setIsLabelModalOpen(true)}
@@ -1168,7 +1168,7 @@ Join here: ${inviteLink}`.trim();
                       <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-lg font-semibold text-white">My Labels</h3>
-                          {user?.creatorProfile?.verificationStatus === 'verified' && (
+                          {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
                             <button
                               onClick={() => setIsLabelModalOpen(true)}
                               className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -1685,7 +1685,7 @@ Join here: ${inviteLink}`.trim();
                                 Clear Filters
                               </button>
                             )}
-                            {user?.creatorProfile?.verificationStatus === 'verified' && (
+                            {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
                               <button
                                 onClick={() => setIsLabelModalOpen(true)}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -1778,7 +1778,7 @@ Join here: ${inviteLink}`.trim();
                       <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-lg font-semibold text-white">My Collectives</h3>
-                          {user?.creatorProfile?.verificationStatus === 'verified' && (
+                          {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
                             <button
                               onClick={() => setIsCollectiveModalOpen(true)}
                               className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -2195,7 +2195,7 @@ Join here: ${inviteLink}`.trim();
                                 Clear Filters
                               </button>
                             )}
-                            {user?.creatorProfile?.verificationStatus === 'verified' && (
+                            {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
                               <button
                                 onClick={() => setIsCollectiveModalOpen(true)}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"

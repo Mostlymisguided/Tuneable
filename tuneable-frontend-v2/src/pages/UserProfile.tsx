@@ -954,8 +954,8 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Add Label & Collective Buttons - Only for verified creators viewing own profile */}
-              {isOwnProfile && currentUser && currentUser.creatorProfile?.verificationStatus === 'verified' && (
+              {/* Add Label & Collective Buttons - Only for verified creators or admins viewing own profile */}
+              {isOwnProfile && currentUser && (currentUser.creatorProfile?.verificationStatus === 'verified' || currentUser.role?.includes('admin')) && (
                 <div className="mb-2 flex items-center space-x-2">
                   <button
                     onClick={() => setIsCollectiveModalOpen(true)}
