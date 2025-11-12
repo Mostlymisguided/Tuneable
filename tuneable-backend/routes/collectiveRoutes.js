@@ -140,7 +140,7 @@ router.get('/:slug/team', authMiddleware, async (req, res) => {
   }
 });
 
-// Invite admin to collective (founders only)
+// Invite admin to collective (founders and admins)
 router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
@@ -152,10 +152,10 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Collective not found' });
     }
     
-    // Check if inviter is founder
-    const isFounder = collective.isFounder(inviterId);
-    if (!isFounder) {
-      return res.status(403).json({ error: 'Only collective founders can invite admins' });
+    // Check if inviter is founder or admin
+    const isCollectiveEditor = collective.isAdmin(inviterId);
+    if (!isCollectiveEditor) {
+      return res.status(403).json({ error: 'Only collective founders and admins can invite admins' });
     }
     
     let targetUser;
