@@ -152,7 +152,7 @@ const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, handleOAuthCallback } = useAuth();
   
   // Web player store for playing media
   const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
@@ -276,7 +276,41 @@ const UserProfile: React.FC = () => {
         fetchUserProfile();
       }
     }
-  }, [userId, currentUser, navigate, searchParams]);
+    
+    // Handle OAuth token in URL (for account linking redirects)
+    const token = searchParams.get('token');
+    if (token && isOwnProfile) {
+      // Handle OAuth callback
+      handleOAuthCallback(token).then(() => {
+        // Refresh user profile to show updated OAuth connections
+        fetchUserProfile();
+        // Remove token and oauth_success from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('token');
+        newParams.delete('oauth_success');
+        setSearchParams(newParams, { replace: true });
+        toast.success('Account connected successfully!');
+      }).catch((error: any) => {
+        console.error('Error handling OAuth callback:', error);
+        toast.error('Failed to connect account');
+        // Remove token from URL even on error
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('token');
+        setSearchParams(newParams, { replace: true });
+      });
+    } else {
+      // Check if we're returning from OAuth connection and refresh user data
+      const oauthSuccess = searchParams.get('oauth_success');
+      if (oauthSuccess === 'true' && isOwnProfile) {
+        // Refresh user profile to show updated OAuth connections
+        fetchUserProfile();
+        // Remove the oauth_success param from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('oauth_success');
+        setSearchParams(newParams, { replace: true });
+      }
+    }
+  }, [userId, currentUser, navigate, searchParams, isOwnProfile, handleOAuthCallback, fetchUserProfile]);
 
 
   // Settings handlers

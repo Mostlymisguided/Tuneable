@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import { useEffect } from 'react';
+import { X, Loader2 } from 'lucide-react';
 import { Facebook, Instagram, Music2 } from 'lucide-react';
 
 interface SocialMediaModalProps {
@@ -35,49 +35,34 @@ const platformConfig = {
 };
 
 export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl, onSave }: SocialMediaModalProps) {
-  const [url, setUrl] = useState(currentUrl || '');
-  const [isValidating, setIsValidating] = useState(false);
-  const [error, setError] = useState('');
-
   const config = platformConfig[platform];
 
-  const validateUrl = (url: string): boolean => {
-    if (!url.trim()) return false;
+  const handleOAuthConnect = () => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     
-    const patterns = {
-      facebook: /^https?:\/\/(www\.)?facebook\.com\/[a-zA-Z0-9.]+/,
-      instagram: /^https?:\/\/(www\.)?instagram\.com\/[a-zA-Z0-9._]+/,
-      soundcloud: /^https?:\/\/(www\.)?soundcloud\.com\/[a-zA-Z0-9._-]+/
-    };
-
-    return patterns[platform].test(url);
+    // Get current user ID from URL or localStorage to redirect back to profile
+    const currentPath = window.location.pathname;
+    const userId = currentPath.split('/user/')[1]?.split('?')[0];
+    
+    // Build redirect URL to return to profile settings after OAuth
+    const redirectPath = userId ? `/user/${userId}?settings=true&tab=profile&oauth_success=true` : '/dashboard?oauth_success=true';
+    const redirectUrl = encodeURIComponent(`${window.location.origin}${redirectPath}`);
+    
+    // Redirect to OAuth endpoint with redirect parameter
+    const oauthUrl = `${API_BASE_URL}/auth/${platform}?redirect=${redirectUrl}&link_account=true`;
+    window.location.href = oauthUrl;
   };
 
-  const handleSave = async () => {
-    setError('');
-    setIsValidating(true);
-
-    if (!url.trim()) {
-      setError('Please enter a URL');
-      setIsValidating(false);
-      return;
+  // Auto-redirect to OAuth when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      // Small delay to show the modal briefly before redirect
+      const timer = setTimeout(() => {
+        handleOAuthConnect();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-
-    if (!validateUrl(url)) {
-      setError(`Please enter a valid ${config.name} URL`);
-      setIsValidating(false);
-      return;
-    }
-
-    try {
-      await onSave(url);
-      onClose();
-    } catch (err) {
-      setError('Failed to save URL. Please try again.');
-    } finally {
-      setIsValidating(false);
-    }
-  };
+  }, [isOpen]);
 
 
   if (!isOpen) return null;
@@ -88,12 +73,20 @@ export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className={`p-2 rounded-lg bg-${config.color}-100`}>
-              <config.icon className={`w-5 h-5 text-${config.color}-600`} />
+            <div className={`p-2 rounded-lg ${
+              platform === 'facebook' ? 'bg-blue-100' :
+              platform === 'instagram' ? 'bg-pink-100' :
+              'bg-orange-100'
+            }`}>
+              <config.icon className={`w-5 h-5 ${
+                platform === 'facebook' ? 'text-blue-600' :
+                platform === 'instagram' ? 'text-pink-600' :
+                'text-orange-600'
+              }`} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Add {config.name}</h3>
-              <p className="text-sm text-gray-400">Connect your {config.name} profile</p>
+              <h3 className="text-lg font-semibold text-white">Connect {config.name}</h3>
+              <p className="text-sm text-gray-400">Linking your {config.name} account</p>
             </div>
           </div>
           <button
@@ -104,30 +97,19 @@ export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl
           </button>
         </div>
 
-        {/* Manual URL Entry */}
-        <div>
-          <label className="block text-sm font-medium text-white mb-2">
-            Add {config.name} URL
-          </label>
-          <div className="space-y-3">
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder={config.placeholder}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            
-            {error && (
-              <p className="text-red-400 text-sm flex items-center space-x-1">
-                <X className="w-4 h-4" />
-                <span>{error}</span>
-              </p>
-            )}
-            
-            <div className="text-xs text-gray-400">
-              <p>Example: {config.example}</p>
-            </div>
+        {/* OAuth Connection Info */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-white font-medium">
+              Redirecting to {config.name}...
+            </p>
+            <p className="text-sm text-gray-400">
+              You'll be redirected to {config.name} to authorize the connection. 
+              After authorizing, you'll be brought back to your profile.
+            </p>
           </div>
         </div>
 
@@ -140,21 +122,10 @@ export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl
             Cancel
           </button>
           <button
-            onClick={handleSave}
-            disabled={isValidating || !url.trim()}
-            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+            onClick={handleOAuthConnect}
+            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
           >
-            {isValidating ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Save URL</span>
-              </>
-            )}
+            <span>Continue to {config.name}</span>
           </button>
         </div>
       </div>

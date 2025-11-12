@@ -16,6 +16,15 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       req.session = req.session || {};
       req.session.pendingInviteCode = req.query.invite;
     }
+    // Store redirect URL and link_account flag in session for account linking
+    if (req.query.redirect) {
+      req.session = req.session || {};
+      req.session.oauthRedirect = req.query.redirect;
+    }
+    if (req.query.link_account === 'true') {
+      req.session = req.session || {};
+      req.session.linkAccount = true;
+    }
     passport.authenticate('facebook', { 
       scope: ['email'] 
     })(req, res, next);
@@ -36,10 +45,18 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           { expiresIn: '24h' }
         );
 
-        // Redirect to frontend with ONLY the token (security improvement)
-        // Frontend will fetch user data using the token
+        // Check if we have a custom redirect URL (for account linking)
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        if (req.session?.oauthRedirect) {
+          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          // Redirect to custom URL with token
+          res.redirect(`${redirectUrl}&token=${token}`);
+        } else {
+          // Default redirect to auth callback
+          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        }
         
       } catch (error) {
         console.error('Facebook callback error:', error);
@@ -79,6 +96,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     // Store invite code in session if provided
     if (req.query.invite) {
       req.session.pendingInviteCode = req.query.invite;
+    }
+    // Store redirect URL and link_account flag in session for account linking
+    if (req.query.redirect) {
+      req.session.oauthRedirect = req.query.redirect;
+    }
+    if (req.query.link_account === 'true') {
+      req.session.linkAccount = true;
     }
     
     // Generate random state parameter for CSRF protection
@@ -157,10 +181,18 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           { expiresIn: '24h' }
         );
 
-        // Redirect to frontend with ONLY the token (security improvement)
-        // Frontend will fetch user data using the token
+        // Check if we have a custom redirect URL (for account linking)
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        if (req.session?.oauthRedirect) {
+          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          // Redirect to custom URL with token
+          res.redirect(`${redirectUrl}&token=${token}`);
+        } else {
+          // Default redirect to auth callback
+          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        }
         
       } catch (error) {
         console.error('Google callback error:', error);
@@ -183,6 +215,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 // SoundCloud OAuth routes - only available if configured
 if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
   router.get('/soundcloud', (req, res, next) => {
+    // Store redirect URL and link_account flag in session for account linking
+    if (req.query.redirect) {
+      req.session = req.session || {};
+      req.session.oauthRedirect = req.query.redirect;
+    }
+    if (req.query.link_account === 'true') {
+      req.session = req.session || {};
+      req.session.linkAccount = true;
+    }
     // Ensure session exists
     if (!req.session) {
       req.session = {};
@@ -322,11 +363,19 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           { expiresIn: '24h' }
         );
 
-        // Redirect to frontend with ONLY the token (security improvement)
-        // Frontend will fetch user data using the token
+        // Check if we have a custom redirect URL (for account linking)
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        console.log('✅ Redirecting to:', `${frontendUrl}/auth/callback?token=${token.substring(0, 20)}...`);
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        if (req.session?.oauthRedirect) {
+          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          // Redirect to custom URL with token
+          res.redirect(`${redirectUrl}&token=${token}`);
+        } else {
+          // Default redirect to auth callback
+          console.log('✅ Redirecting to:', `${frontendUrl}/auth/callback?token=${token.substring(0, 20)}...`);
+          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        }
         
       } catch (error) {
         console.error('❌ SoundCloud callback error:', error);
@@ -353,6 +402,15 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
       req.session = req.session || {};
       req.session.pendingInviteCode = req.query.invite;
     }
+    // Store redirect URL and link_account flag in session for account linking
+    if (req.query.redirect) {
+      req.session = req.session || {};
+      req.session.oauthRedirect = req.query.redirect;
+    }
+    if (req.query.link_account === 'true') {
+      req.session = req.session || {};
+      req.session.linkAccount = true;
+    }
     passport.authenticate('instagram', { 
       scope: ['user_profile', 'user_media'] 
     })(req, res, next);
@@ -373,10 +431,18 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           { expiresIn: '24h' }
         );
 
-        // Redirect to frontend with ONLY the token (security improvement)
-        // Frontend will fetch user data using the token
+        // Check if we have a custom redirect URL (for account linking)
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        if (req.session?.oauthRedirect) {
+          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          // Redirect to custom URL with token
+          res.redirect(`${redirectUrl}&token=${token}`);
+        } else {
+          // Default redirect to auth callback
+          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+        }
         
       } catch (error) {
         console.error('Instagram callback error:', error);

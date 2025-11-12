@@ -28,14 +28,30 @@ const AuthCallback: React.FC = () => {
         try {
           // handleOAuthCallback now fetches user data automatically
           await handleOAuthCallback(token);
-          toast.success('Login successful!');
           
           // Check if this was a social media OAuth connection
           const oauthSuccess = searchParams.get('oauth_success');
-          if (oauthSuccess === 'true') {
+          
+          // Check if we're on a custom redirect URL (for account linking)
+          // The redirect URL will be in the current URL path, not as a query param
+          const currentPath = window.location.pathname;
+          const currentSearch = window.location.search;
+          
+          // If we're not on /auth/callback, we might be on a custom redirect URL
+          // Check if the URL contains settings=true (profile settings redirect)
+          if (currentSearch.includes('settings=true') || currentSearch.includes('oauth_success=true')) {
+            // Extract the path and clean up the token from query params
+            const urlParams = new URLSearchParams(currentSearch);
+            urlParams.delete('token'); // Remove token from URL
+            const cleanPath = currentPath + (urlParams.toString() ? '?' + urlParams.toString() : '');
+            toast.success('Account connected successfully!');
+            navigate(cleanPath);
+          } else if (oauthSuccess === 'true') {
             // Redirect to profile page (will redirect to /user/:userId via ProfileRedirect)
+            toast.success('Login successful!');
             navigate('/profile?oauth_success=true');
           } else {
+            toast.success('Login successful!');
             navigate('/dashboard');
           }
         } catch (error) {
