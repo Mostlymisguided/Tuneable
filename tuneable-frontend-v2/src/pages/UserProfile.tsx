@@ -976,15 +976,26 @@ const UserProfile: React.FC = () => {
               
               <div className="mb-2"></div>
 
-              {/* Become a Creator Button - Only show if user doesn't have creator role or profile */}
-              {isOwnProfile && currentUser && !currentUser.role?.includes('creator') && !(user as any).creatorProfile && (
+              {/* Become a Creator Button - Only show if user doesn't have verified creator profile */}
+              {isOwnProfile && currentUser && 
+                (!(user as any).creatorProfile || 
+                 !(user as any).creatorProfile.verificationStatus || 
+                 (user as any).creatorProfile.verificationStatus === 'unverified' ||
+                 (user as any).creatorProfile.verificationStatus === 'pending' ||
+                 (user as any).creatorProfile.verificationStatus === 'rejected') && (
                 <div className="mb-2">
                   <button
                     onClick={() => navigate('/creator/register')}
                     className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
                   >
                     <Award className="w-4 h-4" />
-                    <span>Become a Creator</span>
+                    <span>
+                      {(user as any).creatorProfile?.verificationStatus === 'pending' 
+                        ? 'Creator Application Pending' 
+                        : (user as any).creatorProfile?.verificationStatus === 'rejected'
+                        ? 'Re-apply as Creator'
+                        : 'Become a Creator'}
+                    </span>
                   </button>
                 </div>
               )}
@@ -1369,7 +1380,7 @@ const UserProfile: React.FC = () => {
                   Edit Profile
                 </button>
                 {user && (
-                  (user as any).creatorProfile ? (
+                  (user as any).creatorProfile?.verificationStatus === 'verified' ? (
                     <button
                       onClick={() => handleSettingsTabChange('creator')}
                       className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -1389,7 +1400,11 @@ const UserProfile: React.FC = () => {
                           : 'border-transparent text-gray-400 hover:text-white'
                       }`}
                     >
-                      Become a Creator
+                      {(user as any).creatorProfile?.verificationStatus === 'pending' 
+                        ? 'Creator Application (Pending)' 
+                        : (user as any).creatorProfile?.verificationStatus === 'rejected'
+                        ? 'Creator Application (Rejected)'
+                        : 'Become a Creator'}
                     </button>
                   )
                 )}
@@ -1655,7 +1670,7 @@ const UserProfile: React.FC = () => {
 
             {settingsTab === 'creator' && (
               <div className="card p-6">
-                {user && (user as any).creatorProfile ? (
+                {(user as any).creatorProfile?.verificationStatus === 'verified' ? (
                   <>
                     <h2 className="text-2xl font-bold text-white mb-6">Edit Creator Profile</h2>
                     
@@ -1927,6 +1942,41 @@ const UserProfile: React.FC = () => {
                   </button>
                 </div>
               </>
+                ) : (user as any).creatorProfile?.verificationStatus === 'pending' ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="h-16 w-16 text-purple-400 mx-auto mb-4 animate-spin" />
+                    <h2 className="text-2xl font-bold text-white mb-4">Application Pending</h2>
+                    <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                      Your creator application is currently under review. We'll notify you once it's been processed.
+                    </p>
+                    <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4 max-w-md mx-auto">
+                      <p className="text-sm text-gray-300">
+                        <strong>Artist Name:</strong> {(user as any).creatorProfile?.artistName || 'N/A'}
+                      </p>
+                      {(user as any).creatorProfile?.submittedAt && (
+                        <p className="text-sm text-gray-300 mt-2">
+                          <strong>Submitted:</strong> {new Date((user as any).creatorProfile.submittedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (user as any).creatorProfile?.verificationStatus === 'rejected' ? (
+                  <div className="text-center py-12">
+                    <X className="h-16 w-16 text-red-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-4">Application Rejected</h2>
+                    <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                      {(user as any).creatorProfile?.reviewNotes 
+                        ? (user as any).creatorProfile.reviewNotes 
+                        : 'Your creator application was not approved. You can re-apply with updated information.'}
+                    </p>
+                    <button
+                      onClick={() => navigate('/creator/register')}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
+                    >
+                      <Award className="w-5 h-5" />
+                      <span>Re-apply as Creator</span>
+                    </button>
+                  </div>
                 ) : (
                   <div className="text-center py-12">
                     <Award className="h-16 w-16 text-purple-400 mx-auto mb-4" />

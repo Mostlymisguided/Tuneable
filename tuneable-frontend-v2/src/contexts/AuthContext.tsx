@@ -52,7 +52,7 @@ interface User {
   };
   creatorProfile?: {
     artistName?: string;
-    verificationStatus?: 'pending' | 'verified' | 'rejected';
+    verificationStatus?: 'unverified' | 'pending' | 'verified' | 'rejected';
     bio?: string;
     genres?: string[];
     roles?: string[];

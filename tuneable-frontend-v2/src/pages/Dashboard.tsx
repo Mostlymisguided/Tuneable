@@ -803,6 +803,40 @@ Join here: ${inviteLink}`.trim();
         </p>
       </div>
 
+      {/* Become a Creator Banner */}
+      {user && 
+        (!user.creatorProfile || 
+         !user.creatorProfile.verificationStatus || 
+         user.creatorProfile.verificationStatus !== 'verified') && (
+        <div className="mb-8">
+          <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-lg p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex-1">
+              <h3 className="text-xl font-semibold text-white mb-2">Become a Creator</h3>
+              <p className="text-gray-300">
+                {user.creatorProfile?.verificationStatus === 'pending' 
+                  ? 'Your application is under review' 
+                  : user.creatorProfile?.verificationStatus === 'rejected'
+                  ? 'Re-apply to become a verified creator'
+                  : 'Join our community of verified creators and start sharing your music'}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/creator/register')}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 whitespace-nowrap"
+            >
+              <Award className="w-5 h-5" />
+              <span>
+                {user.creatorProfile?.verificationStatus === 'pending' 
+                  ? 'View Application' 
+                  : user.creatorProfile?.verificationStatus === 'rejected'
+                  ? 'Re-apply'
+                  : 'Apply Now'}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
         {/* Creator Dashboard */}
         {showCreatorDashboard(user) && (
           <div className="mb-8">
