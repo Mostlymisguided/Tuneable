@@ -15,6 +15,7 @@ import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import TagInputModal from '../components/TagInputModal';
 import EmailInviteModal from '../components/EmailInviteModal';
 import CreatorProfilePrompts from '../components/CreatorProfilePrompts';
+import UserProfilePrompts from '../components/UserProfilePrompts';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface LibraryItem {
@@ -2448,6 +2449,11 @@ Join here: ${inviteLink}`.trim();
             </div>
           </div>
         </div>
+      </div>
+
+      {/* User Profile Prompts - for all users */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-8">
+        <UserProfilePrompts user={user} />
       </div>
 
       {/* Invited Users Section */}
