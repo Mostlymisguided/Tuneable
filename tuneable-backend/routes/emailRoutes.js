@@ -325,4 +325,105 @@ router.post('/invite', authMiddleware, [
   }
 });
 
+// @route   GET /api/email/unsubscribe
+// @desc    Unsubscribe from email notifications
+// @access  Public
+router.get('/unsubscribe', async (req, res) => {
+  try {
+    const { email, token } = req.query;
+    
+    if (!email || !token) {
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <h2 style="color: #ef4444;">❌ Invalid Request</h2>
+            <p>Email and token are required to unsubscribe.</p>
+            <p>Please use the unsubscribe link from your email.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim(), 
+      unsubscribeToken: token 
+    });
+    
+    if (!user) {
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <h2 style="color: #ef4444;">❌ Invalid Unsubscribe Link</h2>
+            <p>The unsubscribe link is invalid or has expired.</p>
+            <p>If you continue to receive emails, please contact support.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    if (user.unsubscribeTokenExpires && user.unsubscribeTokenExpires < Date.now()) {
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <h2 style="color: #ef4444;">❌ Link Expired</h2>
+            <p>This unsubscribe link has expired.</p>
+            <p>Please request a new unsubscribe link or contact support.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Disable email notifications
+    if (!user.preferences) user.preferences = {};
+    if (!user.preferences.notifications) user.preferences.notifications = {};
+    user.preferences.notifications.email = false;
+    user.unsubscribeToken = undefined;
+    user.unsubscribeTokenExpires = undefined;
+    
+    await user.save();
+    
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    // Return success page HTML
+    res.send(`
+      <html>
+        <head>
+          <title>Unsubscribed from Tuneable Emails</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background: #f9fafb;">
+          <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h2 style="color: #10b981; margin-top: 0;">✅ Successfully Unsubscribed</h2>
+            <p style="color: #4b5563; line-height: 1.6;">
+              You have been unsubscribed from email notifications from Tuneable.
+            </p>
+            <p style="color: #4b5563; line-height: 1.6;">
+              You can re-enable email notifications at any time in your account settings.
+            </p>
+            <div style="margin-top: 30px;">
+              <a href="${FRONTEND_URL}/profile" 
+                 style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 500;">
+                Go to Profile Settings
+              </a>
+            </div>
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+              If you have any questions, please contact our support team.
+            </p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Error processing unsubscribe:', error);
+    res.status(500).send(`
+      <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+          <h2 style="color: #ef4444;">❌ Error</h2>
+          <p>An error occurred while processing your unsubscribe request.</p>
+          <p>Please try again later or contact support.</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
 module.exports = router;

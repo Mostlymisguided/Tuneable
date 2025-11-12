@@ -6,6 +6,57 @@ const FROM_EMAIL = process.env.EMAIL_FROM || 'onboarding@resend.dev'; // Use onb
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mostlymisguided@icloud.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+// Generate unsubscribe footer for user emails
+async function getUnsubscribeFooter(userOrEmail) {
+  let email = '';
+  let user = null;
+  
+  // Handle both user object and email string
+  if (typeof userOrEmail === 'string') {
+    email = userOrEmail;
+  } else if (userOrEmail && userOrEmail.email) {
+    email = userOrEmail.email;
+    user = userOrEmail;
+  } else {
+    return '';
+  }
+  
+  if (!email) return '';
+  
+  const User = require('../models/User');
+  // Get fresh user data to ensure we have the latest token
+  let freshUser = null;
+  if (user && (user._id || user.id)) {
+    freshUser = await User.findById(user._id || user.id);
+  } else {
+    // Try to find by email
+    freshUser = await User.findOne({ email: email.toLowerCase().trim() });
+  }
+  
+  if (!freshUser) return '';
+  
+  // Generate unsubscribe token if not exists or expired
+  if (!freshUser.unsubscribeToken || 
+      (freshUser.unsubscribeTokenExpires && freshUser.unsubscribeTokenExpires < Date.now())) {
+    freshUser.generateUnsubscribeToken();
+    await freshUser.save().catch(err => console.error('Error saving unsubscribe token:', err));
+  }
+  
+  const unsubscribeUrl = `${FRONTEND_URL}/api/email/unsubscribe?email=${encodeURIComponent(freshUser.email)}&token=${freshUser.unsubscribeToken}`;
+  
+  return `
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">
+        Unsubscribe from email notifications
+      </a>
+    </p>
+    <p style="color: #6b7280; font-size: 12px; text-align: center; margin-top: 5px;">
+      This is an automated notification from Tuneable.
+    </p>
+  `;
+}
+
 // Send creator application notification
 async function sendCreatorApplicationNotification(user) {
   try {
@@ -385,8 +436,8 @@ async function sendEmailVerification(user, verificationToken) {
             ${FRONTEND_URL}/verify-email?token=${verificationToken}
           </p>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
+          ${await getUnsubscribeFooter(user)}
+          <p style="color: #6b7280; font-size: 12px; margin-top: 10px; text-align: center;">
             This verification link will expire in 24 hours. If you didn't create a Tuneable account, you can safely ignore this email.
           </p>
         </div>
@@ -435,8 +486,8 @@ async function sendPasswordReset(user, resetToken) {
           
           <p><strong>This link will expire in 1 hour for security reasons.</strong></p>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
+          ${await getUnsubscribeFooter(user)}
+          <p style="color: #6b7280; font-size: 12px; margin-top: 10px; text-align: center;">
             If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
           </p>
         </div>
@@ -488,10 +539,7 @@ async function sendWelcomeEmail(user) {
             </a>
           </div>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
-            Thanks for joining Tuneable! If you have any questions, feel free to reach out to our support team.
-          </p>
+          ${await getUnsubscribeFooter(user)}
         </div>
       `
     });
@@ -551,10 +599,7 @@ async function sendOwnershipNotification(user, media, ownershipPercentage, added
             </a>
           </div>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
-            This is an automated notification from Tuneable. You can manage your media ownership in your dashboard.
-          </p>
+          ${await getUnsubscribeFooter(user)}
         </div>
       `
     });
@@ -634,10 +679,7 @@ async function sendClaimStatusNotification(user, claim, media, status, adminMess
             </a>
           </div>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
-            This is an automated notification from Tuneable. If you have questions about this decision, please contact our support team.
-          </p>
+          ${await getUnsubscribeFooter(user)}
         </div>
       `
     });
@@ -688,10 +730,7 @@ async function sendInviteApprovalEmail(request, inviteCode) {
             <p style="margin: 0; color: #856404;"><strong>Important:</strong> This invite code is single-use. Please use it within 30 days.</p>
           </div>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
-            This is an automated email from Tuneable. If you have any questions, feel free to reach out to our support team.
-          </p>
+          ${await getUnsubscribeFooter(request.email)}
         </div>
       `
     });
@@ -740,10 +779,7 @@ async function sendInviteRejectionEmail(request, reason) {
             </a>
           </div>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
-            This is an automated email from Tuneable. If you have any questions, feel free to reach out to our support team.
-          </p>
+          ${await getUnsubscribeFooter(request.email)}
         </div>
       `
     });
@@ -798,8 +834,8 @@ async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, invi
             The invite code will be automatically filled when you click the button above, or you can enter it manually when you sign up.
           </p>
           
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-          <p style="color: #6b7280; font-size: 12px;">
+          ${await getUnsubscribeFooter(recipientEmail)}
+          <p style="color: #6b7280; font-size: 12px; text-align: center; margin-top: 10px;">
             This invite was sent by ${inviterUsername}. If you didn't expect this invitation, you can safely ignore this email.
           </p>
         </div>

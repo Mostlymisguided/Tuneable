@@ -96,6 +96,10 @@ const userSchema = new mongoose.Schema({
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
   
+  // Email unsubscribe
+  unsubscribeToken: { type: String },
+  unsubscribeTokenExpires: { type: Date },
+  
   // Last login tracking
   lastLoginAt: { type: Date },
   
@@ -242,6 +246,15 @@ userSchema.methods.resetPassword = function(token, newPassword) {
     return true;
   }
   return false;
+};
+
+// Generate unsubscribe token
+userSchema.methods.generateUnsubscribeToken = function() {
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  this.unsubscribeToken = token;
+  this.unsubscribeTokenExpires = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+  return token;
 };
 
 // Indexes
