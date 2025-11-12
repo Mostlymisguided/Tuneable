@@ -272,12 +272,16 @@ const TuneProfile: React.FC = () => {
         const globalParty = response.parties.find((p: any) => p.type === 'global');
         if (globalParty && globalParty.minimumBid) {
           setMinimumBid(globalParty.minimumBid);
-          if (!hasInitializedBidInput) {
-            setGlobalBidInput(globalParty.minimumBid.toFixed(2));
+          if (!hasInitializedBidInput && media) {
+            const avgBid = calculateGlobalMediaBidAvg(media);
+            const initialBid = Math.max(0.33, avgBid || 0, globalParty.minimumBid);
+            setGlobalBidInput(initialBid.toFixed(2));
             setHasInitializedBidInput(true);
           }
-        } else if (!hasInitializedBidInput) {
-          setGlobalBidInput('0.33');
+        } else if (!hasInitializedBidInput && media) {
+          const avgBid = calculateGlobalMediaBidAvg(media);
+          const initialBid = Math.max(0.33, avgBid || 0);
+          setGlobalBidInput(initialBid.toFixed(2));
           setHasInitializedBidInput(true);
         }
       } catch (error) {
@@ -286,7 +290,7 @@ const TuneProfile: React.FC = () => {
       }
     };
     fetchGlobalPartyMinimumBid();
-  }, [hasInitializedBidInput]);
+  }, [hasInitializedBidInput, media]);
 
   const fetchMediaProfile = async () => {
     try {
@@ -307,12 +311,13 @@ const TuneProfile: React.FC = () => {
     }
   };
 
-  // Calculate GlobalMediaBidAvg (average individual bid amount)
+  // Calculate GlobalMediaBidAvg (average individual bid amount, returns in pounds)
   const calculateGlobalMediaBidAvg = (mediaData: Media) => {
     const bids = mediaData.bids || [];
     if (bids.length === 0) return 0;
     const total = bids.reduce((sum, bid) => sum + bid.amount, 0);
-    return total / bids.length;
+    const avgPence = total / bids.length;
+    return penceToPoundsNumber(avgPence); // Convert pence to pounds
   };
 
   // Check if user can edit this tune
@@ -1323,7 +1328,7 @@ const TuneProfile: React.FC = () => {
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
                   <div className="text-2xl font-bold text-blue-400">
-                    {penceToPounds(calculateGlobalMediaBidAvg(media))}
+                    £{calculateGlobalMediaBidAvg(media).toFixed(2)}
                   </div>
                 </div>
               </div>

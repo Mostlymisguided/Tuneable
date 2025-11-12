@@ -503,12 +503,12 @@ const Party: React.FC = () => {
           youtube: youtubeResults
         });
         
-        // Initialize bid amounts for results (default to 0.33 to encourage higher bids)
-        const defaultBid = 0.33;
+        // Initialize bid amounts for results (use average bid or 0.33, whichever is higher)
         const minBid = party?.minimumBid || 0.01;
         const newBidAmounts: Record<string, string> = {};
         [...databaseResults, ...youtubeResults].forEach(media => {
-          newBidAmounts[media._id || media.id] = Math.max(defaultBid, minBid).toFixed(2);
+          const avgBid = calculateAverageBid(media);
+          newBidAmounts[media._id || media.id] = Math.max(0.33, avgBid || 0, minBid).toFixed(2);
         });
         setNewMediaBidAmounts(newBidAmounts);
         
@@ -555,12 +555,12 @@ const Party: React.FC = () => {
       
       setAddMediaResults({ database: databaseResults, youtube: youtubeResults });
       
-      // Initialize bid amounts for results
-      const defaultBid = 0.33;
+      // Initialize bid amounts for results (use average bid or 0.33, whichever is higher)
       const minBid = party?.minimumBid || 0.01;
       const newBidAmounts: Record<string, string> = {};
       [...databaseResults, ...youtubeResults].forEach(media => {
-        newBidAmounts[media._id || media.id] = Math.max(defaultBid, minBid).toFixed(2);
+        const avgBid = calculateAverageBid(media);
+        newBidAmounts[media._id || media.id] = Math.max(0.33, avgBid || 0, minBid).toFixed(2);
       });
       setNewMediaBidAmounts(newBidAmounts);
       }
@@ -999,12 +999,13 @@ const Party: React.FC = () => {
     });
   };
 
-  // Helper function to calculate average bid for media
+  // Helper function to calculate average bid for media (returns in pounds)
   const calculateAverageBid = (mediaData: any) => {
     const bids = mediaData.bids || [];
     if (bids.length === 0) return 0;
     const total = bids.reduce((sum: number, bid: any) => sum + (bid.amount || 0), 0);
-    return total / bids.length;
+    const avgPence = total / bids.length;
+    return penceToPoundsNumber(avgPence); // Convert pence to pounds
   };
 
   // Bid handling functions (OLD - using bid modal, now replaced with inline bidding)
@@ -1381,7 +1382,7 @@ const Party: React.FC = () => {
                       className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
                         selected
                           ? 'bg-purple-600 text-white'
-                          : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                          : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
                       }`}
                       title={`${penceToPounds(total)} total across queued tunes`}
                     >
@@ -1467,7 +1468,7 @@ const Party: React.FC = () => {
                               }
                             }}
                             placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
-                            className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
+                            className="flex-1 bg-gray-900 hover:shadow-2xl rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                           />
                          
                         </div>
@@ -1475,7 +1476,7 @@ const Party: React.FC = () => {
                         <button
                             onClick={handleAddMediaSearch}
                             disabled={isSearchingNewMedia || !addMediaSearchQuery.trim()}
-                            className="flex p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                            className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                           >
                             {isSearchingNewMedia ? (
                               <Loader2 className="h-5 w-5 animate-spin" />
@@ -1584,7 +1585,7 @@ const Party: React.FC = () => {
                                                 <Link
                                                   key={tagIndex}
                                                   to={`/tune/${mediaData._id || mediaData.id}`}
-                                                  className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
+                                                  className="px-2 py-1 bg-purple-800 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
                                                 >
                                                   #{tag}
                                                 </Link>
@@ -1612,7 +1613,7 @@ const Party: React.FC = () => {
                                               <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
                                             </div>
                                             <div className="text-xs md:text-lg text-gray-300">
-                                              {penceToPounds(calculateAverageBid(mediaData))}
+                                              £{calculateAverageBid(mediaData).toFixed(2)}
                                             </div>
                                           </div>
                                         </div>
@@ -1625,7 +1626,9 @@ const Party: React.FC = () => {
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 const mediaId = mediaData._id || mediaData.id;
-                                                const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                                const avgBid = calculateAverageBid(mediaData);
+                                                const minBid = party?.minimumBid || 0.01;
+                                                const defaultBid = Math.max(0.33, avgBid || 0, minBid);
                                                 const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                                 const newAmount = current + 0.01;
                                                 setQueueBidAmounts({
@@ -1642,7 +1645,11 @@ const Party: React.FC = () => {
                                               type="number"
                                               step="0.01"
                                               min={party?.minimumBid || 0.01}
-                                              value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
+                                              value={queueBidAmounts[mediaData._id || mediaData.id] ?? (() => {
+                                                const avgBid = calculateAverageBid(mediaData);
+                                                const minBid = party?.minimumBid || 0.01;
+                                                return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
+                                              })()}
                                               onChange={(e) => setQueueBidAmounts({
                                                 ...queueBidAmounts,
                                                 [mediaData._id || mediaData.id]: e.target.value
@@ -1655,9 +1662,10 @@ const Party: React.FC = () => {
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 const mediaId = mediaData._id || mediaData.id;
-                                                const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                                const avgBid = calculateAverageBid(mediaData);
                                                 const minBid = party?.minimumBid || 0.01;
+                                                const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                                 const newAmount = Math.max(minBid, current - 0.01);
                                                 setQueueBidAmounts({
                                                   ...queueBidAmounts,
@@ -1680,7 +1688,7 @@ const Party: React.FC = () => {
                                           <button
                                             onClick={() => handleInlineBid(item)}
                                             disabled={isBidding}
-                                            className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                            className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                           >
                                             {(() => {
                                               const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
@@ -1744,9 +1752,10 @@ const Party: React.FC = () => {
                                       type="button"
                                       onClick={() => {
                                         const mediaId = media._id || media.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const avgBid = calculateAverageBid(media);
                                         const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = Math.max(minBid, current - 0.01);
                                         setNewMediaBidAmounts(prev => ({
                                           ...prev,
@@ -1761,7 +1770,11 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.01}
-                                      value={newMediaBidAmounts[media._id || media.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
+                                      value={newMediaBidAmounts[media._id || media.id] ?? (() => {
+                                        const avgBid = calculateAverageBid(media);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
+                                      })()}
                                       onChange={(e) => setNewMediaBidAmounts(prev => ({
                                         ...prev,
                                         [media._id || media.id]: e.target.value
@@ -1772,7 +1785,9 @@ const Party: React.FC = () => {
                                       type="button"
                                       onClick={() => {
                                         const mediaId = media._id || media.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const avgBid = calculateAverageBid(media);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
                                         const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = current + 0.01;
                                         setNewMediaBidAmounts(prev => ({
@@ -1787,7 +1802,7 @@ const Party: React.FC = () => {
                                     </div>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
-                                      className="z-999 px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                      className="z-999 px-3 md:px-4 py-2 bg-purple-800 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                     >
                                       {(() => {
                                         const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
@@ -1841,9 +1856,10 @@ const Party: React.FC = () => {
                                       type="button"
                                       onClick={() => {
                                         const mediaId = media._id || media.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const avgBid = calculateAverageBid(media);
                                         const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = Math.max(minBid, current - 0.01);
                                         setNewMediaBidAmounts(prev => ({
                                           ...prev,
@@ -1858,7 +1874,11 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.01}
-                                      value={newMediaBidAmounts[media._id || media.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
+                                      value={newMediaBidAmounts[media._id || media.id] ?? (() => {
+                                        const avgBid = calculateAverageBid(media);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
+                                      })()}
                                       onChange={(e) => setNewMediaBidAmounts(prev => ({
                                         ...prev,
                                         [media._id || media.id]: e.target.value
@@ -1869,7 +1889,9 @@ const Party: React.FC = () => {
                                       type="button"
                                       onClick={() => {
                                         const mediaId = media._id || media.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const avgBid = calculateAverageBid(media);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
                                         const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = current + 0.01;
                                         setNewMediaBidAmounts(prev => ({
@@ -1884,7 +1906,7 @@ const Party: React.FC = () => {
                                     </div>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
-                                      className="flex px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                      className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                     >
                                       {(() => {
                                         const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
@@ -1907,7 +1929,7 @@ const Party: React.FC = () => {
                                 <button
                                   onClick={handleLoadMoreYouTube}
                                   disabled={isLoadingMoreYouTube}
-                                  className="p-3 bg-red-700 hover:bg-red-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray rounded-lg font-medium transition-colors"
+                                  className="p-3 border bg-red-500/20 hover:bg-red-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray rounded-lg font-medium transition-colors"
                                 >
                                   {isLoadingMoreYouTube ? (
                                     <span className="flex items-center space-x-2">
@@ -1952,8 +1974,8 @@ const Party: React.FC = () => {
                           onClick={() => handleTimePeriodChange(period.key)}
                           className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                             selectedTimePeriod === period.key
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                              ? 'bg-purple-700 text-white'
+                              : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
                           }`}
                         >
                           {period.label}
@@ -2101,7 +2123,9 @@ const Party: React.FC = () => {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const mediaId = mediaData._id || mediaData.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const avgBid = calculateAverageBid(mediaData);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
                                         const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = current + 0.01;
                                         setQueueBidAmounts({
@@ -2119,9 +2143,10 @@ const Party: React.FC = () => {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const mediaId = mediaData._id || mediaData.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const avgBid = calculateAverageBid(mediaData);
                                         const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = Math.max(minBid, current - 0.01);
                                         setQueueBidAmounts({
                                           ...queueBidAmounts,
@@ -2144,7 +2169,11 @@ const Party: React.FC = () => {
                                       type="number"
                                       step="0.01"
                                       min={party?.minimumBid || 0.01}
-                                      value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
+                                      value={queueBidAmounts[mediaData._id || mediaData.id] ?? (() => {
+                                        const avgBid = calculateAverageBid(mediaData);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
+                                      })()}
                                       onChange={(e) => setQueueBidAmounts({
                                         ...queueBidAmounts,
                                         [mediaData._id || mediaData.id]: e.target.value
@@ -2157,9 +2186,10 @@ const Party: React.FC = () => {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const mediaId = mediaData._id || mediaData.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const avgBid = calculateAverageBid(mediaData);
                                         const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = Math.max(minBid, current - 0.01);
                                         setQueueBidAmounts({
                                           ...queueBidAmounts,
@@ -2183,7 +2213,9 @@ const Party: React.FC = () => {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const mediaId = mediaData._id || mediaData.id;
-                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const avgBid = calculateAverageBid(mediaData);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
                                         const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                         const newAmount = current + 0.01;
                                         setQueueBidAmounts({

@@ -93,7 +93,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
       {topSupporters.map((supporter: any, index: number) => (
         <div
           key={supporter.user._id || supporter.user.uuid || index}
-          className="flex flex-row md:items-center md:justify-between p-1.5 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
+          className="flex flex-row md:items-center md:justify-between p-1.5 md:p-4 bg-purple-900/20 rounded-lg hover:bg-purple-500/40 transition-all cursor-pointer"
           onClick={() => (supporter.user._id || supporter.user.uuid) && navigate(`/user/${supporter.user._id || supporter.user.uuid}`)}
         >
           {/* Left: Rank + Profile + Info */}
@@ -146,8 +146,11 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
             <div className="text-sm md:text-xl font-bold text-green-400">
               {penceToPounds(supporter.totalAmount)}
             </div>
-            <div className="text-xs text-gray-400">
-              avg {penceToPounds(supporter.totalAmount / supporter.bidCount)}
+            <div className="flex items-center justify-end space-x-1 text-xs text-gray-400">
+              <span title="Average Bid">
+                <TrendingUp className="h-3 w-3" />
+              </span>
+              <span>{penceToPounds(supporter.totalAmount / supporter.bidCount)}</span>
             </div>
             {userStatsMap && (supporter.user.uuid || supporter.user._id) && (
               <div className="text-xs text-purple-300 mt-1 hidden md:block">
