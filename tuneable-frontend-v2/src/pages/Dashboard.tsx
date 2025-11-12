@@ -45,7 +45,7 @@ interface SearchResult {
 }
 
 const Dashboard: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
