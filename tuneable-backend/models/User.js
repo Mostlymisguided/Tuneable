@@ -147,7 +147,7 @@ const userSchema = new mongoose.Schema({
   labelAffiliations: [{
     labelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Label', required: true },
     role: { type: String, enum: ['artist', 'producer', 'manager', 'staff'], required: true },
-    status: { type: String, enum: ['pending', 'active', 'inactive'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'active'], default: 'pending' },
     joinedAt: { type: Date, default: Date.now },
     invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }],
