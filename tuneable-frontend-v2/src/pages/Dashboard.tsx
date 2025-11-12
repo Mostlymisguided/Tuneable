@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -17,6 +17,7 @@ import EmailInviteModal from '../components/EmailInviteModal';
 import CreatorProfilePrompts from '../components/CreatorProfilePrompts';
 import UserProfilePrompts from '../components/UserProfilePrompts';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import MediaValidationModal from '../components/MediaValidationModal';
 
 interface LibraryItem {
   mediaId: string;
@@ -68,6 +69,13 @@ const Dashboard: React.FC = () => {
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
+  
+  // Validation modal state
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<{category?: boolean; duration?: boolean}>({});
+  const [validationCategory, setValidationCategory] = useState<string>('');
+  const [validationDuration, setValidationDuration] = useState<number>(0);
+  const [pendingMedia, setPendingMedia] = useState<SearchResult | null>(null);
 
   // Creator Dashboard state
   const [creatorStats, setCreatorStats] = useState<any>(null);
@@ -283,6 +291,32 @@ Join here: ${inviteLink}`.trim();
       /youtube\.com\/embed\//
     ];
     return youtubePatterns.some(pattern => pattern.test(query));
+  };
+
+  // Helper to extract YouTube video ID
+  const extractYouTubeVideoId = (url: string): string | null => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
+  // Helper to fetch video category if needed
+  const fetchVideoCategory = async (videoId: string): Promise<string> => {
+    try {
+      const response = await searchAPI.searchByYouTubeUrl(`https://www.youtube.com/watch?v=${videoId}`);
+      if (response.videos && response.videos.length > 0) {
+        return response.videos[0].category || 'Unknown';
+      }
+    } catch (error) {
+      console.error('Error fetching video category:', error);
+    }
+    return 'Unknown';
   };
 
   // Fetch global party minimum bid
@@ -683,13 +717,74 @@ Join here: ${inviteLink}`.trim();
     }
   };
 
-  const startAddTune = (media: SearchResult) => {
+  const startAddTune = async (media: SearchResult) => {
+    // Validate category and duration before proceeding
+    let category = media.category || 'Unknown';
+    const duration = media.duration || 0;
+
+    // If category is Unknown and it's a YouTube video, fetch it
+    if (category === 'Unknown' && media.sources?.youtube) {
+      const videoId = extractYouTubeVideoId(media.sources.youtube);
+      if (videoId) {
+        category = await fetchVideoCategory(videoId);
+        media.category = category;
+      }
+    }
+
+    // Check for warnings
+    const warnings: {category?: boolean; duration?: boolean} = {};
+    const DURATION_THRESHOLD = 671; // 11:11 in seconds
+
+    if (category.toLowerCase() !== 'music') {
+      warnings.category = true;
+    }
+
+    if (duration > DURATION_THRESHOLD) {
+      warnings.duration = true;
+    }
+
+    // If there are warnings, show validation modal
+    if (Object.keys(warnings).length > 0) {
+      setValidationWarnings(warnings);
+      setValidationCategory(category);
+      setValidationDuration(duration);
+      setPendingMedia(media);
+      setShowValidationModal(true);
+      return;
+    }
+
+    // No warnings, proceed to tag modal or directly add
     if (!media._id) {
       setPendingAddTuneResult(media);
       setShowAddTuneTagModal(true);
     } else {
       void handleAddTune(media, []);
     }
+  };
+
+  const handleValidationConfirm = () => {
+    if (!pendingMedia) return;
+    setShowValidationModal(false);
+    // Proceed to tag modal or add directly
+    if (!pendingMedia._id) {
+      setPendingAddTuneResult(pendingMedia);
+      setShowAddTuneTagModal(true);
+    } else {
+      void handleAddTune(pendingMedia, []);
+    }
+    // Clear validation state
+    setValidationWarnings({});
+    setValidationCategory('');
+    setValidationDuration(0);
+    setPendingMedia(null);
+  };
+
+  const handleValidationCancel = () => {
+    setShowValidationModal(false);
+    setValidationWarnings({});
+    setValidationCategory('');
+    setValidationDuration(0);
+    setPendingMedia(null);
   };
 
   return (
@@ -2311,12 +2406,18 @@ Join here: ${inviteLink}`.trim();
                       <div className="text-gray-400 text-xs md:text-sm truncate">
                         {result.artist}
                       </div>
-                    {result.isLocal && (
+                      {result.duration && (
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-3 w-3 text-gray-500" />
+                          <span className="text-gray-500 text-xs">{formatDuration(result.duration)}</span>
+                        </div>
+                      )}
+                      {result.isLocal && (
                         <span className="inline-block px-2 py-0.5 bg-purple-900 text-purple-200 text-xs rounded">
-                        In Database
-                      </span>
-                    )}
-                  </div>
+                          In Database
+                        </span>
+                      )}
+                    </div>
                 </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <div>
@@ -2761,6 +2862,18 @@ Join here: ${inviteLink}`.trim();
 
     </div>
       </div>
+
+      {/* Media Validation Modal */}
+      <MediaValidationModal
+        isOpen={showValidationModal}
+        onConfirm={handleValidationConfirm}
+        onCancel={handleValidationCancel}
+        mediaTitle={pendingMedia?.title}
+        mediaArtist={pendingMedia?.artist}
+        warnings={validationWarnings}
+        category={validationCategory}
+        duration={validationDuration}
+      />
 
       <TagInputModal
         isOpen={showAddTuneTagModal}
