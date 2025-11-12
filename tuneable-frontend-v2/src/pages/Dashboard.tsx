@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram } from 'lucide-react';
-import { userAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
+import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { toast } from 'react-toastify';
@@ -45,7 +45,7 @@ interface SearchResult {
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
@@ -145,6 +145,29 @@ Join here: ${inviteLink}`.trim();
       toast.error('Could not copy invite. Please try again.');
     }
   }, [inviteMessage]);
+
+  const handleUploadClick = useCallback(async () => {
+    // Check if user's email is verified
+    if (!user?.emailVerified) {
+      const shouldSendVerification = window.confirm(
+        'Please verify your email address before uploading media. Would you like us to send you a verification email?'
+      );
+      
+      if (shouldSendVerification) {
+        try {
+          await emailAPI.resendVerification();
+          toast.success('Verification email sent! Please check your inbox and click the verification link.');
+        } catch (error: any) {
+          console.error('Error sending verification email:', error);
+          toast.error(error.response?.data?.error || 'Failed to send verification email');
+        }
+      }
+      return;
+    }
+    
+    // Email is verified, proceed to upload page
+    navigate('/creator/upload');
+  }, [user?.emailVerified, navigate]);
 
   const handleEmailInvite = useCallback(() => {
     setIsEmailInviteModalOpen(true);
@@ -815,7 +838,7 @@ Join here: ${inviteLink}`.trim();
                         <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <button
-                            onClick={() => navigate('/creator/upload')}
+                            onClick={handleUploadClick}
                             className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
                           >
                             <div className="flex items-center">
@@ -893,7 +916,7 @@ Join here: ${inviteLink}`.trim();
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-white">My Media</h3>
                         <button
-                          onClick={() => navigate('/creator/upload')}
+                          onClick={handleUploadClick}
                           className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                         >
                           <Upload className="h-4 w-4 mr-2" />
@@ -912,7 +935,7 @@ Join here: ${inviteLink}`.trim();
                           <p className="text-gray-400 mb-2">No media found</p>
                           <p className="text-gray-500 text-sm mb-4">Upload your first track to get started!</p>
                           <button
-                            onClick={() => navigate('/creator/upload')}
+                            onClick={handleUploadClick}
                             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                           >
                             Upload Media

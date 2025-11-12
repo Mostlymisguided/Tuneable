@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
-import { labelAPI } from '../lib/api';
+import { labelAPI, emailAPI } from '../lib/api';
 import axios from 'axios';
 
 // Helper functions to convert between MM:SS format and seconds
@@ -77,7 +77,7 @@ const CreatorUpload: React.FC = () => {
           <Music className="h-16 w-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
           <p className="text-gray-300 mb-4">
-            Only verified creators and admins can upload media
+            Only verified creators can upload media
           </p>
           <button
             onClick={() => navigate('/creator-register')}
@@ -93,6 +93,29 @@ const CreatorUpload: React.FC = () => {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
+
+    // Check email verification before allowing file selection
+    if (!user?.emailVerified) {
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      const shouldSendVerification = window.confirm(
+        'Please verify your email address before uploading media. Would you like us to send you a verification email?'
+      );
+      
+      if (shouldSendVerification) {
+        try {
+          await emailAPI.resendVerification();
+          toast.success('Verification email sent! Please check your inbox and click the verification link.');
+        } catch (error: any) {
+          console.error('Error sending verification email:', error);
+          toast.error(error.response?.data?.error || 'Failed to send verification email');
+        }
+      }
+      return;
+    }
 
     // Validate file type
     if (!selectedFile.name.toLowerCase().endsWith('.mp3')) {

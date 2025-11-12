@@ -42,6 +42,7 @@ interface User {
   globalUserAggregateRank?: number;
   globalUserBidAvg?: number;
   globalUserBids?: number;
+  emailVerified?: boolean;
   creatorProfile?: {
     artistName?: string;
     verificationStatus?: 'pending' | 'verified' | 'rejected';

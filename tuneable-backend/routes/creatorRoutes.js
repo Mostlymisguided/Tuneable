@@ -71,6 +71,12 @@ router.post('/apply', authMiddleware, upload.array('proofFiles', 5), async (req,
       proofFiles // Store proof files in profile
     };
 
+    // Add creator role immediately on application submission
+    // This allows pending creators to access creator dashboard and upload features
+    if (!user.role.includes('creator')) {
+      user.role.push('creator');
+    }
+
     // Check for OAuth verification (future enhancement)
     // For now, all applications are pending manual review
     const isOAuthVerified = false; // TODO: Check if user has verified OAuth accounts
@@ -79,11 +85,6 @@ router.post('/apply', authMiddleware, upload.array('proofFiles', 5), async (req,
       // Auto-approve if OAuth verified
       user.creatorProfile.verificationStatus = 'verified';
       user.creatorProfile.verifiedAt = new Date();
-      
-      // Add creator role
-      if (!user.role.includes('creator')) {
-        user.role.push('creator');
-      }
     }
 
     await user.save();
