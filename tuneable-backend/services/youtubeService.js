@@ -13,7 +13,7 @@ const getCategoryName = async (categoryId, apiKey) => {
         });
         
         // Track quota usage (videoCategories.list = 1 unit)
-        recordQuotaUsage(QUOTA_COSTS.VIDEO_CATEGORIES, 'getCategoryName', { categoryId });
+        await recordQuotaUsage(QUOTA_COSTS.VIDEO_CATEGORIES, 'getCategoryName', { categoryId });
         
         if (response.data.items && response.data.items.length > 0) {
             return response.data.items[0].snippet.title;
@@ -41,7 +41,7 @@ const searchYouTube = async (query, pageToken = null) => {
     });
 
     // Track quota usage for search.list (100 units)
-    recordQuotaUsage(QUOTA_COSTS.SEARCH_LIST, 'searchYouTube', { query, resultCount: searchResponse.data.items?.length || 0 });
+    await recordQuotaUsage(QUOTA_COSTS.SEARCH_LIST, 'searchYouTube', { query, resultCount: searchResponse.data.items?.length || 0 });
 
     const videos = searchResponse.data.items.map((item) => ({
         id: item.id.videoId,
@@ -65,7 +65,7 @@ const searchYouTube = async (query, pageToken = null) => {
     // Track quota usage for videos.list with contentDetails (1 unit per 50 videos, minimum 1)
     const videoCount = videos.length;
     const quotaCost = Math.ceil(videoCount / 50) * QUOTA_COSTS.VIDEOS_LIST_CONTENT_DETAILS;
-    recordQuotaUsage(quotaCost, 'searchYouTube-details', { videoCount });
+    await recordQuotaUsage(quotaCost, 'searchYouTube-details', { videoCount });
 
     // ✅ Helper Function: Convert YouTube Duration (ISO 8601) to Seconds
 const parseDuration = (duration) => {
@@ -147,7 +147,7 @@ const getVideoDetails = async (videoId) => {
         const snippetCost = Math.ceil(videoCount / 50) * QUOTA_COSTS.VIDEOS_LIST_SNIPPET;
         const contentDetailsCost = Math.ceil(videoCount / 50) * QUOTA_COSTS.VIDEOS_LIST_CONTENT_DETAILS;
         const quotaCost = snippetCost + contentDetailsCost;
-        recordQuotaUsage(quotaCost, 'getVideoDetails', { videoId });
+        await recordQuotaUsage(quotaCost, 'getVideoDetails', { videoId });
 
         if (response.data.items && response.data.items.length > 0) {
             const video = response.data.items[0];

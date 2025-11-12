@@ -1,14 +1,10 @@
 /**
  * API Quota Tracking Service
  * Tracks daily API quota usage with automatic reset
+ * Now persisted to MongoDB for deployment resilience
  */
 
-// In-memory storage for quota (could be moved to Redis for production)
-let quotaData = {
-  usage: 0,
-  resetDate: null,
-  history: []
-};
+const Quota = require('../models/Quota');
 
 // YouTube API quota costs (units per operation)
 const QUOTA_COSTS = {
@@ -26,20 +22,33 @@ const DAILY_QUOTA_LIMIT = 10000;
 /**
  * Get or initialize quota tracking for today
  */
-function getTodayQuota() {
+async function getTodayQuota() {
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   
-  // Reset if it's a new day
-  if (!quotaData.resetDate || quotaData.resetDate !== today) {
-    console.log(`🔄 Resetting quota tracking for ${today}`);
-    quotaData = {
+  try {
+    let quota = await Quota.findOne({ date: today });
+    
+    if (!quota) {
+      console.log(`🔄 Initializing quota tracking for ${today}`);
+      quota = await Quota.create({
+        date: today,
+        usage: 0,
+        history: []
+      });
+    }
+    
+    return quota;
+  } catch (error) {
+    console.error('Error getting quota:', error);
+    // Fallback to in-memory if DB fails
+    return {
       usage: 0,
+      date: today,
       resetDate: today,
-      history: []
+      history: [],
+      save: async () => {} // No-op for fallback
     };
   }
-  
-  return quotaData;
 }
 
 /**
@@ -48,13 +57,13 @@ function getTodayQuota() {
  * @param {string} operation - Description of the operation
  * @param {object} metadata - Additional metadata
  */
-function recordQuotaUsage(units, operation, metadata = {}) {
-  const quota = getTodayQuota();
+async function recordQuotaUsage(units, operation, metadata = {}) {
+  const quota = await getTodayQuota();
   
   quota.usage += units;
   
   quota.history.push({
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(),
     units,
     operation,
     metadata,
@@ -66,6 +75,8 @@ function recordQuotaUsage(units, operation, metadata = {}) {
     quota.history = quota.history.slice(-100);
   }
   
+  await quota.save();
+  
   const percentage = (quota.usage / DAILY_QUOTA_LIMIT) * 100;
   
   console.log(`📊 Quota usage: ${quota.usage}/${DAILY_QUOTA_LIMIT} units (${percentage.toFixed(1)}%) - ${operation}`);
@@ -75,19 +86,20 @@ function recordQuotaUsage(units, operation, metadata = {}) {
     limit: DAILY_QUOTA_LIMIT,
     remaining: DAILY_QUOTA_LIMIT - quota.usage,
     percentage: percentage,
-    resetDate: quota.resetDate
+    resetDate: quota.date || quota.resetDate
   };
 }
 
 /**
  * Get current quota status
  */
-function getQuotaStatus() {
-  const quota = getTodayQuota();
+async function getQuotaStatus() {
+  const quota = await getTodayQuota();
   const percentage = (quota.usage / DAILY_QUOTA_LIMIT) * 100;
   
   // Calculate reset time (midnight UTC tomorrow)
-  const resetDate = new Date(quota.resetDate + 'T00:00:00Z');
+  const dateString = quota.date || quota.resetDate;
+  const resetDate = new Date(dateString + 'T00:00:00Z');
   resetDate.setUTCDate(resetDate.getUTCDate() + 1);
   const resetTime = resetDate.toISOString();
   
@@ -96,7 +108,7 @@ function getQuotaStatus() {
     limit: DAILY_QUOTA_LIMIT,
     remaining: Math.max(0, DAILY_QUOTA_LIMIT - quota.usage),
     percentage: percentage,
-    resetDate: quota.resetDate,
+    resetDate: dateString,
     resetTime: resetTime,
     status: percentage >= 90 ? 'critical' : percentage >= 70 ? 'warning' : percentage >= 50 ? 'caution' : 'healthy',
     canSearch: quota.usage < DAILY_QUOTA_LIMIT * 0.95 // Allow searches if under 95%
@@ -106,23 +118,28 @@ function getQuotaStatus() {
 /**
  * Get quota history
  */
-function getQuotaHistory(limit = 50) {
-  const quota = getTodayQuota();
+async function getQuotaHistory(limit = 50) {
+  const quota = await getTodayQuota();
   return quota.history.slice(-limit);
 }
 
 /**
  * Reset quota manually (admin only)
  */
-function resetQuota() {
+async function resetQuota() {
   const today = new Date().toISOString().split('T')[0];
-  quotaData = {
-    usage: 0,
-    resetDate: today,
-    history: []
-  };
+  
+  await Quota.findOneAndUpdate(
+    { date: today },
+    { 
+      usage: 0,
+      history: []
+    },
+    { upsert: true, new: true }
+  );
+  
   console.log('🔄 Quota manually reset');
-  return getQuotaStatus();
+  return await getQuotaStatus();
 }
 
 module.exports = {

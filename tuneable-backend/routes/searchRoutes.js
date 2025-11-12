@@ -364,7 +364,7 @@ router.get('/youtube-url', async (req, res) => {
 // Get quota status (public endpoint - can be called by any authenticated user)
 router.get('/quota-status', authMiddleware, async (req, res) => {
     try {
-        const status = getQuotaStatus();
+        const status = await getQuotaStatus();
         res.json(status);
     } catch (error) {
         console.error('Error fetching quota status:', error);
@@ -383,7 +383,7 @@ router.get('/admin/quota-history', authMiddleware, async (req, res) => {
         }
 
         const limit = parseInt(req.query.limit) || 50;
-        const history = getQuotaHistory(limit);
+        const history = await getQuotaHistory(limit);
         res.json({ history });
     } catch (error) {
         console.error('Error fetching quota history:', error);
@@ -401,7 +401,7 @@ router.post('/admin/quota-reset', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Admin access required' });
         }
 
-        const status = resetQuota();
+        const status = await resetQuota();
         res.json({ 
             message: 'Quota reset successfully',
             status 
