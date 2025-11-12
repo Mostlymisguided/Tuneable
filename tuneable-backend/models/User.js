@@ -152,6 +152,13 @@ const userSchema = new mongoose.Schema({
     invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }],
   
+  // Pending admin invitations to labels
+  pendingLabelAdminInvites: [{
+    labelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Label', required: true },
+    invitedAt: { type: Date, default: Date.now },
+    invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }],
+  
   // Party affiliations - track which parties user has joined
   joinedParties: [{
     partyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },

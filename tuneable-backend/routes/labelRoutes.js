@@ -4,6 +4,7 @@ const Label = require('../models/Label');
 const User = require('../models/User');
 const Media = require('../models/Media');
 const Bid = require('../models/Bid');
+const Notification = require('../models/Notification');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
@@ -203,8 +204,27 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'User is already an admin of this label' });
     }
     
-    // Add as admin
-    await label.addAdmin(targetUser._id, 'admin', inviterId);
+    // Check if user already has a pending admin invite
+    const existingInvite = targetUser.pendingLabelAdminInvites?.find(
+      invite => invite.labelId && invite.labelId.toString() === label._id.toString()
+    );
+    
+    if (existingInvite) {
+      return res.status(400).json({ error: 'User already has a pending admin invitation for this label' });
+    }
+    
+    // Add pending admin invite
+    if (!targetUser.pendingLabelAdminInvites) {
+      targetUser.pendingLabelAdminInvites = [];
+    }
+    
+    targetUser.pendingLabelAdminInvites.push({
+      labelId: label._id,
+      invitedAt: new Date(),
+      invitedBy: inviterId
+    });
+    
+    await targetUser.save();
     
     // Create notification for the invited user
     try {
@@ -216,7 +236,9 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
         message: `${inviter?.username || 'Someone'} invited you to join "${label.name}" as an admin`,
         link: `/label/${label.slug}`,
         linkText: 'View Label',
-        relatedUserId: inviterId
+        relatedUserId: inviterId,
+        relatedLabelId: label._id,
+        inviteType: 'admin'
       });
     } catch (notifError) {
       console.error('Error creating label invite notification:', notifError);
@@ -304,7 +326,10 @@ router.post('/:slug/invite-artist', authMiddleware, async (req, res) => {
         message: `${inviter?.username || 'Someone'} invited you to join "${label.name}" as an ${role}`,
         link: `/label/${label.slug}`,
         linkText: 'View Label',
-        relatedUserId: inviterId
+        relatedUserId: inviterId,
+        relatedLabelId: label._id,
+        inviteType: 'artist',
+        inviteRole: role
       });
     } catch (notifError) {
       console.error('Error creating label invite notification:', notifError);
@@ -315,6 +340,185 @@ router.post('/:slug/invite-artist', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error inviting artist:', error);
     res.status(500).json({ error: 'Failed to invite artist', details: error.message });
+  }
+});
+
+// Accept label invitation (admin or artist)
+router.post('/:slug/accept-invite', authMiddleware, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const userId = req.user._id;
+    const { inviteType } = req.body; // 'admin' or 'artist'
+    
+    const label = await Label.findBySlug(slug);
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (inviteType === 'admin') {
+      // Check for pending admin invite
+      const pendingInvite = user.pendingLabelAdminInvites?.find(
+        invite => invite.labelId && invite.labelId.toString() === label._id.toString()
+      );
+      
+      if (!pendingInvite) {
+        return res.status(400).json({ error: 'No pending admin invitation found for this label' });
+      }
+      
+      // Check if already an admin
+      if (label.isAdmin(userId)) {
+        // Remove pending invite if already admin
+        user.pendingLabelAdminInvites = user.pendingLabelAdminInvites.filter(
+          invite => invite.labelId.toString() !== label._id.toString()
+        );
+        await user.save();
+        return res.status(400).json({ error: 'You are already an admin of this label' });
+      }
+      
+      // Add as admin
+      await label.addAdmin(userId, 'admin', pendingInvite.invitedBy);
+      
+      // Remove pending invite
+      user.pendingLabelAdminInvites = user.pendingLabelAdminInvites.filter(
+        invite => invite.labelId.toString() !== label._id.toString()
+      );
+      await user.save();
+      
+      // Mark related notifications as read
+      await Notification.updateMany(
+        {
+          userId: userId,
+          type: 'label_invite',
+          relatedLabelId: label._id,
+          inviteType: 'admin',
+          isRead: false
+        },
+        { isRead: true, readAt: new Date() }
+      );
+      
+      res.json({ success: true, message: 'Admin invitation accepted successfully' });
+    } else if (inviteType === 'artist') {
+      // Check for pending artist affiliation
+      const pendingAffiliation = user.labelAffiliations?.find(
+        aff => aff.labelId && aff.labelId.toString() === label._id.toString() && aff.status === 'pending'
+      );
+      
+      if (!pendingAffiliation) {
+        return res.status(400).json({ error: 'No pending artist invitation found for this label' });
+      }
+      
+      // Activate affiliation
+      pendingAffiliation.status = 'active';
+      await user.save();
+      
+      // Mark related notifications as read
+      await Notification.updateMany(
+        {
+          userId: userId,
+          type: 'label_invite',
+          relatedLabelId: label._id,
+          inviteType: 'artist',
+          isRead: false
+        },
+        { isRead: true, readAt: new Date() }
+      );
+      
+      res.json({ success: true, message: 'Artist invitation accepted successfully' });
+    } else {
+      return res.status(400).json({ error: 'Invalid inviteType. Must be "admin" or "artist"' });
+    }
+  } catch (error) {
+    console.error('Error accepting invitation:', error);
+    res.status(500).json({ error: 'Failed to accept invitation', details: error.message });
+  }
+});
+
+// Decline label invitation (admin or artist)
+router.post('/:slug/decline-invite', authMiddleware, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const userId = req.user._id;
+    const { inviteType } = req.body; // 'admin' or 'artist'
+    
+    const label = await Label.findBySlug(slug);
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (inviteType === 'admin') {
+      // Check for pending admin invite
+      const pendingInvite = user.pendingLabelAdminInvites?.find(
+        invite => invite.labelId && invite.labelId.toString() === label._id.toString()
+      );
+      
+      if (!pendingInvite) {
+        return res.status(400).json({ error: 'No pending admin invitation found for this label' });
+      }
+      
+      // Remove pending invite
+      user.pendingLabelAdminInvites = user.pendingLabelAdminInvites.filter(
+        invite => invite.labelId.toString() !== label._id.toString()
+      );
+      await user.save();
+      
+      // Mark related notifications as read
+      await Notification.updateMany(
+        {
+          userId: userId,
+          type: 'label_invite',
+          relatedLabelId: label._id,
+          inviteType: 'admin',
+          isRead: false
+        },
+        { isRead: true, readAt: new Date() }
+      );
+      
+      res.json({ success: true, message: 'Admin invitation declined' });
+    } else if (inviteType === 'artist') {
+      // Check for pending artist affiliation
+      const pendingAffiliation = user.labelAffiliations?.find(
+        aff => aff.labelId && aff.labelId.toString() === label._id.toString() && aff.status === 'pending'
+      );
+      
+      if (!pendingAffiliation) {
+        return res.status(400).json({ error: 'No pending artist invitation found for this label' });
+      }
+      
+      // Remove pending affiliation
+      user.labelAffiliations = user.labelAffiliations.filter(
+        aff => !(aff.labelId.toString() === label._id.toString() && aff.status === 'pending')
+      );
+      await user.save();
+      
+      // Mark related notifications as read
+      await Notification.updateMany(
+        {
+          userId: userId,
+          type: 'label_invite',
+          relatedLabelId: label._id,
+          inviteType: 'artist',
+          isRead: false
+        },
+        { isRead: true, readAt: new Date() }
+      );
+      
+      res.json({ success: true, message: 'Artist invitation declined' });
+    } else {
+      return res.status(400).json({ error: 'Invalid inviteType. Must be "admin" or "artist"' });
+    }
+  } catch (error) {
+    console.error('Error declining invitation:', error);
+    res.status(500).json({ error: 'Failed to decline invitation', details: error.message });
   }
 });
 

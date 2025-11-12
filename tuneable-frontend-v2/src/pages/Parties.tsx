@@ -5,7 +5,7 @@ import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
 import PlayerWarningModal from '../components/PlayerWarningModal';
-import { Music, Users, MapPin, Clock } from 'lucide-react';
+import { Music, Users, MapPin } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartyType {
@@ -19,6 +19,7 @@ interface PartyType {
   partiers: (string | { id: string; username: string; uuid?: string; userId?: string; _id?: string })[];
   media?: any[];
   songs?: any[]; // Legacy support
+  mediaCount?: number; // Count of queued media (from backend)
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
@@ -228,17 +229,6 @@ const Parties: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -283,14 +273,10 @@ const Parties: React.FC = () => {
 
       <div className="space-y-3 mb-4">
         <div className="flex items-center text-sm text-white">
-          <MapPin className="h-4 w-4 mr-2" />
-          <span>{party.location}</span>
-        </div>
-        
-
-        <div className="flex items-center text-sm text-white">
-          <Clock className="h-4 w-4 mr-2" />
-          <span>{formatDate(party.startTime)}</span>
+          <Music className="h-4 w-4 mr-2" />
+          <span>
+            {party.mediaCount ?? (party.media?.length || party.songs?.length || 0)} {(party.mediaCount ?? (party.media?.length || party.songs?.length || 0)) === 1 ? 'tune' : 'tunes'}
+          </span>
         </div>
 
         <div className="flex items-center text-sm text-white">
@@ -301,6 +287,11 @@ const Parties: React.FC = () => {
               : `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
             }
           </span>
+        </div>
+
+        <div className="flex items-center text-sm text-white">
+          <MapPin className="h-4 w-4 mr-2" />
+          <span>{party.location}</span>
         </div>
 
         {/* Tags Display */}

@@ -40,6 +40,10 @@ const createNotification = async (params) => {
       relatedUserId,
       relatedBidId,
       relatedCommentId,
+      relatedLabelId,
+      relatedCollectiveId,
+      inviteType,
+      inviteRole,
       groupKey
     } = params;
 
@@ -83,6 +87,10 @@ const createNotification = async (params) => {
       relatedUserId,
       relatedBidId,
       relatedCommentId,
+      relatedLabelId,
+      relatedCollectiveId,
+      inviteType,
+      inviteRole,
       groupKey,
       isRead: false
     });
@@ -94,6 +102,8 @@ const createNotification = async (params) => {
       .populate('relatedMediaId', 'title artist coverArt uuid')
       .populate('relatedPartyId', 'name uuid')
       .populate('relatedUserId', 'username profilePic uuid')
+      .populate('relatedLabelId', 'name slug uuid')
+      .populate('relatedCollectiveId', 'name slug uuid')
       .lean();
 
     // Send real-time notification via Socket.IO

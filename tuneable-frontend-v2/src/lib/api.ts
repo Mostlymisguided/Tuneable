@@ -705,6 +705,18 @@ export const labelAPI = {
     return response.data;
   },
 
+  // Accept label invitation (admin or artist)
+  acceptInvite: async (slug: string, inviteType: 'admin' | 'artist') => {
+    const response = await api.post(`/labels/${slug}/accept-invite`, { inviteType });
+    return response.data;
+  },
+
+  // Decline label invitation (admin or artist)
+  declineInvite: async (slug: string, inviteType: 'admin' | 'artist') => {
+    const response = await api.post(`/labels/${slug}/decline-invite`, { inviteType });
+    return response.data;
+  },
+
   // Create label (authenticated)
   createLabel: async (labelData: FormData | {
     name: string;

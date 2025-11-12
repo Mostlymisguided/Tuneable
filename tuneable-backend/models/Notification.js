@@ -43,6 +43,12 @@ const notificationSchema = new mongoose.Schema({
   relatedUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   relatedBidId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bid' },
   relatedCommentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment' },
+  relatedLabelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Label' },
+  relatedCollectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective' },
+  
+  // Invitation metadata
+  inviteType: { type: String, enum: ['admin', 'artist', 'member'] }, // For label/collective invites
+  inviteRole: { type: String }, // Specific role for artist/member invites
   
   // Metadata
   isRead: { type: Boolean, default: false },

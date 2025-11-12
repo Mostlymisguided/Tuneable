@@ -168,11 +168,84 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
  */
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const parties = await Party.find()
-            .select('-media') // Exclude media for better performance
-            .populate('host', 'username uuid'); // ✅ Include uuid for consistent host identification
+        // Use aggregation to get parties with media counts in a single query
+        const partiesWithCounts = await Party.aggregate([
+            {
+                $project: {
+                    uuid: 1,
+                    name: 1,
+                    location: 1,
+                    host: 1,
+                    partyCode: 1,
+                    partiers: 1,
+                    startTime: 1,
+                    endTime: 1,
+                    privacy: 1,
+                    type: 1,
+                    status: 1,
+                    watershed: 1,
+                    tags: 1,
+                    description: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    minimumBid: 1,
+                    mediaSource: 1,
+                    // Count queued media only (matching Party page display)
+                    mediaCount: {
+                        $size: {
+                            $filter: {
+                                input: { $ifNull: ['$media', []] },
+                                as: 'item',
+                                cond: { $eq: ['$$item.status', 'queued'] }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'host',
+                    foreignField: '_id',
+                    as: 'hostData'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$hostData',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $project: {
+                    uuid: 1,
+                    name: 1,
+                    location: 1,
+                    host: {
+                        _id: '$hostData._id',
+                        username: '$hostData.username',
+                        uuid: '$hostData.uuid'
+                    },
+                    partyCode: 1,
+                    partiers: 1,
+                    startTime: 1,
+                    endTime: 1,
+                    privacy: 1,
+                    type: 1,
+                    status: 1,
+                    watershed: 1,
+                    tags: 1,
+                    description: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    minimumBid: 1,
+                    mediaSource: 1,
+                    mediaCount: 1
+                }
+            }
+        ]);
 
-        res.status(200).json({ message: 'Parties fetched successfully', parties });
+        res.status(200).json({ message: 'Parties fetched successfully', parties: partiesWithCounts });
     } catch (err) {
         handleError(res, err, 'Failed to fetch parties');
     }

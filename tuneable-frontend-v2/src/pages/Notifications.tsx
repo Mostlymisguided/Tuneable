@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, CheckCheck, Trash2, ArrowLeft } from 'lucide-react';
-import { notificationAPI } from '../lib/api';
+import { Bell, Check, CheckCheck, Trash2, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import { notificationAPI, labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'react-toastify';
 
 interface Notification {
   _id: string;
@@ -19,6 +20,9 @@ interface Notification {
   relatedMediaId?: any;
   relatedPartyId?: any;
   relatedUserId?: any;
+  relatedLabelId?: any;
+  inviteType?: 'admin' | 'artist' | 'member';
+  inviteRole?: string;
 }
 
 const Notifications: React.FC = () => {
@@ -29,6 +33,7 @@ const Notifications: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [processingInvite, setProcessingInvite] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   // Get API base URL for Socket.IO connection
@@ -174,8 +179,93 @@ const Notifications: React.FC = () => {
     }
   };
 
+  // Extract slug from notification link or relatedLabelId
+  const getLabelSlug = (notification: Notification): string | null => {
+    if (notification.link) {
+      const match = notification.link.match(/\/label\/([^\/]+)/);
+      if (match) return match[1];
+    }
+    if (notification.relatedLabelId) {
+      if (typeof notification.relatedLabelId === 'string') {
+        return notification.relatedLabelId;
+      }
+      if (notification.relatedLabelId.slug) {
+        return notification.relatedLabelId.slug;
+      }
+      if (notification.relatedLabelId._id) {
+        return notification.relatedLabelId._id;
+      }
+    }
+    return null;
+  };
+
+  // Handle accept invitation
+  const handleAcceptInvite = async (e: React.MouseEvent, notification: Notification) => {
+    e.stopPropagation();
+    if (!notification.inviteType) return;
+    
+    try {
+      setProcessingInvite(notification._id);
+      const slug = getLabelSlug(notification);
+      if (!slug) {
+        toast.error('Unable to find label information');
+        return;
+      }
+      
+      await labelAPI.acceptInvite(slug, notification.inviteType);
+      toast.success('Invitation accepted!');
+      
+      // Remove notification and update unread count
+      const notificationWasUnread = !notification.isRead;
+      setNotifications(prev => prev.filter(n => n._id !== notification._id));
+      if (notificationWasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error: any) {
+      console.error('Error accepting invitation:', error);
+      toast.error(error.response?.data?.error || 'Failed to accept invitation');
+    } finally {
+      setProcessingInvite(null);
+    }
+  };
+
+  // Handle decline invitation
+  const handleDeclineInvite = async (e: React.MouseEvent, notification: Notification) => {
+    e.stopPropagation();
+    if (!notification.inviteType) return;
+    
+    try {
+      setProcessingInvite(notification._id);
+      const slug = getLabelSlug(notification);
+      if (!slug) {
+        toast.error('Unable to find label information');
+        return;
+      }
+      
+      await labelAPI.declineInvite(slug, notification.inviteType);
+      toast.success('Invitation declined');
+      
+      // Remove notification and update unread count
+      const notificationWasUnread = !notification.isRead;
+      setNotifications(prev => prev.filter(n => n._id !== notification._id));
+      if (notificationWasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error: any) {
+      console.error('Error declining invitation:', error);
+      toast.error(error.response?.data?.error || 'Failed to decline invitation');
+    } finally {
+      setProcessingInvite(null);
+    }
+  };
+
   // Handle notification click
   const handleNotificationClick = (notification: Notification) => {
+    // Don't navigate if it's a label invite (user should use accept/decline buttons)
+    if (notification.type === 'label_invite') {
+      return;
+    }
+    
     if (!notification.isRead) {
       handleMarkAsRead(notification._id);
     }
@@ -281,7 +371,27 @@ const Notifications: React.FC = () => {
                         <p className="text-sm text-gray-400 mt-1">
                           {notification.message}
                         </p>
-                        {notification.linkText && (
+                        {notification.type === 'label_invite' && notification.inviteType && (
+                          <div className="flex items-center gap-2 mt-3">
+                            <button
+                              onClick={(e) => handleAcceptInvite(e, notification)}
+                              disabled={processingInvite === notification._id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Accept
+                            </button>
+                            <button
+                              onClick={(e) => handleDeclineInvite(e, notification)}
+                              disabled={processingInvite === notification._id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Decline
+                            </button>
+                          </div>
+                        )}
+                        {notification.linkText && notification.type !== 'label_invite' && (
                           <span className="text-xs text-purple-400 mt-2 inline-block">
                             {notification.linkText} →
                           </span>
