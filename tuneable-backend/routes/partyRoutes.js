@@ -433,7 +433,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 globalMediaAggregateTopUser: entry.mediaId.globalMediaAggregateTopUser,
                 
                 // ✅ NEW: Song status and timing information
-                status: entry.status || 'queued',
+                status: entry.status || 'active',
                 queuedAt: entry.queuedAt,
                 playedAt: entry.playedAt,
                 completedAt: entry.completedAt,
@@ -971,7 +971,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
                 media_uuid: populatedMedia.uuid,
                 partyMediaAggregate: populatedMedia.globalMediaAggregate || 0,
                 partyBids: populatedMedia.bids || [],
-                status: 'queued'
+                status: 'active'
             };
 
         } else {
@@ -1996,8 +1996,8 @@ router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) =
             return res.status(404).json({ error: 'Media not found in party' });
         }
         
-        // Restore media to queued status
-        mediaEntry.status = 'queued';
+        // Restore media to active status
+        mediaEntry.status = 'active';
         mediaEntry.vetoedAt = null;
         mediaEntry.vetoedBy = null;
         mediaEntry.vetoedBy_uuid = null;

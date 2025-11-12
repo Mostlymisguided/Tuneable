@@ -264,7 +264,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
         addedBy: userId,
         partyMediaAggregate: 0,
         partyBids: [],
-        status: 'queued',
+        status: 'active',
         queuedAt: new Date()
       };
       party.media.push(partyMediaEntry);

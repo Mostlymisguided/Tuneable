@@ -81,7 +81,7 @@ async function testGlobalPartyBidding() {
           media_uuid: populatedMedia.uuid,
           partyMediaAggregate: populatedMedia.globalMediaAggregate || 0,
           partyBids: populatedMedia.bids || [],
-          status: 'queued'
+          status: 'active'
         };
         
         console.log('✅ Virtual party media entry created successfully');

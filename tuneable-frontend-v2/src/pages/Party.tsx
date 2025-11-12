@@ -941,7 +941,7 @@ const Party: React.FC = () => {
     }
 
     try {
-      // Un-veto the media (restore to 'queued' status)
+      // Un-veto the media (restore to 'active' status)
       await partyAPI.unvetoMedia(partyId!, media._id || media.id);
       toast.success('Media restored to queue');
       
