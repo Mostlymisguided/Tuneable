@@ -14,6 +14,7 @@ import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import TagInputModal from '../components/TagInputModal';
 import EmailInviteModal from '../components/EmailInviteModal';
+import CreatorProfilePrompts from '../components/CreatorProfilePrompts';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface LibraryItem {
@@ -833,10 +834,15 @@ Join here: ${inviteLink}`.trim();
                         </div>
                       </div>
 
+                      {/* Profile Completion Prompts */}
+                      {showCreatorDashboard(user) && (
+                        <CreatorProfilePrompts user={user} />
+                      )}
+
                       {/* Quick Actions */}
                       <div className="bg-gray-900 rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <button
                             onClick={handleUploadClick}
                             className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
