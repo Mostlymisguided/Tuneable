@@ -1772,7 +1772,7 @@ const Admin: React.FC = () => {
                             <button
                               onClick={() => {
                                 const notes = prompt('Add approval notes (optional):');
-                                reviewCreatorApplication(app.userId?._id || app.userId, 'verified', notes || '');
+                                reviewCreatorApplication(app._id, 'verified', notes || '');
                               }}
                               className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                             >
@@ -1783,7 +1783,7 @@ const Admin: React.FC = () => {
                               onClick={() => {
                                 const notes = prompt('Add rejection reason:');
                                 if (notes) {
-                                  reviewCreatorApplication(app.userId?._id || app.userId, 'rejected', notes);
+                                  reviewCreatorApplication(app._id, 'rejected', notes);
                                 }
                               }}
                               className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
