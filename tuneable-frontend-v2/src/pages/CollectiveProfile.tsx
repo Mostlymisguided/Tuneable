@@ -5,7 +5,7 @@ import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook,
 import { collectiveAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { DEFAULT_PROFILE_PIC, COUNTRIES } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 
@@ -1111,17 +1111,9 @@ useEffect(() => {
                     className="input"
                   >
                     <option value="">Select Country</option>
-                    <option value="United Kingdom">United Kingdom</option>
-                    <option value="United States">United States</option>
-                    <option value="Canada">Canada</option>
-                    <option value="Australia">Australia</option>
-                    <option value="Germany">Germany</option>
-                    <option value="France">France</option>
-                    <option value="Spain">Spain</option>
-                    <option value="Italy">Italy</option>
-                    <option value="Netherlands">Netherlands</option>
-                    <option value="Belgium">Belgium</option>
-                    {/* Add more countries as needed */}
+                    {COUNTRIES.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
                   </select>
                 </div>
               </div>
