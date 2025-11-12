@@ -16,7 +16,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, SkipForward, SkipBack, Loader2, Youtube, Tag } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
@@ -1143,33 +1143,6 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleSkipNext = async () => {
-    if (!partyId) return;
-    
-    try {
-      await partyAPI.skipNext(partyId);
-      toast.success('Skipped to next media');
-      // Refresh party data to show updated queue
-      await fetchPartyDetails();
-    } catch (error: any) {
-      console.error('Error skipping to next media:', error);
-      toast.error(error.response?.data?.error || 'Failed to skip to next media');
-    }
-  };
-
-  const handleSkipPrevious = async () => {
-    if (!partyId) return;
-    
-    try {
-      await partyAPI.skipPrevious(partyId);
-      toast.success('Skipped to previous media');
-      // Refresh party data to show updated queue
-      await fetchPartyDetails();
-    } catch (error: any) {
-      console.error('Error skipping to previous media:', error);
-      toast.error(error.response?.data?.error || 'Failed to skip to previous media');
-    }
-  };
 
   // Handle clicking play button on media in the queue
   const handlePlayMedia = (item: any, index: number) => {
