@@ -824,26 +824,30 @@ Join here: ${inviteLink}`.trim();
                             </div>
                             <ArrowUp className="h-4 w-4 text-white" />
                           </button>
-                          <button
-                              onClick={() => setIsLabelModalOpen(true)}
-                            className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                          >
-                            <div className="flex items-center">
-                              <Building className="h-5 w-5 text-white mr-3" />
-                              <span className="text-white font-medium">Create Label</span>
-                            </div>
-                            <Plus className="h-4 w-4 text-white" />
-                          </button>
-                            <button
-                              onClick={() => setIsCollectiveModalOpen(true)}
-                              className="flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
-                            >
-                              <div className="flex items-center">
-                                <Users className="h-5 w-5 text-white mr-3" />
-                                <span className="text-white font-medium">Create Collective</span>
-                              </div>
-                              <Plus className="h-4 w-4 text-white" />
-                            </button>
+                          {user?.creatorProfile?.verificationStatus === 'verified' && (
+                            <>
+                              <button
+                                onClick={() => setIsLabelModalOpen(true)}
+                                className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                              >
+                                <div className="flex items-center">
+                                  <Building className="h-5 w-5 text-white mr-3" />
+                                  <span className="text-white font-medium">Create Label</span>
+                                </div>
+                                <Plus className="h-4 w-4 text-white" />
+                              </button>
+                              <button
+                                onClick={() => setIsCollectiveModalOpen(true)}
+                                className="flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
+                              >
+                                <div className="flex items-center">
+                                  <Users className="h-5 w-5 text-white mr-3" />
+                                  <span className="text-white font-medium">Create Collective</span>
+                                </div>
+                                <Plus className="h-4 w-4 text-white" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -1164,13 +1168,15 @@ Join here: ${inviteLink}`.trim();
                       <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-lg font-semibold text-white">My Labels</h3>
-                          <button
-                            onClick={() => setIsLabelModalOpen(true)}
-                            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Label
-                          </button>
+                          {user?.creatorProfile?.verificationStatus === 'verified' && (
+                            <button
+                              onClick={() => setIsLabelModalOpen(true)}
+                              className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Label
+                            </button>
+                          )}
                         </div>
 
                         {/* Filters */}
@@ -1679,12 +1685,14 @@ Join here: ${inviteLink}`.trim();
                                 Clear Filters
                               </button>
                             )}
-                            <button
-                              onClick={() => setIsLabelModalOpen(true)}
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                            >
-                              Create Label
-                            </button>
+                            {user?.creatorProfile?.verificationStatus === 'verified' && (
+                              <button
+                                onClick={() => setIsLabelModalOpen(true)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                              >
+                                Create Label
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1770,13 +1778,15 @@ Join here: ${inviteLink}`.trim();
                       <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-lg font-semibold text-white">My Collectives</h3>
-                          <button
-                            onClick={() => setIsCollectiveModalOpen(true)}
-                            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Collective
-                          </button>
+                          {user?.creatorProfile?.verificationStatus === 'verified' && (
+                            <button
+                              onClick={() => setIsCollectiveModalOpen(true)}
+                              className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Collective
+                            </button>
+                          )}
                         </div>
 
                         {/* Filters */}
@@ -2185,12 +2195,14 @@ Join here: ${inviteLink}`.trim();
                                 Clear Filters
                               </button>
                             )}
-                            <button
-                              onClick={() => setIsCollectiveModalOpen(true)}
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                            >
-                              Create Collective
-                            </button>
+                            {user?.creatorProfile?.verificationStatus === 'verified' && (
+                              <button
+                                onClick={() => setIsCollectiveModalOpen(true)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                              >
+                                Create Collective
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
