@@ -660,7 +660,7 @@ const CreatorRegister: React.FC = () => {
       <div>
         <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
           <Award className="h-6 w-6 mr-2 text-purple-400" />
-          Verification
+          Verification (Optional)
         </h3>
 
         <div className="space-y-4">
@@ -833,7 +833,7 @@ const CreatorRegister: React.FC = () => {
                 ) : (
                   <>
                     <CheckCircle className="h-5 w-5 mr-2" />
-                    Submit Application
+                    Submit
                   </>
                 )}
               </button>

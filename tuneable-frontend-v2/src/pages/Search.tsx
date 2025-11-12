@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
 import TagInputModal from '../components/TagInputModal';
+import MediaValidationModal from '../components/MediaValidationModal';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
@@ -48,6 +49,12 @@ const SearchPage: React.FC = () => {
   const [hasMoreExternal, setHasMoreExternal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<SearchResult | null>(null);
+  
+  // Validation modal state
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<{category?: boolean; duration?: boolean}>({});
+  const [validationCategory, setValidationCategory] = useState<string>('');
+  const [validationDuration, setValidationDuration] = useState<number>(0);
 
   useEffect(() => {
     if (!partyId) {
@@ -293,6 +300,51 @@ const SearchPage: React.FC = () => {
     }
   };
 
+  // Helper to extract YouTube video ID from URL
+  const extractYouTubeVideoId = (url: string): string | null => {
+    if (!url) return null;
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
+  // Helper to fetch video category if needed
+  const fetchVideoCategory = async (videoId: string): Promise<string> => {
+    try {
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      const response = await searchAPI.searchByYouTubeUrl(url);
+      if (response.videos && response.videos.length > 0) {
+        return response.videos[0].category || 'Unknown';
+      }
+    } catch (error) {
+      console.error('Error fetching video category:', error);
+    }
+    return 'Unknown';
+  };
+
+  // Handler for validation modal confirm
+  const handleValidationConfirm = () => {
+    setShowValidationModal(false);
+    if (pendingMedia) {
+      setShowTagModal(true);
+    }
+  };
+
+  // Handler for validation modal cancel
+  const handleValidationCancel = () => {
+    setShowValidationModal(false);
+    setPendingMedia(null);
+    setValidationWarnings({});
+    setValidationCategory('');
+    setValidationDuration(0);
+  };
+
   const handleBid = async (song: SearchResult) => {
     if (!partyId) return;
     
@@ -384,7 +436,43 @@ const SearchPage: React.FC = () => {
         }
       }
       } else {
-        // Handle regular song - show tag modal first
+        // Handle regular song - validate before showing tag modal
+        let category = song.category || 'Unknown';
+        const duration = song.duration || 0;
+        
+        // If category is Unknown and it's a YouTube video, fetch it
+        if (category === 'Unknown' && song.sources?.youtube) {
+          const videoId = extractYouTubeVideoId(song.sources.youtube);
+          if (videoId) {
+            category = await fetchVideoCategory(videoId);
+            // Update song object with fetched category
+            song.category = category;
+          }
+        }
+        
+        // Check for warnings
+        const warnings: {category?: boolean; duration?: boolean} = {};
+        const DURATION_THRESHOLD = 671; // 11:11 in seconds
+        
+        if (category.toLowerCase() !== 'music') {
+          warnings.category = true;
+        }
+        
+        if (duration > DURATION_THRESHOLD) {
+          warnings.duration = true;
+        }
+        
+        // If there are warnings, show validation modal
+        if (Object.keys(warnings).length > 0) {
+          setValidationWarnings(warnings);
+          setValidationCategory(category);
+          setValidationDuration(duration);
+          setPendingMedia(song);
+          setShowValidationModal(true);
+          return;
+        }
+        
+        // No warnings, proceed directly to tag modal
         setPendingMedia(song);
         setShowTagModal(true);
       }
@@ -829,6 +917,17 @@ const SearchPage: React.FC = () => {
         onSubmit={handleTagSubmit}
         mediaTitle={pendingMedia?.title}
         mediaArtist={pendingMedia?.artist}
+      />
+
+      <MediaValidationModal
+        isOpen={showValidationModal}
+        onConfirm={handleValidationConfirm}
+        onCancel={handleValidationCancel}
+        mediaTitle={pendingMedia?.title}
+        mediaArtist={pendingMedia?.artist}
+        warnings={validationWarnings}
+        category={validationCategory}
+        duration={validationDuration}
       />
     </div>
   );

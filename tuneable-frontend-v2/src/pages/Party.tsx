@@ -10,6 +10,7 @@ import BidModal from '../components/BidModal';
 // import PartyQueueSearch from '../components/PartyQueueSearch'; // Commented out for now
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
+import MediaValidationModal from '../components/MediaValidationModal';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
@@ -98,6 +99,12 @@ const Party: React.FC = () => {
   // Tag modal state
   const [showTagModal, setShowTagModal] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<any>(null);
+  
+  // Validation modal state
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<{category?: boolean; duration?: boolean}>({});
+  const [validationCategory, setValidationCategory] = useState<string>('');
+  const [validationDuration, setValidationDuration] = useState<number>(0);
   
   const [showVetoed] = useState(false);
 
@@ -630,12 +637,92 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleAddMediaToParty = (media: any) => {
+  // Helper to extract YouTube video ID from URL
+  const extractYouTubeVideoId = (url: string): string | null => {
+    if (!url) return null;
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
+  // Helper to fetch video category if needed
+  const fetchVideoCategory = async (videoId: string): Promise<string> => {
+    try {
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      const response = await searchAPI.searchByYouTubeUrl(url);
+      if (response.videos && response.videos.length > 0) {
+        return response.videos[0].category || 'Unknown';
+      }
+    } catch (error) {
+      console.error('Error fetching video category:', error);
+    }
+    return 'Unknown';
+  };
+
+  const handleAddMediaToParty = async (media: any) => {
     if (!partyId) return;
     
-    // Store pending media and show tag modal
+    let category = media.category || 'Unknown';
+    const duration = media.duration || 0;
+    
+    // If category is Unknown and it's a YouTube video, fetch it
+    if (category === 'Unknown' && media.sources?.youtube) {
+      const videoId = extractYouTubeVideoId(media.sources.youtube);
+      if (videoId) {
+        category = await fetchVideoCategory(videoId);
+        // Update media object with fetched category
+        media.category = category;
+      }
+    }
+    
+    // Check for warnings
+    const warnings: {category?: boolean; duration?: boolean} = {};
+    const DURATION_THRESHOLD = 671; // 11:11 in seconds
+    
+    if (category.toLowerCase() !== 'music') {
+      warnings.category = true;
+    }
+    
+    if (duration > DURATION_THRESHOLD) {
+      warnings.duration = true;
+    }
+    
+    // If there are warnings, show validation modal
+    if (Object.keys(warnings).length > 0) {
+      setValidationWarnings(warnings);
+      setValidationCategory(category);
+      setValidationDuration(duration);
+      setPendingMedia(media);
+      setShowValidationModal(true);
+      return;
+    }
+    
+    // No warnings, proceed directly to tag modal
     setPendingMedia(media);
     setShowTagModal(true);
+  };
+
+  // Handler for validation modal confirm
+  const handleValidationConfirm = () => {
+    setShowValidationModal(false);
+    if (pendingMedia) {
+      setShowTagModal(true);
+    }
+  };
+
+  // Handler for validation modal cancel
+  const handleValidationCancel = () => {
+    setShowValidationModal(false);
+    setPendingMedia(null);
+    setValidationWarnings({});
+    setValidationCategory('');
+    setValidationDuration(0);
   };
 
   const handleTagSubmit = async (tags: string[]) => {
@@ -2152,6 +2239,18 @@ const Party: React.FC = () => {
         onSubmit={handleTagSubmit}
         mediaTitle={pendingMedia?.title}
         mediaArtist={pendingMedia?.artist}
+      />
+
+      {/* Media Validation Modal */}
+      <MediaValidationModal
+        isOpen={showValidationModal}
+        onConfirm={handleValidationConfirm}
+        onCancel={handleValidationCancel}
+        mediaTitle={pendingMedia?.title}
+        mediaArtist={pendingMedia?.artist}
+        warnings={validationWarnings}
+        category={validationCategory}
+        duration={validationDuration}
       />
     </div>
   );
