@@ -1207,7 +1207,7 @@ const Party: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 border border-gray-600 px-3 py-2 rounded-lg backdrop-blur-sm">
+          <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
             <div className="flex items-center space-x-2">
               <Users className="h-6 w-6 text-white" />
               <div>
@@ -1216,7 +1216,7 @@ const Party: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 border border-gray-600 px-3 py-2 rounded-lg backdrop-blur-sm">
+          <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
             <div className="flex items-center space-x-2">
               <Coins className="h-6 w-6 text-yellow-400" />
               <div>
@@ -1317,114 +1317,6 @@ const Party: React.FC = () => {
           <div className="space-y-3">
             {getPartyMedia().length > 0 ? (
               <div className="space-y-6">
-                {/* Currently Playing - using webPlayerStore.currentMedia */}
-                {currentMedia && (() => {
-                  const playingItem = getPartyMedia().find((item: any) => {
-                    const mediaData = item.mediaId || item;
-                    return mediaData.id === currentMedia.id;
-                  });
-                  if (!playingItem) return null;
-                  const mediaData = playingItem.mediaId || playingItem;
-                  return (
-                    <div>
-                      <h3 className="text-lg font-medium text-purple-400 mb-3 flex items-center">
-                        <Play className="h-5 w-5 mr-2" />
-                        Currently Playing
-                      </h3>
-                      <div className="space-y-3">
-                        <div
-                          key={`playing-${mediaData.id}`}
-                          className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
-                        >
-                              {/* Album Artwork with Play Icon Overlay */}
-                              <div className="relative w-32 h-32 md:w-16 md:h-16 flex-shrink-0 group">
-                                <img
-                                  src={mediaData.coverArt || DEFAULT_COVER_ART}
-                                  alt={mediaData.title || 'Unknown Media'}
-                                  className="w-full h-full rounded object-cover"
-                                  width="64"
-                                  height="64"
-                                />
-                                {/* Play Icon Overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-default md:cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handlePlayMedia(playingItem, 0);
-                                  }}
-                                >
-                                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
-                                    <Play className="h-5 w-5 md:h-6 md:w-6 text-white" />
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex-1">
-                                <h4 className="font-medium text-white text-lg">{mediaData.title || 'Unknown Media'}</h4>
-                                <p className="text-sm text-gray-400">{Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}</p>
-                                <p className="text-xs text-purple-300">
-                                  Started: {playingItem.playedAt ? new Date(playingItem.playedAt).toLocaleTimeString() : 'Now'}
-                                </p>
-                                
-                                {/* Tags Display for Currently Playing */}
-                                {mediaData.tags && mediaData.tags.length > 0 && (
-                                  <div className="mt-2">
-                                    <div className="flex flex-wrap gap-1">
-                                      {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
-                                        <Link
-                                          key={tagIndex}
-                                          to={`/tune/${mediaData._id || mediaData.id}`}
-                                          className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
-                                        >
-                                          #{tag}
-                                        </Link>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                
-                              {/* Category Display for Currently Playing */}
-                              {mediaData.category && mediaData.category !== 'Unknown' && (
-                                <div className="mt-1">
-                                  <span className="inline-block px-2 py-1 bg-pink-600 text-white text-xs rounded-full">
-                                    {mediaData.category}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                              
-                              {/* Skip buttons for remote parties */}
-                              {party.type === 'remote' && (
-                                <div className="flex flex-col space-y-2">
-                                  <button
-                                    onClick={handleSkipPrevious}
-                                    className="p-2 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors"
-                                    title="Skip to previous media"
-                                  >
-                                    <SkipBack className="h-4 w-4 text-white" />
-                                  </button>
-                                  <button
-                                    onClick={handleSkipNext}
-                                    className="p-2 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors"
-                                    title="Skip to next media"
-                                  >
-                                    <SkipForward className="h-4 w-4 text-white" />
-                                  </button>
-                                </div>
-                              )}
-                              
-                              <div className="text-right">
-                                <p className="text-sm font-medium text-white">
-                                  {penceToPounds(typeof mediaData.partyMediaAggregate === 'number' ? mediaData.partyMediaAggregate : 0)}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {Array.isArray(mediaData.bids) ? mediaData.bids.length : 0} bids
-                                </p>
-                              </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 {/* Party Queue Search - MOVED ABOVE SORT BY TIME AND COMMENTED OUT */}
                 {!showVetoed && party && (
                   <div className="mb-6">
