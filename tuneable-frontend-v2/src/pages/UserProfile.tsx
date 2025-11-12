@@ -982,13 +982,9 @@ const UserProfile: React.FC = () => {
               
               <div className="mb-2"></div>
 
-              {/* Become a Creator Button - Only show if user doesn't have verified creator profile */}
+              {/* Become a Creator Button - Only show if user doesn't have 'creator' role */}
               {isOwnProfile && currentUser && 
-                (!(user as any).creatorProfile || 
-                 !(user as any).creatorProfile.verificationStatus || 
-                 (user as any).creatorProfile.verificationStatus === 'unverified' ||
-                 (user as any).creatorProfile.verificationStatus === 'pending' ||
-                 (user as any).creatorProfile.verificationStatus === 'rejected') && (
+                !currentUser.role?.includes('creator') && (
                 <div className="mb-2">
                   <button
                     onClick={() => navigate('/creator/register')}
@@ -1386,7 +1382,7 @@ const UserProfile: React.FC = () => {
                   Edit Profile
                 </button>
                 {user && (
-                  (user as any).creatorProfile?.verificationStatus === 'verified' ? (
+                  (user as any).role?.includes('creator') ? (
                     <button
                       onClick={() => handleSettingsTabChange('creator')}
                       className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -1395,7 +1391,13 @@ const UserProfile: React.FC = () => {
                           : 'border-transparent text-gray-400 hover:text-white'
                       }`}
                     >
-                      Edit Creator Profile
+                      {(user as any).creatorProfile?.verificationStatus === 'verified' 
+                        ? 'Edit Creator Profile'
+                        : (user as any).creatorProfile?.verificationStatus === 'pending' 
+                        ? 'Creator Application (Pending)' 
+                        : (user as any).creatorProfile?.verificationStatus === 'rejected'
+                        ? 'Creator Application (Rejected)'
+                        : 'Creator Profile'}
                     </button>
                   ) : (
                     <button
@@ -1406,11 +1408,7 @@ const UserProfile: React.FC = () => {
                           : 'border-transparent text-gray-400 hover:text-white'
                       }`}
                     >
-                      {(user as any).creatorProfile?.verificationStatus === 'pending' 
-                        ? 'Creator Application (Pending)' 
-                        : (user as any).creatorProfile?.verificationStatus === 'rejected'
-                        ? 'Creator Application (Rejected)'
-                        : 'Become a Creator'}
+                      Become a Creator
                     </button>
                   )
                 )}
