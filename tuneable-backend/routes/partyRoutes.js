@@ -875,6 +875,14 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         };
 
         party.media.push(partyMediaEntry);
+        
+        // Fix any legacy 'queued' statuses in all media entries before saving
+        party.media.forEach(entry => {
+          if (entry.status && entry.status !== 'active' && entry.status !== 'vetoed') {
+            entry.status = 'active';
+          }
+        });
+        
         await party.save();
 
         // Update global bid tracking (first bid is automatically the top bid) - schema grammar
@@ -1147,6 +1155,18 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmount;
             partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
             partyMediaEntry.partyBids.push(bid._id);
+            // Ensure status is valid (fix any legacy 'queued' status)
+            if (partyMediaEntry.status !== 'active' && partyMediaEntry.status !== 'vetoed') {
+              partyMediaEntry.status = 'active';
+            }
+            
+            // Fix any legacy 'queued' statuses in all media entries before saving
+            party.media.forEach(entry => {
+              if (entry.status && entry.status !== 'active' && entry.status !== 'vetoed') {
+                entry.status = 'active';
+              }
+            });
+            
             await party.save();
         }
 

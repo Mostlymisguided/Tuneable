@@ -2191,7 +2191,18 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + amount;
       partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
       partyMediaEntry.partyBids.push(bid._id);
+      // Ensure status is valid (fix any legacy 'queued' status)
+      if (partyMediaEntry.status !== 'active' && partyMediaEntry.status !== 'vetoed') {
+        partyMediaEntry.status = 'active';
+      }
     }
+    
+    // Fix any legacy 'queued' statuses in all media entries before saving
+    globalParty.media.forEach(entry => {
+      if (entry.status && entry.status !== 'active' && entry.status !== 'vetoed') {
+        entry.status = 'active';
+      }
+    });
     
     await globalParty.save();
 
