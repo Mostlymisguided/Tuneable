@@ -204,6 +204,13 @@ const Notifications: React.FC = () => {
     e.stopPropagation();
     if (!notification.inviteType) return;
     
+    // Only handle 'admin' and 'artist' invites for labels
+    // 'member' invites are for collectives (not yet implemented in frontend)
+    if (notification.inviteType === 'member') {
+      toast.error('Collective member invitations are not yet supported');
+      return;
+    }
+    
     try {
       setProcessingInvite(notification._id);
       const slug = getLabelSlug(notification);
@@ -212,7 +219,7 @@ const Notifications: React.FC = () => {
         return;
       }
       
-      await labelAPI.acceptInvite(slug, notification.inviteType);
+      await labelAPI.acceptInvite(slug, notification.inviteType as 'admin' | 'artist');
       toast.success('Invitation accepted!');
       
       // Remove notification and update unread count
@@ -234,6 +241,13 @@ const Notifications: React.FC = () => {
     e.stopPropagation();
     if (!notification.inviteType) return;
     
+    // Only handle 'admin' and 'artist' invites for labels
+    // 'member' invites are for collectives (not yet implemented in frontend)
+    if (notification.inviteType === 'member') {
+      toast.error('Collective member invitations are not yet supported');
+      return;
+    }
+    
     try {
       setProcessingInvite(notification._id);
       const slug = getLabelSlug(notification);
@@ -242,7 +256,7 @@ const Notifications: React.FC = () => {
         return;
       }
       
-      await labelAPI.declineInvite(slug, notification.inviteType);
+      await labelAPI.declineInvite(slug, notification.inviteType as 'admin' | 'artist');
       toast.success('Invitation declined');
       
       // Remove notification and update unread count
