@@ -1111,7 +1111,10 @@ const CreatorUpload: React.FC = () => {
               <label htmlFor="rights-confirmation" className="text-sm text-gray-300">
                 <strong className="text-white">Rights Confirmation:</strong> I confirm that I own or have authorization 
                 to distribute the rights (composition and master) in this uploaded work, and I grant Tuneable CIC a 
-                non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content. 
+                non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.
+                <br /><br />
+                <strong className="text-white">Your Rights:</strong> You retain full rights over your works. You may 
+                revoke any rights granted to Tuneable at any time by removing your works from the platform.
                 <Link to="/terms-of-service" className="text-purple-400 underline ml-1 hover:text-purple-300">
                   View Terms
                 </Link>
