@@ -190,13 +190,13 @@ router.get('/', authMiddleware, async (req, res) => {
                     updatedAt: 1,
                     minimumBid: 1,
                     mediaSource: 1,
-                    // Count queued media only (matching Party page display)
+                    // Count active media only (matching Party page display)
                     mediaCount: {
                         $size: {
                             $filter: {
                                 input: { $ifNull: ['$media', []] },
                                 as: 'item',
-                                cond: { $eq: ['$$item.status', 'queued'] }
+                                cond: { $eq: ['$$item.status', 'active'] }
                             }
                         }
                     }
@@ -298,7 +298,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 addedBy: media.addedBy?._id || media.addedBy,
                 partyMediaAggregate: media.globalMediaAggregate || 0,
                 partyBids: media.bids || [],
-                status: 'queued',
+                status: 'active',
                 queuedAt: media.createdAt || new Date(),
                 partyMediaBidTop: media.globalMediaBidTop || 0,
                 partyMediaBidTopUser: media.globalMediaBidTopUser,
@@ -444,8 +444,8 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
         // ✅ Sort media by status and then by bid value
         processedMedia.sort((a, b) => {
-            // First sort by status priority: playing > queued > played > vetoed
-            const statusPriority = { playing: 0, queued: 1, played: 2, vetoed: 3 };
+            // First sort by status priority: active > vetoed
+            const statusPriority = { active: 0, vetoed: 1 };
             const statusDiff = statusPriority[a.status] - statusPriority[b.status];
             
             if (statusDiff !== 0) return statusDiff;
@@ -744,7 +744,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         }
 
         // Calculate queue context
-        const queuedMedia = party.media.filter(m => m.status === 'queued');
+        const queuedMedia = party.media.filter(m => m.status === 'active');
         const queueSize = queuedMedia.length;
         const queuePosition = queueSize + 1; // This new media will be at the end
 
@@ -865,7 +865,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             addedBy: userId,
             partyMediaAggregate: bidAmount, // First bid becomes the aggregate
             partyBids: [bid._id],
-            status: 'queued',
+            status: 'active',
             queuedAt: new Date(),
             // Top bid tracking (first bid is automatically the top bid) - schema grammar
             partyMediaBidTop: bidAmount,
@@ -1028,14 +1028,14 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         let queuedMedia, queueSize, queuePosition;
         
         if (isRequestingGlobalParty) {
-            // For Global Party, all media is considered "queued" and we get it from Media collection
+            // For Global Party, all media is considered "active" and we get it from Media collection
             const Media = require('../models/Media');
             queuedMedia = await Media.find({ bids: { $exists: true, $ne: [] } });
             queueSize = queuedMedia.length;
             queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
         } else {
             // Regular party logic
-            queuedMedia = party.media.filter(m => m.status === 'queued' && m.mediaId); // Filter out null mediaId entries
+            queuedMedia = party.media.filter(m => m.status === 'active' && m.mediaId); // Filter out null mediaId entries
             queueSize = queuedMedia.length;
             queuePosition = queuedMedia.findIndex(m => 
                 (m.mediaId._id || m.mediaId).toString() === actualMediaId.toString()
@@ -1240,6 +1240,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
 });
 
 // Mark media as playing (called by web player when media starts)
+// Note: Status is now managed per-user in webPlayerStore, this endpoint just broadcasts
 router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
@@ -1266,35 +1267,26 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
 
         const mediaEntry = party.media[mediaIndex];
         
-        // Can only play queued media
-        if (mediaEntry.status !== 'queued') {
-            return res.status(400).json({ error: 'Can only play queued media' });
+        // Can only play active media
+        if (mediaEntry.status !== 'active') {
+            return res.status(400).json({ error: 'Can only play active media' });
         }
 
-        // Mark all other media as queued
-        party.media.forEach((media, index) => {
-            if (index !== mediaIndex && media.status === 'playing') {
-                media.status = 'queued';
-            }
-        });
-
-        // Mark this media as playing
-        mediaEntry.status = 'playing';
+        // Update playedAt timestamp (for tracking purposes)
         mediaEntry.playedAt = new Date();
-
         await party.save();
 
-        // Broadcast play event via Socket.IO
+        // Broadcast play event via Socket.IO (for notifications, not status control)
         broadcastToParty(partyId.toString(), {
             type: 'MEDIA_STARTED',
             mediaId: mediaId,
-            playedAt: songEntry.playedAt
+            playedAt: mediaEntry.playedAt
         });
 
         res.json({
             message: 'Media started playing',
             mediaId: mediaId,
-            playedAt: songEntry.playedAt
+            playedAt: mediaEntry.playedAt
         });
     } catch (err) {
         console.error('Error starting media:', err);
@@ -1322,9 +1314,9 @@ router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Only the host can reset media' });
         }
 
-        // Reset all media to queued status
+        // Reset all media to active status
         party.media.forEach(media => {
-            media.status = 'queued';
+            media.status = 'active';
             media.playedAt = null;
             media.completedAt = null;
             media.vetoedAt = null;
@@ -1334,7 +1326,7 @@ router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
         await party.save();
 
         res.json({
-            message: 'All media reset to queued status',
+            message: 'All media reset to active status',
             mediaCount: party.media.length
         });
     } catch (err) {
@@ -1372,14 +1364,13 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
         
         console.log(`Attempting to complete media ${mediaId} with status: ${mediaEntry.status}`);
         
-        // Can complete playing media or queued media (for auto-playback)
-        if (mediaEntry.status !== 'playing' && mediaEntry.status !== 'queued') {
+        // Can only complete active media
+        if (mediaEntry.status !== 'active') {
             console.log(`Media ${mediaId} is in status '${mediaEntry.status}', cannot complete`);
-            return res.status(400).json({ error: 'Can only complete playing or queued media' });
+            return res.status(400).json({ error: 'Can only complete active media' });
         }
 
-        // Mark media as played
-        mediaEntry.status = 'played';
+        // Update completedAt timestamp (status remains 'active' as playback is per-user)
         mediaEntry.completedAt = new Date();
 
         await party.save();
@@ -1407,7 +1398,7 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
 router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) => {
     try {
         const { partyId, status } = req.params;
-        const validStatuses = ['queued', 'playing', 'played', 'vetoed'];
+        const validStatuses = ['active', 'vetoed'];
 
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: 'Invalid status. Must be one of: ' + validStatuses.join(', ') });
@@ -1450,9 +1441,11 @@ router.post('/update-statuses', async (req, res) => {
 });
 
 // Skip to next media (remote parties only)
+// Note: Accepts mediaId in request body to identify current media (playback is per-user)
 router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
+        const { mediaId } = req.body; // Current media being skipped
         const userId = req.user._id;
 
         const party = await Party.findById(partyId).populate('media.mediaId');
@@ -1465,33 +1458,39 @@ router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
         }
 
-        // Find current playing media
-        const currentPlayingIndex = party.media.findIndex(media => media.status === 'playing');
-        if (currentPlayingIndex === -1) {
-            return res.status(400).json({ error: 'No media currently playing' });
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can skip media' });
         }
 
-        // Mark current media as played
-        party.media[currentPlayingIndex].status = 'played';
-        party.media[currentPlayingIndex].completedAt = new Date();
+        if (!mediaId) {
+            return res.status(400).json({ error: 'mediaId is required in request body' });
+        }
 
-        // Find next queued media
-        const nextQueuedIndex = party.media.findIndex((media, index) => 
-            index > currentPlayingIndex && media.status === 'queued'
+        // Find current media by mediaId
+        const currentMediaIndex = party.media.findIndex(media => 
+            media.mediaId && (media.mediaId._id || media.mediaId).toString() === mediaId.toString()
         );
 
-        if (nextQueuedIndex !== -1) {
-            // Mark next media as playing
-            party.media[nextQueuedIndex].status = 'playing';
-            party.media[nextQueuedIndex].playedAt = new Date();
+        if (currentMediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in party' });
         }
+
+        // Update completedAt timestamp for current media
+        party.media[currentMediaIndex].completedAt = new Date();
+
+        // Find next active media
+        const nextActiveIndex = party.media.findIndex((media, index) => 
+            index > currentMediaIndex && media.status === 'active'
+        );
 
         await party.save();
 
         res.json({ 
             success: true, 
             message: 'Skipped to next media',
-            currentMedia: nextQueuedIndex !== -1 ? party.media[nextQueuedIndex] : null
+            currentMedia: nextActiveIndex !== -1 ? party.media[nextActiveIndex] : null,
+            nextMediaId: nextActiveIndex !== -1 ? (party.media[nextActiveIndex].mediaId?._id || party.media[nextActiveIndex].mediaId) : null
         });
 
     } catch (error) {
@@ -1501,9 +1500,11 @@ router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
 });
 
 // Skip to previous media (remote parties only)
+// Note: Accepts mediaId in request body to identify current media (playback is per-user)
 router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
     try {
         const { partyId } = req.params;
+        const { mediaId } = req.body; // Current media being skipped
         const userId = req.user._id;
 
         const party = await Party.findById(partyId).populate('media.mediaId');
@@ -1516,33 +1517,36 @@ router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
         }
 
-        // Find current playing media
-        const currentPlayingIndex = party.media.findIndex(media => media.status === 'playing');
-        if (currentPlayingIndex === -1) {
-            return res.status(400).json({ error: 'No media currently playing' });
+        // Check if user is the host
+        if (party.host.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the host can skip media' });
         }
 
-        // Find previous played media
-        const previousPlayedIndex = party.media.findIndex((media, index) => 
-            index < currentPlayingIndex && media.status === 'played'
+        if (!mediaId) {
+            return res.status(400).json({ error: 'mediaId is required in request body' });
+        }
+
+        // Find current media by mediaId
+        const currentMediaIndex = party.media.findIndex(media => 
+            media.mediaId && (media.mediaId._id || media.mediaId).toString() === mediaId.toString()
         );
 
-        if (previousPlayedIndex !== -1) {
-            // Mark current media as queued
-            party.media[currentPlayingIndex].status = 'queued';
-            party.media[currentPlayingIndex].playedAt = null;
-
-            // Mark previous media as playing
-            party.media[previousPlayedIndex].status = 'playing';
-            party.media[previousPlayedIndex].completedAt = null;
+        if (currentMediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in party' });
         }
+
+        // Find previous media with completedAt timestamp (indicating it was played)
+        const previousPlayedIndex = party.media.findIndex((media, index) => 
+            index < currentMediaIndex && media.completedAt !== null && media.status === 'active'
+        );
 
         await party.save();
 
         res.json({ 
             success: true, 
             message: 'Skipped to previous media',
-            currentMedia: previousPlayedIndex !== -1 ? party.media[previousPlayedIndex] : null
+            currentMedia: previousPlayedIndex !== -1 ? party.media[previousPlayedIndex] : null,
+            previousMediaId: previousPlayedIndex !== -1 ? (party.media[previousPlayedIndex].mediaId?._id || party.media[previousPlayedIndex].mediaId) : null
         });
 
     } catch (error) {
@@ -1891,7 +1895,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         tags: media.tags || [], // Include tags for display
                         category: media.category || null, // Include category for display
                         addedBy: media.addedBy,
-                        status: 'queued', // Global Party media is always considered queued
+                        status: 'active', // Global Party media is always active
                         queuedAt: media.createdAt || new Date(),
                         playedAt: null,
                         completedAt: null,

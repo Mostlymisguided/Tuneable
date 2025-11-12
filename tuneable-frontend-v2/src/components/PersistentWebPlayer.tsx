@@ -219,7 +219,7 @@ const PersistentWebPlayer: React.FC = () => {
             partyAPI.getPartyDetails(currentPartyId)
               .then(response => {
                 const mediaItems = response.party?.media || [];
-                const queuedMedia = mediaItems.filter((item: any) => item.status === 'queued');
+                const queuedMedia = mediaItems.filter((item: any) => item.status === 'active');
                 
                 const mappedMedia = queuedMedia.map((item: any) => {
                   const actualMedia = item.mediaId || item;
@@ -252,7 +252,7 @@ const PersistentWebPlayer: React.FC = () => {
         case 'UPDATE_QUEUE':
           console.log('Queue updated via Socket.IO');
           if (message.queue) {
-            const queuedMedia = message.queue.filter((item: any) => item.status === 'queued');
+            const queuedMedia = message.queue.filter((item: any) => item.status === 'active');
             setQueue(queuedMedia);
             
             if (queuedMedia.length === 0) {

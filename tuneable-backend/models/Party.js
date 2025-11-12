@@ -84,8 +84,8 @@ const PartySchema = new mongoose.Schema({
       // Status and timing (universal)
       status: { 
         type: String, 
-        enum: ['queued', 'playing', 'played', 'vetoed'], 
-        default: 'queued' 
+        enum: ['active', 'vetoed'], 
+        default: 'active' 
       },
       queuedAt: { type: Date, default: Date.now },
       playedAt: { type: Date, default: null },

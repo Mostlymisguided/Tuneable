@@ -156,13 +156,8 @@ const Party: React.FC = () => {
                   if (mediaData.id === message.mediaId) {
                     return {
                       ...item,
-                      status: 'playing',
                       playedAt: message.playedAt || new Date()
                     };
-                  }
-                  // Mark other playing media as queued
-                  if (item.status === 'playing') {
-                    return { ...item, status: 'queued' };
                   }
                   return item;
                 })
@@ -182,10 +177,9 @@ const Party: React.FC = () => {
                 media: prev.media.map((item: any) => {
                   const mediaData = item.mediaId || item;
                   if (mediaData.id === message.mediaId) {
-                    console.log('Found media to mark as played:', mediaData.title);
+                    console.log('Found media to mark as completed:', mediaData.title);
                     return {
                       ...item,
-                      status: 'played',
                       completedAt: message.completedAt || new Date()
                     };
                   }
@@ -259,8 +253,8 @@ const Party: React.FC = () => {
       // This ensures the queue is updated even if it's the "same" party (e.g., on page reload)
       console.log('Updating global player queue for party:', partyId);
         
-        // Filter to only include queued media for the WebPlayer
-        const queuedMedia = getPartyMedia().filter((item: any) => item.status === 'queued');
+        // Filter to only include active media for the WebPlayer
+        const queuedMedia = getPartyMedia().filter((item: any) => item.status === 'active');
         console.log('Queued media for WebPlayer:', queuedMedia.length);
         console.log('All party media statuses:', getPartyMedia().map((s: any) => ({ title: s.mediaId?.title, status: s.status })));
         
@@ -357,7 +351,7 @@ const Party: React.FC = () => {
   useEffect(() => {
     if (party && selectedTimePeriod !== 'all-time' && sortedMedia.length > 0) {
       // Update the global player queue with sorted media
-      const queuedSortedMedia = sortedMedia.filter((media: any) => media.status === 'queued');
+      const queuedSortedMedia = sortedMedia.filter((media: any) => media.status === 'active');
       console.log('Updating WebPlayer queue with sorted media:', queuedSortedMedia.length);
       
       // Clean and set the queue in global store
@@ -705,7 +699,7 @@ const Party: React.FC = () => {
   const topTags = useMemo(() => {
     if (!party) return [] as Array<{ tag: string; total: number; count: number }>;
     const counts: Record<string, { total: number; count: number }> = {};
-    const media = getPartyMedia().filter((it: any) => it.status === 'queued');
+    const media = getPartyMedia().filter((it: any) => it.status === 'active');
 
     for (const item of media) {
       const m = item.mediaId || item;
@@ -740,7 +734,7 @@ const Party: React.FC = () => {
   const topSupporterBids = useMemo(() => {
     if (!party) return [] as any[];
     const out: any[] = [];
-    const media = getPartyMedia().filter((it: any) => it.status === 'queued');
+    const media = getPartyMedia().filter((it: any) => it.status === 'active');
     
     // Normalize tag function (matching queue filtering logic)
     const normalizeTag = (tag: string) => {
@@ -779,7 +773,7 @@ const Party: React.FC = () => {
       media = getPartyMedia().filter((item: any) => item.status === 'queued');
     } else {
       // Show sorted media from the selected time period
-      media = sortedMedia.filter((item: any) => item.status === 'queued');
+      media = sortedMedia.filter((item: any) => item.status === 'active');
     }
     
     // REMOVED: Real-time search filter from addMediaSearchQuery
@@ -843,7 +837,7 @@ const Party: React.FC = () => {
     if (selectedTimePeriod === 'all-time') {
       media = getPartyMedia().filter((item: any) => item.status === 'queued');
     } else {
-      media = sortedMedia.filter((item: any) => item.status === 'queued');
+      media = sortedMedia.filter((item: any) => item.status === 'active');
     }
     
     const searchQuery = addMediaSearchQuery.toLowerCase();
@@ -1323,23 +1317,25 @@ const Party: React.FC = () => {
           <div className="space-y-3">
             {getPartyMedia().length > 0 ? (
               <div className="space-y-6">
-                {/* Currently Playing */}
-                {getPartyMedia().filter((item: any) => item.status === 'playing').length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-purple-400 mb-3 flex items-center">
-                      <Play className="h-5 w-5 mr-2" />
-                      Currently Playing
-                    </h3>
-                    <div className="space-y-3">
-                      {getPartyMedia()
-                        .filter((item: any) => item.status === 'playing')
-                        .map((item: any, index: number) => {
-                          const mediaData = item.mediaId || item;
-                          return (
-                            <div
-                              key={`playing-${mediaData.id}-${index}`}
-                              className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
-                            >
+                {/* Currently Playing - using webPlayerStore.currentMedia */}
+                {currentMedia && (() => {
+                  const playingItem = getPartyMedia().find((item: any) => {
+                    const mediaData = item.mediaId || item;
+                    return mediaData.id === currentMedia.id;
+                  });
+                  if (!playingItem) return null;
+                  const mediaData = playingItem.mediaId || playingItem;
+                  return (
+                    <div>
+                      <h3 className="text-lg font-medium text-purple-400 mb-3 flex items-center">
+                        <Play className="h-5 w-5 mr-2" />
+                        Currently Playing
+                      </h3>
+                      <div className="space-y-3">
+                        <div
+                          key={`playing-${mediaData.id}`}
+                          className="flex items-center space-x-4 p-4 rounded-lg bg-purple-900 border border-purple-400"
+                        >
                               {/* Album Artwork with Play Icon Overlay */}
                               <div className="relative w-32 h-32 md:w-16 md:h-16 flex-shrink-0 group">
                                 <img
@@ -1353,7 +1349,7 @@ const Party: React.FC = () => {
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-default md:cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handlePlayMedia(item, index);
+                                    handlePlayMedia(playingItem, 0);
                                   }}
                                 >
                                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
@@ -1365,7 +1361,7 @@ const Party: React.FC = () => {
                                 <h4 className="font-medium text-white text-lg">{mediaData.title || 'Unknown Media'}</h4>
                                 <p className="text-sm text-gray-400">{Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}</p>
                                 <p className="text-xs text-purple-300">
-                                  Started: {item.playedAt ? new Date(item.playedAt).toLocaleTimeString() : 'Now'}
+                                  Started: {playingItem.playedAt ? new Date(playingItem.playedAt).toLocaleTimeString() : 'Now'}
                                 </p>
                                 
                                 {/* Tags Display for Currently Playing */}
@@ -1423,12 +1419,11 @@ const Party: React.FC = () => {
                                   {Array.isArray(mediaData.bids) ? mediaData.bids.length : 0} bids
                                 </p>
                               </div>
-                            </div>
-                          );
-                        })}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Party Queue Search - MOVED ABOVE SORT BY TIME AND COMMENTED OUT */}
                 {!showVetoed && party && (
@@ -2087,15 +2082,16 @@ const Party: React.FC = () => {
 
             {/* Previously Played Songs - Only show for live parties */}
             {/* NOTE: This section is for future live jukebox feature. MVP uses remote parties only. */}
-            {party.type === 'live' && getPartyMedia().filter((item: any) => item.status === 'played').length > 0 && (
+            {/* Using completedAt timestamp instead of status */}
+            {party.type === 'live' && getPartyMedia().filter((item: any) => item.completedAt).length > 0 && (
               <div id="previously-played" className="mt-8">
                 <h3 className="text-lg font-medium text-gray-400 mb-3 flex items-center">
                   <CheckCircle className="h-5 w-5 mr-2" />
-                  Previously Played ({getPartyMedia().filter((item: any) => item.status === 'played').length})
+                  Previously Played ({getPartyMedia().filter((item: any) => item.completedAt).length})
                 </h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {getPartyMedia()
-                    .filter((item: any) => item.status === 'played')
+                    .filter((item: any) => item.completedAt)
                     .map((item: any, index: number) => {
                       const mediaData = item.mediaId || item;
                       return (

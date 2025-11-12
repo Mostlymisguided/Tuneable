@@ -245,7 +245,7 @@ export interface PartyMedia {
   partyMediaAggregateTop?: number; // Highest user aggregate for this media in party
   partyMediaAggregateTopUser?: string; // User with highest aggregate
   
-  status: 'queued' | 'playing' | 'played' | 'vetoed';
+  status: 'active' | 'vetoed';
   queuedAt?: string;
   playedAt?: string;
   completedAt?: string;
