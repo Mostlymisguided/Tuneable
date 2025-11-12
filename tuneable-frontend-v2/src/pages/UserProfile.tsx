@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
@@ -413,7 +413,7 @@ const UserProfile: React.FC = () => {
   };
 
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       setLoading(true);
       const response = await userAPI.getProfile(userId!);
@@ -440,9 +440,9 @@ const UserProfile: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
-  // Handle user profile loading and OAuth callbacks
+  // Handle user profile loading
   useEffect(() => {
     if (userId) {
       // If userId is "profile", redirect to proper profile route
@@ -461,10 +461,16 @@ const UserProfile: React.FC = () => {
         fetchUserProfile();
       }
     }
+  }, [userId, currentUser, navigate, searchParams, fetchUserProfile]);
+
+  // Separate useEffect for OAuth callbacks to avoid dependency issues with isOwnProfile
+  useEffect(() => {
+    // Calculate isOwnProfile inside the effect to avoid dependency loop
+    const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
     
     // Handle OAuth token in URL (for account linking redirects)
     const token = searchParams.get('token');
-    if (token && isOwnProfile) {
+    if (token && ownProfile) {
       // Handle OAuth callback
       handleOAuthCallback(token).then(() => {
         // Refresh user profile to show updated OAuth connections
@@ -486,7 +492,7 @@ const UserProfile: React.FC = () => {
     } else {
       // Check if we're returning from OAuth connection and refresh user data
       const oauthSuccess = searchParams.get('oauth_success');
-      if (oauthSuccess === 'true' && isOwnProfile) {
+      if (oauthSuccess === 'true' && ownProfile) {
         // Refresh user profile to show updated OAuth connections
         fetchUserProfile();
         // Remove the oauth_success param from URL
@@ -495,7 +501,7 @@ const UserProfile: React.FC = () => {
         setSearchParams(newParams, { replace: true });
       }
     }
-  }, [userId, currentUser, navigate, searchParams, isOwnProfile, handleOAuthCallback, fetchUserProfile]);
+  }, [currentUser, user, searchParams, handleOAuthCallback, fetchUserProfile, setSearchParams]);
 
   const formatJoinDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
