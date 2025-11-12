@@ -43,6 +43,22 @@ interface User {
   globalUserAggregateRank?: number;
   globalUserBidAvg?: number;
   globalUserBids?: number;
+  creatorProfile?: {
+    artistName?: string;
+    verificationStatus?: 'pending' | 'verified' | 'rejected';
+    bio?: string;
+    genres?: string[];
+    roles?: string[];
+    website?: string;
+    socialMedia?: Record<string, string>;
+    label?: string;
+    management?: string;
+    distributor?: string;
+    reviewNotes?: string;
+    verifiedBy?: string;
+    verifiedAt?: Date;
+    submittedAt?: Date;
+  };
 }
 
 interface RegisterData {
