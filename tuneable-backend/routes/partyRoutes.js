@@ -1530,11 +1530,11 @@ router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
         if (previousPlayedIndex !== -1) {
             // Mark current media as queued
             party.media[currentPlayingIndex].status = 'queued';
-            party.media[currentPlayingIndex].playedAt = undefined;
+            party.media[currentPlayingIndex].playedAt = null;
 
             // Mark previous media as playing
             party.media[previousPlayedIndex].status = 'playing';
-            party.media[previousPlayedIndex].completedAt = undefined;
+            party.media[previousPlayedIndex].completedAt = null;
         }
 
         await party.save();
