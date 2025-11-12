@@ -1088,7 +1088,7 @@ const TuneProfile: React.FC = () => {
     setShowBidConfirmationModal(true);
   };
 
-  const handleConfirmGlobalBid = async (tags: string[]) => {
+  const handleConfirmGlobalBid = async (_tags: string[]) => {
     if (!user || !mediaId) return;
 
     setShowBidConfirmationModal(false);

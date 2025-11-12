@@ -1615,7 +1615,7 @@ const Party: React.FC = () => {
                                         {/* Inline Bidding */}
                                         <div className="flex flex-row items-center space-x-1 md:space-x-2">
                                           {/* Input group with +/- buttons */}
-                                          <div className="flex md:flex-col items-center space-x-1">
+                                          <div className="flex-col flex items-center space-x-1">
                                             <button
                                               type="button"
                                               onClick={(e) => {
@@ -1637,7 +1637,7 @@ const Party: React.FC = () => {
                                                 const minBid = party?.minimumBid || 0.01;
                                                 return current <= minBid;
                                               })()}
-                                              className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                              className="px-1.5 py-1 md:px-5 md:mb-1 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
                                             >
                                               <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                             </button>
@@ -1650,7 +1650,7 @@ const Party: React.FC = () => {
                                                 ...queueBidAmounts,
                                                 [mediaData._id || mediaData.id]: e.target.value
                                               })}
-                                              className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
+                                              className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                               onClick={(e) => e.stopPropagation()}
                                             />
                                             <button
@@ -1667,7 +1667,7 @@ const Party: React.FC = () => {
                                                 });
                                               }}
                                               disabled={isBidding}
-                                              className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                              className="px-1.5 py-1 md:px-5 md:py-1.5 md:mt-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
                                             >
                                               <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                             </button>
@@ -1733,7 +1733,9 @@ const Party: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-1 md:flex-shrink-0">
+                                  
+                                  <div className="flex items-center justify-center space-x-0 md:flex-shrink-0">
+                                   <div className="flex items-center space-x-1 mr-4">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1747,7 +1749,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3" />
                                     </button>
@@ -1760,7 +1762,7 @@ const Party: React.FC = () => {
                                         ...prev,
                                         [media._id || media.id]: e.target.value
                                       }))}
-                                      className="w-20 md:w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                      className="w-16 md:w-16 bg-gray-800 rounded px-2 py-1 text-gray text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <button
                                       type="button"
@@ -1774,10 +1776,11 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </button>
+                                    </div>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="z-999 px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
@@ -1828,7 +1831,8 @@ const Party: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-1 md:flex-shrink-0">
+                                  <div className="flex justify-center items-center space-x-1">
+                                    <div className="flex items-center space-x-1 mr-3">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1842,7 +1846,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3" />
                                     </button>
@@ -1855,7 +1859,7 @@ const Party: React.FC = () => {
                                         ...prev,
                                         [media._id || media.id]: e.target.value
                                       }))}
-                                      className="w-20 md:w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
+                                      className="w-16 md:w-16 bg-gray-800 rounded px-2 py-1 text-gray text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <button
                                       type="button"
@@ -1869,10 +1873,11 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </button>
+                                    </div>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="flex px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
@@ -2082,7 +2087,7 @@ const Party: React.FC = () => {
                                 {/* Inline Bidding */}
                                 <div className="flex flex-row items-center space-x-1 md:space-x-2">
                                   {/* Input group with +/- buttons */}
-                                  <div className="flex items-center space-x-1">
+                                  <div className="flex md:flex-col items-center space-x-1">
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -2104,7 +2109,8 @@ const Party: React.FC = () => {
                                         const minBid = party?.minimumBid || 0.01;
                                         return current <= minBid;
                                       })()}
-                                      className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-1 md:px-6
+                                       md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -2117,7 +2123,7 @@ const Party: React.FC = () => {
                                         ...queueBidAmounts,
                                         [mediaData._id || mediaData.id]: e.target.value
                                       })}
-                                      className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
+                                      className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       onClick={(e) => e.stopPropagation()}
                                     />
                                     <button

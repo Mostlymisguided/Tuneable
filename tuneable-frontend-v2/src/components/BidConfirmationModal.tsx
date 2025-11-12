@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Music, Tag, PoundSterling, AlertCircle } from 'lucide-react';
+import { X, Music, Tag, AlertCircle } from 'lucide-react';
 
 interface BidConfirmationModalProps {
   isOpen: boolean;
@@ -225,4 +225,5 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
 };
 
 export default BidConfirmationModal;
+
 
