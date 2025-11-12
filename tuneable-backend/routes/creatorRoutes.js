@@ -175,7 +175,7 @@ router.get('/applications', authMiddleware, adminMiddleware, async (req, res) =>
     const filter = { 'creatorProfile.verificationStatus': status || 'pending' };
 
     const applications = await User.find(filter)
-      .select('username email profilePic creatorProfile role createdAt')
+      .select('_id username email profilePic creatorProfile role createdAt')
       .sort({ 'creatorProfile.submittedAt': -1 });
 
     res.json({ applications });
@@ -190,6 +190,10 @@ router.patch('/applications/:userId/review', authMiddleware, adminMiddleware, as
   try {
     const { userId } = req.params;
     const { status, reviewNotes } = req.body;
+
+    if (!userId || userId === 'undefined' || userId === 'null') {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
 
     if (!['verified', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Status must be verified or rejected' });

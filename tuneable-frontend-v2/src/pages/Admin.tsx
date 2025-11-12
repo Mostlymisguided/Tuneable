@@ -1771,8 +1771,13 @@ const Admin: React.FC = () => {
                           <div className="flex space-x-3">
                             <button
                               onClick={() => {
+                                const userId = app._id || app.id;
+                                if (!userId) {
+                                  toast.error('Unable to identify user ID');
+                                  return;
+                                }
                                 const notes = prompt('Add approval notes (optional):');
-                                reviewCreatorApplication(app._id, 'verified', notes || '');
+                                reviewCreatorApplication(userId, 'verified', notes || '');
                               }}
                               className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                             >
@@ -1781,9 +1786,14 @@ const Admin: React.FC = () => {
                             </button>
                             <button
                               onClick={() => {
+                                const userId = app._id || app.id;
+                                if (!userId) {
+                                  toast.error('Unable to identify user ID');
+                                  return;
+                                }
                                 const notes = prompt('Add rejection reason:');
                                 if (notes) {
-                                  reviewCreatorApplication(app._id, 'rejected', notes);
+                                  reviewCreatorApplication(userId, 'rejected', notes);
                                 }
                               }}
                               className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
