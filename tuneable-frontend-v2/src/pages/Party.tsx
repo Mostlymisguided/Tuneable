@@ -17,7 +17,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
@@ -1600,13 +1600,17 @@ const Party: React.FC = () => {
                                         {/* Metrics Display */}
                                         <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
                                           <div className="text-center p-1 md:p-2">
-                                            <div className="text-xs text-gray-300 tracking-wide">Total</div>
+                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Bid Total">
+                                              <Coins className="h-3 w-3 md:h-4 md:w-4" />
+                                            </div>
                                             <div className="text-xs md:text-lg text-gray-300">
                                               {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
                                             </div>
                                           </div>
                                           <div className="text-center p-1 md:p-2">
-                                            <div className="text-xs text-gray-300 tracking-wide">Avg Bid</div>
+                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Average Bid">
+                                              <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
+                                            </div>
                                             <div className="text-xs md:text-lg text-gray-300">
                                               {penceToPounds(calculateAverageBid(mediaData))}
                                             </div>
@@ -1643,7 +1647,7 @@ const Party: React.FC = () => {
                                                 ...queueBidAmounts,
                                                 [mediaData._id || mediaData.id]: e.target.value
                                               })}
-                                              className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1 md:py-2 text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                              className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1 md:py-2 text-gray text-center text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                               onClick={(e) => e.stopPropagation()}
                                             />
                                             <button
@@ -1762,7 +1766,7 @@ const Party: React.FC = () => {
                                         ...prev,
                                         [media._id || media.id]: e.target.value
                                       }))}
-                                      className="w-16 md:w-16 bg-gray-800 rounded px-2 py-1 text-gray text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      className="w-14 md:w-14 bg-gray-800 rounded px-2 py-1 text-gray text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <button
                                       type="button"
@@ -1859,7 +1863,7 @@ const Party: React.FC = () => {
                                         ...prev,
                                         [media._id || media.id]: e.target.value
                                       }))}
-                                      className="w-16 md:w-16 bg-gray-800 rounded px-2 py-1 text-gray text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      className="w-14 md:w-14 bg-gray-800 rounded px-2 py-1 text-center text-gray text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <button
                                       type="button"
@@ -2072,13 +2076,17 @@ const Party: React.FC = () => {
                                 {/* Metrics Display */}
                                 <div className="flex flex-row md:flex-col items-center space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-1 py-1 md:px-2 md:py-2 rounded-lg">
                                   <div className="text-center p-1 md:p-2">
-                                    <div className="text-[9px] md:text-xs text-gray-300 tracking-wide">Total</div>
+                                    <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Bid Total">
+                                      <Coins className="h-3 w-3 md:h-4 md:w-4" />
+                                    </div>
                                     <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
                                       {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
                                     </div>
                                   </div>
                                   <div className="text-center p-1 md:p-2">
-                                    <div className="text-[9px] md:text-xs text-gray-300 tracking-wide">Avg Bid</div>
+                                    <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Average Bid">
+                                      <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
+                                    </div>
                                     <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
                                       {penceToPounds(calculateAverageBid(mediaData))}
                                     </div>
@@ -2141,7 +2149,7 @@ const Party: React.FC = () => {
                                         ...queueBidAmounts,
                                         [mediaData._id || mediaData.id]: e.target.value
                                       })}
-                                      className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-center text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       onClick={(e) => e.stopPropagation()}
                                     />
                                     <button
