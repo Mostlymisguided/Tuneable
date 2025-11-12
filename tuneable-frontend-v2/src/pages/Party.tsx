@@ -626,6 +626,9 @@ const Party: React.FC = () => {
           <div>
             <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
             <div className="text-sm mt-1">{errorData?.message}</div>
+            {errorData?.suggestion && (
+              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
+            )}
           </div>,
           { autoClose: 8000 }
         );
