@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Media = require('../models/Media');
+const he = require('he');
 
 /**
  * YouTube Liked Videos Bulk Import Service
@@ -103,9 +104,9 @@ async function getBatchVideoDetails(videoIds, accessToken) {
 
             const videos = response.data.items.map(video => ({
                 id: video.id,
-                title: video.snippet.title,
-                description: video.snippet.description,
-                channelTitle: video.snippet.channelTitle,
+                title: he.decode(video.snippet.title || ''),
+                description: he.decode(video.snippet.description || ''),
+                channelTitle: he.decode(video.snippet.channelTitle || ''),
                 publishedAt: video.snippet.publishedAt,
                 thumbnail: video.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`,
                 duration: parseYouTubeDuration(video.contentDetails.duration),
@@ -155,7 +156,7 @@ async function getCategoryMapping() {
 
         const categories = {};
         response.data.items.forEach(category => {
-            categories[category.id] = category.snippet.title;
+            categories[category.id] = he.decode(category.snippet.title || '');
         });
 
         console.log(`✅ Mapped ${Object.keys(categories).length} categories`);

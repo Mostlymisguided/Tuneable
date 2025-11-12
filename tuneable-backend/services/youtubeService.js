@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { recordQuotaUsage, QUOTA_COSTS } = require('./quotaTracker');
+const he = require('he');
 
 // YouTube category mapping
 const getCategoryName = async (categoryId, apiKey) => {
@@ -16,7 +17,7 @@ const getCategoryName = async (categoryId, apiKey) => {
         await recordQuotaUsage(QUOTA_COSTS.VIDEO_CATEGORIES, 'getCategoryName', { categoryId });
         
         if (response.data.items && response.data.items.length > 0) {
-            return response.data.items[0].snippet.title;
+            return he.decode(response.data.items[0].snippet.title || 'Unknown');
         }
         return 'Unknown';
     } catch (error) {
@@ -45,10 +46,10 @@ const searchYouTube = async (query, pageToken = null) => {
 
     const videos = searchResponse.data.items.map((item) => ({
         id: item.id.videoId,
-        title: item.snippet.title,
-        description: item.snippet.description,
+        title: he.decode(item.snippet.title || ''),
+        description: he.decode(item.snippet.description || ''),
         thumbnail: item.snippet.thumbnails.high.url,
-        channelTitle: item.snippet.channelTitle,
+        channelTitle: he.decode(item.snippet.channelTitle || ''),
         publishedAt: item.snippet.publishedAt,
     }));
 
@@ -176,8 +177,8 @@ const getVideoDetails = async (videoId) => {
             const durationInSeconds = contentDetails?.duration ? parseDuration(contentDetails.duration) : 0;
             
             return {
-                title: snippet.title || 'Unknown Title',
-                channelTitle: snippet.channelTitle || 'Unknown Artist',
+                title: he.decode(snippet.title || 'Unknown Title'),
+                channelTitle: he.decode(snippet.channelTitle || 'Unknown Artist'),
                 thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || null,
                 duration: durationInSeconds,
                 tags: [],
