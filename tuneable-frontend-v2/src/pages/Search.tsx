@@ -106,9 +106,22 @@ const SearchPage: React.FC = () => {
       initializeBidAmounts(response.videos);
       
       toast.info(`Found ${response.videos.length} additional songs from YouTube`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Show more error:', error);
-      toast.error('Failed to load more results. Please try again.');
+      
+      // Check if search is disabled due to quota
+      if (error?.response?.status === 429) {
+        const errorData = error.response?.data;
+        toast.error(
+          <div>
+            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
+            <div className="text-sm mt-1">{errorData?.message}</div>
+          </div>,
+          { autoClose: 8000 }
+        );
+      } else {
+        toast.error('Failed to load more results. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -256,9 +269,25 @@ const SearchPage: React.FC = () => {
       } else if (response.source === 'external') {
         toast.info(`Found ${response.videos.length} songs from YouTube`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Search error:', error);
-      toast.error('Search failed. Please try again.');
+      
+      // Check if search is disabled due to quota
+      if (error?.response?.status === 429) {
+        const errorData = error.response?.data;
+        toast.error(
+          <div>
+            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
+            <div className="text-sm mt-1">{errorData?.message}</div>
+            {errorData?.suggestion && (
+              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
+            )}
+          </div>,
+          { autoClose: 8000 }
+        );
+      } else {
+        toast.error('Search failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -157,6 +157,26 @@ router.get('/', async (req, res) => {
                 console.log('Searching external APIs...');
             }
             
+            // Check quota before making external API calls
+            if (source === 'youtube') {
+                const quotaStatus = await getQuotaStatus();
+                
+                if (quotaStatus.searchDisabled) {
+                    console.log(`🚫 YouTube search disabled: quota at ${quotaStatus.percentage.toFixed(1)}% (threshold: ${quotaStatus.threshold}%)`);
+                    return res.status(429).json({ 
+                        error: 'YouTube search is temporarily disabled',
+                        message: `YouTube search has been disabled because API quota usage (${quotaStatus.percentage.toFixed(1)}%) has reached the configured threshold (${quotaStatus.threshold}%).`,
+                        quotaStatus: {
+                            usage: quotaStatus.usage,
+                            limit: quotaStatus.limit,
+                            percentage: quotaStatus.percentage,
+                            resetTime: quotaStatus.resetTime
+                        },
+                        suggestion: 'Please try pasting a YouTube URL directly instead, or wait until the quota resets.'
+                    });
+                }
+            }
+            
             // Step 2: Fall back to external APIs
             let result;
 
@@ -409,6 +429,67 @@ router.post('/admin/quota-reset', authMiddleware, async (req, res) => {
     } catch (error) {
         console.error('Error resetting quota:', error);
         res.status(500).json({ error: 'Failed to reset quota' });
+    }
+});
+
+// Get admin settings (admin only)
+router.get('/admin/settings', authMiddleware, async (req, res) => {
+    try {
+        // Check if user is admin
+        const User = require('../models/User');
+        const user = await User.findById(req.user._id);
+        if (!user || !user.role || !user.role.includes('admin')) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const AdminSettings = require('../models/AdminSettings');
+        const settings = await AdminSettings.getSettings();
+        res.json(settings);
+    } catch (error) {
+        console.error('Error fetching admin settings:', error);
+        res.status(500).json({ error: 'Failed to fetch admin settings' });
+    }
+});
+
+// Update admin settings (admin only)
+router.put('/admin/settings', authMiddleware, async (req, res) => {
+    try {
+        // Check if user is admin
+        const User = require('../models/User');
+        const user = await User.findById(req.user._id);
+        if (!user || !user.role || !user.role.includes('admin')) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const AdminSettings = require('../models/AdminSettings');
+        const settings = await AdminSettings.getSettings();
+        
+        // Update YouTube quota settings
+        if (req.body.youtubeQuota) {
+            if (req.body.youtubeQuota.disableSearchThreshold !== undefined) {
+                const threshold = Number(req.body.youtubeQuota.disableSearchThreshold);
+                if (threshold < 0 || threshold > 100) {
+                    return res.status(400).json({ error: 'Threshold must be between 0 and 100' });
+                }
+                settings.youtubeQuota.disableSearchThreshold = threshold;
+            }
+            if (req.body.youtubeQuota.enabled !== undefined) {
+                settings.youtubeQuota.enabled = Boolean(req.body.youtubeQuota.enabled);
+            }
+        }
+        
+        settings.updatedBy = req.user._id;
+        await settings.save();
+        
+        console.log(`⚙️ Admin settings updated by ${user.username}: threshold=${settings.youtubeQuota.disableSearchThreshold}%, enabled=${settings.youtubeQuota.enabled}`);
+        
+        res.json({ 
+            message: 'Settings updated successfully',
+            settings 
+        });
+    } catch (error) {
+        console.error('Error updating admin settings:', error);
+        res.status(500).json({ error: 'Failed to update admin settings' });
     }
 });
 

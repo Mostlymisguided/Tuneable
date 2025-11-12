@@ -64,6 +64,11 @@ const Admin: React.FC = () => {
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<any>(null);
   const [isLoadingQuota, setIsLoadingQuota] = useState(false);
+  const [, setAdminSettings] = useState<any>(null);
+  const [threshold, setThreshold] = useState(95);
+  const [thresholdEnabled, setThresholdEnabled] = useState(true);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [labels, setLabels] = useState<any[]>([]);
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
   const [labelSortField, setLabelSortField] = useState<string>('createdAt');
@@ -115,6 +120,7 @@ const Admin: React.FC = () => {
         loadClaims();
         loadOverviewStats();
         loadQuotaStatus();
+        loadAdminSettings();
         loadLabels();
         refreshReportCounts();
       } else {
@@ -262,6 +268,65 @@ const Admin: React.FC = () => {
       // Don't show error toast for quota status - it's not critical
     } finally {
       setIsLoadingQuota(false);
+    }
+  };
+
+  const loadAdminSettings = async () => {
+    try {
+      setIsLoadingSettings(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/search/admin/settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const settings = await response.json();
+        setAdminSettings(settings);
+        setThreshold(settings.youtubeQuota?.disableSearchThreshold || 95);
+        setThresholdEnabled(settings.youtubeQuota?.enabled !== false);
+      }
+    } catch (error) {
+      console.error('Error loading admin settings:', error);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const saveAdminSettings = async () => {
+    try {
+      setIsSavingSettings(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/search/admin/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          youtubeQuota: {
+            disableSearchThreshold: threshold,
+            enabled: thresholdEnabled
+          }
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        toast.success('Settings saved successfully');
+        setAdminSettings(result.settings);
+        // Reload quota status to reflect new threshold
+        loadQuotaStatus();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Error saving admin settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -689,6 +754,84 @@ const Admin: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <Settings className="h-5 w-5 mr-2" />
+                YouTube Search Settings
+              </h3>
+              
+              {isLoadingSettings ? (
+                <p className="text-gray-400">Loading settings...</p>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={thresholdEnabled}
+                        onChange={(e) => setThresholdEnabled(e.target.checked)}
+                        className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                      />
+                      <span className="text-white">Enable quota threshold protection</span>
+                    </label>
+                    <p className="text-sm text-gray-400 ml-7 mt-1">
+                      When enabled, YouTube search will be disabled when quota usage reaches the threshold below.
+                    </p>
+                  </div>
+                  
+                  {thresholdEnabled && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-300">
+                          Disable search at threshold: <span className="text-white font-bold">{threshold}%</span>
+                        </label>
+                        {quotaStatus && (
+                          <span className={`text-sm font-medium ${
+                            quotaStatus.percentage >= threshold ? 'text-red-400' : 'text-gray-400'
+                          }`}>
+                            Current: {quotaStatus.percentage.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={threshold}
+                        onChange={(e) => setThreshold(Number(e.target.value))}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>0%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                      </div>
+                      <p className="text-sm text-gray-400 mt-2">
+                        When quota usage reaches {threshold}%, YouTube search will be automatically disabled. 
+                        Users can still paste YouTube URLs directly (uses 100x fewer credits).
+                      </p>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={saveAdminSettings}
+                    disabled={isSavingSettings}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded transition-colors"
+                  >
+                    {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                  </button>
+                  
+                  {quotaStatus?.searchDisabled && (
+                    <div className="mt-4 p-3 bg-red-900/30 border border-red-700 rounded">
+                      <p className="text-sm text-red-300">
+                        ⚠️ YouTube search is currently <strong>disabled</strong> because quota ({quotaStatus.percentage.toFixed(1)}%) has reached the threshold ({quotaStatus.threshold}%).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-gray-800 rounded-lg p-6">

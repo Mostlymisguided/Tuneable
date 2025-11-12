@@ -562,9 +562,25 @@ const Party: React.FC = () => {
       setNewMediaBidAmounts(newBidAmounts);
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Search error:', error);
-      toast.error('Search failed. Please try again.');
+      
+      // Check if search is disabled due to quota
+      if (error?.response?.status === 429) {
+        const errorData = error.response?.data;
+        toast.error(
+          <div>
+            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
+            <div className="text-sm mt-1">{errorData?.message}</div>
+            {errorData?.suggestion && (
+              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
+            )}
+          </div>,
+          { autoClose: 8000 }
+        );
+      } else {
+        toast.error('Search failed. Please try again.');
+      }
     } finally {
       setIsSearchingNewMedia(false);
     }
@@ -599,9 +615,22 @@ const Party: React.FC = () => {
         
         console.log(`✅ Loaded ${response.videos.length} more YouTube results`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading more YouTube results:', error);
-      toast.error('Failed to load more results');
+      
+      // Check if search is disabled due to quota
+      if (error?.response?.status === 429) {
+        const errorData = error.response?.data;
+        toast.error(
+          <div>
+            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
+            <div className="text-sm mt-1">{errorData?.message}</div>
+          </div>,
+          { autoClose: 8000 }
+        );
+      } else {
+        toast.error('Failed to load more results');
+      }
     } finally {
       setIsLoadingMoreYouTube(false);
     }

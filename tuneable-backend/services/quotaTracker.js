@@ -5,6 +5,7 @@
  */
 
 const Quota = require('../models/Quota');
+const AdminSettings = require('../models/AdminSettings');
 
 // YouTube API quota costs (units per operation)
 const QUOTA_COSTS = {
@@ -97,11 +98,25 @@ async function getQuotaStatus() {
   const quota = await getTodayQuota();
   const percentage = (quota.usage / DAILY_QUOTA_LIMIT) * 100;
   
+  // Get admin settings for threshold
+  let threshold = 95; // Default threshold
+  let thresholdEnabled = true; // Default enabled
+  try {
+    const settings = await AdminSettings.getSettings();
+    threshold = settings.youtubeQuota?.disableSearchThreshold ?? 95;
+    thresholdEnabled = settings.youtubeQuota?.enabled !== false;
+  } catch (error) {
+    console.error('Error loading admin settings, using defaults:', error);
+  }
+  
   // Calculate reset time (midnight UTC tomorrow)
   const dateString = quota.date || quota.resetDate;
   const resetDate = new Date(dateString + 'T00:00:00Z');
   resetDate.setUTCDate(resetDate.getUTCDate() + 1);
   const resetTime = resetDate.toISOString();
+  
+  // Check if search should be disabled based on admin threshold
+  const isDisabled = thresholdEnabled && percentage >= threshold;
   
   return {
     usage: quota.usage,
@@ -111,7 +126,10 @@ async function getQuotaStatus() {
     resetDate: dateString,
     resetTime: resetTime,
     status: percentage >= 90 ? 'critical' : percentage >= 70 ? 'warning' : percentage >= 50 ? 'caution' : 'healthy',
-    canSearch: quota.usage < DAILY_QUOTA_LIMIT * 0.95 // Allow searches if under 95%
+    canSearch: !isDisabled, // Based on admin threshold
+    searchDisabled: isDisabled, // Explicit flag
+    threshold: threshold, // Include threshold in response for admin UI
+    thresholdEnabled: thresholdEnabled
   };
 }
 
