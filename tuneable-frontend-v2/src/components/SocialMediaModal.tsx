@@ -6,8 +6,8 @@ interface SocialMediaModalProps {
   isOpen: boolean;
   onClose: () => void;
   platform: 'facebook' | 'instagram' | 'soundcloud';
-  currentUrl?: string;
-  onSave: (url: string) => void;
+  currentUrl?: string; // Kept for backward compatibility but not used
+  onSave: (url: string) => void; // Kept for backward compatibility but not used
 }
 
 const platformConfig = {
@@ -34,7 +34,7 @@ const platformConfig = {
   }
 };
 
-export default function SocialMediaModal({ isOpen, onClose, platform, currentUrl, onSave }: SocialMediaModalProps) {
+export default function SocialMediaModal({ isOpen, onClose, platform }: SocialMediaModalProps) {
   const config = platformConfig[platform];
 
   const handleOAuthConnect = () => {

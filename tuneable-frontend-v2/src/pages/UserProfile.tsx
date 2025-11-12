@@ -258,60 +258,51 @@ const UserProfile: React.FC = () => {
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
 
-  useEffect(() => {
-    if (userId) {
-      // If userId is "profile", redirect to proper profile route
-      if (userId === 'profile') {
-        if (currentUser && (currentUser._id || currentUser.uuid)) {
-          // Redirect to proper user profile route
-          navigate(`/user/${currentUser._id || currentUser.uuid}${searchParams.toString() ? '?' + searchParams.toString() : ''}`, { replace: true });
-          return;
-        } else {
-          // No current user, redirect to profile page which will handle auth
-          navigate('/profile', { replace: true });
-          return;
-        }
-      } else {
-        // Always fetch from API to ensure we have complete profile data including givenName, familyName, cellPhone
-        fetchUserProfile();
+  // Helper functions for loading additional data
+  const loadLabelAffiliations = async () => {
+    try {
+      // Only load if viewing own profile
+      const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
+      if (ownProfile && currentUser) {
+        const response = await userAPI.getLabelAffiliations();
+        setLabelAffiliations(response.labelAffiliations || []);
       }
+      // If viewing another user's profile, we'd need an endpoint to get their labels
+      // For now, we'll skip this - can be added later
+    } catch (err: any) {
+      console.error('Error loading label affiliations:', err);
+      // Silent fail - not critical
     }
-    
-    // Handle OAuth token in URL (for account linking redirects)
-    const token = searchParams.get('token');
-    if (token && isOwnProfile) {
-      // Handle OAuth callback
-      handleOAuthCallback(token).then(() => {
-        // Refresh user profile to show updated OAuth connections
-        fetchUserProfile();
-        // Remove token and oauth_success from URL
-        const newParams = new URLSearchParams(searchParams);
-        newParams.delete('token');
-        newParams.delete('oauth_success');
-        setSearchParams(newParams, { replace: true });
-        toast.success('Account connected successfully!');
-      }).catch((error: any) => {
-        console.error('Error handling OAuth callback:', error);
-        toast.error('Failed to connect account');
-        // Remove token from URL even on error
-        const newParams = new URLSearchParams(searchParams);
-        newParams.delete('token');
-        setSearchParams(newParams, { replace: true });
-      });
-    } else {
-      // Check if we're returning from OAuth connection and refresh user data
-      const oauthSuccess = searchParams.get('oauth_success');
-      if (oauthSuccess === 'true' && isOwnProfile) {
-        // Refresh user profile to show updated OAuth connections
-        fetchUserProfile();
-        // Remove the oauth_success param from URL
-        const newParams = new URLSearchParams(searchParams);
-        newParams.delete('oauth_success');
-        setSearchParams(newParams, { replace: true });
-      }
-    }
-  }, [userId, currentUser, navigate, searchParams, isOwnProfile, handleOAuthCallback, fetchUserProfile]);
+  };
 
+  const loadCollectiveMemberships = async () => {
+    try {
+      // Only load if viewing own profile
+      const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
+      if (ownProfile && currentUser) {
+        const response = await userAPI.getCollectiveMemberships();
+        setCollectiveMemberships(response.collectives || []);
+      }
+      // If viewing another user's profile, we'd need an endpoint to get their collectives
+      // For now, we'll skip this - can be added later
+    } catch (err: any) {
+      console.error('Error loading collective memberships:', err);
+      // Silent fail - not critical
+    }
+  };
+
+  const loadTagRankings = async () => {
+    try {
+      console.log('🏷️ Loading tag rankings for user:', userId);
+      const response = await userAPI.getTagRankings(userId!, 10);
+      console.log('📊 Tag rankings response:', response);
+      setTagRankings(response.tagRankings || []);
+      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
+    } catch (err: any) {
+      console.error('❌ Error loading tag rankings:', err);
+      // Silent fail - not critical
+    }
+  };
 
   // Settings handlers
   const handleSettingsClick = () => {
@@ -451,50 +442,60 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const loadLabelAffiliations = async () => {
-    try {
-      // Only load if viewing own profile
-      const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
-      if (ownProfile && currentUser) {
-        const response = await userAPI.getLabelAffiliations();
-        setLabelAffiliations(response.labelAffiliations || []);
+  // Handle user profile loading and OAuth callbacks
+  useEffect(() => {
+    if (userId) {
+      // If userId is "profile", redirect to proper profile route
+      if (userId === 'profile') {
+        if (currentUser && (currentUser._id || currentUser.uuid)) {
+          // Redirect to proper user profile route
+          navigate(`/user/${currentUser._id || currentUser.uuid}${searchParams.toString() ? '?' + searchParams.toString() : ''}`, { replace: true });
+          return;
+        } else {
+          // No current user, redirect to profile page which will handle auth
+          navigate('/profile', { replace: true });
+          return;
+        }
+      } else {
+        // Always fetch from API to ensure we have complete profile data including givenName, familyName, cellPhone
+        fetchUserProfile();
       }
-      // If viewing another user's profile, we'd need an endpoint to get their labels
-      // For now, we'll skip this - can be added later
-    } catch (err: any) {
-      console.error('Error loading label affiliations:', err);
-      // Silent fail - not critical
     }
-  };
-
-  const loadCollectiveMemberships = async () => {
-    try {
-      // Only load if viewing own profile
-      const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
-      if (ownProfile && currentUser) {
-        const response = await userAPI.getCollectiveMemberships();
-        setCollectiveMemberships(response.collectives || []);
+    
+    // Handle OAuth token in URL (for account linking redirects)
+    const token = searchParams.get('token');
+    if (token && isOwnProfile) {
+      // Handle OAuth callback
+      handleOAuthCallback(token).then(() => {
+        // Refresh user profile to show updated OAuth connections
+        fetchUserProfile();
+        // Remove token and oauth_success from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('token');
+        newParams.delete('oauth_success');
+        setSearchParams(newParams, { replace: true });
+        toast.success('Account connected successfully!');
+      }).catch((error: any) => {
+        console.error('Error handling OAuth callback:', error);
+        toast.error('Failed to connect account');
+        // Remove token from URL even on error
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('token');
+        setSearchParams(newParams, { replace: true });
+      });
+    } else {
+      // Check if we're returning from OAuth connection and refresh user data
+      const oauthSuccess = searchParams.get('oauth_success');
+      if (oauthSuccess === 'true' && isOwnProfile) {
+        // Refresh user profile to show updated OAuth connections
+        fetchUserProfile();
+        // Remove the oauth_success param from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('oauth_success');
+        setSearchParams(newParams, { replace: true });
       }
-      // If viewing another user's profile, we'd need an endpoint to get their collectives
-      // For now, we'll skip this - can be added later
-    } catch (err: any) {
-      console.error('Error loading collective memberships:', err);
-      // Silent fail - not critical
     }
-  };
-
-  const loadTagRankings = async () => {
-    try {
-      console.log('🏷️ Loading tag rankings for user:', userId);
-      const response = await userAPI.getTagRankings(userId!, 10);
-      console.log('📊 Tag rankings response:', response);
-      setTagRankings(response.tagRankings || []);
-      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
-    } catch (err: any) {
-      console.error('❌ Error loading tag rankings:', err);
-      // Silent fail - not critical
-    }
-  };
+  }, [userId, currentUser, navigate, searchParams, isOwnProfile, handleOAuthCallback, fetchUserProfile]);
 
   const formatJoinDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
