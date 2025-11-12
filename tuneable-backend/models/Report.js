@@ -63,14 +63,14 @@ const reportSchema = new mongoose.Schema({
     // Label categories: copyright, label_impersonation, unauthorized_claim, label_incorrect_info, scam_fraud, inappropriate, other
     enum: [
       // Media categories
-      'copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'other',
+      'copyright', 'incorrect_info', 'incorrect_tags', 'inappropriate', 'duplicate', 'something_broken', 'other',
       // Note: 'incorrect_tags' kept in enum for backward compatibility but removed from frontend/validation
       // User categories
-      'harassment', 'spam', 'impersonation',
+      'harassment', 'spam', 'impersonation', 'something_broken',
       // Label categories (reuse some, add new ones)
-      'label_impersonation', 'label_incorrect_info', 'label_spam', 'unauthorized_claim', 'scam_fraud',
+      'label_impersonation', 'label_incorrect_info', 'label_spam', 'unauthorized_claim', 'scam_fraud', 'something_broken',
       // Collective categories
-      'collective_impersonation', 'collective_incorrect_info', 'collective_spam'
+      'collective_impersonation', 'collective_incorrect_info', 'collective_spam', 'something_broken'
       // Note: 'copyright' and 'inappropriate' are reused from media/user categories, 'label_spam' kept for backward compatibility
     ],
     required: true

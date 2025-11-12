@@ -24,7 +24,7 @@ router.post('/media/:mediaId/report', authMiddleware, async (req, res) => {
     }
 
     // Validate category (media categories)
-    const validCategories = ['copyright', 'incorrect_info', 'inappropriate', 'duplicate', 'other'];
+    const validCategories = ['copyright', 'incorrect_info', 'inappropriate', 'duplicate', 'something_broken', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -78,6 +78,7 @@ router.post('/media/:mediaId/report', authMiddleware, async (req, res) => {
         incorrect_info: 'Incorrect Information',
         inappropriate: 'Inappropriate Content',
         duplicate: 'Duplicate',
+        something_broken: 'Something is Broken',
         other: 'Other Issue'
       };
 
@@ -141,7 +142,7 @@ router.post('/:mediaId/report', authMiddleware, async (req, res, next) => {
       return res.status(400).json({ error: 'Category and description are required' });
     }
 
-    const validCategories = ['copyright', 'incorrect_info', 'inappropriate', 'duplicate', 'other'];
+    const validCategories = ['copyright', 'incorrect_info', 'inappropriate', 'duplicate', 'something_broken', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -242,7 +243,7 @@ router.post('/users/:userId/report', authMiddleware, async (req, res) => {
     }
 
     // Validate category (user categories)
-    const validCategories = ['harassment', 'spam', 'impersonation', 'inappropriate', 'copyright', 'other'];
+    const validCategories = ['harassment', 'spam', 'impersonation', 'inappropriate', 'copyright', 'something_broken', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -302,6 +303,7 @@ router.post('/users/:userId/report', authMiddleware, async (req, res) => {
         impersonation: 'Impersonation',
         inappropriate: 'Inappropriate Content/Behavior',
         copyright: 'Copyright Infringement',
+        something_broken: 'Something is Broken',
         other: 'Other Issue'
       };
 
@@ -359,7 +361,7 @@ router.post('/labels/:labelId/report', authMiddleware, async (req, res) => {
     }
 
     // Validate category (label categories)
-    const validCategories = ['copyright', 'unauthorized_claim', 'label_incorrect_info', 'inappropriate', 'other'];
+    const validCategories = ['copyright', 'unauthorized_claim', 'label_incorrect_info', 'inappropriate', 'something_broken', 'other'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -414,6 +416,7 @@ router.post('/labels/:labelId/report', authMiddleware, async (req, res) => {
         unauthorized_claim: 'Unauthorized Use/False Claim',
         label_incorrect_info: 'Incorrect Information',
         inappropriate: 'Inappropriate Content',
+        something_broken: 'Something is Broken',
         other: 'Other Issue'
       };
 
@@ -479,6 +482,7 @@ router.post('/collectives/:collectiveId/report', authMiddleware, async (req, res
       'collective_spam',
       'unauthorized_claim',
       'inappropriate',
+      'something_broken',
       'other'
     ];
 
@@ -532,6 +536,7 @@ router.post('/collectives/:collectiveId/report', authMiddleware, async (req, res
         collective_spam: 'Spam/Scam',
         unauthorized_claim: 'Unauthorized Use/False Claim',
         inappropriate: 'Inappropriate Content',
+        something_broken: 'Something is Broken',
         other: 'Other Issue'
       };
 

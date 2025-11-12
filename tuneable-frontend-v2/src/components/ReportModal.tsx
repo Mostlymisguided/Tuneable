@@ -43,6 +43,13 @@ const reportCategoriesByType = {
       priority: false
     },
     {
+      value: 'something_broken',
+      label: 'Something is Broken',
+      description: 'There\'s a bug or technical issue with this page or feature',
+      requiresEmail: false,
+      priority: false
+    },
+    {
       value: 'other',
       label: 'Other Issue',
       description: 'Something else needs attention',
@@ -87,6 +94,13 @@ const reportCategoriesByType = {
       priority: false
     },
     {
+      value: 'something_broken',
+      label: 'Something is Broken',
+      description: 'There\'s a bug or technical issue with this page or feature',
+      requiresEmail: false,
+      priority: false
+    },
+    {
       value: 'other',
       label: 'Other Issue',
       description: 'Something else needs attention',
@@ -124,6 +138,13 @@ const reportCategoriesByType = {
       priority: false
     },
     {
+      value: 'something_broken',
+      label: 'Something is Broken',
+      description: 'There\'s a bug or technical issue with this page or feature',
+      requiresEmail: false,
+      priority: false
+    },
+    {
       value: 'other',
       label: 'Other Issue',
       description: 'Something else needs attention',
@@ -150,6 +171,13 @@ const reportCategoriesByType = {
       value: 'inappropriate',
       label: 'Inappropriate Content',
       description: 'This collective is posting inappropriate, offensive, or harmful content',
+      requiresEmail: false,
+      priority: false
+    },
+    {
+      value: 'something_broken',
+      label: 'Something is Broken',
+      description: 'There\'s a bug or technical issue with this page or feature',
       requiresEmail: false,
       priority: false
     },

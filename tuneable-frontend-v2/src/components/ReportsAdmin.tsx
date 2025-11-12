@@ -65,6 +65,7 @@ const categoryLabels: { [key: string]: string } = {
   incorrect_tags: 'Incorrect Tags',
   inappropriate: 'Inappropriate Content',
   duplicate: 'Duplicate',
+  something_broken: 'Something is Broken',
   other: 'Other Issue',
   // User categories
   harassment: 'Harassment/Bullying',
