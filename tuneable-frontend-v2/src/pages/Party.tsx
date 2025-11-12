@@ -11,12 +11,13 @@ import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
@@ -96,9 +97,10 @@ const Party: React.FC = () => {
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, string>>({});
   
-  // Tag modal state
+  // Tag modal state (keeping for backward compatibility, but using confirmation modal now)
   const [showTagModal, setShowTagModal] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<any>(null);
+  const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   
   // Validation modal state
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -706,16 +708,16 @@ const Party: React.FC = () => {
       return;
     }
     
-    // No warnings, proceed directly to tag modal
+    // No warnings, proceed directly to confirmation modal
     setPendingMedia(media);
-    setShowTagModal(true);
+    setShowBidConfirmationModal(true);
   };
 
   // Handler for validation modal confirm
   const handleValidationConfirm = () => {
     setShowValidationModal(false);
     if (pendingMedia) {
-      setShowTagModal(true);
+      setShowBidConfirmationModal(true);
     }
   };
 
@@ -728,6 +730,58 @@ const Party: React.FC = () => {
     setValidationDuration(0);
   };
 
+  const handleBidConfirmation = async (tags: string[]) => {
+    if (!partyId || !pendingMedia) return;
+    
+    const rawNewMediaBid = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] ?? '';
+    const bidAmount = parseFloat(rawNewMediaBid);
+    const minBid = party?.minimumBid || 0.01;
+
+    if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
+      toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+      return;
+    }
+    
+    setShowBidConfirmationModal(false);
+    
+    try {
+      // Get the appropriate URL based on media source
+      const mediaSource = party?.mediaSource || 'youtube';
+      let url = '';
+      
+      if (mediaSource === 'youtube' && pendingMedia.sources?.youtube) {
+        url = pendingMedia.sources.youtube;
+      } else if (pendingMedia.sources) {
+        // Fallback to first available source
+        url = Object.values(pendingMedia.sources)[0] as string;
+      }
+      
+      await partyAPI.addMediaToParty(partyId, {
+        url,
+        title: pendingMedia.title,
+        artist: pendingMedia.artist,
+        bidAmount,
+        platform: mediaSource,
+        duration: pendingMedia.duration,
+        tags: tags, // Use user-provided tags from modal
+        category: pendingMedia.category || 'Music'
+      });
+      
+      toast.success(`Added ${pendingMedia.title} to party with £${bidAmount.toFixed(2)} bid!`);
+      
+      // Clear search and refresh party
+      setAddMediaSearchQuery('');
+      setAddMediaResults({ database: [], youtube: [] });
+      setPendingMedia(null);
+      fetchPartyDetails();
+      
+    } catch (error: any) {
+      console.error('Error adding media:', error);
+      toast.error(error.response?.data?.error || 'Failed to add media to party');
+    }
+  };
+
+  // Keep handleTagSubmit for backward compatibility (if TagInputModal is still used elsewhere)
   const handleTagSubmit = async (tags: string[]) => {
     if (!partyId || !pendingMedia) return;
     
@@ -1559,19 +1613,66 @@ const Party: React.FC = () => {
                                           </div>
                                         </div>
                                         {/* Inline Bidding */}
-                                        <div className="flex items-center space-x-1 md:space-x-2">
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min={party?.minimumBid || 0.01}
-                                            value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
-                                            onChange={(e) => setQueueBidAmounts({
-                                              ...queueBidAmounts,
-                                              [mediaData._id || mediaData.id]: e.target.value
-                                            })}
-                                            className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
-                                            onClick={(e) => e.stopPropagation()}
-                                          />
+                                        <div className="flex flex-row items-center space-x-1 md:space-x-2">
+                                          {/* Input group with +/- buttons */}
+                                          <div className="flex md:flex-col items-center space-x-1">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                const mediaId = mediaData._id || mediaData.id;
+                                                const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                                const minBid = party?.minimumBid || 0.01;
+                                                const newAmount = Math.max(minBid, current - 0.01);
+                                                setQueueBidAmounts({
+                                                  ...queueBidAmounts,
+                                                  [mediaId]: newAmount.toFixed(2)
+                                                });
+                                              }}
+                                              disabled={isBidding || (() => {
+                                                const mediaId = mediaData._id || mediaData.id;
+                                                const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                                const minBid = party?.minimumBid || 0.01;
+                                                return current <= minBid;
+                                              })()}
+                                              className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                            >
+                                              <Minus className="h-3 w-3 md:h-4 md:w-4" />
+                                            </button>
+                                            <input
+                                              type="number"
+                                              step="0.01"
+                                              min={party?.minimumBid || 0.01}
+                                              value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
+                                              onChange={(e) => setQueueBidAmounts({
+                                                ...queueBidAmounts,
+                                                [mediaData._id || mediaData.id]: e.target.value
+                                              })}
+                                              className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
+                                              onClick={(e) => e.stopPropagation()}
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                const mediaId = mediaData._id || mediaData.id;
+                                                const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                                const newAmount = current + 0.01;
+                                                setQueueBidAmounts({
+                                                  ...queueBidAmounts,
+                                                  [mediaId]: newAmount.toFixed(2)
+                                                });
+                                              }}
+                                              disabled={isBidding}
+                                              className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                            >
+                                              <Plus className="h-3 w-3 md:h-4 md:w-4" />
+                                            </button>
+                                          </div>
+                                          {/* Bid Button */}
                                           <button
                                             onClick={() => handleInlineBid(item)}
                                             disabled={isBidding}
@@ -1632,7 +1733,24 @@ const Party: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-2 md:flex-shrink-0">
+                                  <div className="flex items-center space-x-1 md:flex-shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const mediaId = media._id || media.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const newAmount = Math.max(minBid, current - 0.01);
+                                        setNewMediaBidAmounts(prev => ({
+                                          ...prev,
+                                          [mediaId]: newAmount.toFixed(2)
+                                        }));
+                                      }}
+                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </button>
                                     <input
                                       type="number"
                                       step="0.01"
@@ -1644,6 +1762,22 @@ const Party: React.FC = () => {
                                       }))}
                                       className="w-20 md:w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const mediaId = media._id || media.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const newAmount = current + 0.01;
+                                        setNewMediaBidAmounts(prev => ({
+                                          ...prev,
+                                          [mediaId]: newAmount.toFixed(2)
+                                        }));
+                                      }}
+                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </button>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="z-999 px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
@@ -1694,7 +1828,24 @@ const Party: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-2 md:flex-shrink-0">
+                                  <div className="flex items-center space-x-1 md:flex-shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const mediaId = media._id || media.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const newAmount = Math.max(minBid, current - 0.01);
+                                        setNewMediaBidAmounts(prev => ({
+                                          ...prev,
+                                          [mediaId]: newAmount.toFixed(2)
+                                        }));
+                                      }}
+                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </button>
                                     <input
                                       type="number"
                                       step="0.01"
@@ -1706,6 +1857,22 @@ const Party: React.FC = () => {
                                       }))}
                                       className="w-20 md:w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray text-sm"
                                     />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const mediaId = media._id || media.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(newMediaBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const newAmount = current + 0.01;
+                                        setNewMediaBidAmounts(prev => ({
+                                          ...prev,
+                                          [mediaId]: newAmount.toFixed(2)
+                                        }));
+                                      }}
+                                      className="px-1.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors flex items-center justify-center"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </button>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
                                       className="flex px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
@@ -1913,19 +2080,66 @@ const Party: React.FC = () => {
                                   </div>
                                 </div>
                                 {/* Inline Bidding */}
-                                <div className="flex items-center space-x-2">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min={party?.minimumBid || 0.01}
-                                    value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
-                                    onChange={(e) => setQueueBidAmounts({
-                                      ...queueBidAmounts,
-                                      [mediaData._id || mediaData.id]: e.target.value
-                                    })}
-                                    className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
+                                <div className="flex flex-row items-center space-x-1 md:space-x-2">
+                                  {/* Input group with +/- buttons */}
+                                  <div className="flex items-center space-x-1">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const mediaId = mediaData._id || mediaData.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const newAmount = Math.max(minBid, current - 0.01);
+                                        setQueueBidAmounts({
+                                          ...queueBidAmounts,
+                                          [mediaId]: newAmount.toFixed(2)
+                                        });
+                                      }}
+                                      disabled={isBidding || (() => {
+                                        const mediaId = mediaData._id || mediaData.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const minBid = party?.minimumBid || 0.01;
+                                        return current <= minBid;
+                                      })()}
+                                      className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                    >
+                                      <Minus className="h-3 w-3 md:h-4 md:w-4" />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min={party?.minimumBid || 0.01}
+                                      value={queueBidAmounts[mediaData._id || mediaData.id] ?? (Math.max(0.33, party?.minimumBid || 0.01).toFixed(2))}
+                                      onChange={(e) => setQueueBidAmounts({
+                                        ...queueBidAmounts,
+                                        [mediaData._id || mediaData.id]: e.target.value
+                                      })}
+                                      className="w-16 md:w-20 bg-gray-800 border border-gray-600 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-gray text-xs md:text-sm"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const mediaId = mediaData._id || mediaData.id;
+                                        const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
+                                        const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                        const newAmount = current + 0.01;
+                                        setQueueBidAmounts({
+                                          ...queueBidAmounts,
+                                          [mediaId]: newAmount.toFixed(2)
+                                        });
+                                      }}
+                                      disabled={isBidding}
+                                      className="px-1.5 py-1 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white transition-colors flex items-center justify-center"
+                                    >
+                                      <Plus className="h-3 w-3 md:h-4 md:w-4" />
+                                    </button>
+                                  </div>
+                                  {/* Bid Button */}
                                   <button
                                     onClick={() => handleInlineBid(item)}
                                     disabled={isBidding}
@@ -2205,7 +2419,29 @@ const Party: React.FC = () => {
         </div>
       </div>
 
-      {/* Tag Input Modal */}
+      {/* Bid Confirmation Modal */}
+      {pendingMedia && (
+        <BidConfirmationModal
+          isOpen={showBidConfirmationModal}
+          onClose={() => {
+            setShowBidConfirmationModal(false);
+            setPendingMedia(null);
+          }}
+          onConfirm={handleBidConfirmation}
+          bidAmount={(() => {
+            const rawNewMediaBid = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] ?? '';
+            const bidAmount = parseFloat(rawNewMediaBid);
+            const minBid = party?.minimumBid || 0.01;
+            const defaultBid = Math.max(0.33, minBid);
+            return Number.isFinite(bidAmount) ? bidAmount : defaultBid;
+          })()}
+          mediaTitle={pendingMedia?.title || 'Unknown'}
+          mediaArtist={pendingMedia?.artist}
+          userBalance={penceToPoundsNumber((user as any)?.balance)}
+        />
+      )}
+
+      {/* Tag Input Modal - kept for backward compatibility */}
       <TagInputModal
         isOpen={showTagModal}
         onClose={() => {

@@ -29,7 +29,9 @@ import {
   Building,
   CheckCircle,
   Users,
-  Upload
+  Upload,
+  Minus,
+  Plus
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
@@ -41,6 +43,7 @@ import { canEditMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 
 interface Media {
   _id: string;
@@ -226,6 +229,7 @@ const TuneProfile: React.FC = () => {
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
+  const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [topParties, setTopParties] = useState<any[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
@@ -1060,7 +1064,7 @@ const TuneProfile: React.FC = () => {
   };
 
   // Handle global bid (chart support)
-  const handleGlobalBid = async () => {
+  const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
       navigate('/login');
@@ -1080,10 +1084,20 @@ const TuneProfile: React.FC = () => {
       return;
     }
 
+    // Show confirmation modal
+    setShowBidConfirmationModal(true);
+  };
+
+  const handleConfirmGlobalBid = async (tags: string[]) => {
+    if (!user || !mediaId) return;
+
+    setShowBidConfirmationModal(false);
     setIsPlacingGlobalBid(true);
 
     try {
-      await mediaAPI.placeGlobalBid(mediaId!, parsedGlobalBidAmount);
+      // For now, tags are only supported for external media
+      // TODO: Update backend to accept tags for existing media bids
+      await mediaAPI.placeGlobalBid(mediaId, parsedGlobalBidAmount);
       
       toast.success(`Placed £${parsedGlobalBidAmount.toFixed(2)} bid on "${media?.title}"!`);
       
@@ -1412,6 +1426,19 @@ const TuneProfile: React.FC = () => {
                 </p>
                 
                 <div className="flex flex-row items-center justify-center space-y-0 space-x-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = parseFloat(globalBidInput) || minimumBid;
+                      const newAmount = Math.max(minimumBid, current - 0.01);
+                      setGlobalBidInput(newAmount.toFixed(2));
+                      setHasInitializedBidInput(true);
+                    }}
+                    disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
+                    className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                  </button>
                   <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
                     <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
                     <input
@@ -1426,6 +1453,23 @@ const TuneProfile: React.FC = () => {
                       className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = parseFloat(globalBidInput) || minimumBid;
+                      const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                      const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
+                      setGlobalBidInput(newAmount.toFixed(2));
+                      setHasInitializedBidInput(true);
+                    }}
+                    disabled={isPlacingGlobalBid || (() => {
+                      const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                      return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
+                    })()}
+                    className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                  </button>
                   <button
                     onClick={handleGlobalBid}
                     disabled={isPlacingGlobalBid || !isGlobalBidValid}
@@ -1942,6 +1986,19 @@ const TuneProfile: React.FC = () => {
                         </p>
                         
                         <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = parseFloat(globalBidInput) || minimumBid;
+                              const newAmount = Math.max(minimumBid, current - 0.01);
+                              setGlobalBidInput(newAmount.toFixed(2));
+                              setHasInitializedBidInput(true);
+                            }}
+                            disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
+                            className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                          >
+                            <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                          </button>
                           <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
                             <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
                             <input
@@ -1956,6 +2013,23 @@ const TuneProfile: React.FC = () => {
                               className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
                             />
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = parseFloat(globalBidInput) || minimumBid;
+                              const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                              const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
+                              setGlobalBidInput(newAmount.toFixed(2));
+                              setHasInitializedBidInput(true);
+                            }}
+                            disabled={isPlacingGlobalBid || (() => {
+                              const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                              return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
+                            })()}
+                            className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                          >
+                            <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                          </button>
                           <button
                             onClick={handleGlobalBid}
                             disabled={isPlacingGlobalBid || !isGlobalBidValid}
@@ -2844,6 +2918,19 @@ const TuneProfile: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Bid Confirmation Modal */}
+      <BidConfirmationModal
+        isOpen={showBidConfirmationModal}
+        onClose={() => setShowBidConfirmationModal(false)}
+        onConfirm={handleConfirmGlobalBid}
+        bidAmount={parsedGlobalBidAmount}
+        mediaTitle={media?.title || 'Unknown'}
+        mediaArtist={media?.artist}
+        currentBid={media?.globalMediaBidTop}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isPlacingGlobalBid}
+      />
 
       {/* Add Link Modal */}
       {showAddLinkModal && (

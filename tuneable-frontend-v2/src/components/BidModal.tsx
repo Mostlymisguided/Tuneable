@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, PoundSterling, AlertCircle } from 'lucide-react';
+import { X, PoundSterling, AlertCircle, Minus, Plus } from 'lucide-react';
 import BetaWarningBanner from './BetaWarningBanner';
 
 interface BidModalProps {
@@ -25,6 +25,15 @@ const BidModal: React.FC<BidModalProps> = ({
 }) => {
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
+
+  const adjustBidAmount = (delta: number) => {
+    const current = parseFloat(bidAmount) || 0;
+    const newAmount = Math.max(0.01, current + delta);
+    const maxAmount = userBalance || 999999;
+    const finalAmount = Math.min(newAmount, maxAmount);
+    setBidAmount(finalAmount.toFixed(2));
+    setError('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,25 +97,43 @@ const BidModal: React.FC<BidModalProps> = ({
             <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700 mb-2">
               Your Bid Amount
             </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <PoundSterling className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => adjustBidAmount(-0.01)}
+                disabled={isLoading || parseFloat(bidAmount) <= 0.01}
+                className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              >
+                <Minus className="h-4 w-4 text-gray-600" />
+              </button>
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <PoundSterling className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="number"
+                  id="bidAmount"
+                  step="0.01"
+                  min="0.01"
+                  value={bidAmount}
+                  onChange={(e) => {
+                    setBidAmount(e.target.value);
+                    setError('');
+                  }}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="0.00"
+                  disabled={isLoading}
+                  autoFocus
+                />
               </div>
-              <input
-                type="number"
-                id="bidAmount"
-                step="0.01"
-                min="0.01"
-                value={bidAmount}
-                onChange={(e) => {
-                  setBidAmount(e.target.value);
-                  setError('');
-                }}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="0.00"
-                disabled={isLoading}
-                autoFocus
-              />
+              <button
+                type="button"
+                onClick={() => adjustBidAmount(0.01)}
+                disabled={isLoading || (userBalance > 0 && parseFloat(bidAmount) >= userBalance)}
+                className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              >
+                <Plus className="h-4 w-4 text-gray-600" />
+              </button>
             </div>
             {error && (
               <div className="mt-2 flex items-center text-sm text-red-600">
