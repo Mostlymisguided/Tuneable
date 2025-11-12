@@ -165,14 +165,14 @@ router.get('/', async (req, res) => {
                     console.log(`🚫 YouTube search disabled: quota at ${quotaStatus.percentage.toFixed(1)}% (threshold: ${quotaStatus.threshold}%)`);
                     return res.status(429).json({ 
                         error: 'YouTube search is temporarily disabled',
-                        message: `YouTube search has been disabled because API quota usage (${quotaStatus.percentage.toFixed(1)}%) has reached the configured threshold (${quotaStatus.threshold}%).`,
+                        message: `YouTube search has been disabled because API quota usage is nearing its limits`,
                         quotaStatus: {
                             usage: quotaStatus.usage,
                             limit: quotaStatus.limit,
                             percentage: quotaStatus.percentage,
                             resetTime: quotaStatus.resetTime
                         },
-                        suggestion: 'Please try pasting a YouTube URL directly instead, or wait until the quota resets.'
+                        suggestion: '✨Please try pasting a YouTube URL directly instead✨'
                     });
                 }
             }
