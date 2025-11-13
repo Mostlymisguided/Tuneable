@@ -19,7 +19,26 @@ const AuthCallback: React.FC = () => {
       const error = searchParams.get('error');
 
       if (error) {
-        toast.error('Authentication failed. Please try again.');
+        // Parse error details from URL
+        const errorDetails = searchParams.get('details');
+        const errorReason = searchParams.get('reason');
+        
+        let errorMessage = 'Authentication failed. Please try again.';
+        
+        if (error === 'oauth_state_mismatch') {
+          errorMessage = 'Security verification failed. Please try signing in again.';
+        } else if (error === 'oauth_session_missing') {
+          errorMessage = 'Session expired. Please try signing in again.';
+        } else if (errorDetails) {
+          errorMessage = `Authentication error: ${decodeURIComponent(errorDetails)}`;
+        } else if (errorReason) {
+          errorMessage = `Authentication failed: ${errorReason}`;
+        }
+        
+        toast.error(errorMessage, {
+          autoClose: 10000,
+          pauseOnHover: true,
+        });
         navigate('/login');
         return;
       }
@@ -54,13 +73,30 @@ const AuthCallback: React.FC = () => {
             toast.success('Login successful!');
             navigate('/dashboard');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error during OAuth callback:', error);
-          toast.error('Authentication failed. Please try again.');
+          
+          let errorMessage = 'Authentication failed. Please try again.';
+          
+          if (error?.response?.status === 401) {
+            errorMessage = 'Authentication token is invalid. Please try signing in again.';
+          } else if (error?.response?.status >= 500) {
+            errorMessage = 'Server error during authentication. Please try again in a moment.';
+          } else if (error?.message) {
+            errorMessage = `Authentication error: ${error.message}`;
+          }
+          
+          toast.error(errorMessage, {
+            autoClose: 10000,
+            pauseOnHover: true,
+          });
           navigate('/login');
         }
       } else {
-        toast.error('Authentication failed. Please try again.');
+        toast.error('No authentication token received. Please try signing in again.', {
+          autoClose: 10000,
+          pauseOnHover: true,
+        });
         navigate('/login');
       }
     };

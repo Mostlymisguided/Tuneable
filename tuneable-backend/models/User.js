@@ -103,6 +103,11 @@ const userSchema = new mongoose.Schema({
   // Last login tracking
   lastLoginAt: { type: Date },
   
+  // Account lockout for failed login attempts
+  failedLoginAttempts: { type: Number, default: 0 },
+  accountLockedUntil: { type: Date, default: null },
+  lastFailedLoginAttempt: { type: Date, default: null },
+  
   // Social media links (available to all users)
   socialMedia: {
     instagram: String,

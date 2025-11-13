@@ -10,7 +10,8 @@ import {
   XCircle,
   X,
   Mail,
-  UserPlus
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 import { userAPI } from '../lib/api';
@@ -25,6 +26,11 @@ const AuthPage: React.FC = () => {
   const [isValidatingCode, setIsValidatingCode] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showInviteCodeError, setShowInviteCodeError] = useState(false);
+  
+  // Account lockout state
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [accountLockedUntil, setAccountLockedUntil] = useState<Date | null>(null);
+  const [countdownTick, setCountdownTick] = useState(0); // Force re-render for countdown
   
   // Field-specific error messages
   const [fieldErrors, setFieldErrors] = useState({
@@ -70,7 +76,30 @@ const AuthPage: React.FC = () => {
   // Check if we're coming from a redirect (like after OAuth)
   const isFromOAuth = location.search.includes('error=') || location.search.includes('success=');
 
-  // Capture invite code from URL on mount
+  // Countdown timer for account lockout
+  useEffect(() => {
+    if (!accountLockedUntil || accountLockedUntil <= new Date()) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      if (accountLockedUntil <= now) {
+        // Lockout expired, reset state
+        setAccountLockedUntil(null);
+        setFailedAttempts(0);
+        setCountdownTick(0);
+        clearInterval(interval);
+      } else {
+        // Force re-render to update countdown display
+        setCountdownTick(prev => prev + 1);
+      }
+    }, 1000); // Update every second
+
+    return () => clearInterval(interval);
+  }, [accountLockedUntil]);
+
+  // Capture invite code and handle OAuth errors from URL on mount
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const inviteParam = params.get('invite');
@@ -78,6 +107,60 @@ const AuthPage: React.FC = () => {
     if (inviteParam && isRegisterPage) {
       setFormData(prev => ({ ...prev, parentInviteCode: inviteParam.toUpperCase() }));
       validateInviteCode(inviteParam.toUpperCase());
+    }
+    
+    // Handle OAuth errors from URL parameters
+    const errorParam = params.get('error');
+    const errorDetails = params.get('details');
+    const errorReason = params.get('reason');
+    
+    if (errorParam) {
+      let errorMessage = 'Authentication failed. Please try again.';
+      
+      // Map OAuth error codes to user-friendly messages
+      switch (errorParam) {
+        case 'facebook_auth_failed':
+          errorMessage = 'Facebook authentication failed. Please try again or use email/password to sign in.';
+          break;
+        case 'google_auth_failed':
+          errorMessage = 'Google authentication failed. Please try again or use email/password to sign in.';
+          break;
+        case 'soundcloud_auth_failed':
+          if (errorReason === 'no_user') {
+            errorMessage = 'SoundCloud account not found. Please sign up first or use email/password to sign in.';
+          } else if (errorDetails) {
+            errorMessage = `SoundCloud authentication failed: ${decodeURIComponent(errorDetails)}. Please try again.`;
+          } else {
+            errorMessage = 'SoundCloud authentication failed. Please try again or use email/password to sign in.';
+          }
+          break;
+        case 'instagram_auth_failed':
+          errorMessage = 'Instagram authentication failed. Please try again or use email/password to sign in.';
+          break;
+        case 'oauth_state_mismatch':
+          errorMessage = 'Security verification failed. Please try signing in again.';
+          break;
+        case 'oauth_session_missing':
+          errorMessage = 'Session expired. Please try signing in again.';
+          break;
+        default:
+          if (errorDetails) {
+            errorMessage = `Authentication error: ${decodeURIComponent(errorDetails)}`;
+          }
+      }
+      
+      toast.error(errorMessage, {
+        autoClose: 10000, // Show OAuth errors longer
+        pauseOnHover: true,
+      });
+      
+      // Clean up URL parameters after showing error
+      const newSearch = new URLSearchParams(location.search);
+      newSearch.delete('error');
+      newSearch.delete('details');
+      newSearch.delete('reason');
+      const newUrl = location.pathname + (newSearch.toString() ? '?' + newSearch.toString() : '');
+      window.history.replaceState({}, '', newUrl);
     }
   }, [location.search, isRegisterPage]);
 
@@ -233,6 +316,9 @@ const AuthPage: React.FC = () => {
 
     try {
       await login(formData.email, formData.password);
+      // Reset failed attempts on successful login
+      setFailedAttempts(0);
+      setAccountLockedUntil(null);
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
@@ -241,7 +327,52 @@ const AuthPage: React.FC = () => {
       console.error('Error response:', error.response);
       console.error('Error message:', error.response?.data?.error || error.message);
       
-      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      // Handle different error types with user-friendly messages
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (!error.response) {
+        // Network error - no response from server
+        errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
+      } else if (error.response.status === 423) {
+        // Account locked
+        const lockedUntil = error.response?.data?.lockedUntil;
+        const minutesRemaining = error.response?.data?.minutesRemaining;
+        const failedAttemptsCount = error.response?.data?.failedAttempts || 6;
+        
+        if (lockedUntil) {
+          setAccountLockedUntil(new Date(lockedUntil));
+          setFailedAttempts(failedAttemptsCount);
+          errorMessage = `Account temporarily locked. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`;
+        } else {
+          errorMessage = error.response?.data?.error || 'Account locked. Please try again later.';
+        }
+      } else if (error.response.status === 401) {
+        // Authentication failed - track attempts
+        const failedAttemptsCount = error.response?.data?.failedAttempts || 0;
+        const remainingAttempts = error.response?.data?.remainingAttempts || (6 - failedAttemptsCount);
+        
+        setFailedAttempts(failedAttemptsCount);
+        
+        if (remainingAttempts > 0) {
+          errorMessage = `Invalid email or password. ${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining before account lockout.`;
+        } else {
+          errorMessage = error.response?.data?.error || 'Invalid email or password. Please check your credentials and try again.';
+        }
+      } else if (error.response.status === 400) {
+        // Validation error
+        const validationError = error.response?.data?.error || error.response?.data?.details?.[0]?.msg;
+        errorMessage = validationError || 'Please check your email and password format.';
+      } else if (error.response.status === 403) {
+        // Account locked or inactive
+        errorMessage = error.response?.data?.error || 'Your account is currently inactive. Please contact support.';
+      } else if (error.response.status >= 500) {
+        // Server error
+        errorMessage = 'Server error. Please try again in a moment. If the problem persists, contact support.';
+      } else {
+        // Other errors - use message from server if available
+        errorMessage = error.response?.data?.error || error.message || errorMessage;
+      }
+      
       toast.error(errorMessage, {
         autoClose: 7000, // Show errors for 7 seconds
         pauseOnHover: true,
@@ -378,6 +509,42 @@ const AuthPage: React.FC = () => {
         <div className="h-px w-full bg-slate-200"></div>
       </div>
 
+      {/* Account Lockout Warning */}
+      {accountLockedUntil && accountLockedUntil > new Date() && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">Account Temporarily Locked</p>
+              <p className="text-xs text-red-600 mt-1">
+                Too many failed login attempts. Please try again after {(() => {
+                  const now = new Date();
+                  const minutesRemaining = Math.ceil((accountLockedUntil.getTime() - now.getTime()) / 60000);
+                  // Use countdownTick to ensure re-render
+                  const _ = countdownTick;
+                  return minutesRemaining > 0 ? `${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}` : 'less than a minute';
+                })()}.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Failed Attempts Warning */}
+      {failedAttempts > 0 && failedAttempts < 6 && !accountLockedUntil && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800">Login Attempt Failed</p>
+              <p className="text-xs text-yellow-600 mt-1">
+                {failedAttempts} failed attempt{failedAttempts > 1 ? 's' : ''}. {6 - failedAttempts} attempt{6 - failedAttempts > 1 ? 's' : ''} remaining before account lockout.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form className="w-full" onSubmit={handleLogin}>
         <label htmlFor="email" className="sr-only">Email address</label>
         <input
@@ -385,7 +552,8 @@ const AuthPage: React.FC = () => {
           type="email"
           autoComplete="email"
           required
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+          disabled={accountLockedUntil !== null && accountLockedUntil > new Date()}
+          className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:bg-gray-100 disabled:cursor-not-allowed"
           placeholder="Email Address"
           value={formData.email}
           onChange={handleChange}
@@ -396,7 +564,8 @@ const AuthPage: React.FC = () => {
           type="password"
           autoComplete="current-password"
           required
-          className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
+          disabled={accountLockedUntil !== null && accountLockedUntil > new Date()}
+          className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:bg-gray-100 disabled:cursor-not-allowed"
           placeholder="Password"
           value={formData.password}
           onChange={handleChange}
@@ -404,10 +573,10 @@ const AuthPage: React.FC = () => {
               <div className="mt-7 p-4 flex items-center justify-center flex-col gap-2">
         <button
           type="submit"
-          disabled={isLoading}
-          className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-gray-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
+          disabled={isLoading || (accountLockedUntil !== null && accountLockedUntil > new Date())}
+          className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-gray-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Loading...' : 'Continue'}
+          {isLoading ? 'Loading...' : (accountLockedUntil !== null && accountLockedUntil > new Date() ? 'Account Locked' : 'Continue')}
         </button>
         </div>
       </form>
@@ -777,14 +946,7 @@ const AuthPage: React.FC = () => {
         
         {/* Scrollable Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-80px)] p-4">
-          {/* Error/Success Messages */}
-          {isFromOAuth && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">
-                There was an issue with your authentication. Please try again.
-              </p>
-            </div>
-          )}
+          {/* OAuth errors are now handled via toast notifications in useEffect */}
           
           {/* Main Content */}
           {isRegisterPage ? renderRegisterForm() : renderLoginForm()}

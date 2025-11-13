@@ -562,14 +562,63 @@ router.post(
         return res.status(401).json({ error: 'Account is inactive. Please contact support.' });
       }
 
+      // Check if account is locked
+      if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
+        const minutesRemaining = Math.ceil((user.accountLockedUntil - new Date()) / 60000);
+        return res.status(423).json({ 
+          error: `Account temporarily locked. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`,
+          lockedUntil: user.accountLockedUntil,
+          minutesRemaining: minutesRemaining
+        });
+      }
+
+      // If locked time has passed, reset lockout
+      if (user.accountLockedUntil && user.accountLockedUntil <= new Date()) {
+        user.failedLoginAttempts = 0;
+        user.accountLockedUntil = null;
+        await user.save();
+      }
+
       // Compare password
       const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
         console.log(`Login attempt failed: Invalid password for email: ${email}`);
-        return res.status(401).json({ error: 'Invalid email or password' });
+        
+        // Increment failed login attempts
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+        user.lastFailedLoginAttempt = new Date();
+        
+        // Lock account after 6 failed attempts
+        if (user.failedLoginAttempts >= 6) {
+          // Lock account for 30 minutes
+          const lockoutDuration = 30 * 60 * 1000; // 30 minutes
+          user.accountLockedUntil = new Date(Date.now() + lockoutDuration);
+          await user.save();
+          
+          return res.status(423).json({ 
+            error: 'Account locked due to too many failed login attempts. Please try again in 30 minutes.',
+            lockedUntil: user.accountLockedUntil,
+            minutesRemaining: 30,
+            failedAttempts: user.failedLoginAttempts
+          });
+        }
+        
+        // Save failed attempt count
+        await user.save();
+        
+        // Return error with remaining attempts
+        const remainingAttempts = 6 - user.failedLoginAttempts;
+        return res.status(401).json({ 
+          error: 'Invalid email or password',
+          failedAttempts: user.failedLoginAttempts,
+          remainingAttempts: remainingAttempts
+        });
       }
       
-      // Update last login time
+      // Successful login - reset failed attempts
+      user.failedLoginAttempts = 0;
+      user.accountLockedUntil = null;
+      user.lastFailedLoginAttempt = null;
       user.lastLoginAt = new Date();
       await user.save();
       
@@ -584,7 +633,12 @@ router.post(
       res.json({ message: 'Login successful!', token, user });
     } catch (error) {
       console.error('Login error:', error);
-      res.status(500).json({ error: 'An error occurred during login. Please try again.', details: error.message });
+      // Don't expose error details in production for security
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      res.status(500).json({ 
+        error: 'An error occurred during login. Please try again.',
+        ...(isDevelopment && { details: error.message })
+      });
     }
   }
 );

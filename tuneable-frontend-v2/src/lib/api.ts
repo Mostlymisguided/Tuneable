@@ -119,10 +119,18 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Only redirect on 401 if it's not a login/register attempt
+    // Login/register endpoints handle their own 401 errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const isAuthEndpoint = error.config?.url?.includes('/users/login') || 
+                             error.config?.url?.includes('/users/register');
+      
+      if (!isAuthEndpoint) {
+        // Clear auth data and redirect to login for other endpoints
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
