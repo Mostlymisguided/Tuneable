@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
@@ -102,6 +102,10 @@ const Party: React.FC = () => {
   const [pendingMedia, setPendingMedia] = useState<any>(null);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [isInlineBid, setIsInlineBid] = useState(false); // Track if this is an inline bid on existing media
+  
+  // Use ref to track pending media during async operations to avoid state update issues
+  const pendingMediaRef = useRef<any>(null);
+  const isInlineBidRef = useRef<boolean>(false);
   
   // Validation modal state
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -734,108 +738,180 @@ const Party: React.FC = () => {
   };
 
   const handleBidConfirmation = async (tags: string[]) => {
-    if (!partyId || !pendingMedia) return;
+    // Use ref values to avoid state update race conditions
+    const currentPendingMedia = pendingMediaRef.current || pendingMedia;
+    const currentIsInlineBid = isInlineBidRef.current || isInlineBid;
     
-    setShowBidConfirmationModal(false);
-    
-    // Handle inline bid on existing media in queue
-    if (isInlineBid) {
-      // For inline bids, use the queue item ID (party media ID), not the media's ID
-      const queueItemId = (pendingMedia as any)._queueItemId || pendingMedia._id || pendingMedia.id;
-      const mediaId = pendingMedia._id || pendingMedia.id; // For bid amount lookup
-      const rawQueueBid = queueBidAmounts[mediaId] ?? (() => {
-        const avgBid = calculateAverageBid(pendingMedia);
-        const minBid = party?.minimumBid || 0.01;
-        return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
-      })();
-      const bidAmount = parseFloat(rawQueueBid);
-      const minBid = party?.minimumBid || 0.01;
-
-      if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-        toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
-        setIsInlineBid(false);
-        setPendingMedia(null);
-        return;
-      }
-      
-      if (!queueItemId) {
-        toast.error('Unable to identify media item');
-        setIsInlineBid(false);
-        setPendingMedia(null);
-        return;
-      }
-      
-      setIsBidding(true);
-      try {
-        await partyAPI.placeBid(partyId, queueItemId, bidAmount);
-        toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${pendingMedia.title}!`);
-        
-        // Refresh party to show updated bid values
-        await fetchPartyDetails();
-        
-        // Reset bid amount for this media back to minimum
-        setQueueBidAmounts(prev => ({
-          ...prev,
-          [mediaId]: Math.max(0.33, party?.minimumBid || 0.01).toFixed(2)
-        }));
-        
-      } catch (error: any) {
-        console.error('Bid error:', error);
-        toast.error(error.response?.data?.error || 'Failed to place bid');
-      } finally {
-        setIsBidding(false);
-        setIsInlineBid(false);
-        setPendingMedia(null);
-      }
+    if (!partyId || !currentPendingMedia) {
+      console.error('handleBidConfirmation: Missing partyId or pendingMedia', { partyId, pendingMedia: currentPendingMedia });
       return;
     }
     
-    // Handle adding new media to party
-    const rawNewMediaBid = newMediaBidAmounts[pendingMedia._id || pendingMedia.id] ?? '';
-    const bidAmount = parseFloat(rawNewMediaBid);
-    const minBid = party?.minimumBid || 0.01;
-
-    if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-      toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
-      setPendingMedia(null);
-      return;
-    }
+    // Store only the properties we need to avoid potential circular reference issues
+    const safePendingMedia = {
+      _id: currentPendingMedia?._id || currentPendingMedia?.id || null,
+      id: currentPendingMedia?.id || currentPendingMedia?._id || null,
+      _queueItemId: (currentPendingMedia as any)?._queueItemId || null,
+      title: currentPendingMedia?.title || 'Unknown',
+      artist: currentPendingMedia?.artist || null,
+      sources: currentPendingMedia?.sources || null,
+      duration: currentPendingMedia?.duration || null,
+      category: currentPendingMedia?.category || 'Music',
+      bids: currentPendingMedia?.bids || []
+    };
+    const currentParty = party;
+    
+    // Don't close modal immediately - let it close after async operation completes
+    // This prevents React from trying to re-render with inconsistent state
     
     try {
-      // Get the appropriate URL based on media source
-      const mediaSource = party?.mediaSource || 'youtube';
-      let url = '';
-      
-      if (mediaSource === 'youtube' && pendingMedia.sources?.youtube) {
-        url = pendingMedia.sources.youtube;
-      } else if (pendingMedia.sources) {
-        // Fallback to first available source
-        url = Object.values(pendingMedia.sources)[0] as string;
+      // Handle inline bid on existing media in queue
+      if (currentIsInlineBid && safePendingMedia) {
+        // For inline bids, use the queue item ID (party media ID), not the media's ID
+        const queueItemId = safePendingMedia._queueItemId || safePendingMedia._id || safePendingMedia.id;
+        const mediaId = safePendingMedia._id || safePendingMedia.id; // For bid amount lookup
+        
+        // Validate we have required IDs
+        if (!queueItemId || !mediaId) {
+          console.error('Missing required IDs:', { queueItemId, mediaId, safePendingMedia });
+          toast.error('Unable to identify media item');
+          setIsInlineBid(false);
+          isInlineBidRef.current = false;
+          setPendingMedia(null);
+          pendingMediaRef.current = null;
+          return;
+        }
+        
+        // Calculate bid amount
+        let bidAmount = 0.33;
+        const minBid = currentParty?.minimumBid || 0.01;
+        
+        try {
+          const rawQueueBid = queueBidAmounts[mediaId];
+          if (rawQueueBid && typeof rawQueueBid === 'string') {
+            const parsed = parseFloat(rawQueueBid);
+            if (Number.isFinite(parsed) && parsed > 0) {
+              bidAmount = parsed;
+            } else {
+              // Calculate default
+              const avgBid = calculateAverageBid(safePendingMedia);
+              bidAmount = Math.max(0.33, avgBid || 0, minBid);
+            }
+          } else {
+            // Calculate default
+            const avgBid = calculateAverageBid(safePendingMedia);
+            bidAmount = Math.max(0.33, avgBid || 0, minBid);
+          }
+        } catch (e) {
+          console.error('Error calculating bid amount:', e);
+          bidAmount = Math.max(0.33, minBid);
+        }
+
+        if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
+          toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+          setIsInlineBid(false);
+          isInlineBidRef.current = false;
+          setPendingMedia(null);
+          pendingMediaRef.current = null;
+          return;
+        }
+        
+        setIsBidding(true);
+        try {
+          await partyAPI.placeBid(partyId, queueItemId, bidAmount);
+          const mediaTitle = safePendingMedia?.title || 'media';
+          toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${mediaTitle}!`);
+          
+          // Refresh party to show updated bid values
+          await fetchPartyDetails();
+          
+          // Reset bid amount for this media back to minimum
+          if (mediaId) {
+            setQueueBidAmounts(prev => ({
+              ...prev,
+              [mediaId]: Math.max(0.33, currentParty?.minimumBid || 0.01).toFixed(2)
+            }));
+          }
+          
+        } catch (error: any) {
+          console.error('Bid error:', error);
+          const errorMessage = error?.response?.data?.error || error?.message || 'Failed to place bid';
+          toast.error(errorMessage);
+        } finally {
+          setIsBidding(false);
+          setIsInlineBid(false);
+          isInlineBidRef.current = false;
+          setPendingMedia(null);
+          pendingMediaRef.current = null;
+          // Close modal after operation completes
+          setShowBidConfirmationModal(false);
+        }
+        return;
       }
       
-      await partyAPI.addMediaToParty(partyId, {
-        url,
-        title: pendingMedia.title,
-        artist: pendingMedia.artist,
-        bidAmount,
-        platform: mediaSource,
-        duration: pendingMedia.duration,
-        tags: tags, // Use user-provided tags from modal
-        category: pendingMedia.category || 'Music'
-      });
-      
-      toast.success(`Added ${pendingMedia.title} to party with £${bidAmount.toFixed(2)} bid!`);
-      
-      // Clear search and refresh party
-      setAddMediaSearchQuery('');
-      setAddMediaResults({ database: [], youtube: [] });
-      setPendingMedia(null);
-      fetchPartyDetails();
-      
+      // Handle adding new media to party
+      if (!currentIsInlineBid && safePendingMedia) {
+        const rawNewMediaBid = newMediaBidAmounts[safePendingMedia._id || safePendingMedia.id] ?? '';
+        const bidAmount = parseFloat(rawNewMediaBid);
+        const minBid = currentParty?.minimumBid || 0.01;
+
+        if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
+          toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+          setPendingMedia(null);
+          pendingMediaRef.current = null;
+          return;
+        }
+        
+        try {
+          // Get the appropriate URL based on media source
+          const mediaSource = currentParty?.mediaSource || 'youtube';
+          let url = '';
+          
+          if (mediaSource === 'youtube' && safePendingMedia.sources?.youtube) {
+            url = safePendingMedia.sources.youtube;
+          } else if (safePendingMedia.sources) {
+            // Fallback to first available source
+            url = Object.values(safePendingMedia.sources)[0] as string;
+          }
+          
+          await partyAPI.addMediaToParty(partyId, {
+            url,
+            title: safePendingMedia.title,
+            artist: safePendingMedia.artist,
+            bidAmount,
+            platform: mediaSource,
+            duration: safePendingMedia.duration,
+            tags: tags, // Use user-provided tags from modal
+            category: safePendingMedia.category || 'Music'
+          });
+          
+          toast.success(`Added ${safePendingMedia.title} to party with £${bidAmount.toFixed(2)} bid!`);
+          
+          // Clear search and refresh party
+          setAddMediaSearchQuery('');
+          setAddMediaResults({ database: [], youtube: [] });
+          await fetchPartyDetails();
+          
+        } catch (error: any) {
+          console.error('Error adding media:', error);
+          toast.error(error.response?.data?.error || 'Failed to add media to party');
+        } finally {
+          setPendingMedia(null);
+          pendingMediaRef.current = null;
+          // Close modal after operation completes
+          setShowBidConfirmationModal(false);
+        }
+      }
     } catch (error: any) {
-      console.error('Error adding media:', error);
-      toast.error(error.response?.data?.error || 'Failed to add media to party');
+      console.error('Error in handleBidConfirmation:', error);
+      toast.error(error?.response?.data?.error || error?.message || 'An error occurred while processing your bid');
+      setIsBidding(false);
+      setIsInlineBid(false);
+      isInlineBidRef.current = false;
       setPendingMedia(null);
+      pendingMediaRef.current = null;
+      // Close modal on error
+      setShowBidConfirmationModal(false);
     }
   };
 
@@ -1058,13 +1134,96 @@ const Party: React.FC = () => {
   };
 
   // Helper function to calculate average bid for media (returns in pounds)
-  const calculateAverageBid = (mediaData: any) => {
-    const bids = mediaData.bids || [];
-    if (bids.length === 0) return 0;
-    const total = bids.reduce((sum: number, bid: any) => sum + (bid.amount || 0), 0);
-    const avgPence = total / bids.length;
-    return penceToPoundsNumber(avgPence); // Convert pence to pounds
-  };
+  const calculateAverageBid = useCallback((mediaData: any) => {
+    try {
+      // Handle both media objects and queue items
+      const bids = mediaData?.bids || [];
+      if (!Array.isArray(bids) || bids.length === 0) return 0;
+      const total = bids.reduce((sum: number, bid: any) => {
+        const amount = bid?.amount || 0;
+        return sum + (typeof amount === 'number' ? amount : 0);
+      }, 0);
+      if (total === 0) return 0;
+      const avgPence = total / bids.length;
+      return penceToPoundsNumber(avgPence); // Convert pence to pounds
+    } catch (error) {
+      console.error('Error in calculateAverageBid:', error, mediaData);
+      return 0;
+    }
+  }, []);
+
+  // Calculate bid amount for confirmation modal using useMemo
+  const confirmationBidAmount = useMemo(() => {
+    // Early return if modal shouldn't be shown or data is invalid
+    if (!showBidConfirmationModal || !party) {
+      const minBid = party?.minimumBid || 0.01;
+      return Math.max(0.33, minBid);
+    }
+    
+    // If pendingMedia is null/undefined, return default
+    if (!pendingMedia || typeof pendingMedia !== 'object') {
+      const minBid = party?.minimumBid || 0.01;
+      return Math.max(0.33, minBid);
+    }
+    
+    try {
+      const minBid = party?.minimumBid || 0.01;
+      
+      if (isInlineBid && pendingMedia) {
+        // For inline bids, use queueBidAmounts
+        const mediaId = pendingMedia?._id || pendingMedia?.id;
+        if (mediaId && typeof mediaId === 'string') {
+          const rawQueueBid = queueBidAmounts[mediaId];
+          if (rawQueueBid && typeof rawQueueBid === 'string') {
+            const bidAmount = parseFloat(rawQueueBid);
+            if (Number.isFinite(bidAmount) && bidAmount > 0) {
+              return bidAmount;
+            }
+          }
+          // Calculate default if not in queueBidAmounts
+          try {
+            const avgBid = calculateAverageBid(pendingMedia);
+            return Math.max(0.33, avgBid || 0, minBid);
+          } catch (e) {
+            console.error('Error calculating average bid:', e);
+            return Math.max(0.33, minBid);
+          }
+        }
+        return Math.max(0.33, minBid);
+      } else {
+        // For new media, use newMediaBidAmounts
+        const mediaId = pendingMedia?._id || pendingMedia?.id;
+        if (mediaId && typeof mediaId === 'string') {
+          const rawNewMediaBid = newMediaBidAmounts[mediaId] ?? '';
+          if (rawNewMediaBid && typeof rawNewMediaBid === 'string') {
+            const bidAmount = parseFloat(rawNewMediaBid);
+            if (Number.isFinite(bidAmount) && bidAmount > 0) {
+              return bidAmount;
+            }
+          }
+        }
+        const defaultBid = Math.max(0.33, minBid);
+        return defaultBid;
+      }
+    } catch (e) {
+      console.error('Error calculating bid amount:', e);
+      return Math.max(0.33, party?.minimumBid || 0.01);
+    }
+  }, [pendingMedia, isInlineBid, party, queueBidAmounts, newMediaBidAmounts, calculateAverageBid, showBidConfirmationModal]);
+
+  // Calculate user balance safely
+  const confirmationUserBalance = useMemo(() => {
+    try {
+      const balance = (user as any)?.balance;
+      if (typeof balance === 'number' && Number.isFinite(balance)) {
+        return penceToPoundsNumber(balance);
+      }
+      return 0;
+    } catch (e) {
+      console.error('Error getting user balance:', e);
+      return 0;
+    }
+  }, [user]);
 
   // Bid handling functions (OLD - using bid modal, now replaced with inline bidding)
   // const handleBidClick = (media: any) => {
@@ -1098,8 +1257,11 @@ const Party: React.FC = () => {
     
     // Show confirmation modal instead of placing bid directly
     // Store both the media data and the queue item ID
-    setPendingMedia({ ...mediaData, _queueItemId: queueItemId });
+    const mediaWithQueueId = { ...mediaData, _queueItemId: queueItemId };
+    setPendingMedia(mediaWithQueueId);
+    pendingMediaRef.current = mediaWithQueueId;
     setIsInlineBid(true);
+    isInlineBidRef.current = true;
     setShowBidConfirmationModal(true);
   };
 
@@ -2562,39 +2724,41 @@ const Party: React.FC = () => {
       </div>
 
       {/* Bid Confirmation Modal */}
-      {pendingMedia && (
+      {pendingMedia && showBidConfirmationModal && party && Number.isFinite(confirmationBidAmount) && confirmationBidAmount > 0 && (
         <BidConfirmationModal
           isOpen={showBidConfirmationModal}
           onClose={() => {
-            setShowBidConfirmationModal(false);
-            setPendingMedia(null);
-            setIsInlineBid(false);
-          }}
-          onConfirm={handleBidConfirmation}
-          bidAmount={(() => {
-            if (isInlineBid && pendingMedia) {
-              // For inline bids, use queueBidAmounts
-              const mediaId = pendingMedia._id || pendingMedia.id;
-              const rawQueueBid = queueBidAmounts[mediaId] ?? (() => {
-                const avgBid = calculateAverageBid(pendingMedia);
-                const minBid = party?.minimumBid || 0.01;
-                return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
-              })();
-              const bidAmount = parseFloat(rawQueueBid);
-              const minBid = party?.minimumBid || 0.01;
-              return Number.isFinite(bidAmount) ? bidAmount : Math.max(0.33, minBid);
-            } else {
-              // For new media, use newMediaBidAmounts
-              const rawNewMediaBid = newMediaBidAmounts[pendingMedia?._id || pendingMedia?.id] ?? '';
-              const bidAmount = parseFloat(rawNewMediaBid);
-              const minBid = party?.minimumBid || 0.01;
-              const defaultBid = Math.max(0.33, minBid);
-              return Number.isFinite(bidAmount) ? bidAmount : defaultBid;
+            try {
+              setShowBidConfirmationModal(false);
+              setPendingMedia(null);
+              pendingMediaRef.current = null;
+              setIsInlineBid(false);
+              isInlineBidRef.current = false;
+            } catch (e) {
+              console.error('Error closing modal:', e);
             }
-          })()}
+          }}
+          onConfirm={(tags) => {
+            try {
+              handleBidConfirmation(tags);
+            } catch (e) {
+              console.error('Error in onConfirm:', e);
+              toast.error('An error occurred. Please try again.');
+              setShowBidConfirmationModal(false);
+              setPendingMedia(null);
+              pendingMediaRef.current = null;
+              setIsInlineBid(false);
+              isInlineBidRef.current = false;
+            }
+          }}
+          bidAmount={confirmationBidAmount}
           mediaTitle={pendingMedia?.title || 'Unknown'}
-          mediaArtist={pendingMedia?.artist}
-          userBalance={penceToPoundsNumber((user as any)?.balance)}
+          mediaArtist={Array.isArray(pendingMedia?.artist) 
+            ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'
+            : typeof pendingMedia?.artist === 'object' && pendingMedia?.artist?.name
+            ? pendingMedia.artist.name
+            : pendingMedia?.artist || undefined}
+          userBalance={confirmationUserBalance}
         />
       )}
 
@@ -2607,7 +2771,11 @@ const Party: React.FC = () => {
         }}
         onSubmit={handleTagSubmit}
         mediaTitle={pendingMedia?.title}
-        mediaArtist={pendingMedia?.artist}
+        mediaArtist={Array.isArray(pendingMedia?.artist) 
+          ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'
+          : typeof pendingMedia?.artist === 'object' && pendingMedia?.artist?.name
+          ? pendingMedia.artist.name
+          : pendingMedia?.artist || undefined}
       />
 
       {/* Media Validation Modal */}
@@ -2616,7 +2784,11 @@ const Party: React.FC = () => {
         onConfirm={handleValidationConfirm}
         onCancel={handleValidationCancel}
         mediaTitle={pendingMedia?.title}
-        mediaArtist={pendingMedia?.artist}
+        mediaArtist={Array.isArray(pendingMedia?.artist) 
+          ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'
+          : typeof pendingMedia?.artist === 'object' && pendingMedia?.artist?.name
+          ? pendingMedia.artist.name
+          : pendingMedia?.artist || undefined}
         warnings={validationWarnings}
         category={validationCategory}
         duration={validationDuration}
