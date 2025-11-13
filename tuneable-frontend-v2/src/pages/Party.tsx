@@ -1020,7 +1020,14 @@ const Party: React.FC = () => {
     
     const mediaData = media.mediaId || media;
     const mediaId = mediaData._id || mediaData.id;
-    const rawQueueBid = queueBidAmounts[mediaId] ?? '';
+    
+    // Calculate default bid if not in queueBidAmounts (same logic as input field)
+    const rawQueueBid = queueBidAmounts[mediaId] ?? (() => {
+      const avgBid = calculateAverageBid(mediaData);
+      const minBid = party?.minimumBid || 0.01;
+      return Math.max(0.33, avgBid || 0, minBid).toFixed(2);
+    })();
+    
     const minBid = party?.minimumBid || 0.01;
     const bidAmount = parseFloat(rawQueueBid);
 
