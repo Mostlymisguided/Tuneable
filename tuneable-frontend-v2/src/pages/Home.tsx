@@ -21,7 +21,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Waves className="h-8 w-8 text-green-400" />,
-      title: "The Adoption Of More Resonant Musical Tuning Standards (e.g. A4 = 432hz)",
+      title: "Adoption Of More Resonant Musical Tuning Standards (e.g. A4 = 432hz)",
      // description: "Advocating for natural tuning that resonates with human consciousness and nature."
     },
     {
@@ -169,7 +169,7 @@ const Home: React.FC = () => {
               Community Interest Company
             </h2>
             <p className="text-xl text-gray-200 leading-relaxed mb-8">
-              As a registered CIC, Tuneable is legally committed to using its assets and profits 
+              As a registered CIC, Tuneable is legally committed to using assets and profits 
               for the benefit of the community. Not driven by shareholder returns, but a 
                mission to create positive social impact through music.
             </p>
