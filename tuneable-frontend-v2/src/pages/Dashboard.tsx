@@ -127,7 +127,7 @@ const Dashboard: React.FC = () => {
 
   const inviteMessage = useMemo(() => {
     const codeLine = user?.personalInviteCode ? `Use my invite code ${user.personalInviteCode} when you sign up.` : '';
-    return `Hey! I'm inviting you to try Tuneable, the social music platform for bidding on beats.
+    return `Hey! I'm inviting you to try Tuneable, the social music platform for supporting your favourite artists by bidding on beats.
 
 ${codeLine}
 

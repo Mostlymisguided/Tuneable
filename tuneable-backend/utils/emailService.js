@@ -815,7 +815,7 @@ async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, invi
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">What is Tuneable?</h3>
             <p style="color: #4b5563; margin-bottom: 0;">
-              Tuneable is a platform where you can discover new music, bid on beats, and connect with artists and music lovers. Join the community and start exploring!
+              Tuneable is a platform where you can discover new music, contribute to charts and connect with music lovers. Join the community and start exploring!
             </p>
           </div>
           
