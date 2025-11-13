@@ -73,9 +73,6 @@ const AuthPage: React.FC = () => {
   // Check if we're on the register page
   const isRegisterPage = location.pathname === '/register';
 
-  // Check if we're coming from a redirect (like after OAuth)
-  const isFromOAuth = location.search.includes('error=') || location.search.includes('success=');
-
   // Countdown timer for account lockout
   useEffect(() => {
     if (!accountLockedUntil || accountLockedUntil <= new Date()) {
@@ -520,8 +517,8 @@ const AuthPage: React.FC = () => {
                 Too many failed login attempts. Please try again after {(() => {
                   const now = new Date();
                   const minutesRemaining = Math.ceil((accountLockedUntil.getTime() - now.getTime()) / 60000);
-                  // Use countdownTick to ensure re-render
-                  const _ = countdownTick;
+                  // Reference countdownTick to ensure re-render when it updates
+                  void countdownTick;
                   return minutesRemaining > 0 ? `${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}` : 'less than a minute';
                 })()}.
               </p>
