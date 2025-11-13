@@ -284,6 +284,7 @@ const AppContent = () => {
           draggable
           pauseOnHover
           transition={Fade}
+          style={{ zIndex: 10001 }}
         />
       </div>
     </Router>
