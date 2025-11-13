@@ -328,10 +328,14 @@ const AuthPage: React.FC = () => {
       let errorMessage = 'Login failed. Please try again.';
       
       if (!error.response) {
-        // Network error - no response from server
+        // Network error - no response from server (show toast, no inline message)
         errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
+        toast.error(errorMessage, {
+          autoClose: 7000,
+          pauseOnHover: true,
+        });
       } else if (error.response.status === 423) {
-        // Account locked
+        // Account locked - inline message will be shown
         const lockedUntil = error.response?.data?.lockedUntil;
         const minutesRemaining = error.response?.data?.minutesRemaining;
         const failedAttemptsCount = error.response?.data?.failedAttempts || 6;
@@ -339,41 +343,43 @@ const AuthPage: React.FC = () => {
         if (lockedUntil) {
           setAccountLockedUntil(new Date(lockedUntil));
           setFailedAttempts(failedAttemptsCount);
-          errorMessage = `Account temporarily locked. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`;
-        } else {
-          errorMessage = error.response?.data?.error || 'Account locked. Please try again later.';
         }
+        // No toast - inline error message is sufficient
       } else if (error.response.status === 401) {
-        // Authentication failed - track attempts
+        // Authentication failed - track attempts, inline message will be shown
         const failedAttemptsCount = error.response?.data?.failedAttempts || 0;
-        const remainingAttempts = error.response?.data?.remainingAttempts || (6 - failedAttemptsCount);
-        
         setFailedAttempts(failedAttemptsCount);
-        
-        if (remainingAttempts > 0) {
-          errorMessage = `Invalid email or password. ${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining before account lockout.`;
-        } else {
-          errorMessage = error.response?.data?.error || 'Invalid email or password. Please check your credentials and try again.';
-        }
+        // No toast - inline error message is sufficient
       } else if (error.response.status === 400) {
         // Validation error
         const validationError = error.response?.data?.error || error.response?.data?.details?.[0]?.msg;
         errorMessage = validationError || 'Please check your email and password format.';
+        toast.error(errorMessage, {
+          autoClose: 7000,
+          pauseOnHover: true,
+        });
       } else if (error.response.status === 403) {
         // Account locked or inactive
         errorMessage = error.response?.data?.error || 'Your account is currently inactive. Please contact support.';
+        toast.error(errorMessage, {
+          autoClose: 7000,
+          pauseOnHover: true,
+        });
       } else if (error.response.status >= 500) {
         // Server error
         errorMessage = 'Server error. Please try again in a moment. If the problem persists, contact support.';
+        toast.error(errorMessage, {
+          autoClose: 7000,
+          pauseOnHover: true,
+        });
       } else {
         // Other errors - use message from server if available
         errorMessage = error.response?.data?.error || error.message || errorMessage;
+        toast.error(errorMessage, {
+          autoClose: 7000,
+          pauseOnHover: true,
+        });
       }
-      
-      toast.error(errorMessage, {
-        autoClose: 7000, // Show errors for 7 seconds
-        pauseOnHover: true,
-      });
     } finally {
       setIsLoading(false);
     }
@@ -535,7 +541,7 @@ const AuthPage: React.FC = () => {
             <div className="flex-1">
               <p className="text-sm font-medium text-yellow-800">Login Attempt Failed</p>
               <p className="text-xs text-yellow-600 mt-1">
-                {failedAttempts} failed attempt{failedAttempts > 1 ? 's' : ''}. {6 - failedAttempts} attempt{6 - failedAttempts > 1 ? 's' : ''} remaining before account lockout.
+                {6 - failedAttempts} attempt{6 - failedAttempts > 1 ? 's' : ''} remaining before account lockout.
               </p>
             </div>
           </div>
