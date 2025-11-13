@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tuneable - Musical Democracy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen">
+        <!-- Hero Section -->
+        <section class="bg-gradient-to-b from-indigo-900 via-purple-900 to-indigo-800 text-white relative overflow-hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+                <div class="text-center">
+                    <!-- Social Music Democracy Badge -->
+                    <div class="flex justify-center mb-8">
+                        <div class="bg-gradient-to-r from-purple-700 to-purple-800 px-6 py-3 rounded-full flex items-center space-x-2 shadow-lg">
+                            <svg class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            <span class="text-white text-xl font-semibold">The Social Music App</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Main Title -->
+                    <h1 class="text-5xl md:text-7xl font-bold p-6 leading-tight">
+                        <span class="text-white">Musical</span>
+                        <br />
+                        <span class="text-pink-400">Democracy</span>
+                    </h1>
+                    
+                    <!-- Description -->
+                    <p class="text-xl md:text-2xl p-12 text-gray-200 max-w-3xl mx-auto leading-relaxed" style="margin-top: 20px;">
+                        Support Your Favourite Artists - Contribute To Global Charts
+                    </p>
+                    
+                    <!-- CTA Button -->
+                    <div class="flex justify-center">
+                        <a
+                            href="https://tuneable.stream/register"
+                            class="text-white rounded-lg p-4 m-6 border-2 border-white font-semibold hover:bg-gray-100 hover:text-gray-900 transition-colors text-lg inline-block"
+                        >
+                            Get Started
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 py-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">
+                        How Tuneable Works
+                    </h2>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div class="text-center group">
+                        <div class="bg-green-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-500/30 group-hover:border-green-400 group-hover:bg-green-600/30 transition-all">
+                            <svg class="h-10 w-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">
+                            Bid on Tunes
+                        </h3>
+                        <p class="text-gray-300 leading-relaxed">
+                            Bid to get your favorite Tunes to the top
+                        </p>
+                    </div>
+
+                    <div class="text-center group">
+                        <div class="bg-yellow-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-yellow-500/30 group-hover:border-yellow-400 group-hover:bg-yellow-600/30 transition-all">
+                            <svg class="h-10 w-10 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">
+                            Support Artists
+                        </h3>
+                        <p class="text-gray-300 leading-relaxed">
+                            Artists earn most of what you bid on Tuneable
+                        </p>
+                    </div>
+                    <div class="text-center group">
+                        <div class="bg-purple-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-purple-500/30 group-hover:border-purple-400 group-hover:bg-purple-600/30 transition-all">
+                            <svg class="h-10 w-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">
+                            Earn TuneBytes
+                        </h3>
+                        <p class="text-gray-300 leading-relaxed">
+                            Get rewarded for discovering popular music
+                        </p>
+                    </div>
+
+                    <div class="text-center group">
+                        <div class="bg-blue-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-blue-500/30 group-hover:border-blue-400 group-hover:bg-blue-600/30 transition-all">
+                            <svg class="h-10 w-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">
+                            Discover Music
+                        </h3>
+                        <p class="text-gray-300 leading-relaxed">
+                            Find music from all around the world
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Our Mission Section -->
+        <section class="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 py-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">
+                        Our Mission
+                    </h2>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all text-center">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-8 w-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 002 2h2.945M3.055 11H1m2.055 0a9 9 0 0117.89 0M21 11h-2.945M21 11a9 9 0 00-17.89 0M9 12a3 3 0 106 0 3 3 0 00-6 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">
+                            Democratically + Transparently Chart The Global Music Catalogue
+                        </h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all text-center">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-8 w-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">
+                            Encourage Users To Pay A Fair Price For Music
+                        </h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all text-center">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">
+                            Empower Artists by Maximising their Earnings
+                        </h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all text-center">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-8 w-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">
+                            Adoption Of More Resonant Musical Tuning Standards (e.g. A4 = 432hz)
+                        </h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all text-center">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-8 w-8 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">
+                            Promote Healing and Communication Through Music
+                        </h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all text-center">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-8 w-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">
+                            Support Sound Healing Initiatives + Wellness Venues
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Community Interest Company Section -->
+        <section class="bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800 py-20">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-12 border border-white/20">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">
+                        Community Interest Company
+                    </h2>
+                    <p class="text-xl text-gray-200 leading-relaxed mb-8">
+                        As a registered CIC, Tuneable is legally committed to using assets and profits 
+                        for the benefit of the community. Not driven by shareholder returns, but a 
+                         mission to create positive social impact through music.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <div class="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
+                            <div class="flex justify-center mb-3">
+                                <svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-white mb-2">Community First</h3>
+                            <p class="text-gray-300 text-sm">Profits Reinvested</p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
+                            <div class="flex justify-center mb-3">
+                                <svg class="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-white mb-2">Transparency</h3>
+                            <p class="text-gray-300 text-sm">Open Governance</p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
+                            <div class="flex justify-center mb-3">
+                                <svg class="h-6 w-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-white mb-2">Social Mission</h3>
+                            <p class="text-gray-300 text-sm">Community Benefit</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold mb-6">
+                    Join Our Musical Evolution
+                </h2>
+            
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <a
+                        href="https://tuneable.stream/register"
+                        class="bg-white text-purple-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
+                    >
+                        Get Started
+                    </a>
+                    <a
+                        href="https://tuneable.stream/creator/register"
+                        class="bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-800 transition-colors border-2 border-purple-500 inline-block"
+                    >
+                        Become a Creator
+                    </a>
+                    <a
+                        href="https://tuneable.stream/parties"
+                        class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors inline-block"
+                    >
+                        Explore Music
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-white py-8">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="mb-4 md:mb-0">
+                        <p class="text-gray-400">&copy; 2025 Tuneable. All rights reserved.</p>
+                    </div>
+                    <div class="flex space-x-6">
+                        <a 
+                            href="https://discord.gg/hwGMZV89up"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-gray-400 hover:text-white transition-colors"
+                        >
+                            Discord
+                        </a>
+                        <a 
+                            href="https://tuneable.stream/help" 
+                            class="text-gray-400 hover:text-white transition-colors"
+                        >
+                            Help
+                        </a>
+                        <a 
+                            href="https://tuneable.stream/privacy-policy" 
+                            class="text-gray-400 hover:text-white transition-colors"
+                        >
+                            Privacy Policy
+                        </a>
+                        <a 
+                            href="https://tuneable.stream/terms-of-service" 
+                            class="text-gray-400 hover:text-white transition-colors"
+                        >
+                            Terms of Service
+                        </a>
+                        <a 
+                            href="https://tuneable.stream/data-deletion" 
+                            class="text-gray-400 hover:text-white transition-colors"
+                        >
+                            Data Deletion
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
+
