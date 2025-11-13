@@ -740,7 +740,9 @@ const Party: React.FC = () => {
     
     // Handle inline bid on existing media in queue
     if (isInlineBid) {
-      const mediaId = pendingMedia._id || pendingMedia.id;
+      // For inline bids, use the queue item ID (party media ID), not the media's ID
+      const queueItemId = (pendingMedia as any)._queueItemId || pendingMedia._id || pendingMedia.id;
+      const mediaId = pendingMedia._id || pendingMedia.id; // For bid amount lookup
       const rawQueueBid = queueBidAmounts[mediaId] ?? (() => {
         const avgBid = calculateAverageBid(pendingMedia);
         const minBid = party?.minimumBid || 0.01;
@@ -756,9 +758,16 @@ const Party: React.FC = () => {
         return;
       }
       
+      if (!queueItemId) {
+        toast.error('Unable to identify media item');
+        setIsInlineBid(false);
+        setPendingMedia(null);
+        return;
+      }
+      
       setIsBidding(true);
       try {
-        await partyAPI.placeBid(partyId, mediaId, bidAmount);
+        await partyAPI.placeBid(partyId, queueItemId, bidAmount);
         toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${pendingMedia.title}!`);
         
         // Refresh party to show updated bid values
@@ -1068,7 +1077,9 @@ const Party: React.FC = () => {
     if (!partyId) return;
     
     const mediaData = media.mediaId || media;
-    const mediaId = mediaData._id || mediaData.id;
+    // For queue items, use the queue item's _id (party media ID), not the media's _id
+    const queueItemId = media._id || media.id; // This is the party media ID
+    const mediaId = mediaData._id || mediaData.id; // This is for the bid amount lookup
     
     // Calculate default bid if not in queueBidAmounts (same logic as input field)
     const rawQueueBid = queueBidAmounts[mediaId] ?? (() => {
@@ -1086,7 +1097,8 @@ const Party: React.FC = () => {
     }
     
     // Show confirmation modal instead of placing bid directly
-    setPendingMedia(mediaData);
+    // Store both the media data and the queue item ID
+    setPendingMedia({ ...mediaData, _queueItemId: queueItemId });
     setIsInlineBid(true);
     setShowBidConfirmationModal(true);
   };
