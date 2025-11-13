@@ -1905,8 +1905,12 @@ const Party: React.FC = () => {
                                             className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                           >
                                             {(() => {
-                                              const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                              const raw = queueBidAmounts[mediaData._id || mediaData.id] ?? defaultBid.toFixed(2);
+                                              const mediaId = mediaData._id || mediaData.id;
+                                              // Use same calculation logic as input field
+                                              const avgBid = calculateAverageBid(mediaData);
+                                              const minBid = party?.minimumBid || 0.01;
+                                              const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                              const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
                                               const parsed = parseFloat(raw);
                                               if (!Number.isFinite(parsed)) {
                                                 return 'Place Bid';
@@ -2450,8 +2454,12 @@ const Party: React.FC = () => {
                                     className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                   >
                                     {(() => {
-                                      const defaultBid = Math.max(0.33, party?.minimumBid || 0.01);
-                                      const raw = queueBidAmounts[mediaData._id || mediaData.id] ?? defaultBid.toFixed(2);
+                                      const mediaId = mediaData._id || mediaData.id;
+                                      // Use same calculation logic as input field
+                                      const avgBid = calculateAverageBid(mediaData);
+                                      const minBid = party?.minimumBid || 0.01;
+                                      const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                      const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
                                       const parsed = parseFloat(raw);
                                       if (!Number.isFinite(parsed)) {
                                         return 'Place Bid';
