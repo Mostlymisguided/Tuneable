@@ -337,7 +337,6 @@ const AuthPage: React.FC = () => {
       } else if (error.response.status === 423) {
         // Account locked - inline message will be shown
         const lockedUntil = error.response?.data?.lockedUntil;
-        const minutesRemaining = error.response?.data?.minutesRemaining;
         const failedAttemptsCount = error.response?.data?.failedAttempts || 6;
         
         if (lockedUntil) {
