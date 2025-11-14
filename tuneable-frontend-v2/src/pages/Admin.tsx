@@ -24,6 +24,7 @@ import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
+import IssueWarningModal from '../components/IssueWarningModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, reportAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
@@ -95,6 +96,10 @@ const Admin: React.FC = () => {
   const hasReportsNotifications = useMemo(() => {
     return Object.values(reportsSummary).some((count) => count > 0);
   }, [reportsSummary]);
+
+  // Warning modal state
+  const [warningModalOpen, setWarningModalOpen] = useState(false);
+  const [selectedUserForWarning, setSelectedUserForWarning] = useState<{ id: string; username: string } | null>(null);
 
   useEffect(() => {
     checkAdminStatus();
@@ -920,6 +925,9 @@ const Admin: React.FC = () => {
                         </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Warnings
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -1027,14 +1035,45 @@ const Admin: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {!user.role.includes('admin') && (
-                            <button
-                              onClick={() => promoteToAdmin(user._id)}
-                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"
-                            >
-                              Make Admin
-                            </button>
-                          )}
+                          <div className="flex items-center space-x-2">
+                            {(user as any).warningCount > 0 && (
+                              <span className="text-xs text-yellow-400 font-semibold">
+                                {(user as any).warningCount} warn{(user as any).warningCount !== 1 ? 'ings' : 'ing'}
+                              </span>
+                            )}
+                            {(user as any).finalWarningCount > 0 && (
+                              <span className="text-xs text-red-400 font-semibold">
+                                {(user as any).finalWarningCount} final
+                              </span>
+                            )}
+                            {(!(user as any).warningCount || (user as any).warningCount === 0) && (
+                              <span className="text-xs text-gray-500">None</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            {!user.role.includes('admin') && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedUserForWarning({ id: user._id, username: user.username });
+                                    setWarningModalOpen(true);
+                                  }}
+                                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                  title="Issue Warning"
+                                >
+                                  ⚠️ Warn
+                                </button>
+                                <button
+                                  onClick={() => promoteToAdmin(user._id)}
+                                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                >
+                                  Make Admin
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1826,6 +1865,23 @@ const Admin: React.FC = () => {
           <div>
             <NotificationsManager />
           </div>
+        )}
+
+        {/* Warning Modal */}
+        {warningModalOpen && selectedUserForWarning && (
+          <IssueWarningModal
+            isOpen={warningModalOpen}
+            onClose={() => {
+              setWarningModalOpen(false);
+              setSelectedUserForWarning(null);
+            }}
+            userId={selectedUserForWarning.id}
+            username={selectedUserForWarning.username}
+            onWarningIssued={() => {
+              // Refresh users list to show updated warning counts
+              fetchUsers();
+            }}
+          />
         )}
 
         {activeTab === 'media' && (

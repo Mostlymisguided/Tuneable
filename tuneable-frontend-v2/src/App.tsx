@@ -9,6 +9,7 @@ import { useWebPlayerStore } from './stores/webPlayerStore';
 import Navbar from './components/Navbar';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import MP3Player from './components/MP3Player';
+import WarningBanner from './components/WarningBanner';
 import Home from './pages/Home';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
@@ -131,6 +132,7 @@ const AppContent = () => {
     <Router>
       <div className="min-h-screen">
         <Navbar />
+        <WarningBanner />
         <main className="pt-16 pb-32">
           <Routes>
             <Route path="/" element={<Home />} />

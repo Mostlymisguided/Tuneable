@@ -108,6 +108,24 @@ const userSchema = new mongoose.Schema({
   accountLockedUntil: { type: Date, default: null },
   lastFailedLoginAttempt: { type: Date, default: null },
   
+  // User warnings system
+  warnings: [{
+    type: {
+      type: String,
+      enum: ['info', 'warning', 'final_warning', 'suspension_notice'],
+      required: true
+    },
+    message: { type: String, required: true },
+    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    issuedAt: { type: Date, default: Date.now },
+    acknowledgedAt: { type: Date, default: null },
+    expiresAt: { type: Date, default: null }, // null = never expires
+    reason: { type: String }, // Reason for warning (e.g., "Spam", "Harassment")
+    _id: false
+  }],
+  warningCount: { type: Number, default: 0 }, // Total count of warnings (for escalation)
+  finalWarningCount: { type: Number, default: 0 }, // Count of final warnings
+  
   // Social media links (available to all users)
   socialMedia: {
     instagram: String,

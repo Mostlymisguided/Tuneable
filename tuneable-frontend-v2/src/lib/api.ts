@@ -588,6 +588,37 @@ export const userAPI = {
     return response.data;
   },
   
+  // Get user's warnings
+  getWarnings: async (userId?: string) => {
+    const params = userId ? { userId } : {};
+    const response = await api.get('/users/warnings', { params });
+    return response.data;
+  },
+
+  // Acknowledge a warning
+  acknowledgeWarning: async (warningIndex: number) => {
+    const response = await api.post(`/users/warnings/${warningIndex}/acknowledge`);
+    return response.data;
+  },
+
+  // Admin: Issue warning to user
+  issueWarning: async (userId: string, type: string, message: string, reason?: string, expiresInDays?: number) => {
+    const response = await api.post('/users/admin/warnings', {
+      userId,
+      type,
+      message,
+      reason,
+      expiresInDays
+    });
+    return response.data;
+  },
+
+  // Admin: Get all warnings for a user
+  getUserWarnings: async (userId: string) => {
+    const response = await api.get(`/users/admin/users/${userId}/warnings`);
+    return response.data;
+  },
+
   // Get user's tag rankings
   getTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};

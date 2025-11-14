@@ -2640,4 +2640,223 @@ router.get('/search', authMiddleware, async (req, res) => {
   }
 });
 
+// ============================================
+// USER WARNINGS SYSTEM
+// ============================================
+
+// Get user's warnings (authenticated users can see their own, admins can see any)
+router.get('/warnings', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.query.userId || req.user._id;
+    const isAdmin = req.user.role && req.user.role.includes('admin');
+    
+    // Users can only see their own warnings unless they're admin
+    if (userId !== req.user._id.toString() && !isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    const user = await User.findById(userId).select('warnings warningCount finalWarningCount');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Filter out expired warnings
+    const now = new Date();
+    const activeWarnings = user.warnings.filter(warning => {
+      return !warning.expiresAt || warning.expiresAt > now;
+    });
+    
+    // Populate issuedBy field
+    await User.populate(activeWarnings, { path: 'issuedBy', select: 'username _id' });
+    
+    res.json({
+      warnings: activeWarnings,
+      warningCount: user.warningCount,
+      finalWarningCount: user.finalWarningCount,
+      hasUnacknowledged: activeWarnings.some(w => !w.acknowledgedAt)
+    });
+  } catch (error) {
+    console.error('Error fetching warnings:', error);
+    res.status(500).json({ error: 'Failed to fetch warnings', details: error.message });
+  }
+});
+
+// Acknowledge a warning (mark as read)
+router.post('/warnings/:warningIndex/acknowledge', authMiddleware, async (req, res) => {
+  try {
+    const { warningIndex } = req.params;
+    const userId = req.user._id;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const index = parseInt(warningIndex);
+    if (isNaN(index) || index < 0 || index >= user.warnings.length) {
+      return res.status(400).json({ error: 'Invalid warning index' });
+    }
+    
+    // Check if warning is expired
+    const warning = user.warnings[index];
+    if (warning.expiresAt && warning.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Warning has expired' });
+    }
+    
+    // Mark as acknowledged
+    if (!warning.acknowledgedAt) {
+      user.warnings[index].acknowledgedAt = new Date();
+      await user.save();
+    }
+    
+    res.json({ message: 'Warning acknowledged', warning: user.warnings[index] });
+  } catch (error) {
+    console.error('Error acknowledging warning:', error);
+    res.status(500).json({ error: 'Failed to acknowledge warning', details: error.message });
+  }
+});
+
+// Admin: Issue warning to user
+router.post('/admin/warnings', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId, type, message, reason, expiresInDays } = req.body;
+    
+    if (!userId || !type || !message) {
+      return res.status(400).json({ error: 'Missing required fields: userId, type, message' });
+    }
+    
+    const validTypes = ['info', 'warning', 'final_warning', 'suspension_notice'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'Invalid warning type' });
+    }
+    
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Calculate expiration date
+    let expiresAt = null;
+    if (expiresInDays && expiresInDays > 0) {
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays));
+    }
+    
+    // Create warning
+    const warning = {
+      type,
+      message: message.trim(),
+      reason: reason?.trim() || null,
+      issuedBy: req.user._id,
+      issuedAt: new Date(),
+      acknowledgedAt: null,
+      expiresAt
+    };
+    
+    targetUser.warnings.push(warning);
+    
+    // Update warning counts
+    if (type === 'warning' || type === 'final_warning' || type === 'suspension_notice') {
+      targetUser.warningCount = (targetUser.warningCount || 0) + 1;
+    }
+    if (type === 'final_warning') {
+      targetUser.finalWarningCount = (targetUser.finalWarningCount || 0) + 1;
+    }
+    
+    await targetUser.save();
+    
+    // Automatic escalation logic
+    const WARNING_THRESHOLD = 3; // After 3 warnings, temp ban
+    const FINAL_WARNING_THRESHOLD = 2; // After 2 final warnings, temp ban
+    const TEMP_BAN_DAYS = 7; // 7 day temp ban
+    
+    if (targetUser.warningCount >= WARNING_THRESHOLD || targetUser.finalWarningCount >= FINAL_WARNING_THRESHOLD) {
+      // Apply temporary ban
+      const banUntil = new Date();
+      banUntil.setDate(banUntil.getDate() + TEMP_BAN_DAYS);
+      targetUser.accountLockedUntil = banUntil;
+      targetUser.isActive = false;
+      
+      // Add suspension notice
+      targetUser.warnings.push({
+        type: 'suspension_notice',
+        message: `Your account has been temporarily suspended for ${TEMP_BAN_DAYS} days due to multiple warnings.`,
+        reason: 'Automatic suspension after multiple warnings',
+        issuedBy: req.user._id,
+        issuedAt: new Date(),
+        acknowledgedAt: null,
+        expiresAt: banUntil
+      });
+      
+      await targetUser.save();
+      
+      // Send email notification
+      try {
+        const emailService = require('../utils/emailService');
+        await emailService.sendWarningEmail(targetUser.email, {
+          type: 'suspension_notice',
+          message: `Your account has been temporarily suspended for ${TEMP_BAN_DAYS} days due to multiple warnings.`,
+          reason: 'Automatic suspension after multiple warnings'
+        });
+      } catch (emailError) {
+        console.error('Error sending warning email:', emailError);
+        // Don't fail the request if email fails
+      }
+    } else {
+      // Send email notification for regular warnings
+      try {
+        const emailService = require('../utils/emailService');
+        await emailService.sendWarningEmail(targetUser.email, {
+          type,
+          message: message.trim(),
+          reason: reason?.trim() || null
+        });
+      } catch (emailError) {
+        console.error('Error sending warning email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+    
+    // Populate issuedBy for response
+    await User.populate(warning, { path: 'issuedBy', select: 'username _id' });
+    
+    res.json({
+      message: 'Warning issued successfully',
+      warning,
+      warningCount: targetUser.warningCount,
+      finalWarningCount: targetUser.finalWarningCount,
+      accountLocked: !!targetUser.accountLockedUntil
+    });
+  } catch (error) {
+    console.error('Error issuing warning:', error);
+    res.status(500).json({ error: 'Failed to issue warning', details: error.message });
+  }
+});
+
+// Admin: Get all warnings for a user
+router.get('/admin/users/:userId/warnings', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId).select('warnings warningCount finalWarningCount username email');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Populate issuedBy for all warnings
+    await User.populate(user.warnings, { path: 'issuedBy', select: 'username _id' });
+    
+    res.json({
+      warnings: user.warnings,
+      warningCount: user.warningCount,
+      finalWarningCount: user.finalWarningCount,
+      username: user.username,
+      email: user.email
+    });
+  } catch (error) {
+    console.error('Error fetching user warnings:', error);
+    res.status(500).json({ error: 'Failed to fetch user warnings', details: error.message });
+  }
+});
+
 module.exports = router;

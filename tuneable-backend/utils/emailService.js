@@ -855,6 +855,95 @@ async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, invi
   }
 }
 
+// Send warning email to user
+async function sendWarningEmail(userEmail, warningData) {
+  try {
+    if (!userEmail) {
+      console.log('⚠️ No email provided for warning notification');
+      return false;
+    }
+
+    const { type, message, reason } = warningData;
+    
+    const typeLabels = {
+      info: 'ℹ️ Information',
+      warning: '⚠️ Warning',
+      final_warning: '🔴 Final Warning',
+      suspension_notice: '🚫 Account Suspension'
+    };
+    
+    const typeColors = {
+      info: '#3b82f6',
+      warning: '#f59e0b',
+      final_warning: '#ef4444',
+      suspension_notice: '#dc2626'
+    };
+    
+    const unsubscribeFooter = await getUnsubscribeFooter(userEmail);
+    
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Tuneable</h1>
+        </div>
+        
+        <div style="background: white; padding: 30px; border: 2px solid ${typeColors[type] || '#9333ea'}; border-radius: 0 0 8px 8px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h2 style="color: ${typeColors[type] || '#9333ea'}; margin: 0;">
+              ${typeLabels[type] || 'Notification'}
+            </h2>
+          </div>
+          
+          <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${typeColors[type] || '#9333ea'};">
+            <p style="margin: 0; color: #1f2937; line-height: 1.6;">
+              ${message.replace(/\n/g, '<br>')}
+            </p>
+          </div>
+          
+          ${reason ? `
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0; color: #92400e;">
+                <strong>Reason:</strong> ${reason}
+              </p>
+            </div>
+          ` : ''}
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+              This is an official notification from Tuneable. Please review our 
+              <a href="${FRONTEND_URL}/terms-of-service" style="color: #9333ea;">Terms of Service</a> 
+              and <a href="${FRONTEND_URL}/help" style="color: #9333ea;">Community Guidelines</a>.
+            </p>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 15px;">
+              If you have questions or believe this warning was issued in error, please contact us through the Help page.
+            </p>
+          </div>
+        </div>
+        
+        ${unsubscribeFooter}
+      </div>
+    `;
+    
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: `${typeLabels[type] || 'Notification'} - Tuneable`,
+      html
+    });
+    
+    if (error) {
+      console.error('❌ Error sending warning email:', error);
+      return false;
+    }
+    
+    console.log('✅ Warning email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending warning email:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -869,5 +958,6 @@ module.exports = {
   sendClaimStatusNotification,
   sendInviteApprovalEmail,
   sendInviteRejectionEmail,
-  sendInviteEmail
+  sendInviteEmail,
+  sendWarningEmail
 };
