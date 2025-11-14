@@ -1273,7 +1273,7 @@ const UserProfile: React.FC = () => {
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
                 <div className="text-lg md:text-2xl font-bold text-white">{stats.totalBids || 0}</div>
-                <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
+                <div className="text-xs md:text-sm text-gray-300">Tips</div>
               </div>
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
@@ -1288,7 +1288,7 @@ const UserProfile: React.FC = () => {
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                 <div className="text-lg md:text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
-                <div className="text-xs md:text-sm text-gray-300">Tunes Tipped</div>
+                <div className="text-xs md:text-sm text-gray-300">Tunes</div>
               </div>
             </div>
           </div>
