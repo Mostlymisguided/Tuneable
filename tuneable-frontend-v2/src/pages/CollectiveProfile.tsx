@@ -504,7 +504,7 @@ useEffect(() => {
             {/* Report Button - Always visible */}
             <button
               onClick={() => setShowReportModal(true)}
-              className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+              className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
             >
               <Flag className="h-4 w-4" />
               <span className="hidden sm:inline">Report</span>
@@ -514,7 +514,7 @@ useEffect(() => {
             {canEditCollective() && !isEditMode && (
               <button
                 onClick={handleEditClick}
-                className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                className="px-4 py-2.5 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <span className="hidden sm:inline">Edit Collective</span>
                 <span className="sm:hidden">Edit</span>
@@ -526,7 +526,7 @@ useEffect(() => {
             {canEditCollective() && isEditMode && (
               <button
                 onClick={exitEditMode}
-                className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                className="px-4 py-2.5 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <X className="h-4 w-4" />
                 <span className="hidden sm:inline">Cancel</span>

@@ -497,7 +497,7 @@ const LabelProfile: React.FC = () => {
             {canEditLabel() && isEditMode && (
               <button
                 onClick={exitEditMode}
-                className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                className="px-3 md:px-4 py-2.5 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <X className="h-4 w-4" />
                 <span className="hidden sm:inline">Cancel</span>

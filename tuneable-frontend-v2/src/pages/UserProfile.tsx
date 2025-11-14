@@ -1008,7 +1008,7 @@ const UserProfile: React.FC = () => {
       
             </div>
             {/* Profile Picture */}
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
               <img
                 src={user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={`${user.username} profile`}
@@ -1046,7 +1046,7 @@ const UserProfile: React.FC = () => {
                 {(user.homeLocation?.city || user.homeLocation?.country || user.secondaryLocation?.city || user.secondaryLocation?.country) && (
                   <div className="flex flex-col gap-2 mb-1">
                     {user.homeLocation?.city || user.homeLocation?.country ? (
-                      <div className="inline-flex my-2 items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
+                      <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                         <MapPin className="h-3.5 w-3.5" />
                         <span>
                           {[
