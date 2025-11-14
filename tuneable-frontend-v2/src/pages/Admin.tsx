@@ -936,7 +936,13 @@ const Admin: React.FC = () => {
                     {getSortedUsers().map((user) => (
                       <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-white">{user.username}</div>
+                          <button
+                            onClick={() => navigate(`/user/${user._id}`)}
+                            className="text-sm font-medium text-white hover:text-purple-300 underline"
+                            title="View profile"
+                          >
+                            {user.username}
+                          </button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">{user.email}</div>

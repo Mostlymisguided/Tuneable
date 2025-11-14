@@ -523,10 +523,7 @@ const UserProfile: React.FC = () => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Unknown';
-    return date.toLocaleDateString('en-US', { 
-      month: 'long', 
-      year: 'numeric' 
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
   const formatDuration = (seconds?: number) => {
@@ -997,8 +994,8 @@ const UserProfile: React.FC = () => {
             )}
           </div>
           
-          <div className="card flex flex-col sm:flex-row items-start relative">
-            <div className='absolute top-2 right-2 sm:top-0 sm:right-0'>
+          <div className="card p-4 flex flex-col sm:flex-row items-start relative">
+            <div className='absolute top-0 right-0'>
 
               {/* Member Since */}
               <div className="flex rounded-full p-4 items-center">
@@ -1049,7 +1046,7 @@ const UserProfile: React.FC = () => {
                 {(user.homeLocation?.city || user.homeLocation?.country || user.secondaryLocation?.city || user.secondaryLocation?.country) && (
                   <div className="flex flex-col gap-2 mb-1">
                     {user.homeLocation?.city || user.homeLocation?.country ? (
-                      <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
+                      <div className="inline-flex my-2 items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                         <MapPin className="h-3.5 w-3.5" />
                         <span>
                           {[
@@ -1255,11 +1252,12 @@ const UserProfile: React.FC = () => {
                   </button>
 
               )}
-              <div className="absolute bottom-0 right-0 p-4 pb-6">
+              
+              </div>
+              <div className="flex justify-end self-end">
               <span className={`px-3 py-2 bg-purple-600/50 text-xs md:text-base rounded-full font-semibold ${getRoleColor(user.role)}`}>
                   {getRoleDisplay(user.role)}
                 </span>
-              </div>
             </div>
           </div>
         </div>
@@ -1280,7 +1278,7 @@ const UserProfile: React.FC = () => {
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
                 <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
-                <div className="text-xs md:text-sm text-gray-300">Total Spent</div>
+                <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
               </div>
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
