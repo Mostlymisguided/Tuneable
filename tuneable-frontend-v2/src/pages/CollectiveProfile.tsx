@@ -457,17 +457,6 @@ useEffect(() => {
     return links;
   };
 
-  // Get type label
-  const getTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      band: 'Band',
-      collective: 'Collective',
-      production_company: 'Production Company',
-      other: 'Other'
-    };
-    return labels[type] || type;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
