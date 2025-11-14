@@ -100,8 +100,6 @@ const IssueWarningModal: React.FC<IssueWarningModalProps> = ({
     }
   };
 
-  const typeConfig = getWarningTypeConfig(warningType);
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
       <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">

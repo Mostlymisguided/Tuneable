@@ -1879,7 +1879,7 @@ const Admin: React.FC = () => {
             username={selectedUserForWarning.username}
             onWarningIssued={() => {
               // Refresh users list to show updated warning counts
-              fetchUsers();
+              loadUsers();
             }}
           />
         )}
