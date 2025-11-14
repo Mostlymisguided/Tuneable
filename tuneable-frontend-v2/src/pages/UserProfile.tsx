@@ -1362,7 +1362,7 @@ const UserProfile: React.FC = () => {
                         </span>
                         <span className="flex items-center">
                           <Activity className="w-4 h-4 mr-1" />
-                          {mediaData.bidCount || 0} tip{(mediaData.bidCount || 0) !== 1 ? 's' : ''}
+                          {mediaData.bidCount || 0} Tip{(mediaData.bidCount || 0) !== 1 ? 's' : ''}
                         </span>
                       </div>
                       {/* Tags Display */}

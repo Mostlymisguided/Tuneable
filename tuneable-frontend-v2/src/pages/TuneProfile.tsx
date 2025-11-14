@@ -1282,19 +1282,19 @@ const TuneProfile: React.FC = () => {
                 })()}
               </div>
               
-              {/* Bid Metrics Grid */}
+              {/* Tip Metrics Grid */}
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 gap-y-2 md:gap-4 px-2 md:px-0">
-                {/* Bid Total */}
+                {/* Tip Total */}
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
-                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Bid Total</div>
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Tip Total</div>
                   <div className="text-base md:text-2xl font-bold text-green-400">
                     {penceToPounds(media.globalMediaAggregate)}
                   </div>
                 </div>
                 
-                {/* Total Bids Count */}
+                {/* Total Tips Count */}
                 <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-cyan-500/50">
-                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bids</div>
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Total Tips</div>
                   <div className="text-base md:text-2xl font-bold text-cyan-400">
                     {media.bids?.length || 0}
                   </div>
@@ -1316,17 +1316,17 @@ const TuneProfile: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Top Bid - Hidden on mobile */}
+                {/* Top Tip - Hidden on mobile */}
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Bid</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Tip</div>
                   <div className="text-2xl font-bold text-yellow-400">
                     {penceToPounds(media.globalMediaBidTop)}
                   </div>
                 </div>
                 
-                {/* Average Bid - Hidden on mobile */}
+                {/* Average Tip - Hidden on mobile */}
                 <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Bid</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Tip</div>
                   <div className="text-2xl font-bold text-blue-400">
                     £{calculateGlobalMediaBidAvg(media).toFixed(2)}
                   </div>
@@ -1417,7 +1417,7 @@ const TuneProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* Global Bid Section - Support This Tune */}
+        {/* Global Tip Section - Support This Tune */}
         {user && (
           <div className="mb-8 px-2 md:px-0">
             <div className="max-w-2xl mx-auto">
@@ -1484,7 +1484,7 @@ const TuneProfile: React.FC = () => {
                       <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
                     ) : (
                       <span>
-                        {isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid'}
+                        {isGlobalBidValid ? `Tip £${globalBidInput}` : 'Enter Tip'}
                       </span>
                     )}
                   </button>
@@ -1524,12 +1524,12 @@ const TuneProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Top Bids */}
+        {/* Top Tips */}
         {media.bids && media.bids.length > 0 && (
           <div className="mb-6 px-2 md:px-0">
             <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
               <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
-              Top Bids
+              Top Tips
             </h2>
             <div className="card bg-black/20 rounded-lg p-4 md:p-6">
               <TopBidders bids={media.bids} maxDisplay={5} />

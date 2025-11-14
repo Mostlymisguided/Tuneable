@@ -134,7 +134,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
                     <span className="hidden md:inline">•</span>
                   </>
                 )}
-                <span>{supporter.bidCount} {supporter.bidCount === 1 ? 'bid' : 'bids'}</span>
+                <span>{supporter.bidCount} {supporter.bidCount === 1 ? 'Tip' : 'Tips'}</span>
                 <span className="hidden md:inline">•</span>
                 <span className="truncate">Since {getRelativeTime(supporter.firstBidDate)}</span>
               </div>
@@ -147,7 +147,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
               {penceToPounds(supporter.totalAmount)}
             </div>
             <div className="flex items-center justify-end space-x-1 text-xs text-gray-400">
-              <span title="Average Bid">
+              <span title="Average Tip">
                 <TrendingUp className="h-3 w-3" />
               </span>
               <span>{penceToPounds(supporter.totalAmount / supporter.bidCount)}</span>

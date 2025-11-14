@@ -91,10 +91,10 @@ const Home: React.FC = () => {
                 <Coins className="h-10 w-10 text-green-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Bid on Tunes
+                Tip on Tunes
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Bid to get your favorite Tunes to the top
+                Tip to Get Your Favorite Tunes to the Top
               </p>
             </div>
 
@@ -106,7 +106,7 @@ const Home: React.FC = () => {
                 Support Artists
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Artists earn most of what you bid on Tuneable
+                Artists Earn Most of Your Tips on Tuneable
               </p>
             </div>
             <div className="text-center group">
@@ -117,7 +117,7 @@ const Home: React.FC = () => {
                 Earn TuneBytes
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Get rewarded for discovering popular music
+                Get Rewarded for Discovering Popular Music
               </p>
             </div>
 
@@ -129,7 +129,7 @@ const Home: React.FC = () => {
                 Discover Music
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Find music from all around the world
+                Find Music from All Around the World
               </p>
             </div>
 

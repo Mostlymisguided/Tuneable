@@ -913,7 +913,7 @@ Join here: ${inviteLink}`.trim();
                         <div className="bg-gray-900 rounded-lg p-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm text-gray-400">Total Bid Amount</p>
+                              <p className="text-sm text-gray-400">Total Tip Amount</p>
                               <p className="text-2xl font-bold text-white mt-1">
                                 {penceToPounds(creatorStats.stats?.totalBidAmount || 0)}
                               </p>
@@ -1099,7 +1099,7 @@ Join here: ${inviteLink}`.trim();
                                       }}
                                       className="flex items-center hover:text-purple-400 transition-colors"
                                     >
-                                      Total Bids
+                                      Total Tips
                                       {myMediaSortField === 'globalMediaAggregate' ? (
                                         myMediaSortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />
                                       ) : (
@@ -1167,7 +1167,7 @@ Join here: ${inviteLink}`.trim();
                                         {penceToPounds(item.globalMediaAggregate || 0)}
                                       </div>
                                       <div className="text-xs text-gray-400">
-                                        {item.bidCount || 0} bids
+                                        {item.bidCount || 0} Tips
                                       </div>
                                     </td>
                                     <td className="px-4 py-3">
@@ -2529,7 +2529,7 @@ Join here: ${inviteLink}`.trim();
               <Coins className="h-6 w-6 text-blue-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-white">Avg Bid</p>
+              <p className="text-sm font-medium text-white">Avg Tip</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
                 {penceToPounds(user?.globalUserBidAvg || 0)}
               </p>
@@ -2543,7 +2543,7 @@ Join here: ${inviteLink}`.trim();
               <AudioLines className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-white">Total Bids</p>
+              <p className="text-sm font-medium text-white">Total Tips</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
                 {user?.globalUserBids || 0}
               </p>
@@ -2795,7 +2795,7 @@ Join here: ${inviteLink}`.trim();
                     onClick={() => handleSort('globalMediaAggregateAvg')}
                   >
                     <div className="flex items-center">
-                      Avg Bid
+                      Avg Tip
                       {getSortIcon('globalMediaAggregateAvg')}
                     </div>
                   </th>
@@ -2804,7 +2804,7 @@ Join here: ${inviteLink}`.trim();
                     onClick={() => handleSort('globalUserMediaAggregate')}
                   >
                     <div className="flex items-center">
-                      Your Bid
+                      Your Tip
                       {getSortIcon('globalUserMediaAggregate')}
                     </div>
                   </th>
@@ -2877,7 +2877,7 @@ Join here: ${inviteLink}`.trim();
                         title="Increase bid"
                       >
                         <Plus className="h-3 w-3 mr-1" />
-                        Bid
+                        Tip
                       </button>
                     </td>
                   </tr>
