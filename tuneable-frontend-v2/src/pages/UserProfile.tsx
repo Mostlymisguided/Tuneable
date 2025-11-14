@@ -1008,7 +1008,7 @@ const UserProfile: React.FC = () => {
       
             </div>
             {/* Profile Picture */}
-            <div className="flex-shrink-0 relative sm:mx-0">
+            <div className="flex-shrink-0 relative">
               <img
                 src={user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={`${user.username} profile`}
@@ -1035,7 +1035,7 @@ const UserProfile: React.FC = () => {
             </div>
             
             {/* User Info */}
-            <div className="mt-2 sm:mt-0 sm:ml-6 flex-1 text-white">
+            <div className="flex-1 text-white">
               <div className="">
                 <h1 className="text-4xl font-bold">{user.username}</h1>
                 {(user.givenName || user.familyName) && (

@@ -534,7 +534,7 @@ useEffect(() => {
             )}
           </div>
           
-          <div className="card flex items-start relative">
+          <div className="card p-4 flex flex-col sm:flex-row items-start relative">
             {/* Verification Badge - Top Right */}
             {collective.verificationStatus === 'verified' && (
               <div className="absolute top-0 right-0 p-4">
@@ -545,7 +545,7 @@ useEffect(() => {
             )}
 
             {/* Profile Picture */}
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
               {collective.profilePicture ? (
                 <img
                   src={collective.profilePicture}
@@ -583,21 +583,18 @@ useEffect(() => {
             </div>
             
             {/* Collective Info */}
-            <div className="ml-6 flex-1 text-white">
+            <div className="flex-1 text-white">
               <div className="">
                 <div className="flex items-center space-x-3 mb-2">
                   <h1 className="text-4xl font-bold">{collective.name}</h1>
-                  <span className="px-3 py-1 bg-purple-600/50 text-white text-sm rounded-full font-medium border border-purple-500/30">
-                    {getTypeLabel(collective.type)}
-                  </span>
                 </div>
                 {collective.description && (
-                  <p className="text-xl text-gray-300 mb-4 max-w-2xl">{collective.description}</p>
+                  <p className="text-xl text-gray-300 mb-2 max-w-2xl">{collective.description}</p>
                 )}
                 
                 {/* Location */}
                 {collective.location && (collective.location.city || collective.location.region || collective.location.country) && (
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                       <MapPin className="h-3.5 w-3.5" />
                       <span>
@@ -609,7 +606,7 @@ useEffect(() => {
 
                 {/* Social Media Links */}
                 {socialLinks.length > 0 && (
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <div className="flex flex-wrap gap-2">
                       {socialLinks.map((social) => {
                         const IconComponent = social.icon;
@@ -632,7 +629,7 @@ useEffect(() => {
 
                 {/* Website */}
                 {collective.website && (
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <a
                       href={collective.website}
                       target="_blank"
@@ -647,7 +644,7 @@ useEffect(() => {
 
                 {/* Genres */}
                 {collective.genres && collective.genres.length > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {collective.genres.map((genre, index) => (
                       <span key={index} className="bg-purple-600/50 text-white px-3 py-1 rounded-full text-xs font-medium border border-purple-500/30">
                         {genre}
@@ -694,33 +691,33 @@ useEffect(() => {
         {collective.stats && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Collective Statistics</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-2">
               {collective.stats.memberCount !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">{collective.stats.memberCount || 0}</div>
                   <div className="text-sm text-gray-300">Members</div>
                 </div>
               )}
               {collective.stats.releaseCount !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">{collective.stats.releaseCount || 0}</div>
                   <div className="text-sm text-gray-300">Releases</div>
                 </div>
               )}
               {collective.stats.globalCollectiveAggregate !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
-                  <div className="text-sm text-gray-300">Total Bids</div>
+                  <div className="text-sm text-gray-300">Total Tips</div>
                 </div>
               )}
               {collective.stats.globalCollectiveBidCount !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Calendar className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                   <div className="text-2xl font-bold text-white">{collective.stats.globalCollectiveBidCount || 0}</div>
-                  <div className="text-sm text-gray-300">Total Bid Count</div>
+                  <div className="text-sm text-gray-300">Tip Count</div>
                 </div>
               )}
             </div>

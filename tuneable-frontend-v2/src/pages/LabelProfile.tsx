@@ -466,18 +466,18 @@ const LabelProfile: React.FC = () => {
         <div className="mb-8 relative">
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 mb-4 rounded-lg font-medium transition-colors border border-white/20 bg-gray-700/40 text-white hover:bg-purple-500"
+            className="px-4 py-2 mb-2 rounded-lg font-medium transition-colors border border-white/20 bg-gray-700/40 text-white hover:bg-purple-500"
           >
             <ArrowLeft className="inline h-4 w-4 mr-2" />
             Back
           </button>
 
           {/* Edit Label & Report Buttons */}
-          <div className='inline rounded-full items-center absolute right-0 top-0 mb-4 flex space-x-2'>
+          <div className='inline rounded-full items-center absolute right-0 top-0 flex space-x-2'>
             {/* Report Button - Always visible */}
             <button
               onClick={() => setShowReportModal(true)}
-              className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+              className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
             >
               <Flag className="h-4 w-4" />
               <span className="hidden sm:inline">Report</span>
@@ -487,7 +487,7 @@ const LabelProfile: React.FC = () => {
             {canEditLabel() && !isEditMode && (
               <button
                 onClick={handleEditClick}
-                className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                className="px-4 py-2.5 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <span className="hidden sm:inline">Edit Label</span>
                 <span className="sm:hidden">Edit</span>
@@ -505,7 +505,7 @@ const LabelProfile: React.FC = () => {
             )}
           </div>
           
-          <div className="card flex items-start relative">
+          <div className="card p-4 flex flex-col sm:flex-row items-start relative">
             {/* Verification Badge - Top Right */}
             {label.verificationStatus === 'verified' && (
               <div className="absolute top-0 right-0 p-4">
@@ -516,7 +516,7 @@ const LabelProfile: React.FC = () => {
             )}
 
             {/* Profile Picture */}
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
               {label.profilePicture ? (
                 <img
                   src={label.profilePicture}
@@ -554,16 +554,16 @@ const LabelProfile: React.FC = () => {
             </div>
             
             {/* Label Info */}
-            <div className="ml-6 flex-1 text-white">
+            <div className="flex-1 text-white">
               <div className="">
-                <h1 className="text-4xl font-bold mb-4">{label.name}</h1>
+                <h1 className="text-4xl font-bold mb-2">{label.name}</h1>
                 {label.description && (
-                  <p className="text-xl text-gray-300 mb-4 max-w-2xl">{label.description}</p>
+                  <p className="text-xl text-gray-300 mb-2 max-w-2xl">{label.description}</p>
                 )}
                 
                 {/* Location */}
                 {label.location && (label.location.city || label.location.region || label.location.country) && (
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                       <MapPin className="h-3.5 w-3.5" />
                       <span>
@@ -575,7 +575,7 @@ const LabelProfile: React.FC = () => {
 
                 {/* Social Media Links */}
                 {socialLinks.length > 0 && (
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <div className="flex flex-wrap gap-2">
                       {socialLinks.map((social) => {
                         const IconComponent = social.icon;
@@ -598,7 +598,7 @@ const LabelProfile: React.FC = () => {
 
                 {/* Website */}
                 {label.website && (
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <a
                       href={label.website}
                       target="_blank"
@@ -613,7 +613,7 @@ const LabelProfile: React.FC = () => {
 
                 {/* Genres */}
                 {label.genres && label.genres.length > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {label.genres.map((genre, index) => (
                       <span key={index} className="bg-purple-600/50 text-white px-3 py-1 rounded-full text-xs font-medium border border-purple-500/30">
                         {genre}
@@ -671,34 +671,34 @@ const LabelProfile: React.FC = () => {
         {/* Stats */}
         {label.stats && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-center text-white mb-4">Label Statistics</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <h2 className="text-2xl font-bold text-center text-white mb-4">Label Info</h2>
+            <div className="grid grid-cols-4 gap-2">
               {label.stats.artistCount !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{label.stats.artistCount || 0}</div>
-                  <div className="text-sm text-gray-300">Artists</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{label.stats.artistCount || 0}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Artists</div>
                 </div>
               )}
               {label.stats.releaseCount !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{label.stats.releaseCount || 0}</div>
-                  <div className="text-sm text-gray-300">Releases</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{label.stats.releaseCount || 0}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Releases</div>
                 </div>
               )}
               {label.stats.globalLabelAggregate !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{penceToPounds(label.stats.globalLabelAggregate || 0)}</div>
-                  <div className="text-sm text-gray-300">Total Bids</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(label.stats.globalLabelAggregate || 0)}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                 </div>
               )}
               {label.stats.globalLabelBidCount !== undefined && (
-                <div className="card bg-black/20 rounded-lg p-6 text-center">
+                <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Calendar className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{label.stats.globalLabelBidCount || 0}</div>
-                  <div className="text-sm text-gray-300">Total Bid Count</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{label.stats.globalLabelBidCount || 0}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Tip Count</div>
                 </div>
               )}
             </div>
