@@ -1275,7 +1275,7 @@ const UserProfile: React.FC = () => {
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
                 <div className="text-lg md:text-2xl font-bold text-white">{stats.totalBids || 0}</div>
-                <div className="text-xs md:text-sm text-gray-300">Total Bids</div>
+                <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
               </div>
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
@@ -1285,12 +1285,12 @@ const UserProfile: React.FC = () => {
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
                 <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
-                <div className="text-xs md:text-sm text-gray-300">Avg Bid</div>
+                <div className="text-xs md:text-sm text-gray-300">Avg Tip</div>
               </div>
               <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                 <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                 <div className="text-lg md:text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
-                <div className="text-xs md:text-sm text-gray-300">Tunes Bid</div>
+                <div className="text-xs md:text-sm text-gray-300">Tunes Tipped</div>
               </div>
             </div>
           </div>
@@ -1362,7 +1362,7 @@ const UserProfile: React.FC = () => {
                         </span>
                         <span className="flex items-center">
                           <Activity className="w-4 h-4 mr-1" />
-                          {mediaData.bidCount || 0} bid{(mediaData.bidCount || 0) !== 1 ? 's' : ''}
+                          {mediaData.bidCount || 0} tip{(mediaData.bidCount || 0) !== 1 ? 's' : ''}
                         </span>
                       </div>
                       {/* Tags Display */}
@@ -1386,7 +1386,7 @@ const UserProfile: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-lg md:text-xl font-bold text-green-400">{penceToPounds(mediaData.totalAmount || 0)}</div>
-                      <div className="text-xs md:text-sm text-gray-400">Total Bid</div>
+                      <div className="text-xs md:text-sm text-gray-400">Total Tip</div>
                     </div>
                   </div>
                 ))}
@@ -1428,7 +1428,7 @@ const UserProfile: React.FC = () => {
                   </div>
                   <div className="space-y-1.5 md:space-y-2 text-xs md:text-sm text-gray-300">
                     <div className="flex items-center justify-between">
-                      <span>Total Bid</span>
+                      <span>Total Tip</span>
                       <span className="text-sm md:text-base font-semibold text-white">
                         {penceToPounds(ranking.aggregate || 0)}
                       </span>
@@ -1456,8 +1456,8 @@ const UserProfile: React.FC = () => {
         {stats && stats.totalBids === 0 && (
           <div className="text-center py-12">
             <Music className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">No Bids Yet</h3>
-            <p className="text-gray-400">This user hasn't placed any bids yet.</p>
+            <h3 className="text-xl font-semibold text-white mb-2">No Tips Yet</h3>
+            <p className="text-gray-400">This user hasn't given any tips yet.</p>
           </div>
         )}
           </>
@@ -2183,7 +2183,7 @@ const UserProfile: React.FC = () => {
                           Anonymous Mode
                         </label>
                         <p className="text-sm text-gray-400 mt-1">
-                          Hide your name from public profiles while keeping your username and bidding activity visible for platform transparency
+                          Hide your name from public profiles while keeping your username and tipping activity visible for platform transparency
                         </p>
                       </div>
                     </div>

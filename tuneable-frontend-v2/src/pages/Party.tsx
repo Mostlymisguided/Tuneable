@@ -96,6 +96,8 @@ const Party: React.FC = () => {
   
   // Queue bidding state (for inline bidding on queue items)
   const [queueBidAmounts, setQueueBidAmounts] = useState<Record<string, string>>({});
+  // NOTE: UI copy intentionally references "tips" while backend models/API
+  // still use "bid" terminology. Keep code-level naming until contracts change.
   
   // Tag modal state (keeping for backward compatibility, but using confirmation modal now)
   const [showTagModal, setShowTagModal] = useState(false);
@@ -782,7 +784,7 @@ const Party: React.FC = () => {
           return;
         }
         
-        // Calculate bid amount
+        // Calculate bid amount (UI presents this as a tip)
         let bidAmount = 0.33;
         const minBid = currentParty?.minimumBid || 0.01;
         
@@ -808,7 +810,7 @@ const Party: React.FC = () => {
         }
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-          toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+          toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
           setIsInlineBid(false);
           isInlineBidRef.current = false;
           setPendingMedia(null);
@@ -820,7 +822,7 @@ const Party: React.FC = () => {
         try {
           await partyAPI.placeBid(partyId, queueItemId, bidAmount);
           const mediaTitle = safePendingMedia?.title || 'media';
-          toast.success(`Bid £${bidAmount.toFixed(2)} placed on ${mediaTitle}!`);
+          toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
           
           // Refresh party to show updated bid values
           await fetchPartyDetails();
@@ -835,7 +837,7 @@ const Party: React.FC = () => {
           
         } catch (error: any) {
           console.error('Bid error:', error);
-          const errorMessage = error?.response?.data?.error || error?.message || 'Failed to place bid';
+          const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send tip';
           toast.error(errorMessage);
         } finally {
           setIsBidding(false);
@@ -856,7 +858,7 @@ const Party: React.FC = () => {
         const minBid = currentParty?.minimumBid || 0.01;
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-          toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+          toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
           setPendingMedia(null);
           pendingMediaRef.current = null;
           return;
@@ -885,7 +887,7 @@ const Party: React.FC = () => {
             category: safePendingMedia.category || 'Music'
           });
           
-          toast.success(`Added ${safePendingMedia.title} to party with £${bidAmount.toFixed(2)} bid!`);
+          toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
           
           // Clear search and refresh party
           setAddMediaSearchQuery('');
@@ -904,7 +906,7 @@ const Party: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error in handleBidConfirmation:', error);
-      toast.error(error?.response?.data?.error || error?.message || 'An error occurred while processing your bid');
+      toast.error(error?.response?.data?.error || error?.message || 'An error occurred while processing your tip');
       setIsBidding(false);
       setIsInlineBid(false);
       isInlineBidRef.current = false;
@@ -924,7 +926,7 @@ const Party: React.FC = () => {
     const minBid = party?.minimumBid || 0.01;
 
     if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-      toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+      toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
       return;
     }
     
@@ -951,7 +953,7 @@ const Party: React.FC = () => {
         category: pendingMedia.category || 'Music'
       });
       
-      toast.success(`Added ${pendingMedia.title} to party with £${bidAmount.toFixed(2)} bid!`);
+      toast.success(`Added ${pendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
       
       // Clear search and refresh party
       setAddMediaSearchQuery('');
@@ -1251,7 +1253,7 @@ const Party: React.FC = () => {
     const bidAmount = parseFloat(rawQueueBid);
 
     if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-      toast.error(`Minimum bid is £${minBid.toFixed(2)}`);
+      toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
       return;
     }
     
@@ -1276,14 +1278,14 @@ const Party: React.FC = () => {
     }
 
     try {
-      const confirmationMessage = `Are you sure you want to veto "${mediaData.title || 'this media'}"? All bids will be refunded to users.`;
+      const confirmationMessage = `Are you sure you want to veto "${mediaData.title || 'this media'}"? All tips will be refunded to users.`;
       if (!window.confirm(confirmationMessage)) return;
 
       const vetoReason = window.prompt('Optional: provide a reason for the veto (leave blank to skip).')?.trim();
 
-      // Veto the media (sets status to 'vetoed' and refunds bids)
+      // Veto the media (sets status to 'vetoed' and refunds bids/tips)
       await partyAPI.vetoMedia(partyId!, mediaId, vetoReason || undefined);
-      toast.success('Media vetoed and bids refunded');
+      toast.success('Media vetoed and tips refunded');
       
       // Refresh party data
       await fetchPartyDetails();
@@ -1345,7 +1347,7 @@ const Party: React.FC = () => {
       }
       
       const response = await partyAPI.placeBid(partyId, mediaId, bidAmount);
-      toast.success(`Bid of £${bidAmount.toFixed(2)} placed successfully!`);
+      toast.success(`Tip of £${bidAmount.toFixed(2)} sent successfully!`);
       
       // Update user balance if provided in response
       if (response.updatedBalance !== undefined) {
@@ -1367,7 +1369,7 @@ const Party: React.FC = () => {
       if (error.response?.data?.error === 'Insufficient funds') {
         toast.error(`Insufficient funds. You have £${error.response.data.currentBalance.toFixed(2)} but need £${error.response.data.requiredAmount.toFixed(2)}`);
       } else {
-        toast.error(error.response?.data?.error || 'Failed to place bid');
+        toast.error(error.response?.data?.error || 'Failed to send tip');
       }
     } finally {
       setIsBidding(false);
@@ -1553,7 +1555,7 @@ const Party: React.FC = () => {
               <Coins className="h-6 w-6 text-yellow-400" />
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(calculateTotalBids())}</div>
-                <div className="text-xs sm:text-sm text-gray-300">Total Bids</div>
+                <div className="text-xs sm:text-sm text-gray-300">Total Tips</div>
               </div>
             </div>
           </div>
@@ -1815,7 +1817,7 @@ const Party: React.FC = () => {
                                         {/* Metrics Display */}
                                         <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
                                           <div className="text-center p-1 md:p-2">
-                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Bid Total">
+                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Tip Total">
                                               <Coins className="h-3 w-3 md:h-4 md:w-4" />
                                             </div>
                                             <div className="text-xs md:text-lg text-gray-300">
@@ -1823,7 +1825,7 @@ const Party: React.FC = () => {
                                             </div>
                                           </div>
                                           <div className="text-center p-1 md:p-2">
-                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Average Bid">
+                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Average Tip">
                                               <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
                                             </div>
                                             <div className="text-xs md:text-lg text-gray-300">
@@ -1831,7 +1833,7 @@ const Party: React.FC = () => {
                                             </div>
                                           </div>
                                         </div>
-                                        {/* Inline Bidding */}
+                                        {/* Inline tipping controls (API still expects bid terminology) */}
                                         <div className="flex flex-row items-center space-x-1 md:space-x-2">
                                           {/* Input group with +/- buttons */}
                                           <div className="flex-col flex justify-center items-center space-x-1">
@@ -1898,7 +1900,7 @@ const Party: React.FC = () => {
                                               <Minus className="h-3 w-3 md:h-4 md:w-4 text-gray-300" />
                                             </button>
                                           </div>
-                                          {/* Bid Button */}
+                                          {/* Tip Button */}
                                           <button
                                             onClick={() => handleInlineBid(item)}
                                             disabled={isBidding}
@@ -1913,9 +1915,9 @@ const Party: React.FC = () => {
                                               const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
                                               const parsed = parseFloat(raw);
                                               if (!Number.isFinite(parsed)) {
-                                                return 'Place Bid';
+                                                return 'Send Tip';
                                               }
-                                              return `Bid £${parsed.toFixed(2)}`;
+                                              return `Tip £${parsed.toFixed(2)}`;
                                             })()}
                                           </button>
                                         </div>
@@ -2316,7 +2318,7 @@ const Party: React.FC = () => {
                                 {/* Metrics Display */}
                                 <div className="flex flex-row md:flex-col items-center space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-1 py-1 md:px-2 md:py-2 rounded-lg">
                                   <div className="text-center p-1 md:p-2">
-                                    <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Bid Total">
+                                    <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Tip Total">
                                       <Coins className="h-3 w-3 md:h-4 md:w-4" />
                                     </div>
                                     <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
@@ -2324,7 +2326,7 @@ const Party: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="text-center p-1 md:p-2">
-                                    <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Average Bid">
+                                    <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Average Tip">
                                       <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
                                     </div>
                                     <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
@@ -2332,7 +2334,7 @@ const Party: React.FC = () => {
                                     </div>
                                   </div>
                                 </div>
-                                {/* Inline Bidding */}
+                                {/* Inline tipping controls (API still expects bid terminology) */}
                                 <div className="flex flex-row items-center space-x-1 md:space-x-2">
                                   {/* Input group with +/- buttons */}
                                   <div className="flex md:flex-col items-center space-x-0">
@@ -2447,7 +2449,7 @@ const Party: React.FC = () => {
                                       <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
                                   </div>
-                                  {/* Bid Button */}
+                                  {/* Tip Button */}
                                   <button
                                     onClick={() => handleInlineBid(item)}
                                     disabled={isBidding}
@@ -2462,9 +2464,9 @@ const Party: React.FC = () => {
                                       const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
                                       const parsed = parseFloat(raw);
                                       if (!Number.isFinite(parsed)) {
-                                        return 'Place Bid';
+                                      return 'Send Tip';
                                       }
-                                      return `Bid £${parsed.toFixed(2)}`;
+                                    return `Tip £${parsed.toFixed(2)}`;
                                     })()}
                                   </button>
                                 </div>
