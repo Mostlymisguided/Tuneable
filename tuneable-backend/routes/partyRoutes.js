@@ -871,14 +871,29 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             entry.mediaId && entry.mediaId.toString() === media._id.toString()
         );
 
+        let isNewMediaEntry = false;
         if (existingPartyMediaEntry) {
             // Media already exists in party
             if (existingPartyMediaEntry.status === 'active') {
-                return res.status(400).json({ 
-                    error: 'This media is already in the party queue',
-                    mediaId: media._id,
-                    mediaTitle: media.title
-                });
+                // Media is already active - just add the bid to existing entry
+                existingPartyMediaEntry.partyBids = existingPartyMediaEntry.partyBids || [];
+                existingPartyMediaEntry.partyBids.push(bid._id);
+                existingPartyMediaEntry.partyMediaAggregate = (existingPartyMediaEntry.partyMediaAggregate || 0) + bidAmountPence;
+                
+                // Update top bid if this is higher
+                if (bidAmountPence > (existingPartyMediaEntry.partyMediaBidTop || 0)) {
+                    existingPartyMediaEntry.partyMediaBidTop = bidAmountPence;
+                    existingPartyMediaEntry.partyMediaBidTopUser = userId;
+                }
+                
+                // Update aggregate top if this user's aggregate is higher
+                // Note: For existing media, we need to check user's total aggregate for this media
+                // For now, we'll just check if this single bid is higher than the current aggregate top
+                // The BidMetricsEngine will recalculate this properly
+                if (userPartyAggregate > (existingPartyMediaEntry.partyMediaAggregateTop || 0)) {
+                    existingPartyMediaEntry.partyMediaAggregateTop = userPartyAggregate;
+                    existingPartyMediaEntry.partyMediaAggregateTopUser = userId;
+                }
             } else if (existingPartyMediaEntry.status === 'vetoed') {
                 // Media was vetoed - allow re-adding by updating the existing entry
                 existingPartyMediaEntry.status = 'active';
@@ -906,6 +921,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             }
         } else {
             // Media not in party - add it
+            isNewMediaEntry = true;
             const partyMediaEntry = {
                 mediaId: media._id,
                 media_uuid: media.uuid,
@@ -933,12 +949,18 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         
         await party.save();
 
-        // Update global bid tracking (first bid is automatically the top bid) - schema grammar
+        // Update global bid tracking - only update if this is a new top bid or new media
         // Store in pence
-        media.globalMediaBidTop = bidAmountPence;
-        media.globalMediaBidTopUser = userId;
-        media.globalMediaAggregateTop = userGlobalAggregate;
-        media.globalMediaAggregateTopUser = userId;
+        const previousTopBidAmount = media.globalMediaBidTop || 0; // Already in pence
+        const wasNewTopBid = bidAmountPence > previousTopBidAmount;
+        
+        if (wasNewTopBid || isNewMediaEntry) {
+            // Only update if this is a new top bid or it's completely new media
+            media.globalMediaBidTop = bidAmountPence;
+            media.globalMediaBidTopUser = userId;
+            media.globalMediaAggregateTop = userGlobalAggregate;
+            media.globalMediaAggregateTopUser = userId;
+        }
         await media.save();
 
         // Note: For first bid on new media, the bidder is typically the owner, so no bid_received notification needed
@@ -958,10 +980,11 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             });
 
         res.status(201).json({
-            message: 'Media added to party successfully',
+            message: isNewMediaEntry ? 'Media added to party successfully' : 'Bid added to existing media in party',
             media: populatedMedia,
             bid: bid,
-            updatedBalance: user.balance
+            updatedBalance: user.balance,
+            isNewMedia: isNewMediaEntry
         });
 
     } catch (err) {
