@@ -689,17 +689,29 @@ router.get('/:slug/artists', async (req, res) => {
       return res.status(404).json({ error: 'Label not found' });
     }
 
+    // Find users with active label affiliations
     const artists = await User.find({ 
       'labelAffiliations.labelId': label._id,
       'labelAffiliations.status': 'active'
     })
-    .select('username profilePic creatorProfile.artistName creatorProfile.genres')
-    .populate('creatorProfile');
+    .select('username profilePic creatorProfile')
+    .lean(); // Use lean() for better performance since we don't need Mongoose documents
 
-    res.json({ artists });
+    // Format the response to match frontend expectations
+    const formattedArtists = artists.map(artist => ({
+      _id: artist._id,
+      username: artist.username,
+      profilePic: artist.profilePic,
+      creatorProfile: {
+        artistName: artist.creatorProfile?.artistName,
+        genres: artist.creatorProfile?.genres || []
+      }
+    }));
+
+    res.json({ artists: formattedArtists });
   } catch (error) {
     console.error('Error fetching label artists:', error);
-    res.status(500).json({ error: 'Failed to fetch label artists' });
+    res.status(500).json({ error: 'Failed to fetch label artists', details: error.message });
   }
 });
 
