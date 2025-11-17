@@ -830,7 +830,7 @@ useEffect(() => {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-purple-400 font-medium">{penceToPounds(media.stats.totalBidAmount)}</p>
-                          <p className="text-gray-400 text-sm">{media.stats.bidCount} bids</p>
+                          <p className="text-gray-400 text-sm">{media.stats.bidCount} Tips Received</p>
                         </div>
                       </div>
                     ))}
@@ -930,7 +930,7 @@ useEffect(() => {
                           {penceToPounds(release.stats.totalBidAmount)}
                         </span>
                         <span className="text-gray-400 text-sm">
-                          {release.stats.bidCount} bids
+                          {release.stats.bidCount} Tips
                         </span>
                       </div>
                     </div>

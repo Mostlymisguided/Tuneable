@@ -17,7 +17,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
@@ -77,6 +77,7 @@ const Party: React.FC = () => {
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('all-time');
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Search state
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>([]);
@@ -466,6 +467,26 @@ const Party: React.FC = () => {
   const handleTimePeriodChange = (timePeriod: string) => {
     setSelectedTimePeriod(timePeriod);
     fetchSortedMedia(timePeriod);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh party data (includes all bids)
+      await fetchPartyDetails();
+      
+      // If viewing a time-filtered period, also refresh sorted media
+      if (selectedTimePeriod !== 'all-time') {
+        await fetchSortedMedia(selectedTimePeriod);
+      }
+      
+      toast.success('Party data refreshed');
+    } catch (error) {
+      console.error('Error refreshing party:', error);
+      toast.error('Failed to refresh party data');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Helper function to detect YouTube URLs
@@ -2201,6 +2222,19 @@ const Party: React.FC = () => {
                           {period.label}
                         </button>
                       ))}
+                    </div>
+                    
+                    {/* Refresh Button */}
+                    <div className="flex justify-center mt-4">
+                      <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                        title="Refresh party data to see new bids"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                      </button>
                     </div>
                   </div>
                 )}
