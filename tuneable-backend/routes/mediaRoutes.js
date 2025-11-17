@@ -2447,5 +2447,307 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/media/admin/all
+// @desc    Get all media with filtering, sorting, and pagination (admin only)
+// @access  Private (Admin)
+router.get('/admin/all', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'uploadedAt',
+      sortOrder = 'desc',
+      contentType,
+      contentForm,
+      search,
+      addedBy,
+      labelId,
+      rightsCleared,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    // Build query
+    const query = {};
+
+    // Content type filter
+    if (contentType) {
+      if (Array.isArray(contentType)) {
+        query.contentType = { $in: contentType };
+      } else {
+        query.contentType = contentType;
+      }
+    }
+
+    // Content form filter
+    if (contentForm) {
+      if (Array.isArray(contentForm)) {
+        query.contentForm = { $in: contentForm };
+      } else {
+        query.contentForm = contentForm;
+      }
+    }
+
+    // Added by filter
+    if (addedBy && isValidObjectId(addedBy)) {
+      query.addedBy = addedBy;
+    }
+
+    // Label filter (check if media has this label in label array)
+    if (labelId && isValidObjectId(labelId)) {
+      query['label.labelId'] = labelId;
+    }
+
+    // Rights cleared filter
+    if (rightsCleared !== undefined) {
+      query.rightsCleared = rightsCleared === 'true';
+    }
+
+    // Search filter (searches title, artist names, tags, genres)
+    if (search && search.trim().length > 0) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { title: searchRegex },
+        { 'artist.name': searchRegex },
+        { creatorNames: searchRegex },
+        { tags: searchRegex },
+        { genres: searchRegex }
+      ];
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      query.uploadedAt = {};
+      if (dateFrom) {
+        query.uploadedAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        query.uploadedAt.$lte = new Date(dateTo);
+      }
+    }
+
+    // Build sort object
+    const sort = {};
+    const validSortFields = ['uploadedAt', 'title', 'globalMediaAggregate', 'globalMediaBidTop', 'playCount', 'popularity', 'createdAt', 'duration', 'fileSize', 'creatorNames'];
+    let sortField = validSortFields.includes(sortBy) ? sortBy : 'uploadedAt';
+    
+    // Special handling for artist sorting - use creatorNames array first element
+    if (sortBy === 'artist') {
+      sortField = 'creatorNames';
+    }
+    
+    sort[sortField] = sortOrder === 'asc' ? 1 : -1;
+
+    // Fetch media with populated references
+    const media = await Media.find(query)
+      .populate('addedBy', 'username profilePic uuid')
+      .populate('globalMediaBidTopUser', 'username uuid')
+      .populate('globalMediaAggregateTopUser', 'username uuid')
+      .populate('mediaOwners.userId', 'username uuid')
+      .populate('label.labelId', 'name slug')
+      .sort(sort)
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Media.countDocuments(query);
+
+    // Format response
+    const formattedMedia = media.map(item => {
+      const artistNames = item.artist && item.artist.length > 0
+        ? item.artist.map(a => a.name).join(', ')
+        : (item.creatorNames && item.creatorNames.length > 0 ? item.creatorNames[0] : 'Unknown Artist');
+
+      const totalOwnership = item.mediaOwners && item.mediaOwners.length > 0
+        ? item.mediaOwners.reduce((sum, owner) => sum + (owner.percentage || 0), 0)
+        : 0;
+
+      return {
+        _id: item._id,
+        uuid: item.uuid,
+        title: item.title,
+        artist: artistNames,
+        artistArray: item.artist || [],
+        coverArt: item.coverArt,
+        contentType: item.contentType || [],
+        contentForm: item.contentForm || [],
+        mediaType: item.mediaType || [],
+        duration: item.duration,
+        fileSize: item.fileSize,
+        tags: item.tags || [],
+        genres: item.genres || [],
+        explicit: item.explicit || false,
+        rightsCleared: item.rightsCleared || false,
+        uploadedAt: item.uploadedAt || item.createdAt,
+        createdAt: item.createdAt,
+        addedBy: item.addedBy ? {
+          _id: item.addedBy._id,
+          username: item.addedBy.username,
+          profilePic: item.addedBy.profilePic,
+          uuid: item.addedBy.uuid
+        } : null,
+        globalMediaAggregate: item.globalMediaAggregate || 0,
+        globalMediaBidTop: item.globalMediaBidTop || 0,
+        globalMediaBidTopUser: item.globalMediaBidTopUser ? {
+          _id: item.globalMediaBidTopUser._id,
+          username: item.globalMediaBidTopUser.username,
+          uuid: item.globalMediaBidTopUser.uuid
+        } : null,
+        globalMediaAggregateTopUser: item.globalMediaAggregateTopUser ? {
+          _id: item.globalMediaAggregateTopUser._id,
+          username: item.globalMediaAggregateTopUser.username,
+          uuid: item.globalMediaAggregateTopUser.uuid
+        } : null,
+        playCount: item.playCount || 0,
+        popularity: item.popularity || 0,
+        mediaOwners: item.mediaOwners ? item.mediaOwners.map(owner => ({
+          userId: owner.userId?._id || owner.userId,
+          username: owner.userId?.username,
+          percentage: owner.percentage,
+          role: owner.role,
+          verified: owner.verified
+        })) : [],
+        totalOwnership: totalOwnership,
+        ownerCount: item.mediaOwners ? item.mediaOwners.length : 0,
+        label: item.label && item.label.length > 0 ? item.label.map(l => ({
+          labelId: l.labelId?._id || l.labelId,
+          name: l.labelId?.name || 'Unknown',
+          slug: l.labelId?.slug
+        })) : []
+      };
+    });
+
+    res.json({
+      media: formattedMedia,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error fetching media:', error);
+    res.status(500).json({ error: 'Failed to fetch media', details: error.message });
+  }
+});
+
+// @route   PUT /api/media/admin/:mediaId
+// @desc    Update media metadata (admin only)
+// @access  Private (Admin)
+router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { mediaId } = req.params;
+    const { title, artist } = req.body;
+
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    // Update title if provided
+    if (title !== undefined) {
+      if (!title || title.trim().length === 0) {
+        return res.status(400).json({ error: 'Title cannot be empty' });
+      }
+      media.title = title.trim();
+    }
+
+    // Store old artist for edit history
+    const oldArtist = media.artist && media.artist.length > 0 
+      ? media.artist.map(a => a.name).join(', ')
+      : '';
+
+    // Update artist if provided
+    let newArtistNames = null;
+    if (artist !== undefined) {
+      if (!artist || artist.trim().length === 0) {
+        return res.status(400).json({ error: 'Artist cannot be empty' });
+      }
+      
+      // Parse artist string into artist array
+      newArtistNames = artist.split(',').map(name => name.trim()).filter(name => name.length > 0);
+      if (newArtistNames.length === 0) {
+        return res.status(400).json({ error: 'At least one artist name is required' });
+      }
+
+      // Convert to artist subdocuments
+      media.artist = newArtistNames.map(name => ({
+        name: name,
+        userId: null,
+        collectiveId: null,
+        verified: false
+      }));
+
+      // Update creatorNames for search
+      media.creatorNames = newArtistNames;
+    }
+
+    // Add to edit history
+    if (!media.editHistory) {
+      media.editHistory = [];
+    }
+    
+    const changes = [];
+    if (title !== undefined && title.trim() !== media.title) {
+      changes.push({
+        field: 'title',
+        oldValue: media.title,
+        newValue: title.trim()
+      });
+    }
+    if (artist !== undefined && newArtistNames) {
+      const newArtist = newArtistNames.join(', ');
+      if (oldArtist !== newArtist) {
+        changes.push({
+          field: 'artist',
+          oldValue: oldArtist,
+          newValue: newArtist
+        });
+      }
+    }
+
+    if (changes.length > 0) {
+      media.editHistory.push({
+        editedBy: req.user._id,
+        editedAt: new Date(),
+        changes: changes
+      });
+    }
+
+    await media.save();
+
+    // Format response
+    const artistNames = media.artist && media.artist.length > 0
+      ? media.artist.map(a => a.name).join(', ')
+      : (media.creatorNames && media.creatorNames.length > 0 ? media.creatorNames[0] : 'Unknown Artist');
+
+    res.json({
+      message: 'Media updated successfully',
+      media: {
+        _id: media._id,
+        uuid: media.uuid,
+        title: media.title,
+        artist: artistNames,
+        artistArray: media.artist || []
+      }
+    });
+  } catch (error) {
+    console.error('Error updating media:', error);
+    res.status(500).json({ error: 'Failed to update media', details: error.message });
+  }
+});
+
 module.exports = router;
 

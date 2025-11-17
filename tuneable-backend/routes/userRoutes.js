@@ -2752,6 +2752,82 @@ router.get('/admin/bids', authMiddleware, async (req, res) => {
   }
 });
 
+// Admin: Veto a single bid
+router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const Bid = require('../models/Bid');
+    const User = require('../models/User');
+    const mongoose = require('mongoose');
+    const { bidId } = req.params;
+    const { reason } = req.body || {};
+
+    if (!mongoose.isValidObjectId(bidId)) {
+      return res.status(400).json({ error: 'Invalid bid ID format' });
+    }
+
+    // Find the bid
+    const bid = await Bid.findById(bidId).populate('userId', 'balance uuid username');
+    
+    if (!bid) {
+      return res.status(404).json({ error: 'Bid not found' });
+    }
+
+    // Check if bid is already vetoed or refunded
+    if (bid.status !== 'active') {
+      return res.status(400).json({ 
+        error: `Bid is already ${bid.status}`,
+        currentStatus: bid.status
+      });
+    }
+
+    // Refund the user's balance
+    const user = bid.userId;
+    if (!user) {
+      return res.status(404).json({ error: 'User associated with bid not found' });
+    }
+
+    // Refund the bid amount (balance is stored in pence)
+    await User.findByIdAndUpdate(user._id, {
+      $inc: { balance: bid.amount }
+    });
+
+    console.log(`💰 Refunding £${(bid.amount / 100).toFixed(2)} to user ${user.username} for vetoed bid ${bidId}`);
+
+    // Update bid status to vetoed
+    bid.status = 'vetoed';
+    bid.vetoedBy = req.user._id;
+    bid.vetoedBy_uuid = req.user.uuid;
+    bid.vetoedReason = reason || null;
+    bid.vetoedAt = new Date();
+    await bid.save();
+
+    res.json({
+      message: 'Bid vetoed successfully',
+      bid: {
+        _id: bid._id,
+        uuid: bid.uuid,
+        amount: bid.amount,
+        status: bid.status,
+        vetoedAt: bid.vetoedAt,
+        vetoedReason: bid.vetoedReason
+      },
+      refundedAmount: bid.amount,
+      refundedTo: {
+        userId: user._id,
+        username: user.username
+      }
+    });
+  } catch (error) {
+    console.error('Error vetoing bid:', error);
+    res.status(500).json({ error: 'Failed to veto bid', details: error.message });
+  }
+});
+
 // Search users by username, email, or artist name (authenticated users only)
 router.get('/search', authMiddleware, async (req, res) => {
   try {

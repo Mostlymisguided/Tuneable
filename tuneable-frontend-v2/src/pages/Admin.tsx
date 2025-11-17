@@ -92,6 +92,19 @@ const Admin: React.FC = () => {
   const [bidsStatusFilter, setBidsStatusFilter] = useState<string>('');
   const [bidsSearchQuery, setBidsSearchQuery] = useState<string>('');
   const [bidsScopeFilter, setBidsScopeFilter] = useState<string>('');
+  const [mediaList, setMediaList] = useState<any[]>([]);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [mediaSortField, setMediaSortField] = useState<string>('uploadedAt');
+  const [mediaSortDirection, setMediaSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [mediaPage, setMediaPage] = useState<number>(1);
+  const [mediaTotal, setMediaTotal] = useState<number>(0);
+  const [mediaContentTypeFilter, setMediaContentTypeFilter] = useState<string>('');
+  const [mediaContentFormFilter, setMediaContentFormFilter] = useState<string>('');
+  const [mediaSearchQuery, setMediaSearchQuery] = useState<string>('');
+  const [mediaRightsFilter, setMediaRightsFilter] = useState<string>('');
+  const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<'title' | 'artist' | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
@@ -591,6 +604,108 @@ const Admin: React.FC = () => {
     }
   }, [bidsSortField, bidsSortDirection, bidsPage, bidsStatusFilter, bidsSearchQuery, bidsScopeFilter, activeTab]);
 
+  const loadMedia = async () => {
+    try {
+      setIsLoadingMedia(true);
+      const params: any = {
+        page: mediaPage,
+        limit: 50,
+        sortBy: mediaSortField,
+        sortOrder: mediaSortDirection
+      };
+      if (mediaContentTypeFilter) {
+        params.contentType = mediaContentTypeFilter;
+      }
+      if (mediaContentFormFilter) {
+        params.contentForm = mediaContentFormFilter;
+      }
+      if (mediaSearchQuery) {
+        params.search = mediaSearchQuery;
+      }
+      if (mediaRightsFilter !== '') {
+        params.rightsCleared = mediaRightsFilter === 'true';
+      }
+      const data = await mediaAPI.getAllMedia(params);
+      setMediaList(data.media || []);
+      setMediaTotal(data.total || 0);
+    } catch (error) {
+      console.error('Error loading media:', error);
+      toast.error('Failed to load media');
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  };
+
+  const handleMediaSort = (field: string) => {
+    if (mediaSortField === field) {
+      setMediaSortDirection(mediaSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setMediaSortField(field);
+      setMediaSortDirection('desc');
+    }
+  };
+
+  const getMediaSortIcon = (field: string) => {
+    if (mediaSortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return mediaSortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 text-purple-400" />;
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return 'N/A';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleStartEdit = (mediaId: string, field: 'title' | 'artist', currentValue: string) => {
+    setEditingMediaId(mediaId);
+    setEditingField(field);
+    setEditingValue(currentValue);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMediaId(null);
+    setEditingField(null);
+    setEditingValue('');
+  };
+
+  const handleSaveEdit = async (mediaId: string, field: 'title' | 'artist') => {
+    if (!editingValue.trim()) {
+      toast.error(`${field === 'title' ? 'Title' : 'Artist'} cannot be empty`);
+      return;
+    }
+
+    try {
+      const updates: { title?: string; artist?: string } = {};
+      updates[field] = editingValue.trim();
+      
+      await mediaAPI.updateMedia(mediaId, updates);
+      toast.success(`${field === 'title' ? 'Title' : 'Artist'} updated successfully`);
+      handleCancelEdit();
+      loadMedia(); // Reload to get updated data
+    } catch (error: any) {
+      console.error('Error updating media:', error);
+      toast.error(error.response?.data?.error || `Failed to update ${field}`);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'media-management' && isAdmin) {
+      loadMedia();
+    }
+  }, [mediaSortField, mediaSortDirection, mediaPage, mediaContentTypeFilter, mediaContentFormFilter, mediaSearchQuery, mediaRightsFilter, activeTab]);
+
   useEffect(() => {
     if (activeTab === 'reports' && isAdmin) {
       if (reportsSubTab === 'claims') {
@@ -664,6 +779,7 @@ const Admin: React.FC = () => {
     { id: 'users', name: 'Users', icon: Users },
     { id: 'labels', name: 'Labels', icon: Building },
     { id: 'bids', name: 'Bids', icon: DollarSign },
+    { id: 'media-management', name: 'Media', icon: Music },
     { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
     { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -1597,11 +1713,11 @@ const Admin: React.FC = () => {
                               {bid.status === 'active' && (
                                 <button
                                   onClick={async () => {
-                                    const reason = prompt('Enter reason for veto:');
-                                    if (reason) {
+                                    const reason = prompt('Enter reason for veto (optional):');
+                                    if (reason !== null) { // Allow empty string but not cancel
                                       try {
-                                        // TODO: Implement veto functionality
-                                        toast.info('Veto functionality will be implemented');
+                                        await userAPI.vetoBid(bid._id, reason || undefined);
+                                        toast.success(`Bid vetoed successfully. User refunded ${penceToPounds(bid.amount)}.`);
                                         loadBids();
                                       } catch (error: any) {
                                         toast.error(error.response?.data?.error || 'Failed to veto bid');
@@ -1642,6 +1758,413 @@ const Admin: React.FC = () => {
                       <button
                         onClick={() => setBidsPage(p => p + 1)}
                         disabled={bidsPage * 50 >= bidsTotal}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'media-management' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Media Management</h2>
+              <button
+                onClick={loadMedia}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Search
+                  </label>
+                  <input
+                    type="text"
+                    value={mediaSearchQuery}
+                    onChange={(e) => {
+                      setMediaSearchQuery(e.target.value);
+                      setMediaPage(1);
+                      if (e.target.value.length === 0 || e.target.value.length >= 2) {
+                        loadMedia();
+                      }
+                    }}
+                    placeholder="Title, artist, tags..."
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Content Type
+                  </label>
+                  <select
+                    value={mediaContentTypeFilter}
+                    onChange={(e) => {
+                      setMediaContentTypeFilter(e.target.value);
+                      setMediaPage(1);
+                      loadMedia();
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">All Types</option>
+                    <option value="music">Music</option>
+                    <option value="spoken">Spoken</option>
+                    <option value="video">Video</option>
+                    <option value="image">Image</option>
+                    <option value="written">Written</option>
+                    <option value="interactive">Interactive</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Content Form
+                  </label>
+                  <select
+                    value={mediaContentFormFilter}
+                    onChange={(e) => {
+                      setMediaContentFormFilter(e.target.value);
+                      setMediaPage(1);
+                      loadMedia();
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">All Forms</option>
+                    <option value="tune">Tune</option>
+                    <option value="album">Album</option>
+                    <option value="podcast">Podcast</option>
+                    <option value="episode">Episode</option>
+                    <option value="audiobook">Audiobook</option>
+                    <option value="video">Video</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Rights Cleared
+                  </label>
+                  <select
+                    value={mediaRightsFilter}
+                    onChange={(e) => {
+                      setMediaRightsFilter(e.target.value);
+                      setMediaPage(1);
+                      loadMedia();
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">All</option>
+                    <option value="true">Cleared</option>
+                    <option value="false">Not Cleared</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {isLoadingMedia ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : mediaList.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <Music className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No media found</p>
+              </div>
+            ) : (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleMediaSort('title')}
+                        >
+                          <div className="flex items-center">
+                            Media
+                            {getMediaSortIcon('title')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleMediaSort('artist')}
+                        >
+                          <div className="flex items-center">
+                            Artist
+                            {getMediaSortIcon('artist')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleMediaSort('globalMediaAggregate')}
+                        >
+                          <div className="flex items-center">
+                            Total Bids
+                            {getMediaSortIcon('globalMediaAggregate')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleMediaSort('playCount')}
+                        >
+                          <div className="flex items-center">
+                            Plays
+                            {getMediaSortIcon('playCount')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleMediaSort('duration')}
+                        >
+                          <div className="flex items-center">
+                            Duration
+                            {getMediaSortIcon('duration')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Owners
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleMediaSort('uploadedAt')}
+                        >
+                          <div className="flex items-center">
+                            Uploaded
+                            {getMediaSortIcon('uploadedAt')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                      {mediaList.map((item) => (
+                        <tr key={item._id} className="hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {item.coverArt && (
+                                <img
+                                  src={item.coverArt}
+                                  alt={item.title}
+                                  className="h-10 w-10 rounded object-cover mr-3"
+                                />
+                              )}
+                              <div className="flex-1">
+                                {editingMediaId === item._id && editingField === 'title' ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={editingValue}
+                                      onChange={(e) => setEditingValue(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleSaveEdit(item._id, 'title');
+                                        } else if (e.key === 'Escape') {
+                                          handleCancelEdit();
+                                        }
+                                      }}
+                                      className="flex-1 px-2 py-1 bg-gray-700 border border-purple-500 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleSaveEdit(item._id, 'title')}
+                                      className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                      title="Save"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEdit}
+                                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                      title="Cancel"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2 group">
+                                    <button
+                                      onClick={() => navigate(`/tune/${item._id}`)}
+                                      className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                                    >
+                                      {item.title || 'Unknown'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartEdit(item._id, 'title', item.title || '')}
+                                      className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
+                                      title="Edit title"
+                                    >
+                                      ✏️
+                                    </button>
+                                    {item.explicit && (
+                                      <span className="ml-2 text-xs text-red-400">E</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {editingMediaId === item._id && editingField === 'artist' ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={editingValue}
+                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveEdit(item._id, 'artist');
+                                    } else if (e.key === 'Escape') {
+                                      handleCancelEdit();
+                                    }
+                                  }}
+                                  className="flex-1 px-2 py-1 bg-gray-700 border border-purple-500 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                  placeholder="Artist names (comma-separated)"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveEdit(item._id, 'artist')}
+                                  className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                  title="Save"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group">
+                                <div className="text-sm text-gray-300">
+                                  {item.artist || 'Unknown Artist'}
+                                </div>
+                                <button
+                                  onClick={() => handleStartEdit(item._id, 'artist', item.artist || '')}
+                                  className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
+                                  title="Edit artist"
+                                >
+                                  ✏️
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-xs text-gray-400">
+                              {item.contentType?.join(', ') || 'N/A'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {item.contentForm?.join(', ') || 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-green-400">
+                              {penceToPounds(item.globalMediaAggregate || 0)}
+                            </div>
+                            {item.globalMediaBidTop > 0 && (
+                              <div className="text-xs text-gray-500">
+                                Top: {penceToPounds(item.globalMediaBidTop)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {item.playCount || 0}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {formatDuration(item.duration)}
+                            </div>
+                            {item.fileSize && (
+                              <div className="text-xs text-gray-500">
+                                {formatFileSize(item.fileSize)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {item.ownerCount || 0} owner{item.ownerCount !== 1 ? 's' : ''}
+                            </div>
+                            {item.totalOwnership !== 100 && item.totalOwnership > 0 && (
+                              <div className="text-xs text-yellow-400">
+                                {item.totalOwnership}% total
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {item.uploadedAt ? new Date(item.uploadedAt).toLocaleDateString() : 'N/A'}
+                            </div>
+                            {item.addedBy && (
+                              <div className="text-xs text-gray-500">
+                                by {item.addedBy.username}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col gap-1">
+                              {item.rightsCleared ? (
+                                <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Rights Cleared</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>
+                              )}
+                              {item.label && item.label.length > 0 && (
+                                <div className="text-xs text-gray-400">
+                                  {item.label.length} label{item.label.length !== 1 ? 's' : ''}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => navigate(`/tune/${item._id}`)}
+                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                title="View media"
+                              >
+                                View
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {mediaTotal > 50 && (
+                  <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
+                    <div className="text-sm text-gray-300">
+                      Showing {((mediaPage - 1) * 50) + 1} - {Math.min(mediaPage * 50, mediaTotal)} of {mediaTotal}
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setMediaPage(p => Math.max(1, p - 1))}
+                        disabled={mediaPage === 1}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setMediaPage(p => p + 1)}
+                        disabled={mediaPage * 50 >= mediaTotal}
                         className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Next

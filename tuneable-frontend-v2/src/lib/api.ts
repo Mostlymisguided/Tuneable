@@ -366,6 +366,31 @@ export const mediaAPI = {
     const response = await api.get('/media/admin/stats');
     return response.data;
   },
+
+  // Admin: Get all media with filtering
+  getAllMedia: async (params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'uploadedAt' | 'title' | 'globalMediaAggregate' | 'globalMediaBidTop' | 'playCount' | 'popularity' | 'createdAt' | 'duration' | 'fileSize' | 'artist';
+    sortOrder?: 'asc' | 'desc';
+    contentType?: string | string[];
+    contentForm?: string | string[];
+    search?: string;
+    addedBy?: string;
+    labelId?: string;
+    rightsCleared?: boolean;
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const response = await api.get('/media/admin/all', { params });
+    return response.data;
+  },
+
+  // Admin: Update media title and/or artist
+  updateMedia: async (mediaId: string, updates: { title?: string; artist?: string }) => {
+    const response = await api.put(`/media/admin/${mediaId}`, updates);
+    return response.data;
+  },
   
   uploadMedia: async (file: File, metadata: { title: string; artist: string }) => {
     const formData = new FormData();
@@ -717,6 +742,12 @@ export const userAPI = {
     dateTo?: string;
   }) => {
     const response = await api.get('/users/admin/bids', { params });
+    return response.data;
+  },
+
+  // Admin: Veto a single bid
+  vetoBid: async (bidId: string, reason?: string) => {
+    const response = await api.post(`/users/admin/bids/${bidId}/veto`, { reason });
     return response.data;
   },
 
