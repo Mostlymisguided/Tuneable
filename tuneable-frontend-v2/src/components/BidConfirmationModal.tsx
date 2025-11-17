@@ -8,7 +8,6 @@ interface BidConfirmationModalProps {
   bidAmount: number;
   mediaTitle: string;
   mediaArtist?: string;
-  currentBid?: number;
   userBalance?: number;
   isLoading?: boolean;
 }
@@ -20,7 +19,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   bidAmount,
   mediaTitle,
   mediaArtist,
-  currentBid,
   userBalance = 0,
   isLoading = false,
 }) => {
@@ -66,7 +64,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
       <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Confirm Your Bid</h2>
+          <h2 className="text-xl font-semibold text-white">Confirm Your Tip</h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-200 transition-colors"
@@ -80,7 +78,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         <div className="mb-4 p-3 bg-gray-700 rounded-lg">
           <div className="flex items-center space-x-2 mb-1">
             <Music className="h-4 w-4 text-purple-400" />
-            <span className="text-sm font-medium text-gray-300">Bidding on:</span>
+            <span className="text-sm font-medium text-gray-300">Tipping on:</span>
           </div>
           <p className="text-white font-medium">{mediaTitle}</p>
           {mediaArtist && (
@@ -91,15 +89,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         {/* Bid Amount Summary */}
         <div className="mb-4 p-4 bg-purple-900/30 rounded-lg border border-purple-600">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-300">Your Bid Amount:</span>
+            <span className="text-sm text-gray-300">Your Tip Amount:</span>
             <span className="text-2xl font-bold text-purple-400">£{bidAmount.toFixed(2)}</span>
           </div>
-          {currentBid !== undefined && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-400">Current bid:</span>
-              <span className="font-medium text-white">£{currentBid.toFixed(2)}</span>
-            </div>
-          )}
         </div>
 
         {/* Insufficient Funds Warning */}
@@ -189,7 +181,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading || hasInsufficientFunds}
           >
-            {isLoading ? 'Placing Bid...' : 'Confirm Bid'}
+            {isLoading ? 'Placing Tip...' : 'Confirm Tip'}
           </button>
         </div>
       </div>
