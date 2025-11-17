@@ -3029,6 +3029,23 @@ router.post('/admin/warnings', authMiddleware, adminMiddleware, async (req, res)
         console.error('Error sending warning email:', emailError);
         // Don't fail the request if email fails
       }
+      
+      // Create platform notification
+      try {
+        const notificationService = require('../services/notificationService');
+        await notificationService.createNotification({
+          userId: targetUser._id,
+          type: 'warning',
+          title: 'Account Suspended',
+          message: `Your account has been temporarily suspended for ${TEMP_BAN_DAYS} days due to multiple warnings.`,
+          link: '/profile',
+          linkText: 'View Profile',
+          relatedUserId: req.user._id
+        });
+      } catch (notifError) {
+        console.error('Error creating warning notification:', notifError);
+        // Don't fail the request if notification fails
+      }
     } else {
       // Send email notification for regular warnings
       try {
@@ -3041,6 +3058,36 @@ router.post('/admin/warnings', authMiddleware, adminMiddleware, async (req, res)
       } catch (emailError) {
         console.error('Error sending warning email:', emailError);
         // Don't fail the request if email fails
+      }
+      
+      // Create platform notification
+      try {
+        const notificationService = require('../services/notificationService');
+        
+        // Generate appropriate title based on warning type
+        let title = 'Warning Issued';
+        if (type === 'info') {
+          title = 'Information Notice';
+        } else if (type === 'warning') {
+          title = 'Warning Issued';
+        } else if (type === 'final_warning') {
+          title = 'Final Warning';
+        } else if (type === 'suspension_notice') {
+          title = 'Account Suspension Notice';
+        }
+        
+        await notificationService.createNotification({
+          userId: targetUser._id,
+          type: 'warning',
+          title,
+          message: message.trim(),
+          link: '/profile',
+          linkText: 'View Profile',
+          relatedUserId: req.user._id
+        });
+      } catch (notifError) {
+        console.error('Error creating warning notification:', notifError);
+        // Don't fail the request if notification fails
       }
     }
     

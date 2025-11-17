@@ -53,13 +53,14 @@ const createNotification = async (params) => {
 
     // Check if user has this notification type enabled
     // Note: Some notification types are always sent (creator_approved, creator_rejected, 
-    // claim_approved, claim_rejected, admin_announcement) and should not be checked
+    // claim_approved, claim_rejected, admin_announcement, warning) and should not be checked
     const alwaysSendTypes = [
       'creator_approved',
       'creator_rejected',
       'claim_approved',
       'claim_rejected',
-      'admin_announcement'
+      'admin_announcement',
+      'warning'
     ];
 
     if (!alwaysSendTypes.includes(type)) {

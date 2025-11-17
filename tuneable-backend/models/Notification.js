@@ -26,6 +26,7 @@ const notificationSchema = new mongoose.Schema({
       'media_claimed',           // Your uploaded media was claimed
       'label_invite',            // Invited to label
       'collective_invite',       // Invited to collective
+      'warning',                 // Admin warning issued to user
     ],
     required: true
   },
