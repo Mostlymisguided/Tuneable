@@ -734,7 +734,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
                 tags: videoTags,
                 category: videoCategory,
                 addedBy: userId,
-                globalMediaAggregate: bidAmount, // Updated to schema grammar
+                globalMediaAggregate: bidAmountPence, // Store in pence (schema grammar)
                 contentType: 'music',
                 contentForm: 'tune'
             });
@@ -863,12 +863,12 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             mediaId: media._id,
             media_uuid: media.uuid,
             addedBy: userId,
-            partyMediaAggregate: bidAmount, // First bid becomes the aggregate
+            partyMediaAggregate: bidAmountPence, // First bid becomes the aggregate (store in pence)
             partyBids: [bid._id],
             status: 'active',
             queuedAt: new Date(),
             // Top bid tracking (first bid is automatically the top bid) - schema grammar
-            partyMediaBidTop: bidAmount,
+            partyMediaBidTop: bidAmountPence, // Store in pence
             partyMediaBidTopUser: userId,
             partyMediaAggregateTop: userPartyAggregate,
             partyMediaAggregateTopUser: userId
@@ -1065,7 +1065,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             userId,
             partyId,
             mediaId: actualMediaId, // Use mediaId instead of songId
-            amount: bidAmount,
+            amount: bidAmountPence, // Store in pence
             status: 'active',
             bidScope: party.type === 'global' ? 'global' : 'party', // Set bidScope based on party type
             
@@ -1152,7 +1152,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             console.log('🌍 Global Party bidding - skipping party.media update (virtual)');
         } else {
             // Regular party logic - update party media entry
-            partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmount;
+            partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmountPence; // Add pence to pence
             partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
             partyMediaEntry.partyBids.push(bid._id);
             // Ensure status is valid (fix any legacy 'queued' status)
@@ -1174,17 +1174,17 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         const media = await Media.findById(actualMediaId);
         if (media) {
             // Store previous top bid info for outbid notification
-            const previousTopBidAmount = media.globalMediaBidTop || 0;
+            const previousTopBidAmount = media.globalMediaBidTop || 0; // Already in pence
             const previousTopBidderId = media.globalMediaBidTopUser;
-            const wasNewTopBid = bidAmount > previousTopBidAmount;
+            const wasNewTopBid = bidAmountPence > previousTopBidAmount; // Compare pence to pence
             
-            media.globalMediaAggregate = (media.globalMediaAggregate || 0) + bidAmount; // Updated to schema grammar
+            media.globalMediaAggregate = (media.globalMediaAggregate || 0) + bidAmountPence; // Add pence to pence (schema grammar)
             media.bids = media.bids || [];
             media.bids.push(bid._id);
             
             // Update top bid if this is higher
             if (wasNewTopBid) {
-                media.globalMediaBidTop = bidAmount;
+                media.globalMediaBidTop = bidAmountPence; // Store in pence
                 media.globalMediaBidTopUser = userId;
             }
             
