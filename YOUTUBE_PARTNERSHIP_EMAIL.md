@@ -2,133 +2,148 @@
 
 **Subject:** Request for Formal Partnership / Commercial Alignment - Tuneable CIC
 
-**To:** YouTube Partnerships Team / partnerships@youtube.com (or appropriate contact)
+---
 
+**To:** YouTube Partnerships Team / Google API Services Team  
 **From:** Ed Meacock, Founder, Tuneable CIC  
-**Email:** ed@tuneable.stream / hi@tuneable.stream
+**Email:** hi@tuneable.stream  
+**Date:** [Date]
 
 ---
 
-Hello YouTube Partnerships Team,
+Dear YouTube Partnerships Team,
 
-I am the founder of **Tuneable CIC**, a UK Community Interest Company that facilitates fan tipping and artist support through social music queueing and ranking systems.
+I am writing to you as the founder of **Tuneable CIC**, a UK Community Interest Company (Company Number: [CIC Number]), to request formal partnership discussions and commercial alignment regarding our use of the YouTube Data API.
 
 ## About Tuneable
 
-Tuneable allows fans to tip artists and influence the social ranking of songs at events and online parties. Our platform uses the official YouTube embedded player for user-initiated playback and accesses video metadata through the YouTube Data API.
+Tuneable is a community-funded artist support platform that allows fans to tip artists and influence the social ranking of songs at events and online parties. Our platform facilitates fan tipping, social queueing, and artist support—we are **not a music streaming service**.
 
-**Key Points:**
-- **Tuneable is not a streaming service** – we facilitate fan tipping, social queueing, and artist support
-- **Playback is incidental and user-initiated** – we use only the official YouTube embedded player
-- **We do not charge users for access to YouTube content** – revenue relates solely to tips and fan interactions, not streaming or content access
-- **We do not download, store, or rehost any YouTube content** – we only access publicly available metadata through the YouTube Data API
+### Our Mission
 
-## Our Use of YouTube Data API
+As a Community Interest Company, Tuneable exists to increase income for musicians and rights-holders by turning passive listening into active community support. Our CIC status demonstrates that Tuneable is not exploiting third-party content commercially, but rather redistributing fan support to artists.
 
-Tuneable uses the YouTube Data API for:
-- Accessing video metadata (title, artist, duration, thumbnails) for display and search purposes
-- Linking fans to YouTube creators and content
-- Supporting artists financially through our escrow and revenue sharing system
-- Embedding the official YouTube player for user-initiated playback (per YouTube Terms of Service)
+## Current YouTube Data API Usage
 
-We comply with all YouTube API requirements:
-- ✅ We do not charge users for access to YouTube content
-- ✅ We do not circumvent YouTube advertisements
-- ✅ We use only the official YouTube embed player
-- ✅ We follow YouTube branding guidelines
-- ✅ We do not download, store, or rehost any YouTube content
-- ✅ We respect YouTube API quota limits and usage policies
+Tuneable currently uses the YouTube Data API in compliance with YouTube's Terms of Service and API Services Terms. Our usage is limited to:
 
-## Our Revenue Model
+- **Accessing publicly available video metadata** (title, artist, duration, thumbnails) for display and search purposes
+- **Linking users to YouTube creators and content** to support artists financially
+- **Using the official YouTube embedded player** for user-initiated playback only
 
-Money exchanged on Tuneable is for:
-- **Social influence and ranking** – users tip to influence party queues
-- **Artist support** – tips are distributed to artists through our escrow system
-- **Party participation** – community features and social interactions
+### Compliance with YouTube API Requirements
 
-This model is similar to Twitch Bits, TikTok Gifts, or Patreon support, where users pay to support creators and influence community features, not to access content.
+Tuneable fully complies with all YouTube API requirements:
 
-## Community Interest Company Status
+✅ **We do not charge users for access to YouTube content**  
+✅ **We do not circumvent YouTube advertisements**  
+✅ **We use only the official YouTube embed player**  
+✅ **We follow YouTube branding guidelines**  
+✅ **We do not download, store, or rehost any YouTube content**  
+✅ **We respect YouTube API quota limits and usage policies**
 
-As a UK Community Interest Company (CIC), Tuneable exists to:
-- **Increase income for musicians and rights-holders** by turning passive listening into active community support
-- **Redistribute fan support to artists** through our escrow and revenue sharing system
-- **Support the music community** through transparent, artist-friendly practices
+### Revenue Model
 
-Our CIC status demonstrates that Tuneable is not exploiting YouTube content commercially, but rather redistributing fan support to artists and creators.
+Money exchanged on Tuneable is for **social influence, ranking, tipping artists, and party participation**—not for streaming or content access. This model is similar to:
+
+- Twitch Bits (viewers pay to influence stream events)
+- TikTok Gifts (users pay to support creators)
+- Patreon support (fans pay to support artists)
+- Reddit coins (users pay for community features)
+
+**We do not monetize YouTube playback itself.** Playback is incidental, user-initiated, and uses the official YouTube player only.
 
 ## What We're Requesting
 
-We would like to formalize our use of the YouTube Data API and discuss:
+We would like to discuss:
 
 1. **API Compliance & Best Practices**
-   - Confirm our current usage is compliant
-   - Understand any additional requirements for commercial use
-   - Discuss best practices for API usage at scale
+   - Confirmation that our current usage is compliant
+   - Guidance on best practices for commercial API usage
+   - Any recommended improvements to our implementation
 
-2. **Optional Commercial Licensing**
-   - Explore commercial licensing options if available
-   - Understand requirements for scaling our platform
-   - Discuss partnership opportunities
+2. **Optional Commercial Licensing for Scale**
+   - If available, commercial licensing options for expanded API usage
+   - Quota management and scaling considerations
+   - Partnership benefits for supporting artists
 
 3. **How Tuneable Can Drive Traffic and Revenue Back to YouTube**
-   - Our platform drives users to YouTube for playback
-   - We link directly to YouTube creators and channels
-   - We support artists who create content on YouTube
-   - We can provide analytics on traffic driven to YouTube
+   - Our platform drives users to YouTube creators and content
+   - We facilitate financial support for artists (which benefits YouTube creators)
+   - We can provide analytics on traffic and engagement we drive to YouTube
 
 4. **Artist Verification Flows**
-   - Discuss how we can verify artists and rights-holders
-   - Explore integration opportunities for artist verification
-   - Understand how to best support YouTube creators
+   - Potential integration with YouTube's creator verification systems
+   - Streamlined processes for artists to claim revenue from Tuneable
+   - Collaboration on artist support initiatives
 
-## Our Commitment to Compliance
+## Our Commitment
 
-**If YouTube prefers we disable certain features or modify our usage, we will comply immediately.** We are committed to:
-- Full transparency in our API usage
-- Immediate compliance with any YouTube requests
-- Maintaining a positive relationship with YouTube and Google
-- Supporting YouTube creators and driving traffic to the platform
+**If YouTube prefers we disable certain features or modify our usage, we will comply immediately.** Tuneable can continue operating using alternative metadata sources (MusicBrainz, Discogs, Spotify API, Apple Music API, SoundCloud, ISRC databases, user-submitted metadata, or artist uploads) while maintaining all core functionality as a queueing engine, bidding system, and social jukebox platform.
 
-## Alternative Data Sources
+However, we believe that a formal partnership would be mutually beneficial:
 
-We understand that API access may be subject to change. Tuneable is designed to be resilient and can continue operating using alternative metadata sources (MusicBrainz, Discogs, Spotify API, Apple Music API, SoundCloud, ISRC databases, user-submitted metadata, or artist uploads) while maintaining all core functionality as a queueing engine, bidding system, and social jukebox platform.
+- **For YouTube:** Increased traffic, engagement, and financial support for YouTube creators
+- **For Artists:** Additional revenue streams and community support
+- **For Tuneable:** Clear compliance path and potential for growth
 
-However, we believe that a formal partnership with YouTube would be mutually beneficial and would allow us to better support YouTube creators and drive traffic to the platform.
+## Legal Framework
+
+We have comprehensive Terms of Service and Privacy Policy that clearly outline:
+
+- Our platform nature (tipping/social platform, not streaming service)
+- YouTube API usage and compliance
+- Artist revenue escrow system (3-year escrow for unclaimed funds)
+- Opt-out and takedown procedures
+- User responsibilities and limitations of liability
+
+All legal documents are publicly available at:
+- Terms of Service: https://tuneable.stream/terms-of-service
+- Privacy Policy: https://tuneable.stream/privacy-policy
 
 ## Next Steps
 
-I would be happy to:
-- Schedule a call to discuss our platform and API usage in detail
-- Provide a demo of Tuneable and how we use the YouTube Data API
-- Share our Terms of Service and Privacy Policy for review
-- Answer any questions about our platform, business model, or CIC structure
-- Work with your team to ensure full compliance and best practices
+We would be grateful for the opportunity to:
 
-Thank you for your time and consideration. I look forward to hearing from you.
+1. Schedule a call or meeting to discuss partnership opportunities
+2. Receive feedback on our current API usage and compliance
+3. Understand any requirements or recommendations for commercial API usage
+4. Explore how Tuneable can best support YouTube creators and drive value back to YouTube
+
+## Contact Information
+
+**Ed Meacock**  
+Founder, Tuneable CIC  
+Email: hi@tuneable.stream  
+Alternative: mostlymisguided@icloud.com  
+Website: https://tuneable.stream
+
+**Company Details:**
+- Legal Name: Tuneable CIC
+- Company Type: UK Community Interest Company
+- Registration Number: [CIC Number]
+- Registered Address: [Address]
+
+Thank you for your time and consideration. We look forward to the opportunity to discuss how Tuneable can work in partnership with YouTube to support artists and creators.
 
 Best regards,
 
 **Ed Meacock**  
-Founder, Tuneable CIC  
-Email: ed@tuneable.stream / hi@tuneable.stream  
-Website: https://tuneable.stream
+Founder, Tuneable CIC
 
 ---
 
-## Attachments / Links to Include:
+## Attachments / References
 
-- Terms of Service: https://tuneable.stream/terms-of-service
-- Privacy Policy: https://tuneable.stream/privacy-policy
-- Platform Demo: [Link to demo or video walkthrough if available]
+- Terms of Service: https://tuneable.stream/terms-of-service (Section 2.1 covers YouTube API usage)
+- Privacy Policy: https://tuneable.stream/privacy-policy (Section 1.3 covers YouTube Data API information)
+- Platform Overview: https://tuneable.stream
 
 ---
 
-## Notes for Sending:
-
-1. **Research the correct contact:** Look for YouTube Partnerships email or contact form on YouTube's partner program pages
-2. **Consider LinkedIn:** You may also want to reach out to YouTube partnership managers on LinkedIn
-3. **Follow up:** If no response within 2 weeks, send a polite follow-up
-4. **Be prepared:** Have your Terms of Service and Privacy Policy live and accessible before sending
-5. **Document everything:** Keep records of all communications for compliance purposes
-
+**Note:** This email should be personalized with:
+- Actual CIC registration number
+- Registered address
+- Current date
+- Any specific contact names if known
+- Platform metrics or statistics if available

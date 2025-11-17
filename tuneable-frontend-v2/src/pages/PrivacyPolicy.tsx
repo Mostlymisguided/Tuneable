@@ -41,32 +41,64 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">1.3 YouTube Data API Information</h3>
                 <p className="mb-2">
-                  Tuneable uses the YouTube Data API to access publicly available video metadata. We collect and store:
+                  Tuneable uses the YouTube Data API to access publicly available video metadata in compliance with YouTube's Terms of Service 
+                  and API Services Terms. We collect and store:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Video titles, descriptions, and thumbnails (for display purposes only)</li>
-                  <li>Video duration and channel information</li>
+                  <li>Video titles, descriptions, and thumbnails (for display and search purposes only)</li>
+                  <li>Video duration, channel information, and publication dates</li>
                   <li>YouTube video IDs and URLs (for embedding the official YouTube player)</li>
-                  <li>Video metadata is used solely for platform functionality and is not sold or shared with third parties</li>
+                  <li>Video category and basic metadata (for content organization)</li>
                 </ul>
                 <p className="mb-2 mt-4">
-                  <strong>Note:</strong> Tuneable does not collect or store any personal information from YouTube users. 
-                  We only access publicly available metadata through the YouTube Data API in compliance with YouTube's Terms of Service.
+                  <strong>Important:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Tuneable does <strong>not</strong> collect or store any personal information from YouTube users or YouTube account holders</li>
+                  <li>We only access publicly available metadata through the YouTube Data API</li>
+                  <li>We do <strong>not</strong> download, store, or rehost any video or audio content from YouTube</li>
+                  <li>We do <strong>not</strong> access private or unlisted YouTube videos</li>
+                  <li>Video metadata is used solely for platform functionality (display, search, queueing) and is not sold or shared with third parties</li>
+                  <li>Playback uses the official YouTube embedded player only (user-initiated)</li>
+                  <li>We comply with YouTube API quota limits and usage policies</li>
+                </ul>
+                <p className="mb-2">
+                  <strong>Data Processing Basis:</strong> We process YouTube metadata under our legitimate interest to provide platform functionality 
+                  and facilitate user-initiated content discovery and playback. This processing is necessary for the operation of our social music 
+                  platform and does not infringe on YouTube users' privacy rights.
+                </p>
+                <p className="mb-2">
+                  <strong>Compliance:</strong> If YouTube or Google requests that we modify or cease using YouTube Data API content, we will comply 
+                  immediately. In such cases, we may transition to alternative metadata sources (MusicBrainz, Discogs, Spotify API, Apple Music API, 
+                  SoundCloud, ISRC databases, or user-submitted metadata) while maintaining platform functionality.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">1.4 Artist Revenue and Escrow Data</h3>
                 <p className="mb-2">
-                  For artists and rights-holders who claim revenue or have funds in escrow, we collect:
+                  For artists and rights-holders who claim revenue or have funds in escrow, we collect and process:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Identity verification documents (government-issued ID)</li>
-                  <li>Proof of rights ownership (contracts, ISRC codes, distribution agreements)</li>
-                  <li>Payment and banking information for payouts</li>
-                  <li>Tax information (as required by law)</li>
-                  <li>Revenue and transaction history</li>
+                  <li>Identity verification documents (government-issued ID) - stored securely and encrypted</li>
+                  <li>Proof of rights ownership (contracts, ISRC codes, distribution agreements, label affiliations)</li>
+                  <li>Payment and banking information for payouts (processed securely through Stripe)</li>
+                  <li>Tax information (as required by UK tax law and financial regulations)</li>
+                  <li>Revenue and transaction history (for escrow management and payout processing)</li>
+                  <li>Contact information for artist verification and payout communications</li>
                 </ul>
                 <p className="mb-2 mt-4">
-                  This information is stored securely and used solely for processing artist payouts and maintaining escrow accounts.
+                  <strong>Escrow Data Processing:</strong>
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>All artist revenue is held in segregated escrow accounts until claimed by the artist or rights-holder</li>
+                  <li>Escrow data is processed under our legitimate interest to fulfill our contractual obligations to artists and maintain 
+                  financial records as required by law</li>
+                  <li>Identity verification documents are processed under legal obligation (anti-fraud and financial compliance requirements)</li>
+                  <li>Escrow information is retained for 3 years from the date of the first tip/bid, or until claimed by the artist</li>
+                  <li>Unclaimed funds after 3 years may be donated to registered music charities (as outlined in our Terms of Service)</li>
+                </ul>
+                <p className="mb-2">
+                  <strong>Security:</strong> All artist escrow data is stored securely with encryption at rest and in transit. Access is restricted 
+                  to authorized personnel only on a need-to-know basis for payout processing and verification purposes.
                 </p>
               </div>
             </section>
@@ -287,9 +319,12 @@ const PrivacyPolicy: React.FC = () => {
                 <h3 className="text-xl font-medium text-gray-900">6.3 Content and Media Services</h3>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li><strong>YouTube/Google:</strong> YouTube Data API for metadata access and embedded player - <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Google Privacy Policy</a></li>
-                  <li>Tuneable uses YouTube Data API to access publicly available video metadata only</li>
-                  <li>Playback uses the official YouTube embedded player (user-initiated)</li>
-                  <li>Tuneable does not collect personal information from YouTube users</li>
+                  <li>Tuneable uses YouTube Data API to access publicly available video metadata only (in compliance with YouTube Terms of Service)</li>
+                  <li>Playback uses the official YouTube embedded player (user-initiated only)</li>
+                  <li>Tuneable does not collect personal information from YouTube users or YouTube account holders</li>
+                  <li>We do not download, store, or rehost any YouTube content</li>
+                  <li>We comply with YouTube API quota limits and usage policies</li>
+                  <li>If YouTube restricts API access, we will transition to alternative metadata sources (see Terms of Service section 2.1.2)</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">6.4 Data Processing by Third Parties</h3>
@@ -410,14 +445,23 @@ const PrivacyPolicy: React.FC = () => {
                   we are committed to protecting your privacy and complying with UK GDPR and EU GDPR requirements.
                 </p>
                 <p className="mb-2">
-                  <strong>Our Commitment:</strong> As a CIC, Tuneable exists to benefit the music community. We are committed to:
+                  <strong>Our Commitment:</strong> As a UK Community Interest Company (CIC), Tuneable exists to benefit the music community. 
+                  We are committed to:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Transparency in how we collect and use your data</li>
-                  <li>Minimizing data collection to what is necessary</li>
-                  <li>Protecting your privacy rights</li>
-                  <li>Using your data to support artists and the music community</li>
+                  <li>Minimizing data collection to what is necessary for platform functionality and legal compliance</li>
+                  <li>Protecting your privacy rights in accordance with UK GDPR and EU GDPR</li>
+                  <li>Using your data to support artists and the music community (in line with our CIC objectives)</li>
+                  <li>Not selling your personal information to third parties</li>
+                  <li>Maintaining secure, segregated escrow accounts for artist revenue</li>
+                  <li>Complying with all applicable data protection laws and regulations</li>
                 </ul>
+                <p className="mb-2">
+                  <strong>CIC Reporting:</strong> As a CIC, we are required to file annual community interest reports. These reports may include 
+                  anonymized, aggregated data about platform usage and revenue distribution, but will not include personally identifiable 
+                  information about individual users.
+                </p>
               </div>
             </section>
 
