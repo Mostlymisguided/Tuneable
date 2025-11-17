@@ -146,12 +146,34 @@ const Party: React.FC = () => {
       switch (message.type) {
         case 'UPDATE_QUEUE':
           if (message.queue) {
-            setParty((prev: any) => prev ? { ...prev, media: message.queue! } : null);
+            // Preserve existing status fields (especially 'vetoed') when updating queue
+            setParty((prev: any) => {
+              if (!prev) return null;
+              // Merge new queue with existing status information to preserve vetoed status
+              const updatedMedia = message.queue!.map((newItem: any) => {
+                // Find existing item to preserve status
+                const existingItem = prev.media.find((existing: any) => {
+                  const existingMediaId = existing.mediaId?._id || existing.mediaId?.id || existing.mediaId || existing._id;
+                  const newMediaId = newItem.mediaId?._id || newItem.mediaId?.id || newItem.mediaId || newItem.id || newItem._id;
+                  return existingMediaId?.toString() === newMediaId?.toString();
+                });
+                // Preserve status if it exists (especially 'vetoed'), otherwise use newItem's status or default to 'active'
+                return {
+                  ...newItem,
+                  status: existingItem?.status || newItem.status || 'active',
+                  // Also preserve vetoed-related fields
+                  vetoedAt: existingItem?.vetoedAt || newItem.vetoedAt,
+                  vetoedBy: existingItem?.vetoedBy || newItem.vetoedBy,
+                  vetoedBy_uuid: existingItem?.vetoedBy_uuid || newItem.vetoedBy_uuid
+                };
+              });
+              return { ...prev, media: updatedMedia };
+            });
             
             // Note: Socket.IO UPDATE_QUEUE messages don't contain media status information,
             // so we don't update the global player queue here. The queue is managed
             // by the party data from the API calls which include proper status information.
-            console.log('Socket.IO UPDATE_QUEUE received but not updating global queue (no status info)');
+            console.log('Socket.IO UPDATE_QUEUE received - preserved existing status fields');
           }
           break;
         case 'PLAY':
@@ -1076,11 +1098,26 @@ const Party: React.FC = () => {
   const getDisplayMedia = () => {
     let media;
     if (selectedTimePeriod === 'all-time') {
-      // Show regular party media
-      media = getPartyMedia().filter((item: any) => item.status === 'active');
+      // Show regular party media - explicitly filter out vetoed items
+      const allMedia = getPartyMedia();
+      media = allMedia.filter((item: any) => {
+        // Only show items with status 'active', explicitly exclude 'vetoed' and undefined/null
+        const isActive = item.status === 'active';
+        if (!isActive && item.status === 'vetoed') {
+          // Debug: log if we're filtering out vetoed items
+          console.log('🚫 Filtering out vetoed media:', (item.mediaId || item)?.title, 'status:', item.status);
+        }
+        return isActive;
+      });
     } else {
       // Show sorted media from the selected time period
-      media = sortedMedia.filter((item: any) => item.status === 'active');
+      media = sortedMedia.filter((item: any) => {
+        const isActive = item.status === 'active';
+        if (!isActive && item.status === 'vetoed') {
+          console.log('🚫 Filtering out vetoed sorted media:', item.title, 'status:', item.status);
+        }
+        return isActive;
+      });
     }
     
     // REMOVED: Real-time search filter from addMediaSearchQuery
