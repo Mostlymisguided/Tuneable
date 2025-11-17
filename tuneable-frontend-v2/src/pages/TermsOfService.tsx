@@ -45,6 +45,79 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2.1 Platform Nature & YouTube API Usage</h2>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">2.1.1 Tuneable is Not a Streaming Service</h3>
+                <p className="mb-2">
+                  <strong>Tuneable CIC is a community-funded artist support platform, not a music streaming service.</strong> 
+                  Tuneable facilitates fan tipping, social queueing, and artist support. Playback of media content is incidental, 
+                  user-initiated, and uses official third-party players only.
+                </p>
+                <p className="mb-4">
+                  Tuneable does <strong>not</strong>:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Host, download, or store video or audio content</li>
+                  <li>Circumvent YouTube API restrictions or terms of service</li>
+                  <li>Charge users for access to YouTube or third-party content</li>
+                  <li>Replace or compete with streaming services</li>
+                  <li>Store or rehost any media content</li>
+                </ul>
+                <p className="mb-4">
+                  Tuneable <strong>does</strong>:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Allow users to place monetary tips/bids to influence social rankings and party queues</li>
+                  <li>Use public YouTube Data API metadata (title, artist, duration, thumbnails, links) for display purposes only</li>
+                  <li>Embed the official YouTube player for user-initiated playback (per YouTube Terms of Service)</li>
+                  <li>Share revenue with artists and rights-holders through a tipping/support model</li>
+                  <li>Facilitate community support for musicians and creators</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">2.1.2 YouTube Data API Usage</h3>
+                <p className="mb-2">
+                  Tuneable uses the YouTube Data API in compliance with YouTube's Terms of Service and API Services Terms. 
+                  Our use of the API is limited to:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Accessing video metadata (title, artist, duration, thumbnails) for display and search purposes</li>
+                  <li>Linking users to YouTube creators and content</li>
+                  <li>Supporting artists financially through our escrow and revenue sharing system</li>
+                  <li>Using the official YouTube embedded player for playback (user-initiated only)</li>
+                </ul>
+                <p className="mb-2">
+                  Tuneable complies with all YouTube API requirements:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>We do not charge users for access to YouTube content</li>
+                  <li>We do not circumvent YouTube advertisements</li>
+                  <li>We use only the official YouTube embed player</li>
+                  <li>We follow YouTube branding guidelines</li>
+                  <li>We do not download, store, or rehost any YouTube content</li>
+                  <li>We respect YouTube API quota limits and usage policies</li>
+                </ul>
+                <p className="mb-2">
+                  <strong>Revenue Model:</strong> Money exchanged on Tuneable is for social influence, ranking, tipping artists, 
+                  and party participation—not for streaming or content access. This model is similar to Twitch Bits, TikTok Gifts, 
+                  or Patreon support, where users pay to support creators and influence community features, not to access content.
+                </p>
+                <p className="mb-2">
+                  <strong>Community Interest Company Status:</strong> As a UK Community Interest Company (CIC), Tuneable exists 
+                  to increase income for musicians and rights-holders by turning passive listening into active community support. 
+                  Our CIC status demonstrates that Tuneable is not exploiting third-party content commercially, but rather 
+                  redistributing fan support to artists.
+                </p>
+                <p className="mb-2">
+                  <strong>Compliance:</strong> If YouTube or Google requests that we cease using the YouTube Data API or modify 
+                  our usage, we will comply immediately. Tuneable can continue operating using alternative metadata sources 
+                  (MusicBrainz, Discogs, Spotify API, Apple Music API, SoundCloud, ISRC databases, user-submitted metadata, 
+                  or artist uploads) while maintaining all core functionality as a queueing engine, bidding system, and 
+                  social jukebox platform.
+                </p>
+              </div>
+            </section>
+
+            <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. User Accounts</h2>
               <div className="space-y-4 text-gray-700">
                 <h3 className="text-xl font-medium text-gray-900">3.1 Account Creation</h3>
@@ -111,6 +184,73 @@ const TermsOfService: React.FC = () => {
                   <li>Media may be removed for reasons including but not limited to: copyright infringement, inappropriate content, technical issues, platform policy violations, or user reports</li>
                   <li>Removed media may result in refunded bids at Tuneable's discretion</li>
                   <li>Tuneable is not obligated to provide notice before removing content, though reasonable efforts will be made to notify affected users when possible</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5.4 Opt-Out & Takedown Procedures</h2>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">5.4.1 Artist & Rights-Holder Opt-Out</h3>
+                <p className="mb-2">
+                  Artists, rights-holders, or authorized representatives may request that their content be removed from Tuneable 
+                  at any time. Upon receipt of a valid opt-out request, Tuneable will:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Immediately remove or disable access to the requested content metadata</li>
+                  <li>Cease using any related YouTube Data API content for that media</li>
+                  <li>Remove the content from all party queues and search results</li>
+                  <li>Process the request within 7 business days (or sooner if technically feasible)</li>
+                </ul>
+                <p className="mb-2">
+                  <strong>How to Request Opt-Out:</strong> Send an email to <strong>hi@tuneable.stream</strong> with:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Your name and contact information</li>
+                  <li>Proof of rights ownership (artist name, label, ISRC codes, or other documentation)</li>
+                  <li>Specific content identifiers (song titles, YouTube URLs, or Tuneable media IDs)</li>
+                  <li>Clear statement of your opt-out request</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">5.4.2 YouTube/Google Takedown Requests</h3>
+                <p className="mb-2">
+                  If YouTube, Google, or any authorized representative requests that Tuneable cease using YouTube Data API content 
+                  or remove specific content, Tuneable will:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Comply immediately with the request</li>
+                  <li>Remove all related metadata and API-derived content</li>
+                  <li>Disable embedding of affected YouTube videos</li>
+                  <li>Continue operating using alternative metadata sources (as outlined in section 2.1.2)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">5.4.3 Copyright Takedown (DMCA-Style)</h3>
+                <p className="mb-2">
+                  Tuneable respects intellectual property rights and will process valid copyright takedown requests. 
+                  To submit a copyright takedown request, send an email to <strong>hi@tuneable.stream</strong> with:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Your name, address, telephone number, and email address</li>
+                  <li>Identification of the copyrighted work claimed to have been infringed</li>
+                  <li>Identification of the material that is claimed to be infringing (with specific URLs or identifiers)</li>
+                  <li>A statement that you have a good faith belief that use of the material is not authorized</li>
+                  <li>A statement that the information in the notification is accurate and that you are authorized to act on behalf 
+                  of the copyright owner</li>
+                  <li>Your physical or electronic signature</li>
+                </ul>
+                <p className="mb-2">
+                  Tuneable will process valid takedown requests within 7 business days and may terminate repeat infringers' 
+                  accounts in appropriate circumstances.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.4.4 Effect of Opt-Out on Escrowed Funds</h3>
+                <p className="mb-2">
+                  If an artist opts out after tips have been placed on their content:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>All escrowed funds for that artist will remain available for claim for the standard 3-year escrow period</li>
+                  <li>The artist may still claim accumulated revenue even after opting out, provided they meet verification requirements</li>
+                  <li>If the artist does not wish to claim funds, they will be handled according to our unclaimed funds policy (section 8.7.6)</li>
                 </ul>
               </div>
             </section>
@@ -216,6 +356,88 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">8.7 Artist Revenue Escrow Terms</h2>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">8.7.1 Escrow System</h3>
+                <p className="mb-2">
+                  All tips and bid revenue directed toward artists and rights-holders are held in escrow in a segregated account 
+                  until claimed by the artist or rights-holder. This escrow system ensures that artists receive their entitled 
+                  revenue even if they have not yet registered or claimed their account on Tuneable.
+                </p>
+                <p className="mb-2">
+                  <strong>Escrow Duration:</strong> Funds will be held in escrow for a period of 3 years from the date of the 
+                  first tip/bid. After this period, unclaimed funds may be donated to a registered music charity or music 
+                  education organization, as determined by Tuneable CIC in accordance with our community interest objectives.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">8.7.2 Artist Claim Process</h3>
+                <p className="mb-2">
+                  Artists and rights-holders can claim accumulated revenue at any time by:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Registering for a Tuneable account and verifying their identity</li>
+                  <li>Providing proof of rights ownership (through our creator verification process)</li>
+                  <li>Completing the artist payout setup process</li>
+                  <li>Meeting the minimum payout threshold of £10 GBP</li>
+                </ul>
+                <p className="mb-2">
+                  Once verified, artists will receive all accumulated escrowed revenue (minus standard platform fees) 
+                  according to our payment schedule.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">8.7.3 Platform Fees</h3>
+                <p className="mb-2">
+                  Standard platform fees apply to all escrowed and paid-out revenue:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Platform operating fee: 30% of bid revenue (as outlined in section 8.1)</li>
+                  <li>Payment processing fees: Standard Stripe fees apply to all payouts</li>
+                  <li>No additional fees are charged for escrow services</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">8.7.4 Verification Requirements</h3>
+                <p className="mb-2">
+                  To claim escrowed revenue, artists must provide:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Proof of identity (government-issued ID)</li>
+                  <li>Proof of rights ownership (contracts, ISRC codes, distribution agreements, or other documentation)</li>
+                  <li>Valid payment information for payouts</li>
+                  <li>Completed tax information forms (as required by law)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">8.7.5 No Pre-Contact Obligation</h3>
+                <p className="mb-2">
+                  Tuneable operates under industry-standard practices similar to SoundExchange, PPL, Patreon, and Twitch. 
+                  We are not legally required to pre-contact every artist before displaying their publicly available content 
+                  metadata or before accepting tips directed toward their work. Tuneable operates under:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>Implied License:</strong> YouTube content is licensed by uploaders under YouTube's Terms of Service, 
+                  which allows public display of metadata and embedding of videos</li>
+                  <li><strong>Safe Harbour:</strong> Tuneable complies with all takedown requests and opt-out requests immediately 
+                  upon receipt (see section 5.4 for opt-out procedures)</li>
+                </ul>
+                <p className="mb-2">
+                  Artists who do not wish to participate can opt out at any time, and all escrowed funds will be handled 
+                  according to our escrow terms.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">8.7.6 Unclaimed Funds</h3>
+                <p className="mb-2">
+                  After the 3-year escrow period, if funds remain unclaimed:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Tuneable CIC will make reasonable efforts to contact the artist or rights-holder</li>
+                  <li>If contact cannot be established, unclaimed funds will be donated to registered music charities or 
+                  music education organizations</li>
+                  <li>This practice aligns with Tuneable CIC's community interest objectives of supporting the music community</li>
+                  <li>All donations will be transparently reported in Tuneable's annual community interest report</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">9. Prohibited Activities</h2>
               <p className="text-gray-700 mb-4">You agree not to:</p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
@@ -228,6 +450,59 @@ const TermsOfService: React.FC = () => {
                 <li>Upload malicious code or viruses</li>
                 <li>Collect user information without consent</li>
               </ul>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">9.1 User Responsibilities</h2>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">9.1.1 Compliance with Third-Party Terms</h3>
+                <p className="mb-2">
+                  When using Tuneable, you are responsible for complying with the terms of service of all third-party platforms 
+                  and services that Tuneable integrates with, including but not limited to:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>YouTube Terms of Service:</strong> You must comply with YouTube's Terms of Service when content 
+                  from YouTube is displayed or played through Tuneable</li>
+                  <li><strong>OAuth Providers:</strong> When using Facebook, Google, SoundCloud, or Instagram login, you must 
+                  comply with their respective terms of service</li>
+                  <li><strong>Payment Processors:</strong> When making payments through Stripe, you must comply with Stripe's 
+                  terms of service</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">9.1.2 Content Responsibility</h3>
+                <p className="mb-2">
+                  You are solely responsible for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Ensuring you have the necessary rights to any content you upload or claim</li>
+                  <li>Verifying that content you add to parties does not infringe on third-party rights</li>
+                  <li>Respecting copyright and intellectual property rights of artists and rights-holders</li>
+                  <li>Not using Tuneable to distribute unauthorized or pirated content</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">9.1.3 Account Security</h3>
+                <p className="mb-2">
+                  You are responsible for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Maintaining the confidentiality of your account credentials</li>
+                  <li>All activities that occur under your account</li>
+                  <li>Notifying Tuneable immediately of any unauthorized access or security breaches</li>
+                  <li>Using strong passwords and enabling two-factor authentication when available</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">9.1.4 Platform Usage</h3>
+                <p className="mb-2">
+                  You agree to:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Use Tuneable only for lawful purposes and in accordance with these Terms</li>
+                  <li>Not attempt to circumvent platform features, security measures, or API limitations</li>
+                  <li>Not use Tuneable in a way that could damage, disable, or impair the Service</li>
+                  <li>Respect other users' rights and privacy</li>
+                  <li>Report any violations of these Terms or suspicious activity to Tuneable</li>
+                </ul>
+              </div>
             </section>
 
             <section className="mb-8">
@@ -253,12 +528,78 @@ const TermsOfService: React.FC = () => {
                   THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. 
                   WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
                 </p>
+                <p className="mb-2">
+                  Tuneable does not guarantee:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Continuous, uninterrupted, or error-free access to the Service</li>
+                  <li>That all content will be available at all times</li>
+                  <li>That third-party services (YouTube, payment processors, etc.) will always be available</li>
+                  <li>That the Service will meet your specific requirements or expectations</li>
+                  <li>That any errors or defects will be corrected</li>
+                </ul>
 
-                <h3 className="text-xl font-medium text-gray-900">11.2 Limitation of Liability</h3>
+                <h3 className="text-xl font-medium text-gray-900">11.2 Third-Party Content and Services</h3>
+                <p className="mb-2">
+                  Tuneable is not responsible for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>The availability, accuracy, or legality of content from third-party platforms (YouTube, SoundCloud, etc.)</li>
+                  <li>Changes to third-party APIs, terms of service, or availability that may affect Tuneable's functionality</li>
+                  <li>Actions taken by third-party platforms that may impact content displayed on Tuneable</li>
+                  <li>Any loss or damage resulting from the unavailability of third-party content or services</li>
+                </ul>
+                <p className="mb-2">
+                  If YouTube, Google, or any other third-party service restricts or revokes Tuneable's access to their API or 
+                  content, Tuneable will comply with such restrictions but is not liable for any resulting impact on Service 
+                  functionality. Tuneable will make reasonable efforts to transition to alternative data sources, but cannot 
+                  guarantee seamless continuity of all features.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">11.3 Limitation of Liability</h3>
                 <p className="mb-2">
                   TO THE MAXIMUM EXTENT PERMITTED BY LAW, TUNEABLE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, 
                   CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
                 </p>
+                <p className="mb-2">
+                  Tuneable's total liability to you for any claims arising from or related to the Service shall not exceed the 
+                  amount you paid to Tuneable in the 12 months preceding the claim, or £100 GBP, whichever is greater.
+                </p>
+                <p className="mb-2">
+                  This limitation of liability applies to:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Loss of data, content, or account information</li>
+                  <li>Loss of wallet balance or bid funds (except as required by law)</li>
+                  <li>Interruption of Service or inability to access the Service</li>
+                  <li>Errors, bugs, or technical malfunctions</li>
+                  <li>Third-party actions or service unavailability</li>
+                  <li>Any other damages or losses related to your use of the Service</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">11.4 Exceptions to Limitation of Liability</h3>
+                <p className="mb-2">
+                  Nothing in these Terms excludes or limits Tuneable's liability for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Death or personal injury caused by Tuneable's negligence</li>
+                  <li>Fraud or fraudulent misrepresentation</li>
+                  <li>Any other liability that cannot be excluded or limited by applicable law</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">11.5 Indemnification</h3>
+                <p className="mb-2">
+                  You agree to indemnify, defend, and hold harmless Tuneable, its officers, directors, employees, and agents 
+                  from and against any claims, damages, obligations, losses, liabilities, costs, or debt, and expenses 
+                  (including but not limited to attorney's fees) arising from:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Your use of the Service</li>
+                  <li>Your violation of these Terms</li>
+                  <li>Your violation of any third-party rights (including intellectual property rights)</li>
+                  <li>Any content you submit, upload, or claim on the Service</li>
+                  <li>Your violation of any applicable laws or regulations</li>
+                </ul>
               </div>
             </section>
 
