@@ -660,7 +660,7 @@ const CreatorRegister: React.FC = () => {
       <div>
         <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
           <Award className="h-6 w-6 mr-2 text-purple-400" />
-          Verification (Optional)
+          Final Verification (Optional)
         </h3>
 
         <div className="space-y-4">

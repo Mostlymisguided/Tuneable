@@ -11,7 +11,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Music className="h-8 w-8 text-purple-400" />,
-      title: "Encourage Users To Pay A Fair Price For Music",
+      title: "Encourage Users To Pay A Fair Price",
       //description: "Supporting creators through fair compensation and direct fan engagement."
     },
     {
@@ -21,7 +21,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Waves className="h-8 w-8 text-green-400" />,
-      title: "Adoption Of More Resonant Musical Tuning Standards (e.g. A4 = 432hz)",
+      title: "More Resonant Musical Tuning Standards (e.g. A4 = 432hz)",
      // description: "Advocating for natural tuning that resonates with human consciousness and nature."
     },
     {
@@ -31,7 +31,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Shield className="h-8 w-8 text-indigo-400" />,
-      title: "Support Sound Healing Initiatives + Wellness Venues",
+      title: "Support Sound Healing + Wellness Venues",
      // description: "Integrating music therapy and healing practices into our platform and community."
     }
   ];
@@ -60,7 +60,7 @@ const Home: React.FC = () => {
             
             {/* Description */}
             <p className="text-xl md:text-2xl p-12 text-gray-200 max-w-3xl mx-auto leading-relaxed" style={{ marginTop: '20px' }}>
-              Support Your Favourite Artists - Contribute To Global Charts
+              Support Your Favourite Artists - Tip Your Favourite Tunes - Contribute To Global Charts
             </p>
             
             {/* CTA Button */}
@@ -106,7 +106,7 @@ const Home: React.FC = () => {
                 Support Artists
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Artists Earn Most of Your Tips on Tuneable
+                Artists Earn Most of Your Tips
               </p>
             </div>
             <div className="text-center group">
