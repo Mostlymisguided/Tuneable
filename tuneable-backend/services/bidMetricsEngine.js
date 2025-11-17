@@ -199,6 +199,16 @@ class BidMetricsEngine {
     const result = await Bid.aggregate(pipeline);
     const amount = result.length > 0 ? result[0].total : 0;
     
+    // Debug logging for PartyMediaAggregate to help diagnose tip total issues
+    if (metricName === 'PartyMediaAggregate' && params.partyId && params.mediaId) {
+      console.log(`🔍 Computing ${metricName} for party ${params.partyId}, media ${params.mediaId}:`, {
+        matchStage,
+        resultCount: result.length,
+        amount,
+        result
+      });
+    }
+    
     // Build full context based on config.returns
     const context = {
       amount,
@@ -412,8 +422,12 @@ class BidMetricsEngine {
     const updateFields = {};
     const fieldName = this._getMetricFieldName(metricName);
     
-    // Store the main metric value
-    updateFields[`media.$.${fieldName}`] = result.amount || result;
+    // Store the main metric value - FIX: handle 0 correctly (0 is a valid value for pence)
+    // result.amount can be 0, so we need to check for undefined/null, not falsy
+    const metricValue = (result.amount !== undefined && result.amount !== null) 
+      ? result.amount 
+      : (typeof result === 'number' ? result : 0);
+    updateFields[`media.$.${fieldName}`] = metricValue;
     
     // Store user references for gamification (if applicable)
     if (metricName === 'PartyMediaBidTop' && result.userId) {
@@ -422,17 +436,26 @@ class BidMetricsEngine {
       updateFields['media.$.partyMediaAggregateTopUser'] = result.userId;
     }
     
-    await Party.findOneAndUpdate(
+    // FIX: Handle mediaId that might already be ObjectId or string, and ensure proper matching
+    const mediaIdObj = mongoose.Types.ObjectId.isValid(mediaId) 
+      ? (mediaId instanceof mongoose.Types.ObjectId ? mediaId : new mongoose.Types.ObjectId(mediaId))
+      : mediaId;
+    
+    const updateResult = await Party.findOneAndUpdate(
       { 
         _id: partyId, 
-        'media.mediaId': mongoose.Types.ObjectId(mediaId) 
+        'media.mediaId': mediaIdObj
       },
       { 
         $set: updateFields
       }
     );
     
-    console.log(`📊 Updated ${metricName} for party ${partyId}, media ${mediaId}: ${result.amount || result}`);
+    if (!updateResult) {
+      console.warn(`⚠️ Failed to update ${metricName} for party ${partyId}, media ${mediaId} - party or media entry not found. Query: { _id: ${partyId}, 'media.mediaId': ${mediaIdObj} }`);
+    } else {
+      console.log(`📊 Updated ${metricName} for party ${partyId}, media ${mediaId}: ${metricValue} (was ${result.amount}, result object:`, result, ')');
+    }
     
     // Also update party-level metrics if this affects them
     await this._updatePartyLevelMetrics(partyId, bidData, operation);
