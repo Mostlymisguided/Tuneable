@@ -701,6 +701,25 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Get all bids with filtering
+  getAllBids: async (params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'createdAt' | 'amount' | 'vetoedAt' | 'username' | 'mediaTitle' | 'partyName';
+    sortOrder?: 'asc' | 'desc';
+    status?: 'active' | 'vetoed' | 'refunded';
+    userId?: string;
+    partyId?: string;
+    mediaId?: string;
+    search?: string;
+    bidScope?: 'party' | 'global';
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const response = await api.get('/users/admin/bids', { params });
+    return response.data;
+  },
+
   // Search users by username or email
   searchUsers: async (params?: {
     search?: string;

@@ -2602,6 +2602,156 @@ router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
   }
 });
 
+// Admin: Get all bids with filtering, sorting, and pagination
+router.get('/admin/bids', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const Bid = require('../models/Bid');
+    const mongoose = require('mongoose');
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      status,
+      userId,
+      partyId,
+      mediaId,
+      search,
+      bidScope,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    // Build query
+    const query = {};
+
+    // Status filter
+    if (status && ['active', 'vetoed', 'refunded'].includes(status)) {
+      query.status = status;
+    }
+
+    // User filter
+    if (userId) {
+      if (mongoose.isValidObjectId(userId)) {
+        query.userId = userId;
+      } else {
+        // Search by username (denormalized field)
+        query.username = new RegExp(userId, 'i');
+      }
+    }
+
+    // Party filter
+    if (partyId && mongoose.isValidObjectId(partyId)) {
+      query.partyId = partyId;
+    }
+
+    // Media filter
+    if (mediaId && mongoose.isValidObjectId(mediaId)) {
+      query.mediaId = mediaId;
+    }
+
+    // Bid scope filter
+    if (bidScope && ['party', 'global'].includes(bidScope)) {
+      query.bidScope = bidScope;
+    }
+
+    // Search filter (searches username, media title, party name)
+    if (search && search.trim().length > 0) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { username: searchRegex },
+        { mediaTitle: searchRegex },
+        { mediaArtist: searchRegex },
+        { partyName: searchRegex }
+      ];
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) {
+        query.createdAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        query.createdAt.$lte = new Date(dateTo);
+      }
+    }
+
+    // Build sort object
+    const sort = {};
+    const validSortFields = ['createdAt', 'amount', 'vetoedAt', 'username', 'mediaTitle', 'partyName'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    sort[sortField] = sortOrder === 'asc' ? 1 : -1;
+
+    // Fetch bids with populated references
+    const bids = await Bid.find(query)
+      .populate('userId', 'username profilePic uuid')
+      .populate('mediaId', 'title artist coverArt _id')
+      .populate('partyId', 'name type')
+      .populate('vetoedBy', 'username uuid')
+      .sort(sort)
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Bid.countDocuments(query);
+
+    // Format response
+    const formattedBids = bids.map(bid => ({
+      _id: bid._id,
+      uuid: bid.uuid,
+      amount: bid.amount, // In pence
+      status: bid.status,
+      createdAt: bid.createdAt,
+      vetoedAt: bid.vetoedAt,
+      vetoedReason: bid.vetoedReason,
+      isInitialBid: bid.isInitialBid,
+      queuePosition: bid.queuePosition,
+      queueSize: bid.queueSize,
+      platform: bid.platform,
+      partyType: bid.partyType,
+      bidScope: bid.bidScope || 'party',
+      user: {
+        _id: bid.userId?._id || bid.userId,
+        username: bid.username || bid.userId?.username || 'Unknown',
+        profilePic: bid.userId?.profilePic,
+        uuid: bid.userId?.uuid || bid.user_uuid
+      },
+      media: {
+        _id: bid.mediaId?._id || bid.mediaId,
+        title: bid.mediaTitle || bid.mediaId?.title || 'Unknown',
+        artist: bid.mediaArtist || (Array.isArray(bid.mediaId?.artist) ? bid.mediaId.artist[0]?.name : bid.mediaId?.artist) || 'Unknown',
+        coverArt: bid.mediaCoverArt || bid.mediaId?.coverArt
+      },
+      party: {
+        _id: bid.partyId?._id || bid.partyId,
+        name: bid.partyName || bid.partyId?.name || 'Unknown',
+        type: bid.partyType || bid.partyId?.type || 'unknown'
+      },
+      vetoedBy: bid.vetoedBy ? {
+        _id: bid.vetoedBy._id,
+        username: bid.vetoedBy.username,
+        uuid: bid.vetoedBy.uuid
+      } : null
+    }));
+
+    res.json({
+      bids: formattedBids,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error fetching bids:', error);
+    res.status(500).json({ error: 'Failed to fetch bids', details: error.message });
+  }
+});
+
 // Search users by username, email, or artist name (authenticated users only)
 router.get('/search', authMiddleware, async (req, res) => {
   try {

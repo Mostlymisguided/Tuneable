@@ -18,7 +18,8 @@ import {
   ArrowUp,
   ArrowDown,
   Building,
-  Bell
+  Bell,
+  DollarSign
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
@@ -82,6 +83,15 @@ const Admin: React.FC = () => {
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
+  const [bids, setBids] = useState<any[]>([]);
+  const [isLoadingBids, setIsLoadingBids] = useState(false);
+  const [bidsSortField, setBidsSortField] = useState<string>('createdAt');
+  const [bidsSortDirection, setBidsSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [bidsPage, setBidsPage] = useState<number>(1);
+  const [bidsTotal, setBidsTotal] = useState<number>(0);
+  const [bidsStatusFilter, setBidsStatusFilter] = useState<string>('');
+  const [bidsSearchQuery, setBidsSearchQuery] = useState<string>('');
+  const [bidsScopeFilter, setBidsScopeFilter] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
@@ -528,6 +538,59 @@ const Admin: React.FC = () => {
     }
   }, [vetoedBidsSortField, vetoedBidsSortDirection, vetoedBidsPage, activeTab]);
 
+  const loadBids = async () => {
+    try {
+      setIsLoadingBids(true);
+      const params: any = {
+        page: bidsPage,
+        limit: 50,
+        sortBy: bidsSortField,
+        sortOrder: bidsSortDirection
+      };
+      if (bidsStatusFilter) {
+        params.status = bidsStatusFilter;
+      }
+      if (bidsSearchQuery) {
+        params.search = bidsSearchQuery;
+      }
+      if (bidsScopeFilter) {
+        params.bidScope = bidsScopeFilter;
+      }
+      const data = await userAPI.getAllBids(params);
+      setBids(data.bids || []);
+      setBidsTotal(data.total || 0);
+    } catch (error) {
+      console.error('Error loading bids:', error);
+      toast.error('Failed to load bids');
+    } finally {
+      setIsLoadingBids(false);
+    }
+  };
+
+  const handleBidsSort = (field: string) => {
+    if (bidsSortField === field) {
+      setBidsSortDirection(bidsSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setBidsSortField(field);
+      setBidsSortDirection('desc');
+    }
+  };
+
+  const getBidsSortIcon = (field: string) => {
+    if (bidsSortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return bidsSortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 text-purple-400" />;
+  };
+
+  useEffect(() => {
+    if (activeTab === 'bids' && isAdmin) {
+      loadBids();
+    }
+  }, [bidsSortField, bidsSortDirection, bidsPage, bidsStatusFilter, bidsSearchQuery, bidsScopeFilter, activeTab]);
+
   useEffect(() => {
     if (activeTab === 'reports' && isAdmin) {
       if (reportsSubTab === 'claims') {
@@ -600,6 +663,7 @@ const Admin: React.FC = () => {
     { id: 'overview', name: 'Overview', icon: BarChart3 },
     { id: 'users', name: 'Users', icon: Users },
     { id: 'labels', name: 'Labels', icon: Building },
+    { id: 'bids', name: 'Bids', icon: DollarSign },
     { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
     { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -1318,6 +1382,273 @@ const Admin: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'bids' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Bid Management</h2>
+              <button
+                onClick={loadBids}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Search
+                  </label>
+                  <input
+                    type="text"
+                    value={bidsSearchQuery}
+                    onChange={(e) => {
+                      setBidsSearchQuery(e.target.value);
+                      setBidsPage(1);
+                      if (e.target.value.length === 0 || e.target.value.length >= 2) {
+                        loadBids();
+                      }
+                    }}
+                    placeholder="User, media, or party..."
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={bidsStatusFilter}
+                    onChange={(e) => {
+                      setBidsStatusFilter(e.target.value);
+                      setBidsPage(1);
+                      loadBids();
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="vetoed">Vetoed</option>
+                    <option value="refunded">Refunded</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Scope
+                  </label>
+                  <select
+                    value={bidsScopeFilter}
+                    onChange={(e) => {
+                      setBidsScopeFilter(e.target.value);
+                      setBidsPage(1);
+                      loadBids();
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">All Scopes</option>
+                    <option value="party">Party</option>
+                    <option value="global">Global</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {isLoadingBids ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : bids.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <DollarSign className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No bids found</p>
+              </div>
+            ) : (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Media
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          User
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleBidsSort('amount')}
+                        >
+                          <div className="flex items-center">
+                            Amount
+                            {getBidsSortIcon('amount')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                          onClick={() => handleBidsSort('createdAt')}
+                        >
+                          <div className="flex items-center">
+                            Date Placed
+                            {getBidsSortIcon('createdAt')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Party
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Scope
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Platform
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                      {bids.map((bid) => (
+                        <tr key={bid._id} className="hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {bid.media?.coverArt && (
+                                <img
+                                  src={bid.media.coverArt}
+                                  alt={bid.media.title}
+                                  className="h-10 w-10 rounded object-cover mr-3"
+                                />
+                              )}
+                              <div>
+                                <button
+                                  onClick={() => navigate(`/tune/${bid.media._id}`)}
+                                  className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                                >
+                                  {bid.media?.title || 'Unknown'}
+                                </button>
+                                <div className="text-xs text-gray-400">{bid.media?.artist || 'Unknown Artist'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => bid.user?.uuid && navigate(`/user/${bid.user.uuid}`)}
+                              className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                            >
+                              {bid.user?.username || 'Unknown'}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-green-400">
+                              {penceToPounds(bid.amount)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {bid.status === 'active' ? (
+                              <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Active</span>
+                            ) : bid.status === 'vetoed' ? (
+                              <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
+                            ) : (
+                              <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs font-medium">Refunded</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {bid.createdAt ? new Date(bid.createdAt).toLocaleString() : 'N/A'}
+                            </div>
+                            {bid.isInitialBid && (
+                              <div className="text-xs text-purple-400">Initial bid</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {bid.party?.name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {bid.party?.type || 'unknown'}
+                            </div>
+                            {bid.queuePosition && (
+                              <div className="text-xs text-gray-500">
+                                Queue: {bid.queuePosition}/{bid.queueSize || '?'}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-xs text-gray-400 uppercase">
+                              {bid.bidScope || 'party'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-xs text-gray-400 capitalize">
+                              {bid.platform || 'unknown'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              {bid.status === 'active' && (
+                                <button
+                                  onClick={async () => {
+                                    const reason = prompt('Enter reason for veto:');
+                                    if (reason) {
+                                      try {
+                                        // TODO: Implement veto functionality
+                                        toast.info('Veto functionality will be implemented');
+                                        loadBids();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to veto bid');
+                                      }
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                  title="Veto bid"
+                                >
+                                  Veto
+                                </button>
+                              )}
+                              {bid.vetoedAt && (
+                                <div className="text-xs text-gray-500">
+                                  Vetoed: {new Date(bid.vetoedAt).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {bidsTotal > 50 && (
+                  <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
+                    <div className="text-sm text-gray-300">
+                      Showing {((bidsPage - 1) * 50) + 1} - {Math.min(bidsPage * 50, bidsTotal)} of {bidsTotal}
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setBidsPage(p => Math.max(1, p - 1))}
+                        disabled={bidsPage === 1}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setBidsPage(p => p + 1)}
+                        disabled={bidsPage * 50 >= bidsTotal}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
