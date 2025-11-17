@@ -2932,7 +2932,6 @@ const TuneProfile: React.FC = () => {
         bidAmount={parsedGlobalBidAmount}
         mediaTitle={media?.title || 'Unknown'}
         mediaArtist={media?.artist}
-        currentBid={media?.globalMediaBidTop}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
       />
