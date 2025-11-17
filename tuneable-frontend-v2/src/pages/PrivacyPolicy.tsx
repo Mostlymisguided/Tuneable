@@ -26,41 +26,155 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Username, email address, and password (for traditional accounts)</li>
                   <li>Profile information including name, profile picture, and location</li>
-                  <li>Facebook account information (when using Facebook login)</li>
+                  <li>OAuth provider information (Facebook, Google, SoundCloud, Instagram) when using social login</li>
+                  <li>Creator profile information (for verified artists and creators)</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">1.2 Usage Data</h3>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Music preferences and listening history</li>
-                  <li>Party participation and song bids</li>
-                  <li>Payment information (processed securely through Stripe)</li>
-                  <li>Device information and IP address</li>
+                  <li>Party participation, song bids, and queue interactions</li>
+                  <li>Payment and transaction information (processed securely through Stripe)</li>
+                  <li>Device information, IP address, and browser type</li>
+                  <li>Platform usage patterns and feature interactions</li>
                 </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">1.3 YouTube Data API Information</h3>
+                <p className="mb-2">
+                  Tuneable uses the YouTube Data API to access publicly available video metadata. We collect and store:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Video titles, descriptions, and thumbnails (for display purposes only)</li>
+                  <li>Video duration and channel information</li>
+                  <li>YouTube video IDs and URLs (for embedding the official YouTube player)</li>
+                  <li>Video metadata is used solely for platform functionality and is not sold or shared with third parties</li>
+                </ul>
+                <p className="mb-2 mt-4">
+                  <strong>Note:</strong> Tuneable does not collect or store any personal information from YouTube users. 
+                  We only access publicly available metadata through the YouTube Data API in compliance with YouTube's Terms of Service.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">1.4 Artist Revenue and Escrow Data</h3>
+                <p className="mb-2">
+                  For artists and rights-holders who claim revenue or have funds in escrow, we collect:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Identity verification documents (government-issued ID)</li>
+                  <li>Proof of rights ownership (contracts, ISRC codes, distribution agreements)</li>
+                  <li>Payment and banking information for payouts</li>
+                  <li>Tax information (as required by law)</li>
+                  <li>Revenue and transaction history</li>
+                </ul>
+                <p className="mb-2 mt-4">
+                  This information is stored securely and used solely for processing artist payouts and maintaining escrow accounts.
+                </p>
               </div>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. How We Use Your Information</h2>
-              <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                <li>Provide and maintain our music streaming and party services</li>
-                <li>Process payments and manage your account balance</li>
-                <li>Enable social features like party creation and participation</li>
-                <li>Improve our services and develop new features</li>
-                <li>Communicate with you about your account and our services</li>
-                <li>Ensure platform security and prevent fraud</li>
-              </ul>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">2.1 Service Provision</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Provide and maintain our social music platform and party services</li>
+                  <li>Process payments, manage wallet balances, and handle transactions</li>
+                  <li>Enable social features like party creation, participation, and bidding</li>
+                  <li>Display media metadata and facilitate user-initiated playback through official third-party players</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">2.2 Artist Revenue Management</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Maintain escrow accounts for artist revenue</li>
+                  <li>Process artist payouts and verify rights ownership</li>
+                  <li>Calculate and distribute revenue shares</li>
+                  <li>Comply with tax and financial reporting requirements</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">2.3 Platform Improvement</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Analyze usage patterns to improve our services</li>
+                  <li>Develop new features and functionality</li>
+                  <li>Conduct research and analytics (in anonymized form)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">2.4 Communication and Support</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Send account-related notifications and updates</li>
+                  <li>Respond to user inquiries and support requests</li>
+                  <li>Send important service announcements (with opt-out options for marketing communications)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">2.5 Security and Compliance</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Ensure platform security and prevent fraud</li>
+                  <li>Comply with legal obligations and regulatory requirements</li>
+                  <li>Enforce our Terms of Service and community guidelines</li>
+                  <li>Protect the rights and safety of users and third parties</li>
+                </ul>
+              </div>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Information Sharing</h2>
               <div className="space-y-4 text-gray-700">
-                <p>We do not sell your personal information. We may share your information only in the following circumstances:</p>
-                <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>With your consent:</strong> When you explicitly agree to share information</li>
-                  <li><strong>Service providers:</strong> With trusted third parties who help us operate our platform (e.g., Stripe for payments, Facebook for OAuth)</li>
-                  <li><strong>Legal requirements:</strong> When required by law or to protect our rights and safety</li>
-                  <li><strong>Business transfers:</strong> In connection with a merger, acquisition, or sale of assets</li>
+                <p className="mb-4">
+                  <strong>Tuneable does not sell your personal information.</strong> We may share your information only in the following circumstances:
+                </p>
+                
+                <h3 className="text-xl font-medium text-gray-900">3.1 With Your Consent</h3>
+                <p className="mb-2">
+                  We share information when you explicitly agree to share it, such as when you:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Connect your account to third-party services</li>
+                  <li>Participate in public parties or share content</li>
+                  <li>Opt-in to specific features that require data sharing</li>
                 </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">3.2 Service Providers</h3>
+                <p className="mb-2">
+                  We share information with trusted third-party service providers who help us operate our platform:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>Stripe:</strong> Payment processing and financial transactions (see Stripe's privacy policy)</li>
+                  <li><strong>OAuth Providers:</strong> Facebook, Google, SoundCloud, Instagram for authentication (see their respective privacy policies)</li>
+                  <li><strong>YouTube/Google:</strong> Access to YouTube Data API for metadata (see Google's privacy policy)</li>
+                  <li><strong>Hosting Providers:</strong> Cloud infrastructure and data storage services</li>
+                  <li><strong>Analytics Services:</strong> Platform usage analytics (in anonymized form where possible)</li>
+                </ul>
+                <p className="mb-2">
+                  All service providers are contractually obligated to protect your information and use it only for the purposes we specify.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">3.3 Legal Requirements</h3>
+                <p className="mb-2">
+                  We may share information when required by law, including:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Responding to valid legal requests, subpoenas, or court orders</li>
+                  <li>Complying with tax, financial, or regulatory reporting requirements</li>
+                  <li>Protecting our rights, property, or safety, or that of our users</li>
+                  <li>Investigating potential violations of our Terms of Service</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">3.4 Business Transfers</h3>
+                <p className="mb-2">
+                  In the event of a merger, acquisition, or sale of assets, your information may be transferred to the acquiring entity. 
+                  We will notify you of any such change in ownership and provide you with options regarding your data.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">3.5 Artist Revenue Information</h3>
+                <p className="mb-2">
+                  For artists receiving revenue payouts, we may share limited information with:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Payment processors (Stripe) for payout processing</li>
+                  <li>Tax authorities as required by law</li>
+                  <li>Financial institutions for payment verification</li>
+                </ul>
+                <p className="mb-2">
+                  We do not share detailed revenue information publicly without your explicit consent.
+                </p>
               </div>
             </section>
 
@@ -79,36 +193,160 @@ const PrivacyPolicy: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Your Rights</h2>
-              <p className="text-gray-700 mb-4">You have the right to:</p>
-              <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                <li>Access and update your personal information</li>
-                <li>Delete your account and associated data</li>
-                <li>Opt out of certain data processing activities</li>
-                <li>Request a copy of your data</li>
-                <li>Withdraw consent for data processing</li>
-              </ul>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Your Rights (GDPR/UK GDPR)</h2>
+              <div className="space-y-4 text-gray-700">
+                <p className="mb-4">
+                  Under the General Data Protection Regulation (GDPR) and UK GDPR, you have the following rights regarding your personal data:
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.1 Right of Access</h3>
+                <p className="mb-2">
+                  You have the right to request a copy of all personal information we hold about you. To request your data, 
+                  contact us at <strong>hi@tuneable.stream</strong> with the subject line "Data Access Request".
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.2 Right to Rectification</h3>
+                <p className="mb-2">
+                  You can update most of your personal information directly through your account settings. For information 
+                  that cannot be updated through your account, contact us to request corrections.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.3 Right to Erasure ("Right to be Forgotten")</h3>
+                <p className="mb-2">
+                  You can request deletion of your account and associated personal data. We will delete your data within 30 days, 
+                  except where we are required to retain it for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Legal or regulatory compliance (e.g., financial records, tax information)</li>
+                  <li>Ongoing legal proceedings or disputes</li>
+                  <li>Artist revenue escrow obligations (funds will be handled according to our escrow terms)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">5.4 Right to Restrict Processing</h3>
+                <p className="mb-2">
+                  You can request that we limit how we use your personal data in certain circumstances, such as when you 
+                  contest the accuracy of the data or object to its processing.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.5 Right to Data Portability</h3>
+                <p className="mb-2">
+                  You can request a copy of your data in a structured, machine-readable format. This includes your account 
+                  information, usage data, and transaction history.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.6 Right to Object</h3>
+                <p className="mb-2">
+                  You can object to processing of your personal data for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Direct marketing purposes (you can opt out in your account settings)</li>
+                  <li>Legitimate interests processing (we will consider your objection and may stop processing if appropriate)</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">5.7 Right to Withdraw Consent</h3>
+                <p className="mb-2">
+                  Where we process your data based on consent, you can withdraw that consent at any time. This will not affect 
+                  the lawfulness of processing that occurred before your withdrawal.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">5.8 Exercising Your Rights</h3>
+                <p className="mb-2">
+                  To exercise any of these rights, contact us at <strong>hi@tuneable.stream</strong>. We will respond to your 
+                  request within 30 days (or sooner if required by law). We may need to verify your identity before processing 
+                  your request.
+                </p>
+                <p className="mb-2">
+                  If you are not satisfied with our response, you have the right to lodge a complaint with the UK Information 
+                  Commissioner's Office (ICO) or your local data protection authority.
+                </p>
+              </div>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Third-Party Services</h2>
-              <p className="text-gray-700 mb-4">
-                Our platform integrates with third-party services including:
-              </p>
-              <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                <li><strong>Facebook:</strong> For OAuth authentication (see Facebook's privacy policy)</li>
-                <li><strong>Stripe:</strong> For payment processing (see Stripe's privacy policy)</li>
-                <li><strong>YouTube:</strong> For music streaming (see YouTube's privacy policy)</li>
-              </ul>
+              <div className="space-y-4 text-gray-700">
+                <p className="mb-4">
+                  Our platform integrates with third-party services. When you use these services, their privacy policies apply:
+                </p>
+                
+                <h3 className="text-xl font-medium text-gray-900">6.1 Authentication Services</h3>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>Facebook:</strong> OAuth authentication - <a href="https://www.facebook.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Facebook Privacy Policy</a></li>
+                  <li><strong>Google:</strong> OAuth authentication - <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Google Privacy Policy</a></li>
+                  <li><strong>SoundCloud:</strong> OAuth authentication - <a href="https://soundcloud.com/pages/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">SoundCloud Privacy Policy</a></li>
+                  <li><strong>Instagram:</strong> OAuth authentication - <a href="https://help.instagram.com/519522125107875" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Instagram Privacy Policy</a></li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">6.2 Payment Processing</h3>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>Stripe:</strong> Payment processing and financial transactions - <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Stripe Privacy Policy</a></li>
+                  <li>Stripe processes payment information securely and in compliance with PCI DSS standards</li>
+                  <li>Tuneable does not store full credit card numbers or sensitive payment details</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">6.3 Content and Media Services</h3>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>YouTube/Google:</strong> YouTube Data API for metadata access and embedded player - <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Google Privacy Policy</a></li>
+                  <li>Tuneable uses YouTube Data API to access publicly available video metadata only</li>
+                  <li>Playback uses the official YouTube embedded player (user-initiated)</li>
+                  <li>Tuneable does not collect personal information from YouTube users</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">6.4 Data Processing by Third Parties</h3>
+                <p className="mb-2">
+                  When you use third-party services through Tuneable:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Your interactions with these services are subject to their privacy policies</li>
+                  <li>We encourage you to review their privacy policies before using these services</li>
+                  <li>Tuneable is not responsible for the privacy practices of third-party services</li>
+                  <li>You can control which third-party services you connect to your Tuneable account</li>
+                </ul>
+              </div>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Data Retention</h2>
-              <p className="text-gray-700">
-                We retain your personal information for as long as necessary to provide our services and comply with legal obligations. 
-                When you delete your account, we will delete your personal information within 30 days, except where we are required 
-                to retain it for legal or regulatory purposes.
-              </p>
+              <div className="space-y-4 text-gray-700">
+                <h3 className="text-xl font-medium text-gray-900">7.1 General Data Retention</h3>
+                <p className="mb-2">
+                  We retain your personal information for as long as necessary to:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Provide our services to you</li>
+                  <li>Comply with legal obligations and regulatory requirements</li>
+                  <li>Resolve disputes and enforce our agreements</li>
+                  <li>Maintain security and prevent fraud</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">7.2 Account Deletion</h3>
+                <p className="mb-2">
+                  When you delete your account, we will delete your personal information within 30 days, except where we are required 
+                  to retain it for:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Legal or regulatory compliance (e.g., financial records, tax information)</li>
+                  <li>Ongoing legal proceedings or disputes</li>
+                  <li>Artist revenue escrow obligations (funds held in escrow for 3 years as outlined in our Terms of Service)</li>
+                  <li>Fraud prevention and security purposes</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">7.3 Artist Revenue Data</h3>
+                <p className="mb-2">
+                  For artists receiving revenue payouts, we retain:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Financial records and transaction history: 7 years (as required by UK tax law)</li>
+                  <li>Identity verification documents: Until account closure + 7 years</li>
+                  <li>Escrow account information: 3 years from last transaction or until claimed</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">7.4 Anonymized Data</h3>
+                <p className="mb-2">
+                  We may retain anonymized, aggregated data indefinitely for analytics, research, and platform improvement purposes. 
+                  This data cannot be used to identify individual users.
+                </p>
+              </div>
             </section>
 
             <section className="mb-8">
@@ -140,14 +378,67 @@ const PrivacyPolicy: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Contact Us</h2>
-              <p className="text-gray-700">
-                If you have any questions about this privacy policy or our data practices, please contact us at:
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. International Data Transfers</h2>
+              <div className="space-y-4 text-gray-700">
+                <p className="mb-2">
+                  Tuneable is a UK-based Community Interest Company. Your data is primarily processed and stored in the United Kingdom 
+                  and European Economic Area (EEA). However, some of our service providers may process data outside the UK/EEA:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>Stripe:</strong> Payment processing may involve data transfer to the United States (protected by Stripe's 
+                  compliance with international data protection standards)</li>
+                  <li><strong>Cloud Infrastructure:</strong> Our hosting providers may store data in various locations (protected by 
+                  appropriate safeguards)</li>
+                  <li><strong>OAuth Providers:</strong> Authentication services may process data in their respective jurisdictions</li>
+                </ul>
+                <p className="mb-2">
+                  We ensure that all international data transfers are protected by appropriate safeguards, including:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Standard Contractual Clauses (SCCs) approved by the European Commission</li>
+                  <li>Service providers' compliance with GDPR-equivalent data protection standards</li>
+                  <li>Regular security audits and assessments</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Data Controller Information</h2>
+              <div className="space-y-4 text-gray-700">
+                <p className="mb-2">
+                  <strong>Tuneable CIC</strong> is the data controller for your personal information. As a UK Community Interest Company, 
+                  we are committed to protecting your privacy and complying with UK GDPR and EU GDPR requirements.
+                </p>
+                <p className="mb-2">
+                  <strong>Our Commitment:</strong> As a CIC, Tuneable exists to benefit the music community. We are committed to:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Transparency in how we collect and use your data</li>
+                  <li>Minimizing data collection to what is necessary</li>
+                  <li>Protecting your privacy rights</li>
+                  <li>Using your data to support artists and the music community</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">13. Contact Us</h2>
+              <p className="text-gray-700 mb-4">
+                If you have any questions about this privacy policy, our data practices, or wish to exercise your data protection rights, 
+                please contact us:
               </p>
               <div className="mt-4 p-4 bg-gray-100 rounded-lg">
-                <p className="text-gray-700">
-                  <strong>Email:</strong> mostlymisguided@icloud.com<br />
-                  <strong>Response Time:</strong> We will respond to all privacy inquiries within 7 business days
+                <p className="text-gray-700 mb-2">
+                  <strong>Email:</strong> hi@tuneable.stream<br />
+                  <strong>Alternative Email:</strong> mostlymisguided@icloud.com<br />
+                  <strong>Response Time:</strong> We will respond to all privacy inquiries within 7 business days<br />
+                  <strong>Data Protection Officer:</strong> Contact via the email addresses above
+                </p>
+                <p className="text-gray-700 mt-4">
+                  <strong>UK Information Commissioner's Office (ICO):</strong><br />
+                  If you are not satisfied with our response, you can lodge a complaint with the ICO:<br />
+                  Website: <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">ico.org.uk</a><br />
+                  Phone: 0303 123 1113
                 </p>
               </div>
             </section>
