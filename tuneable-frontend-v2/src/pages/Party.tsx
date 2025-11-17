@@ -309,7 +309,7 @@ const Party: React.FC = () => {
             globalMediaAggregate: typeof actualMedia.globalMediaAggregate === 'number' ? actualMedia.globalMediaAggregate : 0,
             partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
             totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
-            bids: actualMedia.bids,
+            bids: item.partyBids || item.bids || actualMedia.bids || [], // Use party-specific bids (PartyUserMediaAggregate) if available, fallback to global bids
             addedBy: typeof actualMedia.addedBy === 'object' ? actualMedia.addedBy?.username || 'Unknown' : actualMedia.addedBy
           };
         });
@@ -400,7 +400,7 @@ const Party: React.FC = () => {
           globalMediaAggregate: typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0,
           partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
           totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
-          bids: item.bids,
+          bids: item.partyBids || item.bids || [], // Use party-specific bids (PartyUserMediaAggregate) if available, fallback to processed bids
           addedBy: typeof item.addedBy === 'object' ? item.addedBy?.username || 'Unknown' : item.addedBy
         };
       });

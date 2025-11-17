@@ -364,6 +364,14 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 select: 'username profilePic uuid homeLocation secondaryLocation'
             })
             .populate({
+                path: 'media.partyBids',
+                model: 'Bid',
+                populate: {
+                    path: 'userId',
+                    select: 'username profilePic uuid homeLocation secondaryLocation'
+                }
+            })
+            .populate({
                 path: 'partiers',
                 model: 'User',
                 select: 'username uuid',
@@ -414,7 +422,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 sources: sourcesObj, // ✅ Store sources as object { youtube: '...', upload: '...' }
                 globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Global total (schema grammar)
                 partyMediaAggregate: entry.partyMediaAggregate || 0, // ✅ Party-media aggregate (schema grammar)
-                bids: entry.mediaId.bids || [], // ✅ Use populated bids from mediaId with user data
+                bids: entry.partyBids || [], // ✅ Use party-specific bids (PartyUserMediaAggregate) instead of global bids
                 addedBy: entry.mediaId.addedBy, // ✅ Ensures `addedBy` exists
                 totalBidValue: entry.partyMediaAggregate || 0, // ✅ Use party-media aggregate for queue ordering
                 tags: entry.mediaId.tags || [], // ✅ Include tags
@@ -1796,6 +1804,14 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         },
                     },
                 })
+                .populate({
+                    path: 'media.partyBids',
+                    model: 'Bid',
+                    populate: {
+                        path: 'userId',
+                        select: 'username profilePic uuid homeLocation secondaryLocation'
+                    }
+                })
                 .populate('media.addedBy', 'username');
 
             if (!party) {
@@ -1955,7 +1971,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Schema grammar
                         partyMediaAggregate: entry.partyMediaAggregate || 0, // All-time party-media aggregate (schema grammar)
                         timePeriodBidValue, // Bid value for the specific time period
-                        bids: entry.mediaId.bids || [], // Include populated bids for TopBidders component
+                        bids: entry.partyBids || [], // Use party-specific bids (PartyUserMediaAggregate) for regular parties
                         tags: entry.mediaId.tags || [], // Include tags for display
                         category: entry.mediaId.category || null, // Include category for display
                         addedBy: entry.addedBy,
