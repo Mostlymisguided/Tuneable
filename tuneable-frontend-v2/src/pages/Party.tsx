@@ -845,6 +845,9 @@ const Party: React.FC = () => {
           const mediaTitle = safePendingMedia?.title || 'media';
           toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
           
+          // Wait a bit for BidMetricsEngine to update partyMediaAggregate via post-save hook
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           // Refresh party to show updated bid values
           await fetchPartyDetails();
           
@@ -909,6 +912,9 @@ const Party: React.FC = () => {
           });
           
           toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
+          
+          // Wait a bit for BidMetricsEngine to update partyMediaAggregate via post-save hook
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // Clear search and refresh party
           setAddMediaSearchQuery('');
@@ -1520,11 +1526,15 @@ const Party: React.FC = () => {
     const media = getPartyMedia();
     if (!media) return 0;
     
-    return media.reduce((total: number, item: any) => {
-                        const mediaData = item.mediaId || item;
-      const bidValue = mediaData.partyMediaAggregate || 0;
-      return total + (typeof bidValue === 'number' ? bidValue : 0);
-    }, 0);
+    // Sum partyMediaAggregate from all active media entries
+    // partyMediaAggregate is stored directly on the party media entry (item), not on item.mediaId
+    return media
+      .filter((item: any) => item.status === 'active') // Only count active media
+      .reduce((total: number, item: any) => {
+        // partyMediaAggregate is stored on item itself, not on item.mediaId
+        const bidValue = typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0;
+        return total + bidValue;
+      }, 0);
   };
 
 
@@ -1561,7 +1571,8 @@ const Party: React.FC = () => {
          
       </div>
 
-      {/* Metrics Cards */}
+      
+      
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
         <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
           <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
