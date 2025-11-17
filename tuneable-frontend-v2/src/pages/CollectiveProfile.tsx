@@ -474,6 +474,9 @@ useEffect(() => {
   }
 
   const socialLinks = getSocialMediaLinks();
+  const collectiveStats = collective?.stats;
+  const activeMembersCount = Array.isArray(members) ? members.length : 0;
+  const memberDisplayCount = activeMembersCount > 0 ? activeMembersCount : (collectiveStats?.memberCount || 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -677,36 +680,36 @@ useEffect(() => {
             /* NORMAL VIEW - All existing content */
             <>
         {/* Stats */}
-        {collective.stats && (
+        {(collectiveStats || memberDisplayCount > 0) && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Collective Statistics</h2>
-            <div className="grid grid-cols-4 gap-2">
-              {collective.stats.memberCount !== undefined && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+              {(collectiveStats?.memberCount !== undefined || memberDisplayCount > 0) && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{collective.stats.memberCount || 0}</div>
-                  <div className="text-sm text-gray-300">Members</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{memberDisplayCount}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Members</div>
                 </div>
               )}
-              {collective.stats.releaseCount !== undefined && (
+              {collectiveStats?.releaseCount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{collective.stats.releaseCount || 0}</div>
-                  <div className="text-sm text-gray-300">Releases</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{collectiveStats?.releaseCount || 0}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Releases</div>
                 </div>
               )}
-              {collective.stats.globalCollectiveAggregate !== undefined && (
+              {collectiveStats?.globalCollectiveAggregate !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
-                  <div className="text-sm text-gray-300">Total Tips</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(collectiveStats?.globalCollectiveAggregate || 0)}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                 </div>
               )}
-              {collective.stats.globalCollectiveBidCount !== undefined && (
+              {collectiveStats?.globalCollectiveBidCount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Calendar className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">{collective.stats.globalCollectiveBidCount || 0}</div>
-                  <div className="text-sm text-gray-300">Tip Count</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{collectiveStats?.globalCollectiveBidCount || 0}</div>
+                  <div className="text-xs md:text-sm text-gray-300">Tip Count</div>
                 </div>
               )}
             </div>
@@ -947,36 +950,36 @@ useEffect(() => {
               /* Collective Info Tab - Show normal content when viewing info tab in edit mode */
               <div className="space-y-8">
                 {/* Stats */}
-                {collective.stats && (
+                {(collectiveStats || memberDisplayCount > 0) && (
                   <div className="mb-8">
                     <h2 className="text-2xl font-bold text-center text-white mb-4">Collective Statistics</h2>
-                    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {collective.stats.memberCount !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+                      {(collectiveStats?.memberCount !== undefined || memberDisplayCount > 0) && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{collective.stats.memberCount || 0}</div>
-                          <div className="text-sm text-gray-300">Members</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{memberDisplayCount}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Members</div>
                         </div>
                       )}
-                      {collective.stats.releaseCount !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                      {collectiveStats?.releaseCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{collective.stats.releaseCount || 0}</div>
-                          <div className="text-sm text-gray-300">Releases</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{collectiveStats?.releaseCount || 0}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Releases</div>
                         </div>
                       )}
-                      {collective.stats.globalCollectiveAggregate !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                      {collectiveStats?.globalCollectiveAggregate !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <TrendingUp className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{penceToPounds(collective.stats.globalCollectiveAggregate || 0)}</div>
-                          <div className="text-sm text-gray-300">Total Bids</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(collectiveStats?.globalCollectiveAggregate || 0)}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                         </div>
                       )}
-                      {collective.stats.globalCollectiveBidCount !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                      {collectiveStats?.globalCollectiveBidCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Music className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{collective.stats.globalCollectiveBidCount || 0}</div>
-                          <div className="text-sm text-gray-300">Total Bid Count</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{collectiveStats?.globalCollectiveBidCount || 0}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Total Tip Count</div>
                         </div>
                       )}
                     </div>

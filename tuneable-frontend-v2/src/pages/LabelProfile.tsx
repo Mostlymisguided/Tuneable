@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, ArrowLeft, Flag, X, Save, Loader2, UserPlus } from 'lucide-react';
@@ -81,7 +81,7 @@ const LabelProfile: React.FC = () => {
   const [label, setLabel] = useState<Label | null>(null);
   const [recentReleases, setRecentReleases] = useState<Media[]>([]);
   const [topMedia, setTopMedia] = useState<Media[]>([]);
-  const [artists] = useState<Artist[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'artists' | 'media'>('overview');
   const [teamMembers, setTeamMembers] = useState<LabelTeamMember[]>([]);
@@ -124,6 +124,31 @@ const LabelProfile: React.FC = () => {
       tiktok: ''
     }
   });
+
+  const populateEditForm = useCallback((labelData: Label) => {
+    setEditForm({
+      name: labelData.name || '',
+      description: labelData.description || '',
+      email: labelData.email || '',
+      website: labelData.website || '',
+      foundedYear: labelData.foundedYear?.toString() || '',
+      genres: labelData.genres || [],
+      location: {
+        city: labelData.location?.city || '',
+        region: labelData.location?.region || '',
+        country: labelData.location?.country || '',
+        countryCode: labelData.location?.countryCode || ''
+      },
+      socialMedia: {
+        instagram: labelData.socialMedia?.instagram || '',
+        facebook: labelData.socialMedia?.facebook || '',
+        soundcloud: labelData.socialMedia?.soundcloud || '',
+        spotify: labelData.socialMedia?.spotify || '',
+        youtube: labelData.socialMedia?.youtube || '',
+        tiktok: labelData.socialMedia?.tiktok || ''
+      }
+    });
+  }, []);
 
   // Helper function to get country code from country name
   const getCountryCode = (countryName: string): string => {
@@ -185,14 +210,14 @@ const LabelProfile: React.FC = () => {
 
   useEffect(() => {
     if (slug) {
-      fetchLabelData();
+      fetchLabelData(false);
     }
   }, [slug]);
 
-  const fetchLabelData = async () => {
+  const fetchLabelData = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const data = await labelAPI.getLabelBySlug(slug!);
+      const data = await labelAPI.getLabelBySlug(slug!, forceRefresh);
       
       setLabel(data.label);
       setRecentReleases(data.recentReleases || []);
@@ -200,34 +225,29 @@ const LabelProfile: React.FC = () => {
       
       // Populate edit form when label loads (always populate, not just in edit mode)
       if (data.label && canEditLabel(data.label)) {
-        setEditForm({
-          name: data.label.name || '',
-          description: data.label.description || '',
-          email: data.label.email || '',
-          website: data.label.website || '',
-          foundedYear: data.label.foundedYear?.toString() || '',
-          genres: data.label.genres || [],
-          location: {
-            city: data.label.location?.city || '',
-            region: data.label.location?.region || '',
-            country: data.label.location?.country || '',
-            countryCode: data.label.location?.countryCode || ''
-          },
-          socialMedia: {
-            instagram: data.label.socialMedia?.instagram || '',
-            facebook: data.label.socialMedia?.facebook || '',
-            soundcloud: data.label.socialMedia?.soundcloud || '',
-            spotify: data.label.socialMedia?.spotify || '',
-            youtube: data.label.socialMedia?.youtube || '',
-            tiktok: data.label.socialMedia?.tiktok || ''
-          }
-        });
+        populateEditForm(data.label);
+      }
+
+      if (data.label?.slug || slug) {
+        void fetchLabelArtists(data.label?.slug || slug!);
+      } else {
+        setArtists([]);
       }
     } catch (error: any) {
       console.error('Error fetching label data:', error);
       // Handle error (label not found, etc.)
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLabelArtists = async (labelSlug: string) => {
+    try {
+      const response = await labelAPI.getLabelArtists(labelSlug);
+      setArtists(response.artists || []);
+    } catch (error) {
+      console.error('Error fetching label artists:', error);
+      setArtists([]);
     }
   };
 
@@ -458,6 +478,8 @@ const LabelProfile: React.FC = () => {
   }
 
   const socialLinks = getSocialMediaLinks();
+  const labelStats = label?.stats;
+  const artistDisplayCount = artists.length > 0 ? artists.length : (labelStats?.artistCount || 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -669,35 +691,35 @@ const LabelProfile: React.FC = () => {
           /* NORMAL VIEW - All existing content */
           <>
         {/* Stats */}
-        {label.stats && (
+        {(labelStats || artists.length > 0) && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Label Info</h2>
-            <div className="grid grid-cols-4 gap-2">
-              {label.stats.artistCount !== undefined && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+              {(labelStats?.artistCount !== undefined || artists.length > 0) && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                  <div className="text-lg md:text-2xl font-bold text-white">{label.stats.artistCount || 0}</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{artistDisplayCount}</div>
                   <div className="text-xs md:text-sm text-gray-300">Artists</div>
                 </div>
               )}
-              {label.stats.releaseCount !== undefined && (
+              {labelStats?.releaseCount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                  <div className="text-lg md:text-2xl font-bold text-white">{label.stats.releaseCount || 0}</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{labelStats?.releaseCount || 0}</div>
                   <div className="text-xs md:text-sm text-gray-300">Releases</div>
                 </div>
               )}
-              {label.stats.globalLabelAggregate !== undefined && (
+              {labelStats?.globalLabelAggregate !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(label.stats.globalLabelAggregate || 0)}</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(labelStats?.globalLabelAggregate || 0)}</div>
                   <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                 </div>
               )}
-              {label.stats.globalLabelBidCount !== undefined && (
+              {labelStats?.globalLabelBidCount !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Calendar className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                  <div className="text-lg md:text-2xl font-bold text-white">{label.stats.globalLabelBidCount || 0}</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{labelStats?.globalLabelBidCount || 0}</div>
                   <div className="text-xs md:text-sm text-gray-300">Tip Count</div>
                 </div>
               )}
@@ -736,7 +758,7 @@ const LabelProfile: React.FC = () => {
             <div className="space-y-8">
               {/* Label Information */}
               <div className="card bg-black/20 rounded-lg p-6">
-                <h3 className="text-xl font-semibold text-white mb-4">Label Information</h3>
+                <h3 className="text-xl font-semibold text-white mb-4">Label Info</h3>
                 <div className="space-y-3">
                   {label.foundedYear && (
                     <div className="flex items-center space-x-2 text-gray-300">
@@ -831,7 +853,14 @@ const LabelProfile: React.FC = () => {
 
           {activeTab === 'artists' && (
             <div>
-              <h3 className="text-2xl font-bold text-white mb-4">Artists</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-bold text-white">Artists</h3>
+                {artistDisplayCount > 0 && (
+                  <span className="text-sm text-gray-300">
+                    {artistDisplayCount} active
+                  </span>
+                )}
+              </div>
               {artists.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {artists.map((artist) => (
@@ -916,36 +945,36 @@ const LabelProfile: React.FC = () => {
               /* Label Info Tab - Show normal content when viewing info tab in edit mode */
               <div className="space-y-8">
                 {/* Stats */}
-                {label.stats && (
+                {(labelStats || artistDisplayCount > 0) && (
                   <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-center text-white mb-4">Label Statistics</h2>
-                    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {label.stats.artistCount !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                    <h2 className="text-2xl font-bold text-center text-white mb-4">Label Stats</h2>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+                      {(labelStats?.artistCount !== undefined || artistDisplayCount > 0) && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{label.stats.artistCount || 0}</div>
-                          <div className="text-sm text-gray-300">Artists</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{artistDisplayCount}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Artists</div>
                         </div>
                       )}
-                      {label.stats.releaseCount !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                      {labelStats?.releaseCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Music className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{label.stats.releaseCount || 0}</div>
-                          <div className="text-sm text-gray-300">Releases</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{labelStats?.releaseCount || 0}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Releases</div>
                         </div>
                       )}
-                      {label.stats.globalLabelAggregate !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                      {labelStats?.globalLabelAggregate !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <TrendingUp className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{penceToPounds(label.stats.globalLabelAggregate || 0)}</div>
-                          <div className="text-sm text-gray-300">Total Bids</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(labelStats?.globalLabelAggregate || 0)}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                         </div>
                       )}
-                      {label.stats.globalLabelBidCount !== undefined && (
-                        <div className="card bg-black/20 rounded-lg p-6 text-center">
+                      {labelStats?.globalLabelBidCount !== undefined && (
+                        <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Music className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
-                          <div className="text-2xl font-bold text-white">{label.stats.globalLabelBidCount || 0}</div>
-                          <div className="text-sm text-gray-300">Total Bid Count</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{labelStats?.globalLabelBidCount || 0}</div>
+                          <div className="text-xs md:text-sm text-gray-300">Tip Count</div>
                         </div>
                       )}
                     </div>
