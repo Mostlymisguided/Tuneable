@@ -386,12 +386,6 @@ export const mediaAPI = {
     return response.data;
   },
 
-  // Admin: Update media title and/or artist
-  updateMedia: async (mediaId: string, updates: { title?: string; artist?: string }) => {
-    const response = await api.put(`/media/admin/${mediaId}`, updates);
-    return response.data;
-  },
-  
   uploadMedia: async (file: File, metadata: { title: string; artist: string }) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -461,7 +455,8 @@ export const mediaAPI = {
     description?: string;
     sources?: { [key: string]: string };
   }) => {
-    const response = await api.put(`/media/${mediaId}`, updates);
+    // Use admin endpoint for updates (supports title and artist updates)
+    const response = await api.put(`/media/admin/${mediaId}`, updates);
     return response.data;
   },
 
