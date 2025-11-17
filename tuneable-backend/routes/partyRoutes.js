@@ -866,23 +866,63 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         
         await media.save();
 
-        // Add media to party with bid
-        const partyMediaEntry = {
-            mediaId: media._id,
-            media_uuid: media.uuid,
-            addedBy: userId,
-            partyMediaAggregate: bidAmountPence, // First bid becomes the aggregate (store in pence)
-            partyBids: [bid._id],
-            status: 'active',
-            queuedAt: new Date(),
-            // Top bid tracking (first bid is automatically the top bid) - schema grammar
-            partyMediaBidTop: bidAmountPence, // Store in pence
-            partyMediaBidTopUser: userId,
-            partyMediaAggregateTop: userPartyAggregate,
-            partyMediaAggregateTopUser: userId
-        };
+        // Check if media is already in the party to prevent duplicates
+        const existingPartyMediaEntry = party.media.find(entry => 
+            entry.mediaId && entry.mediaId.toString() === media._id.toString()
+        );
 
-        party.media.push(partyMediaEntry);
+        if (existingPartyMediaEntry) {
+            // Media already exists in party
+            if (existingPartyMediaEntry.status === 'active') {
+                return res.status(400).json({ 
+                    error: 'This media is already in the party queue',
+                    mediaId: media._id,
+                    mediaTitle: media.title
+                });
+            } else if (existingPartyMediaEntry.status === 'vetoed') {
+                // Media was vetoed - allow re-adding by updating the existing entry
+                existingPartyMediaEntry.status = 'active';
+                existingPartyMediaEntry.queuedAt = new Date();
+                existingPartyMediaEntry.vetoedAt = null;
+                existingPartyMediaEntry.vetoedBy = null;
+                existingPartyMediaEntry.vetoedBy_uuid = null;
+                
+                // Add the bid to the existing entry
+                existingPartyMediaEntry.partyBids = existingPartyMediaEntry.partyBids || [];
+                existingPartyMediaEntry.partyBids.push(bid._id);
+                existingPartyMediaEntry.partyMediaAggregate = (existingPartyMediaEntry.partyMediaAggregate || 0) + bidAmountPence;
+                
+                // Update top bid if this is higher
+                if (bidAmountPence > (existingPartyMediaEntry.partyMediaBidTop || 0)) {
+                    existingPartyMediaEntry.partyMediaBidTop = bidAmountPence;
+                    existingPartyMediaEntry.partyMediaBidTopUser = userId;
+                }
+                
+                // Update aggregate top if this user's aggregate is higher
+                if (userPartyAggregate > (existingPartyMediaEntry.partyMediaAggregateTop || 0)) {
+                    existingPartyMediaEntry.partyMediaAggregateTop = userPartyAggregate;
+                    existingPartyMediaEntry.partyMediaAggregateTopUser = userId;
+                }
+            }
+        } else {
+            // Media not in party - add it
+            const partyMediaEntry = {
+                mediaId: media._id,
+                media_uuid: media.uuid,
+                addedBy: userId,
+                partyMediaAggregate: bidAmountPence, // First bid becomes the aggregate (store in pence)
+                partyBids: [bid._id],
+                status: 'active',
+                queuedAt: new Date(),
+                // Top bid tracking (first bid is automatically the top bid) - schema grammar
+                partyMediaBidTop: bidAmountPence, // Store in pence
+                partyMediaBidTopUser: userId,
+                partyMediaAggregateTop: userPartyAggregate,
+                partyMediaAggregateTopUser: userId
+            };
+
+            party.media.push(partyMediaEntry);
+        }
         
         // Fix any legacy 'queued' statuses in all media entries before saving
         party.media.forEach(entry => {
