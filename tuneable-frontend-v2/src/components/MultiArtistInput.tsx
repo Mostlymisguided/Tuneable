@@ -233,16 +233,15 @@ const MultiArtistInput: React.FC<MultiArtistInputProps> = ({
                 Relation to next
               </label>
               <select
-                value={artist.relationToNext || ''}
+                value={artist.relationToNext || '&'}
                 disabled={relationsDisabled || disabled}
                 onChange={(e) =>
                   updateArtist(index, {
-                    relationToNext: (e.target.value || null) as ArtistRelation | null
+                    relationToNext: (e.target.value as ArtistRelation) || '&'
                   })
                 }
                 className="input md:flex-1"
               >
-                <option value="">(default &)</option>
                 {relationOptions.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
