@@ -234,6 +234,11 @@ export const partyAPI = {
     return response.data;
   },
   
+  searchByCode: async (code: string): Promise<{ party: any }> => {
+    const response = await api.get(`/parties/search-by-code/${code}`);
+    return response.data;
+  },
+  
   // Admin: Get party statistics
   getStats: async () => {
     const response = await api.get('/parties/admin/stats');

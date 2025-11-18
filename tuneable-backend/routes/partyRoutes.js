@@ -168,8 +168,25 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
  */
 router.get('/', authMiddleware, async (req, res) => {
     try {
+        const userId = req.user._id;
+        
+        // Get user's joined parties to filter private parties
+        const User = require('../models/User');
+        const user = await User.findById(userId).select('joinedParties');
+        const joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId) || [];
+        
         // Use aggregation to get parties with media counts in a single query
         const partiesWithCounts = await Party.aggregate([
+            {
+                $match: {
+                    // Show public parties OR private parties the user has joined OR parties the user hosts
+                    $or: [
+                        { privacy: 'public' },
+                        { privacy: 'private', _id: { $in: joinedPartyIds } },
+                        { privacy: 'private', host: userId }
+                    ]
+                }
+            },
             {
                 $project: {
                     uuid: 1,
@@ -248,6 +265,61 @@ router.get('/', authMiddleware, async (req, res) => {
         res.status(200).json({ message: 'Parties fetched successfully', parties: partiesWithCounts });
     } catch (err) {
         handleError(res, err, 'Failed to fetch parties');
+    }
+});
+
+// @route   GET /api/parties/search-by-code/:code
+// @desc    Search for a party by party code
+// @access  Private
+router.get('/search-by-code/:code', authMiddleware, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const userId = req.user._id;
+        
+        if (!code || code.trim().length === 0) {
+            return res.status(400).json({ error: 'Party code is required' });
+        }
+        
+        const party = await Party.findOne({ partyCode: code.toUpperCase().trim() })
+            .populate('host', 'username uuid')
+            .lean();
+        
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        
+        // Check if user has already joined
+        const User = require('../models/User');
+        const user = await User.findById(userId).select('joinedParties');
+        const isJoined = user?.joinedParties?.some(jp => 
+            jp.partyId.toString() === party._id.toString()
+        ) || false;
+        
+        // Check if user is the host
+        const isHost = party.host._id.toString() === userId.toString();
+        
+        res.json({
+            party: {
+                _id: party._id,
+                uuid: party.uuid,
+                name: party.name,
+                location: party.location,
+                host: party.host,
+                partyCode: party.partyCode,
+                privacy: party.privacy,
+                type: party.type,
+                status: party.status,
+                description: party.description,
+                tags: party.tags,
+                minimumBid: party.minimumBid,
+                mediaSource: party.mediaSource,
+                isJoined,
+                isHost
+            }
+        });
+    } catch (err) {
+        console.error('Error searching party by code:', err);
+        handleError(res, err, 'Failed to search party by code');
     }
 });
 

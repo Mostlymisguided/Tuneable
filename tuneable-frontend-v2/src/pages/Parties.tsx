@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
 import PlayerWarningModal from '../components/PlayerWarningModal';
+import { toast } from 'react-toastify';
 import { Music, Users, MapPin } from 'lucide-react';
 
 // Define types directly to avoid import issues
@@ -38,6 +39,7 @@ const Parties: React.FC = () => {
   const [searchTerms, setSearchTerms] = useState<string[]>([]);
   const [currentSearchInput, setCurrentSearchInput] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
   const { currentPartyId } = useWebPlayerStore();
@@ -102,16 +104,76 @@ const Parties: React.FC = () => {
     fetchParties();
   }, []);
 
+  // Handle invite links from URL params
+  useEffect(() => {
+    const inviteCode = searchParams.get('code');
+    const partyId = searchParams.get('partyId');
+    
+    if (inviteCode) {
+      // User came from an invite link with party code
+      const handleInviteLink = async () => {
+        try {
+          const response = await partyAPI.searchByCode(inviteCode);
+          if (response.party) {
+            const foundParty = response.party;
+            
+            // If already joined, navigate to party
+            if (foundParty.isJoined || foundParty.isHost) {
+              navigate(`/party/${foundParty._id}`);
+              return;
+            }
+            
+            // If private party, prompt for code and join
+            if (foundParty.privacy === 'private') {
+              const enteredCode = prompt(`You've been invited to "${foundParty.name}"! Enter the party code to join:`);
+              if (enteredCode) {
+                try {
+                  await partyAPI.joinParty(foundParty._id, enteredCode);
+                  toast.success(`Joined ${foundParty.name}!`);
+                  navigate(`/party/${foundParty._id}`);
+                } catch (error: any) {
+                  toast.error(error.response?.data?.message || 'Failed to join party');
+                }
+              }
+            } else {
+              // Public party, join directly
+              try {
+                await partyAPI.joinParty(foundParty._id);
+                toast.success(`Joined ${foundParty.name}!`);
+                navigate(`/party/${foundParty._id}`);
+              } catch (error: any) {
+                toast.error(error.response?.data?.message || 'Failed to join party');
+              }
+            }
+          }
+        } catch (error: any) {
+          if (error.response?.status === 404) {
+            toast.error('Party not found. The invite link may be invalid.');
+          } else {
+            toast.error('Error processing invite link');
+            console.error('Error handling invite link:', error);
+          }
+        }
+      };
+      
+      handleInviteLink();
+    } else if (partyId) {
+      // Direct party ID in URL, navigate to party
+      navigate(`/party/${partyId}`);
+    }
+  }, [searchParams, navigate]);
+
   // Filter parties based on search terms
   const filteredParties = parties.filter(party => {
     if (searchTerms.length === 0) return true;
     
-    // Check if any search term matches party name, description, or tags
+    // Check if any search term matches party name, description, tags, or party code
     return searchTerms.some(term => {
       const lowerTerm = term.toLowerCase();
       return party.name.toLowerCase().includes(lowerTerm) ||
         (party.description && party.description.toLowerCase().includes(lowerTerm)) ||
-        (party.tags && party.tags.some(tag => tag.toLowerCase().includes(lowerTerm)));
+        (party.tags && party.tags.some(tag => tag.toLowerCase().includes(lowerTerm))) ||
+        party.partyCode.toLowerCase().includes(lowerTerm);
     });
   });
 
@@ -156,10 +218,60 @@ const Parties: React.FC = () => {
   };
 
   // Handle search input key press
-  const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+  const handleSearchKeyPress = async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && currentSearchInput.trim()) {
       e.preventDefault();
-      handleAddSearchTerm(currentSearchInput);
+      const trimmedInput = currentSearchInput.trim();
+      
+      // Check if input looks like a party code (typically uppercase alphanumeric, 5-10 chars)
+      const looksLikePartyCode = /^[A-Z0-9]{4,10}$/i.test(trimmedInput);
+      
+      if (looksLikePartyCode) {
+        // Try to search by party code
+        try {
+          const response = await partyAPI.searchByCode(trimmedInput);
+          if (response.party) {
+            const foundParty = response.party;
+            
+            // If already joined, navigate to party
+            if (foundParty.isJoined || foundParty.isHost) {
+              navigate(`/party/${foundParty._id}`);
+              setCurrentSearchInput('');
+              return;
+            }
+            
+            // If private party and not joined, show join modal
+            if (foundParty.privacy === 'private') {
+              const inviteCode = prompt(`Found private party "${foundParty.name}". Enter party code to join:`);
+              if (inviteCode) {
+                try {
+                  await partyAPI.joinParty(foundParty._id, inviteCode);
+                  toast.success(`Joined ${foundParty.name}!`);
+                  navigate(`/party/${foundParty._id}`);
+                } catch (error: any) {
+                  toast.error(error.response?.data?.message || 'Failed to join party');
+                }
+              }
+              setCurrentSearchInput('');
+              return;
+            }
+            
+            // Public party, add to search terms
+            handleAddSearchTerm(trimmedInput);
+          }
+        } catch (error: any) {
+          // Party not found by code, treat as regular search term
+          if (error.response?.status === 404) {
+            handleAddSearchTerm(trimmedInput);
+          } else {
+            toast.error('Error searching for party');
+            console.error('Error searching by code:', error);
+          }
+        }
+      } else {
+        // Regular search term
+        handleAddSearchTerm(trimmedInput);
+      }
     }
   };
 
