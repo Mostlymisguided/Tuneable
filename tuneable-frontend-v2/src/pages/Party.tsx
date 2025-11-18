@@ -116,7 +116,7 @@ const Party: React.FC = () => {
   const [validationCategory, setValidationCategory] = useState<string>('');
   const [validationDuration, setValidationDuration] = useState<number>(0);
   
-  const [showVetoed] = useState(false);
+  const [showVetoed, setShowVetoed] = useState(false);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
@@ -1390,22 +1390,34 @@ const Party: React.FC = () => {
   };
   
   const handleUnvetoClick = async (media: any) => {
-    if (!isHost) {
-      toast.error('Only the host can restore media');
+    const mediaData = media.mediaId || media;
+    const mediaId = mediaData._id || mediaData.id || mediaData.uuid;
+    const isAdmin = user?.role?.includes('admin');
+    
+    if (!isHost && !isAdmin) {
+      toast.error('Only the host or admin can unveto media');
       return;
     }
 
     try {
-      // Un-veto the media (restore to 'active' status)
-      await partyAPI.unvetoMedia(partyId!, media._id || media.id);
-      toast.success('Media restored to queue');
+      const confirmationMessage = `Are you sure you want to unveto "${mediaData.title || 'this media'}"? Users who bid on it will be notified and can bid again.`;
+      if (!window.confirm(confirmationMessage)) return;
+
+      await partyAPI.unvetoMedia(partyId!, mediaId);
+      toast.success('Media unvetoed successfully. Users have been notified.');
       
       // Refresh party data
       await fetchPartyDetails();
-    } catch (error) {
-      console.error('Error restoring media:', error);
-      toast.error('Failed to restore media');
+    } catch (error: any) {
+      console.error('Error unvetoing media:', error);
+      toast.error(error.response?.data?.error || 'Failed to unveto media');
     }
+  };
+  
+  // Get vetoed media for display
+  const getVetoedMedia = () => {
+    const allMedia = getPartyMedia();
+    return allMedia.filter((item: any) => item.status === 'vetoed');
   };
 
 
@@ -1732,20 +1744,6 @@ const Party: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Media Queue */}
         <div className="lg:col-span-2">
-          {/* Host Controls */}
-         {isHost && (
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                {/* <button
-                  onClick={() => setEndPartyModalOpen(true)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                  <span>End Party</span>
-                </button> */}
-              </div>
-            </div>
-          )}
           
           <div className="space-y-3">
             {getPartyMedia().length > 0 ? (
@@ -2338,7 +2336,7 @@ const Party: React.FC = () => {
                     </div>
                     
                     {/* Refresh Button */}
-                    <div className="flex justify-center mt-4">
+                    <div className="flex justify-center items-center gap-2 mt-4">
                       <button
                         onClick={handleRefresh}
                         disabled={isRefreshing}
@@ -2349,6 +2347,38 @@ const Party: React.FC = () => {
                         <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Refresh Button and Show Vetoed Toggle - Always visible for Host/Admin */}
+                {(isHost || user?.role?.includes('admin')) && (
+                  <div className="flex justify-center items-center gap-2 mb-6">
+                    <button
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                      title="Refresh party data to see new bids"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                    </button>
+                    {/* Show Vetoed Media Toggle */}
+                    <button
+                      onClick={() => setShowVetoed(!showVetoed)}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                        showVetoed
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      <X className="h-4 w-4" />
+                      <span>{showVetoed ? 'Hide Vetoed' : 'Show Vetoed'}</span>
+                      {getVetoedMedia().length > 0 && (
+                        <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                          {getVetoedMedia().length}
+                        </span>
+                      )}
+                    </button>
                   </div>
                 )}
 
@@ -2643,78 +2673,80 @@ const Party: React.FC = () => {
                 {/* Vetoed Songs - Show when Vetoed tab is active */}
                 {showVetoed && (
                   <div className="space-y-3">
-                    {getPartyMedia().filter((item: any) => item.status === 'vetoed').length === 0 ? (
+                    {getVetoedMedia().length === 0 ? (
                       <div className="text-center py-8">
                         <X className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-500">No vetoed songs</p>
                       </div>
                     ) : (
-                      getPartyMedia()
-                        .filter((item: any) => item.status === 'vetoed')
-                        .map((item: any, index: number) => {
-                          const rawMediaData = item.mediaId || item;
-                          // Ensure artists array is set for ClickableArtistDisplay
-                          const mediaData = {
-                            ...rawMediaData,
-                            artists: Array.isArray(rawMediaData.artists) ? rawMediaData.artists : 
-                                    (Array.isArray(rawMediaData.artist) ? rawMediaData.artist : []),
-                            artist: rawMediaData.artist,
-                            featuring: rawMediaData.featuring || [],
-                            creatorDisplay: rawMediaData.creatorDisplay
-                          };
-                          return (
-                            <div
-                              key={`vetoed-${mediaData.id}-${index}`}
-                              className="bg-red-900/20 border border-red-800/30 p-4 rounded-lg flex items-center space-x-4"
-                            >
-                              <img
-                                src={mediaData.coverArt || DEFAULT_COVER_ART}
-                                alt={mediaData.title || 'Unknown Media'}
-                                className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                                width="128"
-                                height="128"
-                                onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-                              />
-                              
-                              {/* Media Details */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center space-x-2">
-                                  <h4 
-                                    className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
-                                    onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-                                  >
-                                    {mediaData.title || 'Unknown Media'}
-                                  </h4>
-                                  <span className="text-gray-400">•</span>
-                                  <span className="text-gray-300 text-lg truncate font-light">
-                                    <ClickableArtistDisplay media={mediaData} />
-                                  </span>
-                                  <div className="flex items-center space-x-1 ml-2">
-                                    <Clock className="h-4 w-4 text-gray-400" />
-                                    <span className="text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
-                                  </div>
-                                </div>
-                                <div className="mt-2">
-                                  <p className="text-xs text-red-400">
-                                    Vetoed {item.vetoedAt ? new Date(item.vetoedAt).toLocaleString() : 'recently'}
-                                  </p>
+                      getVetoedMedia().map((item: any, index: number) => {
+                        const rawMediaData = item.mediaId || item;
+                        // Ensure artists array is set for ClickableArtistDisplay
+                        const mediaData = {
+                          ...rawMediaData,
+                          artists: Array.isArray(rawMediaData.artists) ? rawMediaData.artists : 
+                                  (Array.isArray(rawMediaData.artist) ? rawMediaData.artist : []),
+                          artist: rawMediaData.artist,
+                          featuring: rawMediaData.featuring || [],
+                          creatorDisplay: rawMediaData.creatorDisplay
+                        };
+                        return (
+                          <div
+                            key={`vetoed-${mediaData.id || mediaData._id}-${index}`}
+                            className="bg-red-900/20 border border-red-800/30 p-4 rounded-lg flex items-center space-x-4"
+                          >
+                            <img
+                              src={mediaData.coverArt || DEFAULT_COVER_ART}
+                              alt={mediaData.title || 'Unknown Media'}
+                              className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                              width="128"
+                              height="128"
+                              onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
+                            />
+                            
+                            {/* Media Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <h4 
+                                  className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                  onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
+                                >
+                                  {mediaData.title || 'Unknown Media'}
+                                </h4>
+                                <span className="text-gray-400">•</span>
+                                <span className="text-gray-300 text-lg truncate font-light">
+                                  <ClickableArtistDisplay media={mediaData} />
+                                </span>
+                                <div className="flex items-center space-x-1 ml-2">
+                                  <Clock className="h-4 w-4 text-gray-400" />
+                                  <span className="text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
                                 </div>
                               </div>
-                              
-                              {/* Restore Button - Host only */}
-                              {isHost && (
-                                <div className="flex flex-col space-y-2">
-                                  <button
-                                    onClick={() => handleUnvetoClick(item)}
-                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
-                                  >
-                                    <span>Restore</span>
-                                  </button>
-                                </div>
-                              )}
+                              <div className="mt-2">
+                                <p className="text-xs text-red-400">
+                                  Vetoed {item.vetoedAt ? new Date(item.vetoedAt).toLocaleString() : 'recently'}
+                                  {item.vetoedBy && ` by ${item.vetoedBy}`}
+                                </p>
+                                {item.vetoedReason && (
+                                  <p className="text-xs text-gray-400 mt-1">Reason: {item.vetoedReason}</p>
+                                )}
+                              </div>
                             </div>
-                          );
-                        })
+                            
+                            {/* Unveto Button - Host or Admin */}
+                            {(isHost || user?.role?.includes('admin')) && (
+                              <div className="flex flex-col space-y-2">
+                                <button
+                                  onClick={() => handleUnvetoClick(item)}
+                                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+                                >
+                                  <span>Unveto</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 )}

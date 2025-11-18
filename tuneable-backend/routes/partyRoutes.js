@@ -452,6 +452,11 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 select: 'username profilePic uuid homeLocation secondaryLocation'
             })
             .populate({
+                path: 'media.vetoedBy',
+                model: 'User',
+                select: 'username uuid'
+            })
+            .populate({
                 path: 'media.partyBids',
                 model: 'Bid',
                 match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
@@ -540,14 +545,18 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 playedAt: entry.playedAt,
                 completedAt: entry.completedAt,
                 vetoedAt: entry.vetoedAt,
-                vetoedBy: entry.vetoedBy,
+                vetoedBy: entry.vetoedBy ? (typeof entry.vetoedBy === 'object' ? entry.vetoedBy.username : entry.vetoedBy) : null,
+                vetoedBy_uuid: entry.vetoedBy_uuid,
+                vetoedReason: entry.vetoedReason,
             };
-        }).filter(Boolean) // ✅ Remove null entries
-          .filter(entry => entry.status !== 'vetoed'); // ✅ Filter out vetoed media
+        }).filter(Boolean); // ✅ Remove null entries (but keep vetoed media for frontend to display)
 
-        // ✅ Sort media by bid value (vetoed already filtered out)
+        // ✅ Sort media by bid value (active media first, then vetoed)
         processedMedia.sort((a, b) => {
-            // Sort by bid value (highest first)
+            // First, sort by status (active first, then vetoed)
+            if (a.status === 'active' && b.status !== 'active') return -1;
+            if (a.status !== 'active' && b.status === 'active') return 1;
+            // Then sort by bid value (highest first)
             return (b.totalBidValue || 0) - (a.totalBidValue || 0);
         });
 
@@ -1894,6 +1903,23 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
 
         await party.save();
 
+        // Get populated media for notification
+        const populatedMedia = await Media.findById(actualMediaId).select('title uuid');
+        
+        // Send notifications to all users who bid on this media
+        const notificationService = require('../services/notificationService');
+        for (const [userId, refund] of refundsByUser) {
+          notificationService.notifyMediaVetoed(
+            userId,
+            actualMediaId,
+            populatedMedia?.title || 'Unknown Media',
+            partyId,
+            party.name,
+            refund.totalAmount,
+            reason || null
+          ).catch(err => console.error(`Error sending veto notification to user ${userId}:`, err));
+        }
+
         const totalRefunded = Array.from(refundsByUser.values()).reduce((sum, r) => sum + r.totalAmount, 0);
 
         res.json({
@@ -1902,12 +1928,116 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
             vetoedAt: mediaEntry.vetoedAt,
             refundedBidsCount: bidsToRefund.length,
             refundedUsersCount: refundsByUser.size,
-            refundedAmount: totalRefunded
+            refundedAmount: totalRefunded,
+            notificationsSent: refundsByUser.size
         });
 
     } catch (err) {
         console.error('Error vetoing media:', err);
         res.status(500).json({ error: 'Error vetoing media', details: err.message });
+    }
+});
+
+// Unveto a media item from a party (restore to active, notify users)
+router.post('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, mediaId } = req.params;
+        const Bid = require('../models/Bid');
+        const User = require('../models/User');
+        const Media = require('../models/Media');
+        const notificationService = require('../services/notificationService');
+        const mongoose = require('mongoose');
+
+        // Find the party
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if user is the host OR admin
+        const isHost = party.host.toString() === req.user._id.toString();
+        const isAdmin = req.user.role && req.user.role.includes('admin');
+        
+        if (!isHost && !isAdmin) {
+            return res.status(403).json({ error: 'Only the party host or admin can unveto media' });
+        }
+
+        // Find the media in the party's queue
+        const mediaIndex = party.media.findIndex(entry => 
+            (entry.mediaId && entry.mediaId.toString() === mediaId) || 
+            (entry.media_uuid === mediaId)
+        );
+        if (mediaIndex === -1) {
+            return res.status(404).json({ error: 'Media not found in party queue' });
+        }
+
+        const mediaEntry = party.media[mediaIndex];
+
+        // Check if media is actually vetoed
+        if (mediaEntry.status !== 'vetoed') {
+            return res.status(400).json({ error: 'Media is not vetoed' });
+        }
+
+        // Resolve actual mediaId
+        let actualMediaId = mediaId;
+        if (!mongoose.isValidObjectId(mediaId)) {
+            const mediaDoc = await Media.findOne({ uuid: mediaId });
+            if (!mediaDoc) {
+                return res.status(404).json({ error: 'Media not found' });
+            }
+            actualMediaId = mediaDoc._id.toString();
+        }
+
+        // Get populated media for title
+        const populatedMedia = await Media.findById(actualMediaId).select('title uuid');
+        if (!populatedMedia) {
+            return res.status(404).json({ error: 'Media not found' });
+        }
+
+        // Find all users who had vetoed bids on this media in this party
+        const vetoedBids = await Bid.find({
+            mediaId: actualMediaId,
+            partyId: partyId,
+            status: 'vetoed'
+        }).populate('userId', 'uuid username');
+
+        // Get unique user IDs
+        const userIds = [...new Set(vetoedBids.map(bid => bid.userId._id.toString()))];
+
+        // Restore party media status to active
+        mediaEntry.status = 'active';
+        mediaEntry.vetoedAt = null;
+        mediaEntry.vetoedBy = null;
+        mediaEntry.vetoedBy_uuid = null;
+
+        await party.save();
+
+        // Send notifications to all users who had vetoed bids
+        // Note: We do NOT restore bid statuses - they remain vetoed
+        // Users can place new bids if they want
+        const notificationPromises = userIds.map(userId => 
+            notificationService.notifyMediaUnvetoed(
+                userId,
+                actualMediaId,
+                populatedMedia.title,
+                partyId,
+                party.name
+            ).catch(err => console.error(`Error sending unveto notification to user ${userId}:`, err))
+        );
+
+        await Promise.all(notificationPromises);
+
+        res.json({
+            message: 'Media unvetoed successfully',
+            mediaId: mediaId,
+            mediaTitle: populatedMedia.title,
+            notifiedUsers: userIds.length,
+            note: 'Bids remain vetoed. Users can place new bids if they wish.'
+        });
+
+    } catch (err) {
+        console.error('Error unvetoing media:', err);
+        res.status(500).json({ error: 'Error unvetoing media', details: err.message });
     }
 });
 

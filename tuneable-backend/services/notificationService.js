@@ -349,6 +349,81 @@ const notifyTuneBytesEarned = async (userId, amount, reason, mediaId = null, med
   }
 };
 
+/**
+ * Notify users that media they bid on was vetoed
+ * @param {string} userId - User ID who bid on the media
+ * @param {string} mediaId - Media ID
+ * @param {string} mediaTitle - Media title
+ * @param {string} partyId - Party ID
+ * @param {string} partyName - Party name
+ * @param {number} refundAmount - Amount refunded (in pence)
+ * @param {string} reason - Optional veto reason
+ */
+const notifyMediaVetoed = async (userId, mediaId, mediaTitle, partyId, partyName, refundAmount, reason = null) => {
+  try {
+    const Media = require('../models/Media');
+    const Party = require('../models/Party');
+    const media = await Media.findById(mediaId).select('uuid');
+    const party = await Party.findById(partyId).select('uuid');
+    
+    const mediaLinkId = media?.uuid || mediaId;
+    const partyLinkId = party?.uuid || partyId;
+    
+    let message = `"${mediaTitle}" was vetoed from "${partyName}". Your bid of £${(refundAmount / 100).toFixed(2)} has been refunded.`;
+    if (reason) {
+      message += ` Reason: ${reason}`;
+    }
+    
+    await createNotification({
+      userId,
+      type: 'media_vetoed',
+      title: 'Media Vetoed',
+      message,
+      link: `/party/${partyLinkId}`,
+      linkText: 'View Party',
+      relatedMediaId: mediaId,
+      relatedPartyId: partyId,
+      groupKey: `media_vetoed_${mediaId}_${partyId}_${userId}`
+    });
+  } catch (error) {
+    console.error('Error creating media vetoed notification:', error);
+  }
+};
+
+/**
+ * Notify users that media they bid on was unvetoed
+ * @param {string} userId - User ID who bid on the media
+ * @param {string} mediaId - Media ID
+ * @param {string} mediaTitle - Media title
+ * @param {string} partyId - Party ID
+ * @param {string} partyName - Party name
+ */
+const notifyMediaUnvetoed = async (userId, mediaId, mediaTitle, partyId, partyName) => {
+  try {
+    const Media = require('../models/Media');
+    const Party = require('../models/Party');
+    const media = await Media.findById(mediaId).select('uuid');
+    const party = await Party.findById(partyId).select('uuid');
+    
+    const mediaLinkId = media?.uuid || mediaId;
+    const partyLinkId = party?.uuid || partyId;
+    
+    await createNotification({
+      userId,
+      type: 'media_unvetoed',
+      title: 'Media Unvetoed',
+      message: `"${mediaTitle}" has been unvetoed in "${partyName}". You can bid on it again if you'd like.`,
+      link: `/party/${partyLinkId}`,
+      linkText: 'View Party',
+      relatedMediaId: mediaId,
+      relatedPartyId: partyId,
+      groupKey: `media_unvetoed_${mediaId}_${partyId}_${userId}`
+    });
+  } catch (error) {
+    console.error('Error creating media unvetoed notification:', error);
+  }
+};
+
 module.exports = {
   createNotification,
   notifyBidReceived,
@@ -356,6 +431,8 @@ module.exports = {
   notifyCommentReply,
   notifyCreatorApplication,
   notifyClaim,
-  notifyTuneBytesEarned
+  notifyTuneBytesEarned,
+  notifyMediaVetoed,
+  notifyMediaUnvetoed
 };
 

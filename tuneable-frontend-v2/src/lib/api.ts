@@ -298,7 +298,7 @@ export const partyAPI = {
   },
   
   unvetoMedia: async (partyId: string, mediaId: string) => {
-    const response = await api.put(`/parties/${partyId}/media/${mediaId}/unveto`);
+    const response = await api.post(`/parties/${partyId}/media/${mediaId}/unveto`);
     return response.data;
   },
   

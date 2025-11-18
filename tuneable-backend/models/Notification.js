@@ -27,6 +27,8 @@ const notificationSchema = new mongoose.Schema({
       'label_invite',            // Invited to label
       'collective_invite',       // Invited to collective
       'warning',                 // Admin warning issued to user
+      'media_vetoed',            // Media you bid on was vetoed
+      'media_unvetoed',          // Media you bid on was unvetoed
     ],
     required: true
   },

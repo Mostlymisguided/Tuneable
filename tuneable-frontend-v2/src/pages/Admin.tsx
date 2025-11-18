@@ -1734,9 +1734,30 @@ const Admin: React.FC = () => {
                                 </button>
                               )}
                               {bid.vetoedAt && (
-                                <div className="text-xs text-gray-500">
-                                  Vetoed: {new Date(bid.vetoedAt).toLocaleDateString()}
-                                </div>
+                                <>
+                                  <div className="text-xs text-gray-500">
+                                    Vetoed: {new Date(bid.vetoedAt).toLocaleDateString()}
+                                  </div>
+                                  {bid.party?._id && bid.media?._id && (
+                                    <button
+                                      onClick={async () => {
+                                        if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can bid again.`)) {
+                                          try {
+                                            await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
+                                            toast.success(`Media unvetoed successfully. Users have been notified.`);
+                                            loadBids();
+                                          } catch (error: any) {
+                                            toast.error(error.response?.data?.error || 'Failed to unveto media');
+                                          }
+                                        }
+                                      }}
+                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors mt-1"
+                                      title="Unveto media in party"
+                                    >
+                                      Unveto
+                                    </button>
+                                  )}
+                                </>
                               )}
                             </div>
                           </td>
@@ -2323,6 +2344,29 @@ const Admin: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-xs text-gray-400 uppercase">
                               {bid.bidScope || 'party'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {bid.party?._id && bid.media?._id && (
+                                <button
+                                  onClick={async () => {
+                                    if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can bid again.`)) {
+                                      try {
+                                        await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
+                                        toast.success(`Media unvetoed successfully. Users have been notified.`);
+                                        loadVetoedBids();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to unveto media');
+                                      }
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                  title="Unveto media in party"
+                                >
+                                  Unveto
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
