@@ -13,6 +13,7 @@ interface Bid {
   };
   amount: number;
   createdAt: string;
+  status?: string; // Bid status: 'active', 'vetoed', 'refunded'
   _doc?: any;
 }
 

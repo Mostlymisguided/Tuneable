@@ -12,6 +12,7 @@ interface Bid {
   };
   amount: number;
   createdAt?: string; // Optional - may not be present in all contexts
+  status?: string; // Bid status: 'active', 'vetoed', 'refunded'
   _doc?: any; // Mongoose document property
 }
 
