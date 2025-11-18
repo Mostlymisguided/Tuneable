@@ -555,6 +555,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       tags: parsedTags,
       description: description || '',
       coverArt: finalCoverArt,
+      category: 'music', // Auto-assign 'music' category for creator uploads
       
       // Note: trackNumber, discNumber, and publisher fields don't exist in Media model
       encodedBy: mappedMetadata.encodedBy || null,
