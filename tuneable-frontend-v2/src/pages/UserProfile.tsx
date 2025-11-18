@@ -576,7 +576,6 @@ const UserProfile: React.FC = () => {
       artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
       artists: Array.isArray(media.artist) ? media.artist : (media.artists || []), // Preserve full artist array with userIds
       featuring: media.featuring || [],
-      creatorDisplay: media.creatorDisplay,
       duration: media.duration,
       coverArt: media.coverArt,
       sources: sources,

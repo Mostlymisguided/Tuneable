@@ -14,7 +14,6 @@ interface PlayerMedia {
   bids: any[];
   addedBy: any;
   totalBidValue: number;
-  creatorDisplay?: string;
   featuring?: any[];
 }
 
