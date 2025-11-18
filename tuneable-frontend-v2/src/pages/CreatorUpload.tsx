@@ -680,7 +680,7 @@ const CreatorUpload: React.FC = () => {
                     className="text-xs text-purple-300 hover:text-white transition-colors"
                     onClick={() => handleMultipleArtistsToggle(true)}
                   >
-                    Need multiple artists? Enable advanced mode
+                    Multiple Artists? Enable Advanced Mode
                   </button>
                 </>
               )}

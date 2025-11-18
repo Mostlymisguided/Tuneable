@@ -2315,7 +2315,7 @@ const TuneProfile: React.FC = () => {
                     className="text-xs text-purple-300 hover:text-white"
                     onClick={() => handleMultipleArtistsToggle(true)}
                   >
-                    Need multiple artists? Enable advanced mode
+                    Multiple Artists? Enable Advanced Mode
                   </button>
                     </>
                   )}
