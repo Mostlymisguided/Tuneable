@@ -21,8 +21,9 @@ This guide walks you through migrating your MongoDB data from a free Atlas clust
 
 1. **Set your connection strings:**
    ```bash
-   export SOURCE_URI="mongodb+srv://username:password@source-cluster.mongodb.net/tuneable?retryWrites=true&w=majority"
-   export DEST_URI="mongodb+srv://username:password@dest-cluster.mongodb.net/tuneable?retryWrites=true&w=majority"
+   # Replace username, password, and cluster names with your actual values
+   export SOURCE_URI="mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@source-cluster.mongodb.net/database?retryWrites=true&w=majority"
+   export DEST_URI="mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@dest-cluster.mongodb.net/database?retryWrites=true&w=majority"
    ```
 
 2. **Run the migration script:**
@@ -41,7 +42,8 @@ This guide walks you through migrating your MongoDB data from a free Atlas clust
 
 1. **Export from source cluster:**
    ```bash
-   mongodump --uri="mongodb+srv://username:password@source-cluster.mongodb.net/tuneable" --out=./backup
+   # Replace username, password, and cluster name with your actual values
+   mongodump --uri="mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@source-cluster.mongodb.net/database" --out=./backup
    ```
 
 2. **Verify the backup:**
@@ -52,7 +54,8 @@ This guide walks you through migrating your MongoDB data from a free Atlas clust
 
 3. **Import to destination cluster:**
    ```bash
-   mongorestore --uri="mongodb+srv://username:password@dest-cluster.mongodb.net/tuneable" --drop ./backup/tuneable
+   # Replace username, password, and cluster name with your actual values
+   mongorestore --uri="mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@dest-cluster.mongodb.net/database" --drop ./backup/database
    ```
    
    **Note:** The `--drop` flag will delete existing collections before importing. Remove it if you want to merge data.
@@ -71,10 +74,12 @@ Update your `.env` file (or `.env.production` for production):
 
 ```bash
 # Old (free cluster)
-MONGO_URI=mongodb+srv://username:password@old-cluster.mongodb.net/tuneable
+# Replace with your actual credentials
+MONGO_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@old-cluster.mongodb.net/database
 
 # New (flex cluster)
-MONGO_URI=mongodb+srv://username:password@new-cluster.mongodb.net/tuneable
+# Replace with your actual credentials
+MONGO_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@new-cluster.mongodb.net/database
 ```
 
 ### 3. Test Your Application

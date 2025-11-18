@@ -17,10 +17,12 @@ set -e  # Exit on error
 # Format: mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority
 
 # Source cluster (free cluster)
-SOURCE_URI="${SOURCE_URI:-mongodb+srv://admin:letsconnecttothecluster@tuneablecluster0.lc0zk.mongodb.net/Tuneable?retryWrites=true&w=majority&appName=TuneableCluster0}"
+# Set via environment variable: export SOURCE_URI="mongodb+srv://username:password@source-cluster.mongodb.net/database"
+SOURCE_URI="${SOURCE_URI:-}"
 
 # Destination cluster (flex cluster)
-DEST_URI="${DEST_URI:-mongodb+srv://admin:letsconnecttothecluster@tuneableproductionclust.nxw4qrm.mongodb.net/Tuneable?retryWrites=true&w=majority&appName=TuneableProductionCluster}"
+# Set via environment variable: export DEST_URI="mongodb+srv://username:password@dest-cluster.mongodb.net/database"
+DEST_URI="${DEST_URI:-}"
 
 # Backup directory
 BACKUP_DIR="./mongodb-backup-$(date +%Y%m%d-%H%M%S)"
@@ -75,12 +77,12 @@ fi
 print_success "MongoDB tools are available"
 
 # Check if connection strings are set
-if [[ "$SOURCE_URI" == *"username:password"* ]] || [[ "$DEST_URI" == *"username:password"* ]]; then
-    print_warning "Please set SOURCE_URI and DEST_URI environment variables or edit them in the script"
+if [[ -z "$SOURCE_URI" ]] || [[ -z "$DEST_URI" ]]; then
+    print_warning "Please set SOURCE_URI and DEST_URI environment variables"
     echo ""
     echo "Example:"
-    echo "  export SOURCE_URI='mongodb+srv://user:pass@source-cluster.mongodb.net/tuneable'"
-    echo "  export DEST_URI='mongodb+srv://user:pass@dest-cluster.mongodb.net/tuneable'"
+    echo "  export SOURCE_URI='mongodb+srv://username:password@source-cluster.mongodb.net/database'"
+    echo "  export DEST_URI='mongodb+srv://username:password@dest-cluster.mongodb.net/database'"
     echo "  ./migrate-to-flex-cluster.sh"
     echo ""
     read -p "Do you want to continue with manual input? (y/n) " -n 1 -r
@@ -88,8 +90,10 @@ if [[ "$SOURCE_URI" == *"username:password"* ]] || [[ "$DEST_URI" == *"username:
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
     fi
-    read -p "Enter SOURCE_URI: " SOURCE_URI
-    read -p "Enter DEST_URI: " DEST_URI
+    read -sp "Enter SOURCE_URI (hidden): " SOURCE_URI
+    echo
+    read -sp "Enter DEST_URI (hidden): " DEST_URI
+    echo
 fi
 
 # ============================================
