@@ -31,7 +31,8 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
   // Handle Mongoose documents by accessing amount from _doc if needed
   const validBids = [...bids].filter(bid => {
     const amount = bid.amount || (bid._doc && bid._doc.amount) || 0;
-    return bid.userId && bid.userId.username && amount > 0;
+    const status = bid.status || (bid._doc && bid._doc.status) || 'active';
+    return bid.userId && bid.userId.username && amount > 0 && status !== 'vetoed';
   });
   
   const topBids = validBids

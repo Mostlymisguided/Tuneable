@@ -408,6 +408,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                     {
                         path: 'bids',
                         model: 'Bid',
+                        match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
                         populate: {
                             path: 'userId',
                             select: 'username profilePic uuid homeLocation secondaryLocation',  // ✅ Added profilePic, uuid, and location for top bidders display
@@ -453,6 +454,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             .populate({
                 path: 'media.partyBids',
                 model: 'Bid',
+                match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
                 populate: {
                     path: 'userId',
                     select: 'username profilePic uuid homeLocation secondaryLocation'
@@ -540,17 +542,12 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 vetoedAt: entry.vetoedAt,
                 vetoedBy: entry.vetoedBy,
             };
-        }).filter(Boolean); // ✅ Remove null entries
+        }).filter(Boolean) // ✅ Remove null entries
+          .filter(entry => entry.status !== 'vetoed'); // ✅ Filter out vetoed media
 
-        // ✅ Sort media by status and then by bid value
+        // ✅ Sort media by bid value (vetoed already filtered out)
         processedMedia.sort((a, b) => {
-            // First sort by status priority: active > vetoed
-            const statusPriority = { active: 0, vetoed: 1 };
-            const statusDiff = statusPriority[a.status] - statusPriority[b.status];
-            
-            if (statusDiff !== 0) return statusDiff;
-            
-            // Within same status, sort by bid value (highest first)
+            // Sort by bid value (highest first)
             return (b.totalBidValue || 0) - (a.totalBidValue || 0);
         });
 
@@ -987,29 +984,14 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
                     existingPartyMediaEntry.partyMediaAggregateTopUser = userId;
                 }
             } else if (existingPartyMediaEntry.status === 'vetoed') {
-                // Media was vetoed - allow re-adding by updating the existing entry
-                existingPartyMediaEntry.status = 'active';
-                existingPartyMediaEntry.queuedAt = new Date();
-                existingPartyMediaEntry.vetoedAt = null;
-                existingPartyMediaEntry.vetoedBy = null;
-                existingPartyMediaEntry.vetoedBy_uuid = null;
-                
-                // Add the bid to the existing entry
-                existingPartyMediaEntry.partyBids = existingPartyMediaEntry.partyBids || [];
-                existingPartyMediaEntry.partyBids.push(bid._id);
-                existingPartyMediaEntry.partyMediaAggregate = (existingPartyMediaEntry.partyMediaAggregate || 0) + bidAmountPence;
-                
-                // Update top bid if this is higher
-                if (bidAmountPence > (existingPartyMediaEntry.partyMediaBidTop || 0)) {
-                    existingPartyMediaEntry.partyMediaBidTop = bidAmountPence;
-                    existingPartyMediaEntry.partyMediaBidTopUser = userId;
-                }
-                
-                // Update aggregate top if this user's aggregate is higher
-                if (userPartyAggregate > (existingPartyMediaEntry.partyMediaAggregateTop || 0)) {
-                    existingPartyMediaEntry.partyMediaAggregateTop = userPartyAggregate;
-                    existingPartyMediaEntry.partyMediaAggregateTopUser = userId;
-                }
+                // Media was vetoed - reject the attempt to re-add it
+                return res.status(403).json({ 
+                    error: `"${media.title}" has been vetoed from this party and cannot be added again. Vetoed media remains in the party history but cannot receive new tips.`,
+                    mediaId: media._id,
+                    mediaTitle: media.title,
+                    vetoedAt: existingPartyMediaEntry.vetoedAt,
+                    vetoedBy: existingPartyMediaEntry.vetoedBy
+                });
             }
         } else {
             // Media not in party - add it
@@ -1160,6 +1142,18 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
 
             if (!partyMediaEntry) {
                 return res.status(404).json({ error: 'Media not found in party queue' });
+            }
+
+            // Check if media is vetoed - reject bids on vetoed media
+            if (partyMediaEntry.status === 'vetoed') {
+                const mediaTitle = partyMediaEntry.mediaId?.title || 'This media';
+                return res.status(403).json({ 
+                    error: `"${mediaTitle}" has been vetoed from this party and cannot receive tips. Vetoed media remains in the party history but cannot receive new tips.`,
+                    mediaId: mediaId,
+                    mediaTitle: mediaTitle,
+                    vetoedAt: partyMediaEntry.vetoedAt,
+                    vetoedBy: partyMediaEntry.vetoedBy
+                });
             }
 
             actualMediaId = partyMediaEntry.mediaId._id || partyMediaEntry.mediaId;
@@ -2178,6 +2172,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                     };
                 })
                 .filter(media => media !== null)
+                .filter(media => media.status !== 'vetoed') // ✅ Filter out vetoed media
                 .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
         }
 

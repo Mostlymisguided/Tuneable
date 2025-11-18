@@ -33,6 +33,9 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
   const userAggregates = bids.reduce((acc, bid) => {
     if (!bid.userId || !bid.userId.username) return acc;
     
+    const status = bid.status || (bid._doc && bid._doc.status) || 'active';
+    if (status === 'vetoed') return acc; // Skip vetoed bids
+    
     const userId = bid.userId.uuid || bid.userId.username;
     const amount = bid.amount || (bid._doc && bid._doc.amount) || 0;
     
