@@ -2014,21 +2014,28 @@ const Party: React.FC = () => {
                                           <button
                                             onClick={() => handleInlineBid(item)}
                                             disabled={isBidding}
-                                            className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                            className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap flex items-center justify-center gap-2"
                                           >
-                                            {(() => {
-                                              const mediaId = mediaData._id || mediaData.id;
-                                              // Use same calculation logic as input field
-                                              const avgBid = calculateAverageBid(mediaData, item);
-                                              const minBid = party?.minimumBid || 0.01;
-                                              const defaultBid = Math.max(0.33, avgBid || 0, minBid);
-                                              const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
-                                              const parsed = parseFloat(raw);
-                                              if (!Number.isFinite(parsed)) {
-                                                return 'Send Tip';
-                                              }
-                                              return `Tip £${parsed.toFixed(2)}`;
-                                            })()}
+                                            {isBidding ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                                <span>Placing Tip...</span>
+                                              </>
+                                            ) : (
+                                              (() => {
+                                                const mediaId = mediaData._id || mediaData.id;
+                                                // Use same calculation logic as input field
+                                                const avgBid = calculateAverageBid(mediaData, item);
+                                                const minBid = party?.minimumBid || 0.01;
+                                                const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                                const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
+                                                const parsed = parseFloat(raw);
+                                                if (!Number.isFinite(parsed)) {
+                                                  return 'Send Tip';
+                                                }
+                                                return `Tip £${parsed.toFixed(2)}`;
+                                              })()
+                                            )}
                                           </button>
                                         </div>
                                       </div>
@@ -2643,21 +2650,28 @@ const Party: React.FC = () => {
                                   <button
                                     onClick={() => handleInlineBid(item)}
                                     disabled={isBidding}
-                                    className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                    className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap flex items-center justify-center gap-2"
                                   >
-                                    {(() => {
-                                      const mediaId = mediaData._id || mediaData.id;
-                                      // Use same calculation logic as input field
-                                      const avgBid = calculateAverageBid(mediaData, item);
-                                      const minBid = party?.minimumBid || 0.01;
-                                      const defaultBid = Math.max(0.33, avgBid || 0, minBid);
-                                      const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
-                                      const parsed = parseFloat(raw);
-                                      if (!Number.isFinite(parsed)) {
-                                      return 'Send Tip';
-                                      }
-                                    return `Tip £${parsed.toFixed(2)}`;
-                                    })()}
+                                    {isBidding ? (
+                                      <>
+                                        <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                        <span>Placing Tip...</span>
+                                      </>
+                                    ) : (
+                                      (() => {
+                                        const mediaId = mediaData._id || mediaData.id;
+                                        // Use same calculation logic as input field
+                                        const avgBid = calculateAverageBid(mediaData, item);
+                                        const minBid = party?.minimumBid || 0.01;
+                                        const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+                                        const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
+                                        const parsed = parseFloat(raw);
+                                        if (!Number.isFinite(parsed)) {
+                                          return 'Send Tip';
+                                        }
+                                        return `Tip £${parsed.toFixed(2)}`;
+                                      })()
+                                    )}
                                   </button>
                                 </div>
                               </div>
@@ -2940,8 +2954,10 @@ const Party: React.FC = () => {
       {pendingMedia && showBidConfirmationModal && party && Number.isFinite(confirmationBidAmount) && confirmationBidAmount > 0 && (
         <BidConfirmationModal
           isOpen={showBidConfirmationModal}
+          isLoading={isBidding}
           onClose={() => {
             try {
+              if (isBidding) return; // Prevent closing while processing
               setShowBidConfirmationModal(false);
               setPendingMedia(null);
               pendingMediaRef.current = null;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Music, Tag, AlertCircle } from 'lucide-react';
+import { X, Music, Tag, AlertCircle, Loader2 } from 'lucide-react';
 
 interface BidConfirmationModalProps {
   isOpen: boolean;
@@ -178,10 +178,17 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             disabled={isLoading || hasInsufficientFunds}
           >
-            {isLoading ? 'Placing Tip...' : 'Confirm Tip'}
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Placing Tip...</span>
+              </>
+            ) : (
+              'Confirm Tip'
+            )}
           </button>
         </div>
       </div>
