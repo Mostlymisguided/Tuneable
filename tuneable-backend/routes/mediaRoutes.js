@@ -2716,7 +2716,7 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
     }
 
     const { mediaId } = req.params;
-    const { title, artist } = req.body;
+    const { title, artist, artists } = req.body;
 
     if (!isValidObjectId(mediaId)) {
       return res.status(400).json({ error: 'Invalid media ID format' });
@@ -2740,26 +2740,76 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
       ? media.artist.map(a => a.name).join(', ')
       : '';
 
-    // Update artist if provided
+    // Update artist if provided (handle both array and string formats)
     let newArtistNames = null;
-    if (artist !== undefined) {
-      if (!artist || artist.trim().length === 0) {
-        return res.status(400).json({ error: 'Artist cannot be empty' });
+    if (artists !== undefined && Array.isArray(artists)) {
+      // Handle artists array format (from MultiArtistInput)
+      if (artists.length === 0) {
+        return res.status(400).json({ error: 'At least one artist is required' });
       }
       
-      // Parse artist string into artist array
-      newArtistNames = artist.split(',').map(name => name.trim()).filter(name => name.length > 0);
-      if (newArtistNames.length === 0) {
-        return res.status(400).json({ error: 'At least one artist name is required' });
-      }
+      media.artist = artists.map((artistEntry, index) => {
+        if (typeof artistEntry === 'object' && artistEntry.name) {
+          return {
+            name: artistEntry.name.trim(),
+            userId: artistEntry.userId || null,
+            collectiveId: artistEntry.collectiveId || null,
+            relationToNext: index === artists.length - 1 ? null : (artistEntry.relationToNext || null),
+            verified: artistEntry.verified || false
+          };
+        }
+        // Fallback if it's just a string
+        return {
+          name: typeof artistEntry === 'string' ? artistEntry.trim() : '',
+          userId: null,
+          collectiveId: null,
+          relationToNext: null,
+          verified: false
+        };
+      });
+      
+      newArtistNames = media.artist.map(a => a.name);
+      media.creatorNames = newArtistNames;
+    } else if (artist !== undefined) {
+      // Handle legacy string format or array format in artist field
+      if (Array.isArray(artist) && artist.length > 0) {
+        // Array format in artist field
+        media.artist = artist.map((artistEntry, index) => {
+          if (typeof artistEntry === 'object' && artistEntry.name) {
+            return {
+              name: artistEntry.name.trim(),
+              userId: artistEntry.userId || null,
+              collectiveId: artistEntry.collectiveId || null,
+              relationToNext: index === artist.length - 1 ? null : (artistEntry.relationToNext || null),
+              verified: artistEntry.verified || false
+            };
+          }
+          return {
+            name: typeof artistEntry === 'string' ? artistEntry.trim() : '',
+            userId: null,
+            collectiveId: null,
+            relationToNext: null,
+            verified: false
+          };
+        });
+        newArtistNames = media.artist.map(a => a.name);
+      } else if (typeof artist === 'string' && artist.trim().length > 0) {
+        // String format - parse comma-separated
+        newArtistNames = artist.split(',').map(name => name.trim()).filter(name => name.length > 0);
+        if (newArtistNames.length === 0) {
+          return res.status(400).json({ error: 'At least one artist name is required' });
+        }
 
-      // Convert to artist subdocuments
-      media.artist = newArtistNames.map(name => ({
-        name: name,
-        userId: null,
-        collectiveId: null,
-        verified: false
-      }));
+        // Convert to artist subdocuments
+        media.artist = newArtistNames.map(name => ({
+          name: name,
+          userId: null,
+          collectiveId: null,
+          verified: false
+        }));
+      } else {
+        return res.status(400).json({ error: 'Artist cannot be empty' });
+      }
 
       // Update creatorNames for search
       media.creatorNames = newArtistNames;
