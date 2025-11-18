@@ -786,12 +786,22 @@ const Party: React.FC = () => {
   };
 
   const handleBidConfirmation = async (tags: string[]) => {
+    // ✅ Early return if already bidding - prevent double-clicks
+    if (isBidding) {
+      console.log('Already processing a tip, please wait...');
+      return;
+    }
+    
+    // ✅ Set loading state IMMEDIATELY to disable button
+    setIsBidding(true);
+    
     // Use ref values to avoid state update race conditions
     const currentPendingMedia = pendingMediaRef.current || pendingMedia;
     const currentIsInlineBid = isInlineBidRef.current || isInlineBid;
     
     if (!partyId || !currentPendingMedia) {
       console.error('handleBidConfirmation: Missing partyId or pendingMedia', { partyId, pendingMedia: currentPendingMedia });
+      setIsBidding(false); // Reset on early return
       return;
     }
     
@@ -823,6 +833,7 @@ const Party: React.FC = () => {
         if (!queueItemId || !mediaId) {
           console.error('Missing required IDs:', { queueItemId, mediaId, safePendingMedia });
           toast.error('Unable to identify media item');
+          setIsBidding(false); // Reset on validation error
           setIsInlineBid(false);
           isInlineBidRef.current = false;
           setPendingMedia(null);
@@ -857,6 +868,7 @@ const Party: React.FC = () => {
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
           toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
+          setIsBidding(false); // Reset on validation error
           setIsInlineBid(false);
           isInlineBidRef.current = false;
           setPendingMedia(null);
@@ -864,7 +876,6 @@ const Party: React.FC = () => {
           return;
         }
         
-        setIsBidding(true);
         try {
           await partyAPI.placeBid(partyId, queueItemId, bidAmount);
           const mediaTitle = safePendingMedia?.title || 'media';
@@ -908,6 +919,7 @@ const Party: React.FC = () => {
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
           toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
+          setIsBidding(false); // Reset on validation error
           setPendingMedia(null);
           pendingMediaRef.current = null;
           return;
