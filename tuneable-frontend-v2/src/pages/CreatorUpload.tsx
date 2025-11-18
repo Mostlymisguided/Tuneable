@@ -312,21 +312,26 @@ const CreatorUpload: React.FC = () => {
     setUseMultipleArtists(checked);
     if (checked) {
       setArtistEntries(prev => {
-        if (prev.length > 0) {
-          return prev;
+        // If we have 0 or 1 entries, ensure we have at least 2 for multiple artists mode
+        if (prev.length === 0) {
+          return [
+            createArtistEntry(
+              formData.artistName ||
+                (user as any)?.creatorProfile?.artistName ||
+                user?.username ||
+                '',
+              {
+                userId: user?._id || null,
+                userUuid: (user as any)?.uuid || null
+              }
+            ),
+            createArtistEntry('') // Add second empty entry
+          ];
+        } else if (prev.length === 1) {
+          // Add a second empty entry if we only have one
+          return [...prev, createArtistEntry('')];
         }
-        return [
-          createArtistEntry(
-            formData.artistName ||
-              (user as any)?.creatorProfile?.artistName ||
-              user?.username ||
-              '',
-            {
-              userId: user?._id || null,
-              userUuid: (user as any)?.uuid || null
-            }
-          )
-        ];
+        return prev; // Already has 2+ entries
       });
     } else {
       if (artistEntries.length > 0) {

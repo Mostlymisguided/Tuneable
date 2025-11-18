@@ -3,7 +3,7 @@ import { Plus, Trash2, User } from 'lucide-react';
 import { userAPI } from '../lib/api';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 
-export type ArtistRelation = ',' | '&' | 'and' | 'with' | 'ft.' | 'feat.' | 'vs.' | 'x' | '×';
+export type ArtistRelation = ',' | '&' | 'and' | 'with' | 'ft.' | 'feat.' | 'vs.' | 'x' | 'X';
 
 export type ArtistEntry = {
   id: string;
@@ -42,7 +42,7 @@ const relationOptions: { value: ArtistRelation; label: string }[] = [
   { value: 'feat.', label: 'Artist A feat. Artist B' },
   { value: 'vs.', label: 'Artist A vs. Artist B' },
   { value: 'x', label: 'Artist A x Artist B' },
-  { value: '×', label: 'Artist A × Artist B' }
+  { value: 'X', label: 'Artist A X Artist B' }
 ];
 
 const createEmptyEntry = (): ArtistEntry => ({

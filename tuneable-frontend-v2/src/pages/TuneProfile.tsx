@@ -640,8 +640,15 @@ const TuneProfile: React.FC = () => {
     if (checked) {
       if (artistEntries.length === 0) {
         const fallback = editForm.artist || getCreatorDisplay(media) || '';
-        setArtistEntries([createArtistEntry(fallback || '')]);
+        setArtistEntries([
+          createArtistEntry(fallback || ''),
+          createArtistEntry('') // Add second empty entry
+        ]);
+      } else if (artistEntries.length === 1) {
+        // Add a second empty entry if we only have one
+        setArtistEntries([...artistEntries, createArtistEntry('')]);
       }
+      // If already has 2+ entries, keep them
     } else if (artistEntries.length > 0) {
       setEditForm(prev => ({ ...prev, artist: artistEntries[0].name || '' }));
     }
