@@ -32,12 +32,12 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
   // Get artist array (handle both array and string formats)
   // Prefer 'artists' array if available (backend sends this with userIds)
   // Otherwise use 'artist' field
-  const artistArray: Artist[] = Array.isArray(media.artists)
+  const artistArray: Artist[] = Array.isArray(media.artists) && media.artists.length > 0
     ? media.artists
-    : Array.isArray(media.artist)
+    : Array.isArray(media.artist) && media.artist.length > 0
     ? media.artist
-    : media.artist
-    ? [{ name: media.artist as string }]
+    : media.artist && typeof media.artist === 'string'
+    ? [{ name: media.artist }]
     : [];
 
   // Get featuring array (handle both array of objects and array of strings)
@@ -51,7 +51,16 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
 
   // If we have artist array with userIds, render with links
   if (artistArray.length > 0) {
-    const hasAnyUserId = artistArray.some(a => a.userId) || (showFeaturing && featuringArray.some(f => f.userId));
+    // Check if any artist has a userId (handle both ObjectId strings and populated objects)
+    const hasAnyUserId = artistArray.some(a => {
+      const userId = a.userId;
+      return userId !== null && userId !== undefined && 
+             (typeof userId === 'string' || typeof userId === 'object');
+    }) || (showFeaturing && featuringArray.some(f => {
+      const userId = f.userId;
+      return userId !== null && userId !== undefined && 
+             (typeof userId === 'string' || typeof userId === 'object');
+    }));
     
     if (hasAnyUserId) {
       // Render with clickable links
@@ -70,6 +79,13 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
             
             const linkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
             
+            const relation = (artist as any)?.relationToNext;
+            const relationText = relation && relation !== ','
+              ? ` ${relation.trim()} `
+              : relation === ','
+              ? ', '
+              : ' & ';
+
             return (
               <React.Fragment key={idx}>
                 {linkPath ? (
@@ -83,7 +99,9 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
                 ) : (
                   <span>{artist.name}</span>
                 )}
-                {idx < artistArray.length - 1 && <span> & </span>}
+                {idx < artistArray.length - 1 && (
+                  <span>{relationText}</span>
+                )}
               </React.Fragment>
             );
           })}

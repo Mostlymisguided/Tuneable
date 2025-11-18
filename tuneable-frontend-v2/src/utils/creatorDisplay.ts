@@ -9,19 +9,41 @@ export function getCreatorDisplay(media: any): string {
   }
   
   // Fallback: format from artist and featuring arrays
-  const artistNames: string[] = [];
+  const artistEntries: Array<{ name: string; relationToNext?: string | null }> = [];
   
   if (Array.isArray(media.artist)) {
-    artistNames.push(...media.artist.map((a: any) => a.name || a).filter(Boolean));
+    media.artist.forEach((artist: any) => {
+      if (!artist) return;
+      if (typeof artist === 'string') {
+        artistEntries.push({ name: artist, relationToNext: null });
+      } else if (artist.name) {
+        artistEntries.push({
+          name: artist.name,
+          relationToNext: artist.relationToNext || null
+        });
+      }
+    });
   } else if (media.artist) {
-    artistNames.push(media.artist);
+    artistEntries.push({ name: media.artist, relationToNext: null });
   }
   
-  if (artistNames.length === 0) {
+  if (artistEntries.length === 0) {
     return 'Unknown Artist';
   }
   
-  let display = artistNames.join(' & ');
+  let display = '';
+  artistEntries.forEach((artist, index) => {
+    display += artist.name;
+    const isLast = index === artistEntries.length - 1;
+    if (!isLast) {
+      const relation = artist.relationToNext || '&';
+      if (relation === ',') {
+        display += ', ';
+      } else {
+        display += ` ${relation.trim()} `;
+      }
+    }
+  });
   
   // Add featuring if available
   if (media.featuring && Array.isArray(media.featuring) && media.featuring.length > 0) {

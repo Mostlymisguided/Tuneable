@@ -8,6 +8,7 @@ import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC, COUNTRIES } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface Collective {
   _id: string;
@@ -826,7 +827,9 @@ useEffect(() => {
                           >
                             {media.title}
                           </Link>
-                          <p className="text-gray-400 text-sm truncate">{media.artist}</p>
+                          <p className="text-gray-400 text-sm truncate">
+                            <ClickableArtistDisplay media={media} />
+                          </p>
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-purple-400 font-medium">{penceToPounds(media.stats.totalBidAmount)}</p>

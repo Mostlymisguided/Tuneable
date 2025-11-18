@@ -30,6 +30,7 @@ import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, 
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface User {
   _id: string;
@@ -1651,7 +1652,9 @@ const Admin: React.FC = () => {
                                 >
                                   {bid.media?.title || 'Unknown'}
                                 </button>
-                                <div className="text-xs text-gray-400">{bid.media?.artist || 'Unknown Artist'}</div>
+                                <div className="text-xs text-gray-400">
+                                  {bid.media ? <ClickableArtistDisplay media={bid.media} /> : 'Unknown Artist'}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -2054,7 +2057,7 @@ const Admin: React.FC = () => {
                             ) : (
                               <div className="flex items-center gap-2 group">
                                 <div className="text-sm text-gray-300">
-                                  {item.artist || 'Unknown Artist'}
+                                  <ClickableArtistDisplay media={item} />
                                 </div>
                                 <button
                                   onClick={() => handleStartEdit(item._id, 'artist', item.artist || '')}
@@ -2270,7 +2273,9 @@ const Admin: React.FC = () => {
                                 >
                                   {bid.media?.title || 'Unknown'}
                                 </button>
-                                <div className="text-xs text-gray-400">{bid.media?.artist || 'Unknown Artist'}</div>
+                                <div className="text-xs text-gray-400">
+                                  {bid.media ? <ClickableArtistDisplay media={bid.media} /> : 'Unknown Artist'}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -2488,7 +2493,9 @@ const Admin: React.FC = () => {
                             )}
                             <div>
                               <h3 className="text-xl font-bold text-white">{claim.mediaId?.title}</h3>
-                              <p className="text-gray-400">{claim.mediaId?.artist?.[0]?.name || claim.mediaId?.artist}</p>
+                              <p className="text-gray-400">
+                                {claim.mediaId ? <ClickableArtistDisplay media={claim.mediaId} /> : 'Unknown Artist'}
+                              </p>
                               <p className="text-sm text-gray-500">
                                 Claimed by: @{claim.userId?.username} ({claim.userId?.email})
                               </p>

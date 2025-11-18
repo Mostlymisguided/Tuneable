@@ -101,6 +101,35 @@ const buildOwnershipResponse = (media) => {
   return { owners, history };
 };
 
+const parseArtistsPayload = (input) => {
+  if (!input) return [];
+  let parsed = input;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (error) {
+      console.warn('Unable to parse artists payload:', error.message);
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map(entry => {
+      if (!entry) return null;
+      const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+      if (!name) return null;
+      return {
+        name,
+        userId: entry.userId || null,
+        relationToNext: entry.relationToNext || null
+      };
+    })
+    .filter(Boolean);
+};
+
 const LANGUAGE_NAMES = {
   en: 'English',
   es: 'Spanish',
@@ -432,6 +461,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     // Determine final values (user input takes priority over extracted metadata)
     const finalTitle = title || extractedMetadata?.title || 'Untitled';
     const finalArtistName = artistName?.trim() || extractedMetadata?.artist || user.creatorProfile?.artistName || user.username;
+    const providedArtists = parseArtistsPayload(req.body.artists);
     const finalAlbum = album || extractedMetadata?.album || null;
     const finalGenres = genre ? [genre] : (extractedMetadata?.genres || []);
     const finalDuration = duration ? parseInt(duration) : (extractedMetadata?.duration || null);
@@ -447,21 +477,37 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     const mappedMetadata = extractedMetadata ? 
       MetadataExtractor.mapToMediaModel(extractedMetadata, userId) : {};
     
-    // Parse artist string if it contains "ft.", "feat.", "&", "and", etc.
-    const parsedArtist = parseArtistString(finalArtistName);
+    const userIdString = userId?.toString();
     
-    // Build artist and featuring arrays from parsed data
-    const artistArray = parsedArtist.artists.map(name => ({
-      name: name.trim(),
-      userId: name.trim() === user.creatorProfile?.artistName || name.trim() === user.username ? userId : null,
-      verified: name.trim() === user.creatorProfile?.artistName || name.trim() === user.username
-    }));
+    // Parse artists from payload or fallback to string parsing
+    let artistArray = [];
+    let featuringArray = [];
     
-    const featuringArray = parsedArtist.featuring.map(name => ({
-      name: name.trim(),
-      userId: null,
-      verified: false
-    }));
+    if (providedArtists.length > 0) {
+      artistArray = providedArtists.map((artist, index) => ({
+        name: artist.name,
+        userId: artist.userId || null,
+        relationToNext: index === providedArtists.length - 1 ? null : (artist.relationToNext || null),
+        verified: artist.userId && userIdString ? artist.userId.toString() === userIdString : false
+      }));
+    } else {
+      // Parse artist string if it contains "ft.", "feat.", "&", "and", etc.
+      const parsedArtist = parseArtistString(finalArtistName);
+      
+      // Build artist and featuring arrays from parsed data
+      artistArray = parsedArtist.artists.map((name, index) => ({
+        name: name.trim(),
+        userId: name.trim() === user.creatorProfile?.artistName || name.trim() === user.username ? userId : null,
+        relationToNext: index === parsedArtist.artists.length - 1 ? null : null,
+        verified: name.trim() === user.creatorProfile?.artistName || name.trim() === user.username
+      }));
+      
+      featuringArray = parsedArtist.featuring.map(name => ({
+        name: name.trim(),
+        userId: null,
+        verified: false
+      }));
+    }
     
     // Generate creatorDisplay from parsed arrays
     const creatorDisplay = formatCreatorDisplay(artistArray, featuringArray);
@@ -1016,6 +1062,11 @@ router.get('/:mediaId/profile', async (req, res) => {
         select: 'name slug profilePicture verificationStatus'
       })
       .populate({
+        path: 'featuring.userId',
+        model: 'User',
+        select: 'username profilePic uuid creatorProfile.artistName'
+      })
+      .populate({
         path: 'featuring.collectiveId',
         model: 'Collective',
         select: 'name slug profilePicture verificationStatus'
@@ -1331,6 +1382,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
               name: artist.name.trim(),
               userId: artist.userId || null,
               collectiveId: artist.collectiveId || req.body.artistCollectiveId || null,
+              relationToNext: artist.relationToNext || null,
               verified: artist.verified || false
             };
           }
@@ -1339,6 +1391,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             name: typeof artist === 'string' ? artist.trim() : '',
             userId: null,
             collectiveId: req.body.artistCollectiveId || null,
+            relationToNext: null,
             verified: false
           };
         });
@@ -1354,6 +1407,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
           name: name.trim(),
           userId: artistUserId,
           collectiveId: artistCollectiveId,
+          relationToNext: null,
           verified: false
         }));
         
@@ -2550,6 +2604,21 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       .populate('globalMediaAggregateTopUser', 'username uuid')
       .populate('mediaOwners.userId', 'username uuid')
       .populate('label.labelId', 'name slug')
+      .populate({
+        path: 'artist.userId',
+        model: 'User',
+        select: 'username profilePic uuid creatorProfile.artistName'
+      })
+      .populate({
+        path: 'artist.collectiveId',
+        model: 'Collective',
+        select: 'name slug profilePicture verificationStatus'
+      })
+      .populate({
+        path: 'featuring.userId',
+        model: 'User',
+        select: 'username profilePic uuid creatorProfile.artistName'
+      })
       .sort(sort)
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
@@ -2571,6 +2640,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
         uuid: item.uuid,
         title: item.title,
         artist: artistNames,
+        artists: item.artist || [], // Full artist array with userIds for ClickableArtistDisplay
         artistArray: item.artist || [],
         coverArt: item.coverArt,
         contentType: item.contentType || [],

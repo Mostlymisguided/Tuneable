@@ -331,7 +331,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser', // ✅ Updated to schema grammar field names
+                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay', // ✅ Updated to schema grammar field names
                 populate: [
                     {
                         path: 'bids',
@@ -350,6 +350,21 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                         path: 'globalMediaAggregateTopUser',
                         model: 'User',
                         select: 'username profilePic uuid homeLocation secondaryLocation'
+                    },
+                    {
+                        path: 'artist.userId',
+                        model: 'User',
+                        select: 'username profilePic uuid creatorProfile.artistName'
+                    },
+                    {
+                        path: 'artist.collectiveId',
+                        model: 'Collective',
+                        select: 'name slug profilePicture verificationStatus'
+                    },
+                    {
+                        path: 'featuring.userId',
+                        model: 'User',
+                        select: 'username profilePic uuid creatorProfile.artistName'
                     }
                 ]
             })
@@ -416,7 +431,12 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 id: entry.mediaId._id || entry.mediaId.uuid, // Use ObjectId first, fallback to UUID
                 uuid: entry.mediaId._id || entry.mediaId.uuid, // Also include uuid field for consistency
                 title: entry.mediaId.title,
-                artist: entry.mediaId.artist,
+                artist: Array.isArray(entry.mediaId.artist) && entry.mediaId.artist.length > 0 
+                    ? entry.mediaId.artist[0].name 
+                    : (entry.mediaId.artist || 'Unknown Artist'), // Backward compatibility string
+                artists: Array.isArray(entry.mediaId.artist) ? entry.mediaId.artist : [], // Full artist array with userIds for ClickableArtistDisplay
+                featuring: entry.mediaId.featuring || [], // Featuring artists array
+                creatorDisplay: entry.mediaId.creatorDisplay, // Creator display string
                 duration: entry.mediaId.duration || '666',
                 coverArt: entry.mediaId.coverArt || '/default-cover.jpg',
                 sources: sourcesObj, // ✅ Store sources as object { youtube: '...', upload: '...' }
@@ -1857,15 +1877,32 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category uuid', // Updated to schema grammar
-                    populate: {
-                        path: 'bids',
-                        model: 'Bid',
-                        populate: {
-                            path: 'userId',
-                            select: 'username profilePic uuid',
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category uuid featuring creatorDisplay', // Updated to schema grammar
+                    populate: [
+                        {
+                            path: 'bids',
+                            model: 'Bid',
+                            populate: {
+                                path: 'userId',
+                                select: 'username profilePic uuid',
+                            },
                         },
-                    },
+                        {
+                            path: 'artist.userId',
+                            model: 'User',
+                            select: 'username profilePic uuid creatorProfile.artistName'
+                        },
+                        {
+                            path: 'artist.collectiveId',
+                            model: 'Collective',
+                            select: 'name slug profilePicture verificationStatus'
+                        },
+                        {
+                            path: 'featuring.userId',
+                            model: 'User',
+                            select: 'username profilePic uuid creatorProfile.artistName'
+                        }
+                    ]
                 })
                 .populate({
                     path: 'media.partyBids',
@@ -1934,7 +1971,22 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
             })
             .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
             .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
-            .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
+            .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation')
+            .populate({
+                path: 'artist.userId',
+                model: 'User',
+                select: 'username profilePic uuid creatorProfile.artistName'
+            })
+            .populate({
+                path: 'artist.collectiveId',
+                model: 'Collective',
+                select: 'name slug profilePicture verificationStatus'
+            })
+            .populate({
+                path: 'featuring.userId',
+                model: 'User',
+                select: 'username profilePic uuid creatorProfile.artistName'
+            });
 
             console.log(`🌍 Global Party time sorting: Found ${bids.length} bids within time period, ${allMediaWithBids.length} media with bids`);
         } else {
@@ -1982,7 +2034,10 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         id: media._id || media.uuid, // Use ObjectId first, fallback to UUID
                         uuid: media._id || media.uuid, // Also include uuid field for consistency
                         title: media.title,
-                        artist: artistName, // Transform for frontend compatibility
+                        artist: artistName, // Backward compatibility string
+                        artists: Array.isArray(media.artist) ? media.artist : [], // Full artist array with userIds for ClickableArtistDisplay
+                        featuring: media.featuring || [], // Featuring artists array
+                        creatorDisplay: media.creatorDisplay, // Creator display string
                         duration: media.duration,
                         coverArt: media.coverArt,
                         sources: media.sources,
@@ -2026,7 +2081,10 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         id: entry.mediaId._id || entry.mediaId.uuid, // Use ObjectId first, fallback to UUID
                         uuid: entry.mediaId._id || entry.mediaId.uuid, // Also include uuid field for consistency
                         title: entry.mediaId.title,
-                        artist: artistName, // Transform for frontend compatibility
+                        artist: artistName, // Backward compatibility string
+                        artists: Array.isArray(entry.mediaId.artist) ? entry.mediaId.artist : [], // Full artist array with userIds for ClickableArtistDisplay
+                        featuring: entry.mediaId.featuring || [], // Featuring artists array
+                        creatorDisplay: entry.mediaId.creatorDisplay, // Creator display string
                         duration: entry.mediaId.duration,
                         coverArt: entry.mediaId.coverArt,
                         sources: entry.mediaId.sources,

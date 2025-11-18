@@ -13,6 +13,11 @@ const mediaSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
     verified: { type: Boolean, default: false },
+    relationToNext: { 
+      type: String, 
+      enum: [',', '&', 'and', 'with', 'ft.', 'feat.', 'vs.', 'x', '×', null],
+      default: null 
+    }, // Controls how this artist connects to the next artist in display string
     _id: false
   }],
   

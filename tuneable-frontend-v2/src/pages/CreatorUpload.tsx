@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
 import { labelAPI, emailAPI } from '../lib/api';
 import axios from 'axios';
+import MultiArtistInput from '../components/MultiArtistInput';
+import type { ArtistEntry } from '../components/MultiArtistInput';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -23,6 +25,13 @@ const mmssToSeconds = (mmss: string): number => {
   const secs = parseInt(parts[1], 10) || 0;
   return mins * 60 + secs;
 };
+
+const createArtistEntry = (name: string = '', overrides: Partial<ArtistEntry> = {}): ArtistEntry => ({
+  id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
+  name,
+  relationToNext: null,
+  ...overrides
+});
 
 const CreatorUpload: React.FC = () => {
   const { user } = useAuth();
@@ -63,6 +72,16 @@ const CreatorUpload: React.FC = () => {
     label: '',
     language: ''
   });
+  const [useMultipleArtists, setUseMultipleArtists] = useState(false);
+  const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>(() => [
+    createArtistEntry(
+      ((user as any)?.creatorProfile?.artistName || user?.username || '') as string,
+      {
+        userId: user?._id || null,
+        userUuid: (user as any)?.uuid || null
+      }
+    )
+  ]);
   const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -289,6 +308,33 @@ const CreatorUpload: React.FC = () => {
     }));
   };
 
+  const handleMultipleArtistsToggle = (checked: boolean) => {
+    setUseMultipleArtists(checked);
+    if (checked) {
+      setArtistEntries(prev => {
+        if (prev.length > 0) {
+          return prev;
+        }
+        return [
+          createArtistEntry(
+            formData.artistName ||
+              (user as any)?.creatorProfile?.artistName ||
+              user?.username ||
+              '',
+            {
+              userId: user?._id || null,
+              userUuid: (user as any)?.uuid || null
+            }
+          )
+        ];
+      });
+    } else {
+      if (artistEntries.length > 0) {
+        setFormData(prev => ({ ...prev, artistName: artistEntries[0].name || '' }));
+      }
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) {
       toast.error('Please select a file to upload');
@@ -312,7 +358,21 @@ const CreatorUpload: React.FC = () => {
       const uploadData = new FormData();
       uploadData.append('audioFile', file);
       uploadData.append('title', formData.title.trim());
-      if (formData.artistName) uploadData.append('artistName', formData.artistName.trim());
+
+      const cleanedArtists = artistEntries
+        .map((artist, idx) => ({
+          ...artist,
+          name: artist.name?.trim(),
+          relationToNext: idx === artistEntries.length - 1 ? null : (artist.relationToNext || '&')
+        }))
+        .filter(artist => artist.name && artist.name.length > 0);
+
+      if (useMultipleArtists && cleanedArtists.length > 0) {
+        uploadData.append('artists', JSON.stringify(cleanedArtists));
+        uploadData.append('artistName', cleanedArtists.map(a => a.name).join(' & '));
+      } else if (formData.artistName) {
+        uploadData.append('artistName', formData.artistName.trim());
+      }
       if (formData.album) uploadData.append('album', formData.album.trim());
       if (formData.genre) uploadData.append('genre', formData.genre);
       if (formData.releaseDate) uploadData.append('releaseDate', formData.releaseDate);
@@ -396,6 +456,13 @@ const CreatorUpload: React.FC = () => {
     'Funk', 'Punk', 'Alternative', 'Dance', 'Latin', 'World',
     'Techno', 'House', 'Minimal', 'D&B', 'Jungle', 'Trance'
   ];
+
+  useEffect(() => {
+    if (useMultipleArtists) {
+      const joined = artistEntries.map(entry => entry.name?.trim()).filter(Boolean).join(' & ');
+      setFormData(prev => (prev.artistName === joined ? prev : { ...prev, artistName: joined }));
+    }
+  }, [artistEntries, useMultipleArtists]);
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -564,25 +631,54 @@ const CreatorUpload: React.FC = () => {
             </div>
 
             {/* Artist Name */}
-            <div>
-              <label className="block text-white font-medium mb-2">
-                Artist Name
-              </label>
-              <input
-                type="text"
-                name="artistName"
-                value={formData.artistName}
-                onChange={handleChange}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                placeholder={
-                  (user as any).creatorProfile?.artistName || 
-                  user?.username || 
-                  'Artist name (defaults to your username)'
-                }
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Leave blank to use {(user as any).creatorProfile?.artistName ? 'your artist name' : 'your username'}
-              </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-white font-medium">
+                  Primary Artists
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    className="accent-purple-600"
+                    checked={useMultipleArtists}
+                    onChange={(e) => handleMultipleArtistsToggle(e.target.checked)}
+                  />
+                  Multiple artists
+                </label>
+              </div>
+              
+              {useMultipleArtists ? (
+                <MultiArtistInput
+                  value={artistEntries}
+                  onChange={setArtistEntries}
+                  description="Search and link each artist. Choose how they connect (e.g. '&', 'ft.', 'with')."
+                />
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    name="artistName"
+                    value={formData.artistName}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    placeholder={
+                      (user as any).creatorProfile?.artistName || 
+                      user?.username || 
+                      'Artist name (defaults to your username)'
+                    }
+                  />
+                  <p className="text-xs text-gray-400">
+                    Leave blank to use {(user as any).creatorProfile?.artistName ? 'your artist name' : 'your username'}
+                  </p>
+                  <button
+                    type="button"
+                    className="text-xs text-purple-300 hover:text-white transition-colors"
+                    onClick={() => handleMultipleArtistsToggle(true)}
+                  >
+                    Need multiple artists? Enable advanced mode
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Album */}

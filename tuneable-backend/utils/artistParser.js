@@ -81,26 +81,51 @@ function parseArtistString(artistString) {
  * @returns {string} Formatted display string
  */
 function formatCreatorDisplay(artists = [], featuring = []) {
-  // Extract names from subdocuments or use strings directly
-  const artistNames = artists.map(a => 
-    typeof a === 'string' ? a : (a.name || a)
-  ).filter(Boolean);
+  // Normalize artist entries to include relation metadata
+  const normalizedArtists = artists
+    .map(a => {
+      if (!a) return null;
+      if (typeof a === 'string') {
+        return { name: a, relationToNext: null };
+      }
+      const relation = a.relationToNext || null;
+      return {
+        name: a.name || '',
+        relationToNext: relation
+      };
+    })
+    .filter(a => a && a.name);
 
-  const featNames = featuring.map(f => 
-    typeof f === 'string' ? f : (f.name || f)
-  ).filter(Boolean);
+  const featNames = featuring
+    .map(f => (typeof f === 'string' ? f : (f?.name || f)))
+    .filter(Boolean);
 
-  if (artistNames.length === 0) {
+  if (normalizedArtists.length === 0) {
     return null;
   }
 
-  let display = artistNames.join(' & ');
+  let display = '';
+
+  normalizedArtists.forEach((artist, index) => {
+    display += artist.name;
+
+    const isLast = index === normalizedArtists.length - 1;
+    if (!isLast) {
+      const relation = artist.relationToNext || '&';
+      // Ensure proper spacing around relation tokens (except commas)
+      if (relation === ',') {
+        display += ', ';
+      } else {
+        display += ` ${relation.trim()} `;
+      }
+    }
+  });
 
   if (featNames.length > 0) {
     display += ` ft. ${featNames.join(', ')}`;
   }
 
-  return display;
+  return display.trim();
 }
 
 /**

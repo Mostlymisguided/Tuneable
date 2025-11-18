@@ -4,6 +4,7 @@ import { Play, Coins, Tag, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import TopSupporters from '../components/TopSupporters';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 const GlobalTunes: React.FC = () => {
   const navigate = useNavigate();
@@ -154,7 +155,9 @@ const GlobalTunes: React.FC = () => {
                 {m.coverArt && <img src={m.coverArt} alt="" className="h-12 w-12 rounded object-cover" />}
                 <div className="min-w-0">
                   <div className="text-white truncate">{m.title}</div>
-                  <div className="text-gray-400 text-sm truncate">{m.artist}</div>
+                  <div className="text-gray-400 text-sm truncate">
+                    <ClickableArtistDisplay media={m} />
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-4">

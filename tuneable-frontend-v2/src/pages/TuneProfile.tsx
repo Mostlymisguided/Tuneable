@@ -44,6 +44,9 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import MultiArtistInput from '../components/MultiArtistInput';
+import type { ArtistEntry } from '../components/MultiArtistInput';
+import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface Media {
   _id: string;
@@ -139,6 +142,13 @@ interface Comment {
   updatedAt: string;
 }
 
+const createArtistEntry = (name: string = '', overrides: Partial<ArtistEntry> = {}): ArtistEntry => ({
+  id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
+  name,
+  relationToNext: null,
+  ...overrides
+});
+
 const TuneProfile: React.FC = () => {
   const { mediaId: mediaId } = useParams<{ mediaId: string }>();
   const navigate = useNavigate();
@@ -219,6 +229,9 @@ const TuneProfile: React.FC = () => {
     elements: [] as string[],
     coverArt: ''
   });
+  const [useMultipleArtists, setUseMultipleArtists] = useState(false);
+  const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>([]);
+  const [artistEntriesInitialized, setArtistEntriesInitialized] = useState(false);
 
   // Add Link modal state
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
@@ -570,6 +583,70 @@ const TuneProfile: React.FC = () => {
     }
   }, [media, user]);
 
+  useEffect(() => {
+    if (!media || artistEntriesInitialized) return;
+    
+    const rawArtistArray = Array.isArray((media as any)?.artists)
+      ? (media as any).artists
+      : Array.isArray((media as any)?.artist)
+      ? (media as any).artist
+      : [];
+    
+    if (rawArtistArray.length > 0) {
+      const entries = rawArtistArray.map((artist: any, index: number, arr: any[]) => {
+        const name = typeof artist === 'string' ? artist : artist?.name || '';
+        const userId =
+          typeof artist?.userId === 'object'
+            ? artist.userId?._id
+            : artist?.userId || null;
+        const userUuid =
+          typeof artist?.userId === 'object'
+            ? artist.userId?.uuid
+            : (artist as any)?.userUuid || null;
+        return createArtistEntry(name, {
+          userId,
+          userUuid,
+          relationToNext:
+            artist?.relationToNext !== undefined
+              ? artist.relationToNext
+              : index === arr.length - 1
+              ? null
+              : artist?.relationToNext || null
+        });
+      });
+      setArtistEntries(entries);
+      setUseMultipleArtists(entries.length > 1);
+    } else {
+      const fallbackName =
+        typeof (media as any)?.artist === 'string'
+          ? (media as any).artist
+          : getCreatorDisplay(media);
+      setArtistEntries([createArtistEntry(fallbackName || '')]);
+      setUseMultipleArtists(false);
+    }
+    
+    setArtistEntriesInitialized(true);
+  }, [media, artistEntriesInitialized]);
+
+  useEffect(() => {
+    if (useMultipleArtists) {
+      const joined = artistEntries.map(entry => entry.name?.trim()).filter(Boolean).join(' & ');
+      setEditForm(prev => ({ ...prev, artist: joined }));
+    }
+  }, [artistEntries, useMultipleArtists]);
+
+  const handleMultipleArtistsToggle = (checked: boolean) => {
+    setUseMultipleArtists(checked);
+    if (checked) {
+      if (artistEntries.length === 0) {
+        const fallback = editForm.artist || getCreatorDisplay(media) || '';
+        setArtistEntries([createArtistEntry(fallback || '')]);
+      }
+    } else if (artistEntries.length > 0) {
+      setEditForm(prev => ({ ...prev, artist: artistEntries[0].name || '' }));
+    }
+  };
+
   // Save media updates
   const handleSaveTune = async () => {
     if (!mediaId) return;
@@ -601,8 +678,21 @@ const TuneProfile: React.FC = () => {
         updateData.artistCollectiveId = null;
       }
       
-      // Add userId for artist if creator is selected
-      if (selectedArtist) {
+      if (useMultipleArtists) {
+        const formattedArtists = artistEntries
+          .map((entry, index) => ({
+            name: entry.name?.trim(),
+            userId: entry.userId || null,
+            relationToNext:
+              index === artistEntries.length - 1 ? null : (entry.relationToNext || '&'),
+            verified: false
+          }))
+          .filter(artist => artist.name && artist.name.length > 0);
+        
+        if (formattedArtists.length > 0) {
+          updateData.artist = formattedArtists;
+        }
+      } else if (selectedArtist) {
         updateData.artistUserId = selectedArtist._id;
         // Format artist as array with userId
         updateData.artist = [{
@@ -1246,40 +1336,7 @@ const TuneProfile: React.FC = () => {
             <div className="flex-1 w-full text-white">
               <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2 md:px-4">{media.title}</h1>
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2 md:px-4">
-                {(() => {
-                  // Check if artist has userId for linking
-                  const artistArray = (media as any).artist;
-                  if (Array.isArray(artistArray) && artistArray.length > 0) {
-                    const firstArtist = artistArray[0];
-                    if (firstArtist.userId) {
-                      // Get userId - handle both populated object and ObjectId string
-                      const userId = typeof firstArtist.userId === 'object' && firstArtist.userId._id
-                        ? firstArtist.userId._id
-                        : typeof firstArtist.userId === 'string'
-                        ? firstArtist.userId
-                        : firstArtist.userId;
-                      
-                      const uuid = typeof firstArtist.userId === 'object' && firstArtist.userId.uuid
-                        ? firstArtist.userId.uuid
-                        : null;
-                      
-                      const linkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
-                      
-                      if (linkPath) {
-                        return (
-                          <Link 
-                            to={linkPath}
-                            className="hover:text-purple-200 hover:underline transition-colors"
-                          >
-                            {getCreatorDisplay(media)}
-                          </Link>
-                        );
-                      }
-                    }
-                  }
-                  // Fallback to plain text if no userId
-                  return <span>{getCreatorDisplay(media)}</span>;
-                })()}
+                <ClickableArtistDisplay media={media} />
               </div>
               
               {/* Tip Metrics Grid */}
@@ -1643,27 +1700,8 @@ const TuneProfile: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               {visibleFields.map((field, index) => {
                 const IconComponent = field.icon;
-                // Special handling for Artist field to make it clickable if userId exists
+                // Special handling for Artist field to use ClickableArtistDisplay
                 const isArtistField = field.label === 'Artist';
-                const artistArray = isArtistField ? (media as any).artist : null;
-                const firstArtist = artistArray && Array.isArray(artistArray) && artistArray.length > 0 ? artistArray[0] : null;
-                const hasUserId = firstArtist && firstArtist.userId;
-                
-                // Get link path for artist
-                let artistLinkPath: string | null = null;
-                if (hasUserId) {
-                  const userId = typeof firstArtist.userId === 'object' && firstArtist.userId._id
-                    ? firstArtist.userId._id
-                    : typeof firstArtist.userId === 'string'
-                    ? firstArtist.userId
-                    : firstArtist.userId;
-                  
-                  const uuid = typeof firstArtist.userId === 'object' && firstArtist.userId.uuid
-                    ? firstArtist.userId.uuid
-                    : null;
-                  
-                  artistLinkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
-                }
                 
                 return (
                   <div key={index} className="flex items-start space-x-3">
@@ -1671,13 +1709,8 @@ const TuneProfile: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-300">{field.label}</div>
                       <div className="text-white font-medium">
-                        {isArtistField && artistLinkPath ? (
-                          <Link 
-                            to={artistLinkPath}
-                            className="hover:text-purple-200 hover:underline transition-colors"
-                          >
-                            {getFieldValue(field.value, (field as any).fieldName)}
-                          </Link>
+                        {isArtistField ? (
+                          <ClickableArtistDisplay media={media} />
                         ) : (
                           getFieldValue(field.value, (field as any).fieldName)
                         )}
@@ -2097,8 +2130,27 @@ const TuneProfile: React.FC = () => {
                     placeholder="Song title"
                   />
                 </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Artist *</label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-white font-medium">Artist *</label>
+                    <label className="flex items-center gap-2 text-sm text-gray-300">
+                      <input
+                        type="checkbox"
+                        className="accent-purple-600"
+                        checked={useMultipleArtists}
+                        onChange={(e) => handleMultipleArtistsToggle(e.target.checked)}
+                      />
+                      Multiple artists
+                    </label>
+                  </div>
+                  {useMultipleArtists ? (
+                    <MultiArtistInput
+                      value={artistEntries}
+                      onChange={setArtistEntries}
+                      description="Search and link each primary artist. Choose how their names connect."
+                    />
+                  ) : (
+                    <>
                   <div className="relative">
                     <input
                       type="text"
@@ -2250,6 +2302,15 @@ const TuneProfile: React.FC = () => {
                       <CheckCircle className="h-4 w-4 text-green-400" />
                       <span>Linked to: {selectedCollective.name}</span>
                     </div>
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs text-purple-300 hover:text-white"
+                    onClick={() => handleMultipleArtistsToggle(true)}
+                  >
+                    Need multiple artists? Enable advanced mode
+                  </button>
+                    </>
                   )}
                 </div>
               </div>

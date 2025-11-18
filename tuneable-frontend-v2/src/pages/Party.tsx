@@ -325,6 +325,9 @@ const Party: React.FC = () => {
             id: actualMedia._id || actualMedia.id || actualMedia.uuid, // Prefer ObjectId first
             title: actualMedia.title,
             artist: Array.isArray(actualMedia.artist) ? actualMedia.artist[0]?.name || 'Unknown Artist' : actualMedia.artist,
+            artists: Array.isArray(actualMedia.artist) ? actualMedia.artist : (actualMedia.artists || []), // Preserve full artist array with userIds for ClickableArtistDisplay
+            featuring: actualMedia.featuring || [],
+            creatorDisplay: actualMedia.creatorDisplay,
             duration: actualMedia.duration,
             coverArt: actualMedia.coverArt,
             sources: sources,
@@ -1796,7 +1799,20 @@ const Party: React.FC = () => {
                             <div className="space-y-3">
                               {getFilteredQueueForSearch().map((item: any, index: number) => {
                                 // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
-                                const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+                                const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+                                // Ensure artists array is set for ClickableArtistDisplay
+                                // Backend sends both 'artist' (string for backward compat) and 'artists' (array with userIds)
+                                const mediaData = {
+                                  ...rawMediaData,
+                                  // Prioritize 'artists' from backend (full array with userIds)
+                                  artists: Array.isArray(rawMediaData.artists) ? rawMediaData.artists : 
+                                          // Fallback: if 'artist' is an array (Mongoose document), use it
+                                          (Array.isArray(rawMediaData.artist) ? rawMediaData.artist : []),
+                                  // Keep 'artist' for backward compatibility (may be string or array)
+                                  artist: rawMediaData.artist,
+                                  featuring: Array.isArray(rawMediaData.featuring) ? rawMediaData.featuring : [],
+                                  creatorDisplay: rawMediaData.creatorDisplay
+                                };
                                 const isAdmin = user?.role?.includes('admin');
                                 return (
                                   <div
@@ -1864,7 +1880,7 @@ const Party: React.FC = () => {
                                           </h4>
                                           <span className="hidden md:inline text-gray-400">•</span>
                                           <span className="text-gray-300 text-sm md:text-lg truncate font-light">
-                                            {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
+                                            <ClickableArtistDisplay media={mediaData} />
                                           </span>
                                           <div className="flex items-center space-x-1 md:ml-2">
                                             <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
@@ -2022,7 +2038,17 @@ const Party: React.FC = () => {
                               <h4 className="text-sm font-semibold text-green-300">From Tuneable Library ({addMediaResults.database.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                              {addMediaResults.database.map((media: any) => (
+                              {addMediaResults.database.map((mediaItem: any) => {
+                                // Ensure artists array is set for ClickableArtistDisplay
+                                const media = {
+                                  ...mediaItem,
+                                  artists: Array.isArray(mediaItem.artists) ? mediaItem.artists : 
+                                          (Array.isArray(mediaItem.artist) ? mediaItem.artist : []),
+                                  artist: mediaItem.artist,
+                                  featuring: mediaItem.featuring || [],
+                                  creatorDisplay: mediaItem.creatorDisplay
+                                };
+                                return (
                                 <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
@@ -2120,7 +2146,8 @@ const Party: React.FC = () => {
                                     </button>
                                   </div>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -2133,7 +2160,17 @@ const Party: React.FC = () => {
                               <h4 className="text-sm font-semibold text-red-300">From YouTube ({addMediaResults.youtube.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
-                              {addMediaResults.youtube.map((media: any) => (
+                              {addMediaResults.youtube.map((mediaItem: any) => {
+                                // Ensure artists array is set for ClickableArtistDisplay
+                                const media = {
+                                  ...mediaItem,
+                                  artists: Array.isArray(mediaItem.artists) ? mediaItem.artists : 
+                                          (Array.isArray(mediaItem.artist) ? mediaItem.artist : []),
+                                  artist: mediaItem.artist,
+                                  featuring: mediaItem.featuring || [],
+                                  creatorDisplay: mediaItem.creatorDisplay
+                                };
+                                return (
                                 <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                                     <img
@@ -2224,7 +2261,8 @@ const Party: React.FC = () => {
                                     </button>
                                   </div>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                             
                             {/* Show More Button for YouTube */}
@@ -2312,7 +2350,20 @@ const Party: React.FC = () => {
                     ) : (
                       getDisplayMedia().map((item: any, index: number) => {
                         // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
-                        const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+                        const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+                        // Ensure artists array is set for ClickableArtistDisplay
+                        // Backend sends both 'artist' (string for backward compat) and 'artists' (array with userIds)
+                        const mediaData = {
+                          ...rawMediaData,
+                          // Prioritize 'artists' from backend (full array with userIds)
+                          artists: Array.isArray(rawMediaData.artists) ? rawMediaData.artists : 
+                                  // Fallback: if 'artist' is an array (Mongoose document), use it
+                                  (Array.isArray(rawMediaData.artist) ? rawMediaData.artist : []),
+                          // Keep 'artist' for backward compatibility (may be string or array)
+                          artist: rawMediaData.artist,
+                          featuring: Array.isArray(rawMediaData.featuring) ? rawMediaData.featuring : [],
+                          creatorDisplay: rawMediaData.creatorDisplay
+                        };
                         const isAdmin = user?.role?.includes('admin');
                         return (
                           <div
@@ -2378,7 +2429,7 @@ const Party: React.FC = () => {
                                   </h4>
                                   <span className="hidden md:inline text-gray-400">•</span>
                                   <span className="text-gray-300 text-sm md:text-lg truncate font-light">
-                                    {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
+                                    <ClickableArtistDisplay media={mediaData} />
                                   </span>
                                   <div className="flex items-center space-x-1 md:ml-2">
                                     <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
@@ -2589,7 +2640,16 @@ const Party: React.FC = () => {
                       getPartyMedia()
                         .filter((item: any) => item.status === 'vetoed')
                         .map((item: any, index: number) => {
-                          const mediaData = item.mediaId || item;
+                          const rawMediaData = item.mediaId || item;
+                          // Ensure artists array is set for ClickableArtistDisplay
+                          const mediaData = {
+                            ...rawMediaData,
+                            artists: Array.isArray(rawMediaData.artists) ? rawMediaData.artists : 
+                                    (Array.isArray(rawMediaData.artist) ? rawMediaData.artist : []),
+                            artist: rawMediaData.artist,
+                            featuring: rawMediaData.featuring || [],
+                            creatorDisplay: rawMediaData.creatorDisplay
+                          };
                           return (
                             <div
                               key={`vetoed-${mediaData.id}-${index}`}
@@ -2615,7 +2675,7 @@ const Party: React.FC = () => {
                                   </h4>
                                   <span className="text-gray-400">•</span>
                                   <span className="text-gray-300 text-lg truncate font-light">
-                                    {Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}
+                                    <ClickableArtistDisplay media={mediaData} />
                                   </span>
                                   <div className="flex items-center space-x-1 ml-2">
                                     <Clock className="h-4 w-4 text-gray-400" />
@@ -2689,7 +2749,9 @@ const Party: React.FC = () => {
                           />
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-gray-300 text-sm truncate">{mediaData.title || 'Unknown Media'}</h4>
-                            <p className="text-xs text-gray-500 truncate">{Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist || 'Unknown Artist'}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              <ClickableArtistDisplay media={mediaData} />
+                            </p>
                             <p className="text-xs text-gray-600">
                               {item.completedAt ? new Date(item.completedAt).toLocaleTimeString() : 'Completed'}
                             </p>
