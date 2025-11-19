@@ -614,11 +614,29 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           return done(new Error('Invalid SoundCloud profile data'), null);
         }
         
+        // Check if this is an account linking request
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
         // Check if user already exists with this SoundCloud ID
         let user = await User.findOne({ soundcloudId: profile.id });
         
         if (user) {
-          // User exists, update their SoundCloud access token
+          // If linking account and the SoundCloud account is already linked to a different user
+          if (isLinkingAccount && linkingUserId) {
+            if (user._id.toString() !== linkingUserId) {
+              // SoundCloud account is already linked to a different user
+              return done(new Error('This SoundCloud account is already linked to another user account. Please use a different account.'), null);
+            }
+            // SoundCloud account is already linked to the current user - just update tokens
+            user.soundcloudAccessToken = accessToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.soundcloud = true;
+            await user.save();
+            return done(null, user);
+          }
+          
+          // Not linking - just log in as the existing user
           user.soundcloudAccessToken = accessToken;
           user.oauthVerified = user.oauthVerified || {};
           user.oauthVerified.soundcloud = true; // Mark SoundCloud OAuth as verified
@@ -649,10 +667,37 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           user = await User.findOne({ username: profile.username });
           
           if (user) {
-            // Check if this is the first time linking SoundCloud
-            const isFirstSoundCloudLink = !user.soundcloudId;
+            // If linking account, verify the username matches the current user
+            if (isLinkingAccount && linkingUserId) {
+              if (user._id.toString() !== linkingUserId) {
+                // Username matches a different user - don't link, return error
+                return done(new Error('This username is already associated with another account. Please use a different SoundCloud account or contact support.'), null);
+              }
+              // Username matches current user - link SoundCloud account
+              const isFirstSoundCloudLink = !user.soundcloudId;
+              user.soundcloudId = profile.id;
+              user.soundcloudUsername = profile.username;
+              user.soundcloudAccessToken = accessToken;
+              user.oauthVerified = user.oauthVerified || {};
+              user.oauthVerified.soundcloud = true;
+              
+              // Update email if user doesn't have one
+              if (profile.emails && profile.emails.length > 0 && !user.email) {
+                user.email = profile.emails[0].value;
+              }
+              
+              // Update profile picture if user doesn't have one or is linking SoundCloud for first time
+              if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstSoundCloudLink)) {
+                user.profilePic = profile.photos[0].value;
+              }
+              
+              user.lastLoginAt = new Date();
+              await user.save();
+              return done(null, user);
+            }
             
-            // Link SoundCloud account to existing user
+            // Not linking - link SoundCloud account to existing user by username
+            const isFirstSoundCloudLink = !user.soundcloudId;
             user.soundcloudId = profile.id;
             user.soundcloudUsername = profile.username;
             user.soundcloudAccessToken = accessToken;
@@ -674,6 +719,82 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             await user.save();
             return done(null, user);
           }
+        }
+        
+        // Check if user exists with the same email (if provided)
+        if (profile.emails && profile.emails.length > 0) {
+          user = await User.findOne({ email: profile.emails[0].value });
+          
+          if (user) {
+            // If linking account, verify the email matches the current user
+            if (isLinkingAccount && linkingUserId) {
+              if (user._id.toString() !== linkingUserId) {
+                // Email matches a different user - don't link, return error
+                return done(new Error('This email is already associated with another account. Please use a different SoundCloud account or contact support.'), null);
+              }
+              // Email matches current user - link SoundCloud account
+              const isFirstSoundCloudLink = !user.soundcloudId;
+              user.soundcloudId = profile.id;
+              user.soundcloudUsername = profile.username;
+              user.soundcloudAccessToken = accessToken;
+              user.oauthVerified = user.oauthVerified || {};
+              user.oauthVerified.soundcloud = true;
+              
+              // Update profile picture if user doesn't have one or is linking SoundCloud for first time
+              if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstSoundCloudLink)) {
+                user.profilePic = profile.photos[0].value;
+              }
+              
+              user.lastLoginAt = new Date();
+              await user.save();
+              return done(null, user);
+            }
+            
+            // Not linking - link SoundCloud account to existing user by email
+            const isFirstSoundCloudLink = !user.soundcloudId;
+            user.soundcloudId = profile.id;
+            user.soundcloudUsername = profile.username;
+            user.soundcloudAccessToken = accessToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.soundcloud = true;
+            
+            // Update profile picture if user doesn't have one or is linking SoundCloud for first time
+            if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstSoundCloudLink)) {
+              user.profilePic = profile.photos[0].value;
+            }
+            
+            user.lastLoginAt = new Date();
+            await user.save();
+            return done(null, user);
+          }
+        }
+        
+        // If linking account but no user found by username, email, or SoundCloud ID, link to current user
+        if (isLinkingAccount && linkingUserId) {
+          const currentUser = await User.findById(linkingUserId);
+          if (!currentUser) {
+            return done(new Error('User session expired. Please log in again.'), null);
+          }
+          
+          // Link SoundCloud account to current user
+          currentUser.soundcloudId = profile.id;
+          currentUser.soundcloudUsername = profile.username;
+          currentUser.soundcloudAccessToken = accessToken;
+          currentUser.oauthVerified = currentUser.oauthVerified || {};
+          currentUser.oauthVerified.soundcloud = true;
+          
+          // Update email if user doesn't have one
+          if (profile.emails && profile.emails.length > 0 && !currentUser.email) {
+            currentUser.email = profile.emails[0].value;
+          }
+          
+          // Update profile picture if user doesn't have one
+          if (profile.photos && profile.photos.length > 0 && !currentUser.profilePic) {
+            currentUser.profilePic = profile.photos[0].value;
+          }
+          
+          await currentUser.save();
+          return done(null, currentUser);
         }
         
         // Create new user

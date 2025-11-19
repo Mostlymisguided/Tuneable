@@ -497,39 +497,103 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
       
       // Continue with passport authentication
       // Add error handler to catch and log detailed errors
-      passport.authenticate('soundcloud', { 
-        failureRedirect: '/login?error=soundcloud_auth_failed',
-        session: false 
-      }, (err, user, info) => {
-        // Custom callback for error handling
-        if (err) {
-          console.error('❌ SoundCloud OAuth authentication error:', err);
-          console.error('Error type:', err.constructor.name);
-          console.error('Error message:', err.message);
-          console.error('Error stack:', err.stack);
-          
-          // Check if it's an OAuth error
-          if (err.oauthError) {
-            console.error('OAuth error details:', err.oauthError);
-            console.error('OAuth error status:', err.oauthError.statusCode);
-            console.error('OAuth error data:', err.oauthError.data);
+      try {
+        passport.authenticate('soundcloud', { 
+          session: false 
+        }, (err, user, info) => {
+          try {
+            // Handle errors from passport strategy
+            if (err) {
+              console.error('❌ SoundCloud OAuth authentication error:', err);
+              console.error('Error type:', err.constructor.name);
+              console.error('Error message:', err.message);
+              console.error('Error stack:', err.stack);
+              
+              // Check if it's an OAuth error
+              if (err.oauthError) {
+                console.error('OAuth error details:', err.oauthError);
+                console.error('OAuth error status:', err.oauthError.statusCode);
+                console.error('OAuth error data:', err.oauthError.data);
+              }
+              
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              // Pass error message in redirect
+              const errorMessage = encodeURIComponent(err.message);
+              return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+            }
+            
+            if (!user) {
+              console.error('❌ SoundCloud OAuth - no user returned');
+              console.error('Info:', info);
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              return res.redirect(`${redirectUrl}?error=soundcloud_auth_failed`);
+            }
+            
+            // Success - user authenticated
+            req.user = user;
+            next();
+          } catch (callbackError) {
+            console.error('Error in SoundCloud OAuth callback handler:', callbackError);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            if (req.session) {
+              delete req.session.oauthRedirect;
+              delete req.session.linkAccount;
+              delete req.session.linkingUserId;
+              delete req.session.linkingUserUuid;
+            }
+            
+            return res.redirect(`${redirectUrl}?error=soundcloud_auth_failed`);
           }
-          
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-          return res.redirect(`${frontendUrl}/login?error=soundcloud_auth_failed&details=${encodeURIComponent(err.message)}`);
+        })(req, res, next);
+      } catch (authError) {
+        console.error('Error in passport.authenticate call:', authError);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = req.session?.oauthRedirect 
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        
+        // Clean up session
+        if (req.session) {
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
         }
         
-        if (!user) {
-          console.error('❌ SoundCloud OAuth - no user returned');
-          console.error('Info:', info);
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-          return res.redirect(`${frontendUrl}/login?error=soundcloud_auth_failed&reason=no_user`);
-        }
-        
-        // Success - user authenticated
-        req.user = user;
-        next();
-      })(req, res, next);
+        const errorMessage = authError.message 
+          ? encodeURIComponent(authError.message)
+          : 'SoundCloud authentication failed';
+        return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+      }
     },
     async (req, res) => {
       try {
