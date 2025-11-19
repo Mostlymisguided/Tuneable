@@ -1462,55 +1462,6 @@ const Party: React.FC = () => {
     }
   };
 
-  // Handle joining party from Party page
-  const handleJoinParty = async () => {
-    if (!partyId || !user) return;
-
-    try {
-      // Check if user is already in partiers
-      const userId = user._id || user.id;
-      const isAlreadyPartier = party?.partiers?.some((partier: any) => {
-        const partierId = typeof partier === 'object' && partier._id 
-          ? partier._id.toString() 
-          : typeof partier === 'string' 
-          ? partier 
-          : partier.id || partier.uuid;
-        return partierId === userId?.toString();
-      });
-
-      if (isAlreadyPartier) {
-        toast.info('You are already a member of this party');
-        return;
-      }
-
-      // Check if party is private and prompt for code
-      let inviteCode: string | undefined;
-      if (party?.privacy === 'private' && !isHost) {
-        const code = window.prompt('This is a private party. Please enter the party code:');
-        if (!code) {
-          return; // User cancelled
-        }
-        inviteCode = code;
-      }
-
-      // Join the party
-      const response = await partyAPI.joinParty(partyId, inviteCode);
-      toast.success('Successfully joined the party!');
-      
-      // ✅ Refresh party details to update partiers list
-      // The backend now returns the updated party with populated partiers
-      if (response.party) {
-        setParty(response.party);
-      } else {
-        // Fallback: fetch party details if response doesn't include party
-        await fetchPartyDetails();
-      }
-    } catch (error: any) {
-      console.error('Error joining party:', error);
-      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to join party');
-    }
-  };
-  
   // Get vetoed media for display
   const getVetoedMedia = () => {
     const allMedia = getPartyMedia();
