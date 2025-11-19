@@ -654,6 +654,18 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Unlock user account
+  unlockUserAccount: async (userId: string) => {
+    const response = await api.post(`/users/admin/users/${userId}/unlock`);
+    return response.data;
+  },
+
+  // Admin: Revoke/Delete warning
+  revokeWarning: async (userId: string, warningIndex: number) => {
+    const response = await api.delete(`/users/admin/users/${userId}/warnings/${warningIndex}`);
+    return response.data;
+  },
+
   // Get user's tag rankings
   getTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};

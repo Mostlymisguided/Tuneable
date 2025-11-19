@@ -887,6 +887,20 @@ const UserProfile: React.FC = () => {
                     {warnings.finalWarningCount} final warning{warnings.finalWarningCount !== 1 ? 's' : ''}
                   </span>
                 )}
+                {warnings.warnings.length > 3 && (
+                  <button
+                    onClick={() => {
+                      // Show all warnings in a modal or expandable section
+                      const allWarnings = warnings.warnings.map((w: any, i: number) => 
+                        `${i + 1}. ${w.type.replace('_', ' ').toUpperCase()}: ${w.message}${w.reason ? ` (Reason: ${w.reason})` : ''} - ${new Date(w.issuedAt).toLocaleDateString()}`
+                      ).join('\n\n');
+                      alert(`All Warnings:\n\n${allWarnings}`);
+                    }}
+                    className="ml-3 text-xs text-purple-400 hover:text-purple-300 underline"
+                  >
+                    View All ({warnings.warnings.length})
+                  </button>
+                )}
               </div>
             </div>
             <div className="space-y-3">

@@ -127,12 +127,40 @@ const IssueWarningModal: React.FC<IssueWarningModalProps> = ({
             {userWarnings.warnings && userWarnings.warnings.length > 0 ? (
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {userWarnings.warnings.slice(-5).reverse().map((w: any, idx: number) => (
-                  <div key={idx} className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
-                    <div className="flex items-center justify-between">
-                      <span className="capitalize">{w.type.replace('_', ' ')}</span>
-                      <span>{new Date(w.issuedAt).toLocaleDateString()}</span>
+                  <div key={idx} className="text-xs text-gray-400 bg-gray-800 p-2 rounded flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="capitalize">{w.type.replace('_', ' ')}</span>
+                        <span>{new Date(w.issuedAt).toLocaleDateString()}</span>
+                      </div>
+                      {w.reason && <div className="mt-1 text-gray-500">Reason: {w.reason}</div>}
                     </div>
-                    {w.reason && <div className="mt-1 text-gray-500">Reason: {w.reason}</div>}
+                    <button
+                      onClick={async () => {
+                        if (window.confirm(`Revoke this warning?`)) {
+                          try {
+                            // Find the index in the full warnings array
+                            const fullIndex = userWarnings.warnings.findIndex((warn: any) => 
+                              warn.issuedAt === w.issuedAt && warn.type === w.type && warn.message === w.message
+                            );
+                            if (fullIndex !== -1) {
+                              await userAPI.revokeWarning(userId, fullIndex);
+                              toast.success('Warning revoked');
+                              fetchUserWarnings();
+                              if (onWarningIssued) {
+                                onWarningIssued();
+                              }
+                            }
+                          } catch (error: any) {
+                            toast.error(error.response?.data?.error || 'Failed to revoke warning');
+                          }
+                        }
+                      }}
+                      className="ml-2 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                      title="Revoke Warning"
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>

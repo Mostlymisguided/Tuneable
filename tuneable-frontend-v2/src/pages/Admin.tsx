@@ -1239,7 +1239,7 @@ const Admin: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 flex-wrap gap-1">
                             {!user.role.includes('admin') && (
                               <>
                                 <button
@@ -1252,6 +1252,25 @@ const Admin: React.FC = () => {
                                 >
                                   ⚠️ Warn
                                 </button>
+                                {(user as any).accountLockedUntil && (
+                                  <button
+                                    onClick={async () => {
+                                      if (window.confirm(`Unlock account for ${user.username}?`)) {
+                                        try {
+                                          await userAPI.unlockUserAccount(user._id);
+                                          toast.success(`Account unlocked for ${user.username}`);
+                                          loadUsers();
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to unlock account');
+                                        }
+                                      }
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                    title="Unlock Account"
+                                  >
+                                    🔓 Unlock
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => promoteToAdmin(user._id)}
                                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"

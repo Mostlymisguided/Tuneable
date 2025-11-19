@@ -563,7 +563,19 @@ router.post(
         return res.status(401).json({ error: 'Account is inactive. Please contact support.' });
       }
 
-      // Check if account is locked
+      // ✅ If locked time has passed, automatically unlock account
+      if (user.accountLockedUntil && user.accountLockedUntil <= new Date()) {
+        user.failedLoginAttempts = 0;
+        user.accountLockedUntil = null;
+        // ✅ Restore account to active if it was suspended
+        if (!user.isActive) {
+          user.isActive = true;
+          console.log(`✅ Automatically unlocked and reactivated account for user ${user._id} (lock expired)`);
+        }
+        await user.save();
+      }
+
+      // Check if account is locked (after auto-unlock check)
       if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
         const minutesRemaining = Math.ceil((user.accountLockedUntil - new Date()) / 60000);
         return res.status(423).json({ 
@@ -571,13 +583,6 @@ router.post(
           lockedUntil: user.accountLockedUntil,
           minutesRemaining: minutesRemaining
         });
-      }
-
-      // If locked time has passed, reset lockout
-      if (user.accountLockedUntil && user.accountLockedUntil <= new Date()) {
-        user.failedLoginAttempts = 0;
-        user.accountLockedUntil = null;
-        await user.save();
       }
 
       // Compare password
@@ -2893,13 +2898,26 @@ router.get('/warnings', authMiddleware, async (req, res) => {
       return !warning.expiresAt || warning.expiresAt > now;
     });
     
+    // ✅ Recalculate warning counts to ensure accuracy (only count non-expired)
+    const activeWarningCount = activeWarnings.filter(w => 
+      w.type === 'warning' || w.type === 'final_warning' || w.type === 'suspension_notice'
+    ).length;
+    const activeFinalWarningCount = activeWarnings.filter(w => w.type === 'final_warning').length;
+    
+    // Update stored counts if they differ (for consistency)
+    if (user.warningCount !== activeWarningCount || user.finalWarningCount !== activeFinalWarningCount) {
+      user.warningCount = activeWarningCount;
+      user.finalWarningCount = activeFinalWarningCount;
+      await user.save();
+    }
+    
     // Populate issuedBy field
     await User.populate(activeWarnings, { path: 'issuedBy', select: 'username _id' });
     
     res.json({
       warnings: activeWarnings,
-      warningCount: user.warningCount,
-      finalWarningCount: user.finalWarningCount,
+      warningCount: activeWarningCount, // Use recalculated count
+      finalWarningCount: activeFinalWarningCount, // Use recalculated count
       hasUnacknowledged: activeWarnings.some(w => !w.acknowledgedAt)
     });
   } catch (error) {
@@ -2909,6 +2927,7 @@ router.get('/warnings', authMiddleware, async (req, res) => {
 });
 
 // Acknowledge a warning (mark as read)
+// ✅ Improved: Uses issuedAt timestamp as identifier for more robust matching
 router.post('/warnings/:warningIndex/acknowledge', authMiddleware, async (req, res) => {
   try {
     const { warningIndex } = req.params;
@@ -2919,24 +2938,40 @@ router.post('/warnings/:warningIndex/acknowledge', authMiddleware, async (req, r
       return res.status(404).json({ error: 'User not found' });
     }
     
+    // ✅ Filter to only active (non-expired) warnings for index matching
+    const now = new Date();
+    const activeWarnings = user.warnings.filter(w => !w.expiresAt || w.expiresAt > now);
+    
     const index = parseInt(warningIndex);
-    if (isNaN(index) || index < 0 || index >= user.warnings.length) {
+    if (isNaN(index) || index < 0 || index >= activeWarnings.length) {
       return res.status(400).json({ error: 'Invalid warning index' });
     }
     
+    // Find the warning in the full array using issuedAt as unique identifier
+    const targetWarning = activeWarnings[index];
+    const warningInArray = user.warnings.find(w => 
+      w.issuedAt && targetWarning.issuedAt &&
+      w.issuedAt.getTime() === targetWarning.issuedAt.getTime() &&
+      w.type === targetWarning.type &&
+      w.message === targetWarning.message
+    );
+    
+    if (!warningInArray) {
+      return res.status(404).json({ error: 'Warning not found' });
+    }
+    
     // Check if warning is expired
-    const warning = user.warnings[index];
-    if (warning.expiresAt && warning.expiresAt < new Date()) {
+    if (warningInArray.expiresAt && warningInArray.expiresAt < now) {
       return res.status(400).json({ error: 'Warning has expired' });
     }
     
     // Mark as acknowledged
-    if (!warning.acknowledgedAt) {
-      user.warnings[index].acknowledgedAt = new Date();
+    if (!warningInArray.acknowledgedAt) {
+      warningInArray.acknowledgedAt = new Date();
       await user.save();
     }
     
-    res.json({ message: 'Warning acknowledged', warning: user.warnings[index] });
+    res.json({ message: 'Warning acknowledged', warning: warningInArray });
   } catch (error) {
     console.error('Error acknowledging warning:', error);
     res.status(500).json({ error: 'Failed to acknowledge warning', details: error.message });
@@ -2982,21 +3017,25 @@ router.post('/admin/warnings', authMiddleware, adminMiddleware, async (req, res)
     
     targetUser.warnings.push(warning);
     
-    // Update warning counts
-    if (type === 'warning' || type === 'final_warning' || type === 'suspension_notice') {
-      targetUser.warningCount = (targetUser.warningCount || 0) + 1;
-    }
-    if (type === 'final_warning') {
-      targetUser.finalWarningCount = (targetUser.finalWarningCount || 0) + 1;
-    }
+    // ✅ Recalculate warning counts based on non-expired warnings only
+    const now = new Date();
+    const activeWarnings = targetUser.warnings.filter(w => !w.expiresAt || w.expiresAt > now);
+    
+    // Count only non-expired warnings
+    targetUser.warningCount = activeWarnings.filter(w => 
+      w.type === 'warning' || w.type === 'final_warning' || w.type === 'suspension_notice'
+    ).length;
+    
+    targetUser.finalWarningCount = activeWarnings.filter(w => w.type === 'final_warning').length;
     
     await targetUser.save();
     
-    // Automatic escalation logic
+    // ✅ Automatic escalation logic (using recalculated counts)
     const WARNING_THRESHOLD = 3; // After 3 warnings, temp ban
     const FINAL_WARNING_THRESHOLD = 2; // After 2 final warnings, temp ban
     const TEMP_BAN_DAYS = 7; // 7 day temp ban
     
+    // Use the recalculated counts (only non-expired warnings)
     if (targetUser.warningCount >= WARNING_THRESHOLD || targetUser.finalWarningCount >= FINAL_WARNING_THRESHOLD) {
       // Apply temporary ban
       const banUntil = new Date();
@@ -3117,19 +3156,139 @@ router.get('/admin/users/:userId/warnings', authMiddleware, adminMiddleware, asy
       return res.status(404).json({ error: 'User not found' });
     }
     
+    // ✅ Recalculate warning counts to ensure accuracy
+    const now = new Date();
+    const activeWarnings = user.warnings.filter(w => !w.expiresAt || w.expiresAt > now);
+    const activeWarningCount = activeWarnings.filter(w => 
+      w.type === 'warning' || w.type === 'final_warning' || w.type === 'suspension_notice'
+    ).length;
+    const activeFinalWarningCount = activeWarnings.filter(w => w.type === 'final_warning').length;
+    
     // Populate issuedBy for all warnings
     await User.populate(user.warnings, { path: 'issuedBy', select: 'username _id' });
     
     res.json({
-      warnings: user.warnings,
-      warningCount: user.warningCount,
-      finalWarningCount: user.finalWarningCount,
+      warnings: user.warnings, // Return all warnings (including expired) for history
+      activeWarnings: activeWarnings, // Also return active warnings separately
+      warningCount: activeWarningCount, // Use recalculated count
+      finalWarningCount: activeFinalWarningCount, // Use recalculated count
       username: user.username,
       email: user.email
     });
   } catch (error) {
     console.error('Error fetching user warnings:', error);
     res.status(500).json({ error: 'Failed to fetch user warnings', details: error.message });
+  }
+});
+
+// Admin: Manually unlock a user account
+router.post('/admin/users/:userId/unlock', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (!user.accountLockedUntil) {
+      return res.status(400).json({ error: 'User account is not locked' });
+    }
+    
+    // Unlock account
+    user.accountLockedUntil = null;
+    user.isActive = true;
+    await user.save();
+    
+    // Create notification
+    try {
+      const notificationService = require('../services/notificationService');
+      await notificationService.createNotification({
+        userId: user._id,
+        type: 'info',
+        title: 'Account Unlocked',
+        message: 'Your account has been manually unlocked by an administrator.',
+        link: '/profile',
+        linkText: 'View Profile',
+        relatedUserId: req.user._id
+      });
+    } catch (notifError) {
+      console.error('Error creating unlock notification:', notifError);
+    }
+    
+    res.json({
+      message: 'Account unlocked successfully',
+      userId: userId,
+      username: user.username
+    });
+  } catch (error) {
+    console.error('Error unlocking account:', error);
+    res.status(500).json({ error: 'Failed to unlock account', details: error.message });
+  }
+});
+
+// Admin: Revoke/Delete a warning
+router.delete('/admin/users/:userId/warnings/:warningIndex', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId, warningIndex } = req.params;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const index = parseInt(warningIndex);
+    if (isNaN(index) || index < 0 || index >= user.warnings.length) {
+      return res.status(400).json({ error: 'Invalid warning index' });
+    }
+    
+    const warning = user.warnings[index];
+    
+    // Remove warning from array
+    user.warnings.splice(index, 1);
+    
+    // ✅ Recalculate warning counts
+    const now = new Date();
+    const activeWarnings = user.warnings.filter(w => !w.expiresAt || w.expiresAt > now);
+    user.warningCount = activeWarnings.filter(w => 
+      w.type === 'warning' || w.type === 'final_warning' || w.type === 'suspension_notice'
+    ).length;
+    user.finalWarningCount = activeWarnings.filter(w => w.type === 'final_warning').length;
+    
+    // ✅ If account was locked due to warnings and count is now below threshold, unlock
+    if (user.accountLockedUntil && user.warningCount < 3 && user.finalWarningCount < 2) {
+      user.accountLockedUntil = null;
+      user.isActive = true;
+      
+      // Create notification about unlock
+      try {
+        const notificationService = require('../services/notificationService');
+        await notificationService.createNotification({
+          userId: user._id,
+          type: 'info',
+          title: 'Account Unlocked',
+          message: 'Your account has been unlocked as a warning was revoked.',
+          link: '/profile',
+          linkText: 'View Profile',
+          relatedUserId: req.user._id
+        });
+      } catch (notifError) {
+        console.error('Error creating unlock notification:', notifError);
+      }
+    }
+    
+    await user.save();
+    
+    res.json({
+      message: 'Warning revoked successfully',
+      warning: warning,
+      warningCount: user.warningCount,
+      finalWarningCount: user.finalWarningCount,
+      accountUnlocked: !user.accountLockedUntil
+    });
+  } catch (error) {
+    console.error('Error revoking warning:', error);
+    res.status(500).json({ error: 'Failed to revoke warning', details: error.message });
   }
 });
 
