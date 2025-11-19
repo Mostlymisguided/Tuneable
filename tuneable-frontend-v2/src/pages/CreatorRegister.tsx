@@ -135,6 +135,27 @@ const CreatorRegister: React.FC = () => {
     const token = searchParams.get('token');
     const platform = searchParams.get('platform');
     const oauthSuccess = searchParams.get('oauth_success');
+    const error = searchParams.get('error');
+    const errorMessage = searchParams.get('message');
+
+    // Handle OAuth errors first
+    if (error && (error === 'account_already_linked' || error === 'account_linking_failed')) {
+      const displayMessage = errorMessage 
+        ? decodeURIComponent(errorMessage)
+        : 'This social media account is already linked to another user account. Please use a different account.';
+      
+      toast.error(displayMessage, {
+        autoClose: 10000,
+        pauseOnHover: true,
+      });
+      
+      // Clean up error params from URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('error');
+      newParams.delete('message');
+      setSearchParams(newParams, { replace: true });
+      return;
+    }
 
     if (token && platform && isAuthenticated) {
       handleOAuthCallback(token)
