@@ -29,6 +29,7 @@ const CreatorRegister: React.FC = () => {
   const { user, register: registerUser, handleOAuthCallback, refreshUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -252,7 +253,13 @@ const CreatorRegister: React.FC = () => {
         return;
       }
       
+      // Prevent double-clicks
+      if (isCreatingAccount) {
+        return;
+      }
+      
       // Create the account
+      setIsCreatingAccount(true);
       try {
         await registerUser({
           email: accountData.email,
@@ -297,7 +304,8 @@ const CreatorRegister: React.FC = () => {
           toast.error(errorMessage);
         }
         // Don't proceed if account creation fails
-        return;
+      } finally {
+        setIsCreatingAccount(false);
       }
     } else {
       // For other steps, just proceed
@@ -995,18 +1003,28 @@ const CreatorRegister: React.FC = () => {
               <button
                 onClick={handleNextStep}
                 disabled={
-                  step === 1 
+                  isCreatingAccount ||
+                  (step === 1 
                     ? !isStep1Valid() 
                     : step === 2 
                     ? !isStep2Valid() 
                     : !isAuthenticated && step === 3
                     ? !isStep3Valid()
-                    : false
+                    : false)
                 }
                 className="flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
-                Next
-                <ArrowRight className="h-5 w-5 ml-2" />
+                {isCreatingAccount ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </>
+                )}
               </button>
             ) : (
               <button
