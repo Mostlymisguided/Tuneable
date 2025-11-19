@@ -93,6 +93,30 @@ const AuthCallback: React.FC = () => {
           navigate('/login');
         }
       } else {
+        // Check if this is an OAuth error (account already linked, etc.)
+        const oauthError = searchParams.get('error');
+        const errorMessage = searchParams.get('message');
+        
+        if (oauthError === 'account_already_linked' && errorMessage) {
+          toast.error(decodeURIComponent(errorMessage), {
+            autoClose: 10000,
+            pauseOnHover: true,
+          });
+          // Redirect back to creator registration or wherever they came from
+          const currentPath = window.location.pathname;
+          if (currentPath.includes('/creator/register')) {
+            // Already on creator registration page, just remove error params
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('error');
+            urlParams.delete('message');
+            const cleanPath = currentPath + (urlParams.toString() ? '?' + urlParams.toString() : '');
+            navigate(cleanPath);
+          } else {
+            navigate('/creator/register');
+          }
+          return;
+        }
+        
         toast.error('No authentication token received. Please try signing in again.', {
           autoClose: 10000,
           pauseOnHover: true,

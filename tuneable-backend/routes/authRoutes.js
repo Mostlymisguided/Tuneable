@@ -8,9 +8,48 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
+// Helper function to optionally extract user from JWT token (for account linking)
+// Can extract from Authorization header or query parameter (for OAuth redirects)
+async function extractUserFromToken(req) {
+  try {
+    let token = null;
+    
+    // Try Authorization header first
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      token = authHeader.split(' ')[1];
+    }
+    
+    // Fallback to query parameter (for OAuth redirects)
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
+    
+    if (!token) return null;
+    
+    const decoded = jwt.verify(token, SECRET_KEY);
+    if (!decoded.userId) return null;
+    
+    // Fetch user by UUID or _id
+    const mongoose = require('mongoose');
+    let user;
+    if (decoded.userId.includes('-')) {
+      user = await User.findOne({ uuid: decoded.userId }).select('_id uuid');
+    } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
+      user = await User.findById(decoded.userId).select('_id uuid');
+    }
+    
+    return user ? { _id: user._id.toString(), uuid: user.uuid } : null;
+  } catch (err) {
+    // Token invalid or expired - that's okay for optional extraction
+    console.warn('Token extraction failed:', err.message);
+    return null;
+  }
+}
+
 // Facebook OAuth routes - only available if configured
 if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
-  router.get('/facebook', (req, res, next) => {
+  router.get('/facebook', async (req, res, next) => {
     // Store invite code in session if provided
     if (req.query.invite) {
       req.session = req.session || {};
@@ -24,6 +63,16 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
     if (req.query.link_account === 'true') {
       req.session = req.session || {};
       req.session.linkAccount = true;
+      
+      // Extract current user from JWT token (if present) and store in session
+      const currentUser = await extractUserFromToken(req);
+      if (currentUser) {
+        req.session.linkingUserId = currentUser._id;
+        req.session.linkingUserUuid = currentUser.uuid;
+        console.log('🔗 Account linking initiated for user:', currentUser.uuid);
+      } else {
+        console.warn('⚠️ Account linking requested but no valid user token found');
+      }
     }
     passport.authenticate('facebook', { 
       scope: ['email'] 
@@ -31,9 +80,42 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
   });
 
   router.get('/facebook/callback', 
-    passport.authenticate('facebook', { failureRedirect: '/login?error=facebook_auth_failed' }),
+    passport.authenticate('facebook', { 
+      failureRedirect: '/login?error=facebook_auth_failed',
+      session: false // We're using JWT, not sessions for auth
+    }),
     async (req, res) => {
       try {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
+        // If this is an account linking request, verify the user matches
+        if (isLinkingAccount && linkingUserId) {
+          const authenticatedUserId = req.user._id.toString();
+          
+          if (authenticatedUserId !== linkingUserId) {
+            // Facebook account is already linked to a different user
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            delete req.session.oauthRedirect;
+            delete req.session.linkAccount;
+            delete req.session.linkingUserId;
+            delete req.session.linkingUserUuid;
+            
+            // Redirect with error message
+            const errorMessage = encodeURIComponent('This Facebook account is already linked to another user account. Please use a different account.');
+            res.redirect(`${redirectUrl}?error=account_already_linked&message=${errorMessage}`);
+            return;
+          }
+          
+          // User matches - account linking successful
+          console.log('✅ Account linking successful for user:', req.user.uuid);
+        }
+        
         // Generate JWT token for the authenticated user using UUID
         const token = jwt.sign(
           { 
@@ -46,11 +128,12 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         );
 
         // Check if we have a custom redirect URL (for account linking)
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         if (req.session?.oauthRedirect) {
           const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
           // Redirect to custom URL with token
           res.redirect(`${redirectUrl}&token=${token}`);
         } else {
@@ -60,7 +143,18 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         
       } catch (error) {
         console.error('Facebook callback error:', error);
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=facebook_auth_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = req.session?.oauthRedirect 
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        
+        // Clean up session
+        delete req.session?.oauthRedirect;
+        delete req.session?.linkAccount;
+        delete req.session?.linkingUserId;
+        delete req.session?.linkingUserUuid;
+        
+        res.redirect(`${redirectUrl}?error=facebook_auth_failed`);
       }
     }
   );
@@ -214,7 +308,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // SoundCloud OAuth routes - only available if configured
 if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
-  router.get('/soundcloud', (req, res, next) => {
+  router.get('/soundcloud', async (req, res, next) => {
     // Store redirect URL and link_account flag in session for account linking
     if (req.query.redirect) {
       req.session = req.session || {};
@@ -223,6 +317,16 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
     if (req.query.link_account === 'true') {
       req.session = req.session || {};
       req.session.linkAccount = true;
+      
+      // Extract current user from JWT token (if present) and store in session
+      const currentUser = await extractUserFromToken(req);
+      if (currentUser) {
+        req.session.linkingUserId = currentUser._id;
+        req.session.linkingUserUuid = currentUser.uuid;
+        console.log('🔗 Account linking initiated for user:', currentUser.uuid);
+      } else {
+        console.warn('⚠️ Account linking requested but no valid user token found');
+      }
     }
     // Ensure session exists
     if (!req.session) {
@@ -352,6 +456,36 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=no_user`);
         }
         
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
+        // If this is an account linking request, verify the user matches
+        if (isLinkingAccount && linkingUserId) {
+          const authenticatedUserId = req.user._id.toString();
+          
+          if (authenticatedUserId !== linkingUserId) {
+            // SoundCloud account is already linked to a different user
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            delete req.session.oauthRedirect;
+            delete req.session.linkAccount;
+            delete req.session.linkingUserId;
+            delete req.session.linkingUserUuid;
+            
+            // Redirect with error message
+            const errorMessage = encodeURIComponent('This SoundCloud account is already linked to another user account. Please use a different account.');
+            res.redirect(`${redirectUrl}?error=account_already_linked&message=${errorMessage}`);
+            return;
+          }
+          
+          // User matches - account linking successful
+          console.log('✅ Account linking successful for user:', req.user.uuid);
+        }
+        
         // Generate JWT token for the authenticated user using UUID
         const token = jwt.sign(
           { 
@@ -364,11 +498,12 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         );
 
         // Check if we have a custom redirect URL (for account linking)
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         if (req.session?.oauthRedirect) {
           const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
           // Redirect to custom URL with token
           res.redirect(`${redirectUrl}&token=${token}`);
         } else {
@@ -379,7 +514,18 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         
       } catch (error) {
         console.error('❌ SoundCloud callback error:', error);
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=soundcloud_auth_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = req.session?.oauthRedirect 
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        
+        // Clean up session
+        delete req.session?.oauthRedirect;
+        delete req.session?.linkAccount;
+        delete req.session?.linkingUserId;
+        delete req.session?.linkingUserUuid;
+        
+        res.redirect(`${redirectUrl}?error=soundcloud_auth_failed`);
       }
     }
   );
@@ -396,7 +542,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 
 // Instagram OAuth routes - only available if configured
 if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
-  router.get('/instagram', (req, res, next) => {
+  router.get('/instagram', async (req, res, next) => {
     // Store invite code in session if provided
     if (req.query.invite) {
       req.session = req.session || {};
@@ -410,6 +556,16 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
     if (req.query.link_account === 'true') {
       req.session = req.session || {};
       req.session.linkAccount = true;
+      
+      // Extract current user from JWT token (if present) and store in session
+      const currentUser = await extractUserFromToken(req);
+      if (currentUser) {
+        req.session.linkingUserId = currentUser._id;
+        req.session.linkingUserUuid = currentUser.uuid;
+        console.log('🔗 Account linking initiated for user:', currentUser.uuid);
+      } else {
+        console.warn('⚠️ Account linking requested but no valid user token found');
+      }
     }
     passport.authenticate('instagram', { 
       scope: ['user_profile', 'user_media'] 
@@ -417,9 +573,42 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   });
 
   router.get('/instagram/callback', 
-    passport.authenticate('instagram', { failureRedirect: '/login?error=instagram_auth_failed' }),
+    passport.authenticate('instagram', { 
+      failureRedirect: '/login?error=instagram_auth_failed',
+      session: false // We're using JWT, not sessions for auth
+    }),
     async (req, res) => {
       try {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
+        // If this is an account linking request, verify the user matches
+        if (isLinkingAccount && linkingUserId) {
+          const authenticatedUserId = req.user._id.toString();
+          
+          if (authenticatedUserId !== linkingUserId) {
+            // Instagram account is already linked to a different user
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            delete req.session.oauthRedirect;
+            delete req.session.linkAccount;
+            delete req.session.linkingUserId;
+            delete req.session.linkingUserUuid;
+            
+            // Redirect with error message
+            const errorMessage = encodeURIComponent('This Instagram account is already linked to another user account. Please use a different account.');
+            res.redirect(`${redirectUrl}?error=account_already_linked&message=${errorMessage}`);
+            return;
+          }
+          
+          // User matches - account linking successful
+          console.log('✅ Account linking successful for user:', req.user.uuid);
+        }
+        
         // Generate JWT token for the authenticated user using UUID
         const token = jwt.sign(
           { 
@@ -432,11 +621,12 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         );
 
         // Check if we have a custom redirect URL (for account linking)
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         if (req.session?.oauthRedirect) {
           const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
           // Redirect to custom URL with token
           res.redirect(`${redirectUrl}&token=${token}`);
         } else {
@@ -446,7 +636,18 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         
       } catch (error) {
         console.error('Instagram callback error:', error);
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=instagram_auth_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = req.session?.oauthRedirect 
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        
+        // Clean up session
+        delete req.session?.oauthRedirect;
+        delete req.session?.linkAccount;
+        delete req.session?.linkingUserId;
+        delete req.session?.linkingUserUuid;
+        
+        res.redirect(`${redirectUrl}?error=instagram_auth_failed`);
       }
     }
   );

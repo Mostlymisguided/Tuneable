@@ -177,6 +177,13 @@ const CreatorRegister: React.FC = () => {
       return;
     }
 
+    // Get JWT token from localStorage for account linking
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please log in again to verify social media');
+      return;
+    }
+
     const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
     // Determine correct step number based on authentication status
     const socialStep = isAuthenticated ? 3 : 4;
@@ -184,8 +191,9 @@ const CreatorRegister: React.FC = () => {
       `${window.location.origin}/creator/register?step=${socialStep}&platform=${platform}`
     );
     
-    // Redirect to OAuth provider with link_account flag and custom redirect
-    window.location.href = `${API_URL}/api/auth/${platform}?link_account=true&redirect=${redirectUrl}`;
+    // Redirect to OAuth provider with link_account flag, token, and custom redirect
+    // Note: Token is passed as query param since OAuth uses browser redirects (not API calls with headers)
+    window.location.href = `${API_URL}/api/auth/${platform}?link_account=true&redirect=${redirectUrl}&token=${encodeURIComponent(token)}`;
   };
 
   // Available options
