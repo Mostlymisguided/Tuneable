@@ -852,11 +852,29 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
       try {
         console.log('Instagram profile:', profile);
         
+        // Check if this is an account linking request
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
         // Check if user already exists with this Instagram ID
         let user = await User.findOne({ instagramId: profile.id });
         
         if (user) {
-          // User exists, update their Instagram access token
+          // If linking account and the Instagram account is already linked to a different user
+          if (isLinkingAccount && linkingUserId) {
+            if (user._id.toString() !== linkingUserId) {
+              // Instagram account is already linked to a different user
+              return done(new Error('This Instagram account is already linked to another user account. Please use a different account.'), null);
+            }
+            // Instagram account is already linked to the current user - just update tokens
+            user.instagramAccessToken = accessToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.instagram = true;
+            await user.save();
+            return done(null, user);
+          }
+          
+          // Not linking - just log in as the existing user
           user.instagramAccessToken = accessToken;
           user.oauthVerified = user.oauthVerified || {};
           user.oauthVerified.instagram = true; // Mark Instagram OAuth as verified
@@ -882,10 +900,32 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           user = await User.findOne({ username: profile.username });
           
           if (user) {
-            // Check if this is the first time linking Instagram
-            const isFirstInstagramLink = !user.instagramId;
+            // If linking account, verify the username matches the current user
+            if (isLinkingAccount && linkingUserId) {
+              if (user._id.toString() !== linkingUserId) {
+                // Username matches a different user - don't link, return error
+                return done(new Error('This username is already associated with another account. Please use a different Instagram account or contact support.'), null);
+              }
+              // Username matches current user - link Instagram account
+              const isFirstInstagramLink = !user.instagramId;
+              user.instagramId = profile.id;
+              user.instagramUsername = profile.username;
+              user.instagramAccessToken = accessToken;
+              user.oauthVerified = user.oauthVerified || {};
+              user.oauthVerified.instagram = true;
+              
+              // Update profile picture if user doesn't have one or is linking Instagram for first time
+              if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstInstagramLink)) {
+                user.profilePic = profile.photos[0].value;
+              }
+              
+              user.lastLoginAt = new Date();
+              await user.save();
+              return done(null, user);
+            }
             
-            // Link Instagram account to existing user
+            // Not linking - link Instagram account to existing user by username
+            const isFirstInstagramLink = !user.instagramId;
             user.instagramId = profile.id;
             user.instagramUsername = profile.username;
             user.instagramAccessToken = accessToken;
@@ -902,6 +942,29 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
             await user.save();
             return done(null, user);
           }
+        }
+        
+        // If linking account but no user found by username or Instagram ID, link to current user
+        if (isLinkingAccount && linkingUserId) {
+          const currentUser = await User.findById(linkingUserId);
+          if (!currentUser) {
+            return done(new Error('User session expired. Please log in again.'), null);
+          }
+          
+          // Link Instagram account to current user
+          currentUser.instagramId = profile.id;
+          currentUser.instagramUsername = profile.username;
+          currentUser.instagramAccessToken = accessToken;
+          currentUser.oauthVerified = currentUser.oauthVerified || {};
+          currentUser.oauthVerified.instagram = true;
+          
+          // Update profile picture if user doesn't have one
+          if (profile.photos && profile.photos.length > 0 && !currentUser.profilePic) {
+            currentUser.profilePic = profile.photos[0].value;
+          }
+          
+          await currentUser.save();
+          return done(null, currentUser);
         }
         
         // Create new user

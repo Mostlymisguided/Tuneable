@@ -657,10 +657,94 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   });
 
   router.get('/instagram/callback', 
-    passport.authenticate('instagram', { 
-      failureRedirect: '/login?error=instagram_auth_failed',
-      session: false // We're using JWT, not sessions for auth
-    }),
+    (req, res, next) => {
+      try {
+        passport.authenticate('instagram', { 
+          session: false // We're using JWT, not sessions for auth
+        }, (err, user, info) => {
+          try {
+            // Handle errors from passport strategy
+            if (err) {
+              console.error('Instagram OAuth strategy error:', err.message);
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              // Pass error message in redirect
+              const errorMessage = encodeURIComponent(err.message);
+              return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+            }
+            
+            // Handle case where no user is returned (authentication failed)
+            if (!user) {
+              console.error('Instagram OAuth authentication failed - no user returned');
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              return res.redirect(`${redirectUrl}?error=instagram_auth_failed`);
+            }
+            
+            // Success - attach user to request and continue
+            req.user = user;
+            next();
+          } catch (callbackError) {
+            console.error('Error in Instagram OAuth callback handler:', callbackError);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            if (req.session) {
+              delete req.session.oauthRedirect;
+              delete req.session.linkAccount;
+              delete req.session.linkingUserId;
+              delete req.session.linkingUserUuid;
+            }
+            
+            return res.redirect(`${redirectUrl}?error=instagram_auth_failed`);
+          }
+        })(req, res, next);
+      } catch (authError) {
+        console.error('Error in passport.authenticate call:', authError);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = req.session?.oauthRedirect 
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        
+        // Clean up session
+        if (req.session) {
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
+        }
+        
+        const errorMessage = authError.message 
+          ? encodeURIComponent(authError.message)
+          : 'Instagram authentication failed';
+        return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+      }
+    },
     async (req, res) => {
       try {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
