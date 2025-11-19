@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { creatorAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,12 +17,16 @@ import {
   Mail,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Shield,
+  Facebook,
+  Instagram
 } from 'lucide-react';
 
 const CreatorRegister: React.FC = () => {
   const navigate = useNavigate();
-  const { user, register: registerUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, register: registerUser, handleOAuthCallback, refreshUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +34,17 @@ const CreatorRegister: React.FC = () => {
 
   // Check if user is authenticated
   const isAuthenticated = !!user;
+
+  // Social media verification status
+  const [verificationStatus, setVerificationStatus] = useState<{
+    facebook: boolean;
+    instagram: boolean;
+    soundcloud: boolean;
+  }>({
+    facebook: false,
+    instagram: false,
+    soundcloud: false
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -43,7 +58,6 @@ const CreatorRegister: React.FC = () => {
       facebook: '',
       soundcloud: '',
       youtube: '',
-      twitter: ''
     },
     label: '',
     management: '',
@@ -72,12 +86,115 @@ const CreatorRegister: React.FC = () => {
   const [genreInput, setGenreInput] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
 
+  // Check existing OAuth connections and update verification status
+  useEffect(() => {
+    if (user?.oauthVerified) {
+      const oauthVerified = user.oauthVerified; // Store in variable for TypeScript
+      
+      setVerificationStatus({
+        facebook: oauthVerified.facebook || false,
+        instagram: oauthVerified.instagram || false,
+        soundcloud: oauthVerified.soundcloud || false
+      });
+
+      // Auto-fill URLs from verified accounts if not already set
+      // Use functional update to check current formData state (not stale closure)
+      setFormData(prev => {
+        const updated = { ...prev, socialMedia: { ...prev.socialMedia } };
+        
+        if (oauthVerified.facebook && !prev.socialMedia.facebook) {
+          const facebookUrl = (user as any).socialMedia?.facebook || 
+                             ((user as any).facebookId ? `https://facebook.com/${(user as any).facebookId}` : '');
+          if (facebookUrl) {
+            updated.socialMedia.facebook = facebookUrl;
+          }
+        }
+        if (oauthVerified.instagram && !prev.socialMedia.instagram) {
+          const instagramUrl = (user as any).socialMedia?.instagram || 
+                              ((user as any).instagramUsername ? `https://instagram.com/${(user as any).instagramUsername}` : '');
+          if (instagramUrl) {
+            updated.socialMedia.instagram = instagramUrl;
+          }
+        }
+        if (oauthVerified.soundcloud && !prev.socialMedia.soundcloud) {
+          const soundcloudUrl = (user as any).socialMedia?.soundcloud || 
+                               ((user as any).soundcloudUsername ? `https://soundcloud.com/${(user as any).soundcloudUsername}` : '');
+          if (soundcloudUrl) {
+            updated.socialMedia.soundcloud = soundcloudUrl;
+          }
+        }
+        
+        return updated;
+      });
+    }
+  }, [user]);
+
+  // Handle OAuth callback when returning from OAuth provider
+  useEffect(() => {
+    const token = searchParams.get('token');
+    const platform = searchParams.get('platform');
+    const oauthSuccess = searchParams.get('oauth_success');
+
+    if (token && platform && isAuthenticated) {
+      handleOAuthCallback(token)
+        .then(() => {
+          // Refresh user data to get updated OAuth status
+          refreshUser().then(() => {
+            toast.success(`${platform.charAt(0).toUpperCase() + platform.slice(1)} account verified successfully!`);
+            // Remove OAuth params from URL
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('token');
+            newParams.delete('platform');
+            newParams.delete('oauth_success');
+            setSearchParams(newParams, { replace: true });
+          });
+        })
+        .catch((error: any) => {
+          console.error('Error handling OAuth callback:', error);
+          toast.error('Failed to verify account. Please try again.');
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('token');
+          newParams.delete('platform');
+          newParams.delete('oauth_success');
+          setSearchParams(newParams, { replace: true });
+        });
+    } else if (oauthSuccess === 'true' && platform && isAuthenticated) {
+      // OAuth succeeded but no token (shouldn't happen, but handle gracefully)
+      refreshUser().then(() => {
+        toast.success(`${platform.charAt(0).toUpperCase() + platform.slice(1)} account verified successfully!`);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('platform');
+        newParams.delete('oauth_success');
+        setSearchParams(newParams, { replace: true });
+      });
+    }
+  }, [searchParams, isAuthenticated, handleOAuthCallback, refreshUser, setSearchParams]);
+
+  // Handle social media verification
+  const handleVerifySocial = (platform: 'facebook' | 'instagram' | 'soundcloud') => {
+    if (!isAuthenticated) {
+      toast.error('Please create an account first before verifying social media');
+      return;
+    }
+
+    const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    // Determine correct step number based on authentication status
+    const socialStep = isAuthenticated ? 3 : 4;
+    const redirectUrl = encodeURIComponent(
+      `${window.location.origin}/creator/register?step=${socialStep}&platform=${platform}`
+    );
+    
+    // Redirect to OAuth provider with link_account flag and custom redirect
+    window.location.href = `${API_URL}/api/auth/${platform}?link_account=true&redirect=${redirectUrl}`;
+  };
+
   // Available options
   const availableGenres = [
-    'Pop', 'Rock', 'Hip Hop', 'R&B', 'Electronic', 'Country', 'Jazz', 
-    'Classical', 'Reggae', 'Metal', 'Indie', 'Folk', 'Blues', 'Soul', 
+    'Electronic','Techno', 'House', 'Minimal', 'D&B', 'Jungle', 'Trance',
+    'Indie', 'Folk', 'Blues', 'Soul', 'Pop', 'Rock', 'Hip Hop', 'Rap', 'R&B', 
+    'Country', 'Jazz', 'Disco', 'Classical', 'Reggae', 'Metal',  
     'Funk', 'Punk', 'Alternative', 'Dance', 'Latin', 'World',
-    'Techno', 'House', 'Minimal', 'D&B', 'Jungle', 'Trance'
+    
   ];
 
   const availableRoles = [
@@ -551,51 +668,104 @@ const CreatorRegister: React.FC = () => {
     </div>
   );
 
-  const renderStep3 = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-          <LinkIcon className="h-6 w-6 mr-2 text-purple-400" />
-          Social Media & Streaming
-        </h3>
+  const renderStep3 = () => {
+    const socialPlatforms = [
+      { key: 'facebook', label: 'Facebook', icon: Facebook, canVerify: true },
+      { key: 'instagram', label: 'Instagram', icon: Instagram, canVerify: true },
+      { key: 'soundcloud', label: 'SoundCloud', icon: Music, canVerify: true },
+      { key: 'youtube', label: 'YouTube', icon: LinkIcon, canVerify: false },
+    ] as const;
 
-        <div className="space-y-3">
-          {Object.entries({
-            instagram: 'Instagram',
-            facebook: 'Facebook',
-            soundcloud: 'SoundCloud',
-            youtube: 'YouTube',
-            twitter: 'Twitter/X'
-          }).map(([key, label]) => (
-            <div key={key}>
-              <label className="block text-gray-300 font-medium mb-1 text-sm">
-                {label}
-              </label>
-              <input
-                type="url"
-                value={formData.socialMedia[key as keyof typeof formData.socialMedia]}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  socialMedia: {
-                    ...formData.socialMedia,
-                    [key]: e.target.value
-                  }
-                })}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                placeholder={`Your ${label} profile URL`}
-              />
-            </div>
-          ))}
-        </div>
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+            <LinkIcon className="h-6 w-6 mr-2 text-purple-400" />
+            Social Media & Streaming
+          </h3>
 
-        <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/30 rounded-lg">
-          <p className="text-blue-200 text-sm">
-            <strong>Tip:</strong> Adding verified social media accounts can speed up the verification process.
-          </p>
+          <div className="space-y-3">
+            {socialPlatforms.map(({ key, label, icon: Icon, canVerify }) => {
+              const isVerified = canVerify && verificationStatus[key as keyof typeof verificationStatus];
+              const platformKey = key as keyof typeof formData.socialMedia;
+              
+              return (
+                <div key={key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-gray-300 font-medium text-sm flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </label>
+                    {isVerified && (
+                      <span className="flex items-center gap-1 text-xs text-green-400">
+                        <Shield className="h-3 w-3" />
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={formData.socialMedia[platformKey]}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        socialMedia: {
+                          ...formData.socialMedia,
+                          [platformKey]: e.target.value
+                        }
+                      })}
+                      className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      placeholder={`Your ${label} profile URL`}
+                    />
+                    {canVerify && (
+                      <button
+                        type="button"
+                        onClick={() => handleVerifySocial(key as 'facebook' | 'instagram' | 'soundcloud')}
+                        disabled={!isAuthenticated}
+                        className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
+                          isVerified
+                            ? 'bg-green-600/20 border border-green-500 text-green-400 cursor-default'
+                            : isAuthenticated
+                            ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        }`}
+                        title={
+                          !isAuthenticated
+                            ? 'Please create an account first'
+                            : isVerified
+                            ? 'Account verified'
+                            : `Verify your ${label} account`
+                        }
+                      >
+                        {isVerified ? (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            Verified
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="h-4 w-4" />
+                            Verify
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/30 rounded-lg">
+            <p className="text-blue-200 text-sm">
+              <strong>Tip:</strong> Verifying your social media accounts can speed up the verification process. 
+              {!isAuthenticated && ' You can verify accounts after creating your account.'}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderStep4 = () => (
     <div className="space-y-6">
@@ -731,6 +901,17 @@ const CreatorRegister: React.FC = () => {
       }
     }
   };
+
+  // Handle step initialization from URL params (for OAuth redirects)
+  useEffect(() => {
+    const stepParam = searchParams.get('step');
+    if (stepParam) {
+      const stepNum = parseInt(stepParam, 10);
+      if (!isNaN(stepNum) && stepNum >= 1 && stepNum <= (isAuthenticated ? 5 : 6)) {
+        setStep(stepNum);
+      }
+    }
+  }, [searchParams, isAuthenticated]);
 
   const getTotalSteps = () => {
     return isAuthenticated ? 5 : 6;
