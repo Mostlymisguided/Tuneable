@@ -97,7 +97,7 @@ const AuthCallback: React.FC = () => {
         const oauthError = searchParams.get('error');
         const errorMessage = searchParams.get('message');
         
-        if (oauthError === 'account_already_linked' && errorMessage) {
+        if ((oauthError === 'account_already_linked' || oauthError === 'account_linking_failed') && errorMessage) {
           toast.error(decodeURIComponent(errorMessage), {
             autoClose: 10000,
             pauseOnHover: true,

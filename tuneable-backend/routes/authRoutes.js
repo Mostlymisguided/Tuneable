@@ -86,6 +86,25 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
     }),
     async (req, res) => {
       try {
+        // Check if there was an error in the passport strategy
+        if (req.authInfo && req.authInfo.message) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const redirectUrl = req.session?.oauthRedirect 
+            ? decodeURIComponent(req.session.oauthRedirect)
+            : `${frontendUrl}/auth/callback`;
+          
+          // Clean up session
+          delete req.session?.oauthRedirect;
+          delete req.session?.linkAccount;
+          delete req.session?.linkingUserId;
+          delete req.session?.linkingUserUuid;
+          
+          // Pass error message in redirect
+          const errorMessage = encodeURIComponent(req.authInfo.message);
+          res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+          return;
+        }
+        
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const isLinkingAccount = req.session?.linkAccount === true;
         const linkingUserId = req.session?.linkingUserId;

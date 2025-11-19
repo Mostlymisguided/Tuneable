@@ -22,11 +22,29 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
     try {
       console.log('Facebook profile:', profile);
       
+      // Check if this is an account linking request
+      const isLinkingAccount = req.session?.linkAccount === true;
+      const linkingUserId = req.session?.linkingUserId;
+      
       // Check if user already exists with this Facebook ID
       let user = await User.findOne({ facebookId: profile.id });
       
       if (user) {
-        // User exists, update their Facebook access token
+        // If linking account and the Facebook account is already linked to a different user
+        if (isLinkingAccount && linkingUserId) {
+          if (user._id.toString() !== linkingUserId) {
+            // Facebook account is already linked to a different user
+            return done(new Error('This Facebook account is already linked to another user account. Please use a different account.'), null);
+          }
+          // Facebook account is already linked to the current user - just update tokens
+          user.facebookAccessToken = accessToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.facebook = true;
+          await user.save();
+          return done(null, user);
+        }
+        
+        // Not linking - just log in as the existing user
         user.facebookAccessToken = accessToken;
         user.oauthVerified = user.oauthVerified || {};
         user.oauthVerified.facebook = true; // Mark Facebook OAuth as verified
@@ -60,10 +78,43 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         user = await User.findOne({ email: profile.emails[0].value });
         
         if (user) {
-          // Check if this is the first time linking Facebook
-          const isFirstFacebookLink = !user.facebookId;
+          // If linking account, verify the email matches the current user
+          if (isLinkingAccount && linkingUserId) {
+            if (user._id.toString() !== linkingUserId) {
+              // Email matches a different user - don't link, return error
+              return done(new Error('This email is already associated with another account. Please use a different Facebook account or contact support.'), null);
+            }
+            // Email matches current user - link Facebook account
+            const isFirstFacebookLink = !user.facebookId;
+            user.facebookId = profile.id;
+            user.facebookAccessToken = accessToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.facebook = true;
+            
+            // Update profile picture if user doesn't have one or is linking Facebook for first time
+            if (profile.photos && profile.photos.length > 0 && (!user.profilePic || isFirstFacebookLink)) {
+              let photoUrl = profile.photos[0].value;
+              photoUrl = photoUrl.replace(/width=\d+/, 'width=400').replace(/height=\d+/, 'height=400');
+              user.profilePic = photoUrl;
+            }
+            
+            // Update names from Facebook only if not already set
+            if (profile.name) {
+              if (profile.name.givenName && !user.givenName) {
+                user.givenName = profile.name.givenName;
+              }
+              if (profile.name.familyName && !user.familyName) {
+                user.familyName = profile.name.familyName;
+              }
+            }
+            
+            user.lastLoginAt = new Date();
+            await user.save();
+            return done(null, user);
+          }
           
-          // Link Facebook account to existing user
+          // Not linking - link Facebook account to existing user by email
+          const isFirstFacebookLink = !user.facebookId;
           user.facebookId = profile.id;
           user.facebookAccessToken = accessToken;
           user.oauthVerified = user.oauthVerified || {};
@@ -92,6 +143,30 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           await user.save();
           return done(null, user);
         }
+      }
+      
+      // If linking account but no user found by email or Facebook ID, link to current user
+      if (isLinkingAccount && linkingUserId) {
+        const currentUser = await User.findById(linkingUserId);
+        if (!currentUser) {
+          return done(new Error('User session expired. Please log in again.'), null);
+        }
+        
+        // Link Facebook account to current user
+        currentUser.facebookId = profile.id;
+        currentUser.facebookAccessToken = accessToken;
+        currentUser.oauthVerified = currentUser.oauthVerified || {};
+        currentUser.oauthVerified.facebook = true;
+        
+        // Update profile picture if user doesn't have one
+        if (profile.photos && profile.photos.length > 0 && !currentUser.profilePic) {
+          let photoUrl = profile.photos[0].value;
+          photoUrl = photoUrl.replace(/width=\d+/, 'width=400').replace(/height=\d+/, 'height=400');
+          currentUser.profilePic = photoUrl;
+        }
+        
+        await currentUser.save();
+        return done(null, currentUser);
       }
       
       // Create new user
