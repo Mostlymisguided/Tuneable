@@ -302,6 +302,16 @@ export const partyAPI = {
     return response.data;
   },
   
+  kickUser: async (partyId: string, userId: string, reason?: string) => {
+    const response = await api.post(`/parties/${partyId}/kick/${userId}`, { reason });
+    return response.data;
+  },
+  
+  unkickUser: async (partyId: string, userId: string) => {
+    const response = await api.post(`/parties/${partyId}/unkick/${userId}`);
+    return response.data;
+  },
+  
   resetMedia: async (partyId: string) => {
     const response = await api.post(`/parties/${partyId}/media/reset`);
     return response.data;

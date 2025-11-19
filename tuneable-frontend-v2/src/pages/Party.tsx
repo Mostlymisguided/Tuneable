@@ -43,7 +43,7 @@ interface PartyMedia {
 
 
 interface PartyUpdateMessage {
-  type: 'PARTY_CREATED' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'PLAY_NEXT';
+  type: 'PARTY_CREATED' | 'MEDIA_STARTED' | 'MEDIA_COMPLETED' | 'MEDIA_VETOED' | 'PARTY_ENDED' | 'UPDATE_QUEUE' | 'PLAY' | 'PAUSE' | 'SKIP' | 'PLAY_NEXT' | 'USER_KICKED';
   partyId?: string;
   mediaId?: string;
   playedAt?: string;
@@ -55,6 +55,8 @@ interface PartyUpdateMessage {
   queue?: PartyMedia[];
   media?: PartyMedia;
   party?: any;
+  userId?: string;
+  kickedBy?: string;
 }
 
 const Party: React.FC = () => {
@@ -181,6 +183,12 @@ const Party: React.FC = () => {
         case 'SKIP':
         case 'PLAY_NEXT':
           // Global store will handle these
+          break;
+          
+        case 'USER_KICKED':
+          console.log('Socket.IO USER_KICKED received');
+          // Refresh party details to update partiers and kickedUsers lists
+          fetchPartyDetails();
           break;
           
         case 'MEDIA_STARTED':
@@ -1411,6 +1419,95 @@ const Party: React.FC = () => {
     } catch (error: any) {
       console.error('Error unvetoing media:', error);
       toast.error(error.response?.data?.error || 'Failed to unveto media');
+    }
+  };
+
+  const handleKickUser = async (userId: string, username: string) => {
+    const isAdmin = user?.role?.includes('admin');
+    
+    if (!isHost && !isAdmin) {
+      toast.error('Only the host or admin can kick users');
+      return;
+    }
+
+    try {
+      const reason = window.prompt(`Kick ${username} from party? (Optional reason):`);
+      if (reason === null) return; // User cancelled
+
+      await partyAPI.kickUser(partyId!, userId, reason || undefined);
+      toast.success(`${username} has been removed from the party`);
+      await fetchPartyDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to kick user');
+    }
+  };
+
+  const handleUnkickUser = async (userId: string, username: string) => {
+    const isAdmin = user?.role?.includes('admin');
+    
+    if (!isHost && !isAdmin) {
+      toast.error('Only the host or admin can unkick users');
+      return;
+    }
+
+    try {
+      const confirmationMessage = `Are you sure you want to allow ${username} to rejoin this party?`;
+      if (!window.confirm(confirmationMessage)) return;
+
+      await partyAPI.unkickUser(partyId!, userId);
+      toast.success(`${username} can now rejoin the party`);
+      await fetchPartyDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to unkick user');
+    }
+  };
+
+  // Handle joining party from Party page
+  const handleJoinParty = async () => {
+    if (!partyId || !user) return;
+
+    try {
+      // Check if user is already in partiers
+      const userId = user._id || user.id;
+      const isAlreadyPartier = party?.partiers?.some((partier: any) => {
+        const partierId = typeof partier === 'object' && partier._id 
+          ? partier._id.toString() 
+          : typeof partier === 'string' 
+          ? partier 
+          : partier.id || partier.uuid;
+        return partierId === userId?.toString();
+      });
+
+      if (isAlreadyPartier) {
+        toast.info('You are already a member of this party');
+        return;
+      }
+
+      // Check if party is private and prompt for code
+      let inviteCode: string | undefined;
+      if (party?.privacy === 'private' && !isHost) {
+        const code = window.prompt('This is a private party. Please enter the party code:');
+        if (!code) {
+          return; // User cancelled
+        }
+        inviteCode = code;
+      }
+
+      // Join the party
+      const response = await partyAPI.joinParty(partyId, inviteCode);
+      toast.success('Successfully joined the party!');
+      
+      // ✅ Refresh party details to update partiers list
+      // The backend now returns the updated party with populated partiers
+      if (response.party) {
+        setParty(response.party);
+      } else {
+        // Fallback: fetch party details if response doesn't include party
+        await fetchPartyDetails();
+      }
+    } catch (error: any) {
+      console.error('Error joining party:', error);
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to join party');
     }
   };
   
@@ -2830,33 +2927,109 @@ const Party: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Partiers - COMMENTED OUT FOR NOW */}
-          {/* 
-          <div className="card">
-            <h3 className="text-lg font-semibold text-white mb-4">Partiers</h3>
-            <div className="space-y-2">
-              {party.partiers.map((partier: any, index: number) => {
-                const hostId = typeof party.host === 'string' ? party.host : party.host?.uuid;
-                const partierId = partier.uuid || partier.id;
-                return (
-                  <div key={`${partierId}-${index}`} className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary-600">
-                        {partier.username?.charAt(0).toUpperCase() || '?'}
-                      </span>
+          {/* Partiers List */}
+          {party.partiers && party.partiers.length > 0 && (
+            <div className="card">
+              <h3 className="text-lg font-semibold text-white mb-4">Partiers ({party.partiers.length})</h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {party.partiers.map((partier: any, index: number) => {
+                  const hostId = typeof party.host === 'object' && party.host?._id 
+                    ? party.host._id.toString() 
+                    : typeof party.host === 'string' 
+                    ? party.host 
+                    : party.host?.uuid || party.host?.id;
+                  const partierId = partier._id?.toString() || partier.id?.toString() || partier.uuid || partier;
+                  const partierUserId = typeof partier === 'object' && partier._id 
+                    ? partier._id.toString() 
+                    : typeof partier === 'string' 
+                    ? partier 
+                    : partier.id || partier.uuid;
+                  const isPartierHost = partierUserId === hostId;
+                  const canKick = (isHost || user?.role?.includes('admin')) && !isPartierHost && partierUserId !== user?._id?.toString();
+                  
+                  return (
+                    <div key={`${partierId}-${index}`} className="flex items-center justify-between space-x-3 p-2 rounded hover:bg-gray-800/50 transition-colors">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-medium text-white">
+                            {typeof partier === 'object' && partier.username 
+                              ? partier.username.charAt(0).toUpperCase() 
+                              : '?'}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-white truncate">
+                              {typeof partier === 'object' && partier.username 
+                                ? partier.username 
+                                : 'Unknown User'}
+                            </span>
+                            {isPartierHost && (
+                              <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded flex-shrink-0">
+                                Host
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {canKick && (
+                        <button
+                          onClick={() => handleKickUser(
+                            partierUserId,
+                            typeof partier === 'object' && partier.username ? partier.username : 'this user'
+                          )}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                          title="Remove user from party"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
-                    <span className="p-2 text-sm text-white">{partier.username || 'Unknown User'}</span>
-                    {partierId === hostId && (
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                        Host
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-          */}
+          )}
+
+          {/* Kicked Users (Host/Admin Only) */}
+          {party.kickedUsers && party.kickedUsers.length > 0 && (isHost || user?.role?.includes('admin')) && (
+            <div className="card">
+              <h3 className="text-lg font-semibold text-white mb-4">Removed Users ({party.kickedUsers.length})</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {party.kickedUsers.map((kickedUser: any, index: number) => {
+                  const kickedUserId = kickedUser.userId?._id?.toString() || kickedUser.userId?.toString() || kickedUser.userId;
+                  const kickedUsername = kickedUser.userId?.username || 'Unknown User';
+                  const kickedAt = kickedUser.kickedAt ? new Date(kickedUser.kickedAt).toLocaleDateString() : 'Unknown date';
+                  
+                  return (
+                    <div key={`kicked-${kickedUserId}-${index}`} className="flex items-center justify-between space-x-3 p-2 rounded bg-red-900/20 border border-red-800/50">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-medium text-white">
+                            {kickedUsername.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-white truncate">{kickedUsername}</div>
+                          <div className="text-xs text-gray-400">Removed {kickedAt}</div>
+                          {kickedUser.reason && (
+                            <div className="text-xs text-gray-500 italic mt-1">Reason: {kickedUser.reason}</div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleUnkickUser(kickedUserId, kickedUsername)}
+                        className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                        title="Allow user to rejoin"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Party Info */}
           <div className="card">

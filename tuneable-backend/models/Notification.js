@@ -29,6 +29,7 @@ const notificationSchema = new mongoose.Schema({
       'warning',                 // Admin warning issued to user
       'media_vetoed',            // Media you bid on was vetoed
       'media_unvetoed',          // Media you bid on was unvetoed
+      'user_kicked',             // User was kicked from a party
     ],
     required: true
   },

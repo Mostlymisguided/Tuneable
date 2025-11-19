@@ -21,6 +21,7 @@ interface PartyType {
   media?: any[];
   songs?: any[]; // Legacy support
   mediaCount?: number; // Count of queued media (from backend)
+  partyAggregate?: number; // Total party aggregate (sum of all active media partyMediaAggregate)
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
@@ -163,21 +164,32 @@ const Parties: React.FC = () => {
     }
   }, [searchParams, navigate]);
 
-  // Filter parties based on search terms
+  // Filter parties based on search terms and current search input (real-time filtering)
   const filteredParties = parties.filter(party => {
-    if (searchTerms.length === 0) return true;
+    // Combine search terms and current input for real-time filtering
+    const allSearchTerms = [...searchTerms];
+    if (currentSearchInput.trim()) {
+      allSearchTerms.push(currentSearchInput.trim().toLowerCase());
+    }
+    
+    if (allSearchTerms.length === 0) return true;
     
     // Check if any search term matches party name, description, tags, or party code
-    return searchTerms.some(term => {
+    return allSearchTerms.some(term => {
       const lowerTerm = term.toLowerCase();
       return party.name.toLowerCase().includes(lowerTerm) ||
         (party.description && party.description.toLowerCase().includes(lowerTerm)) ||
         (party.tags && party.tags.some(tag => tag.toLowerCase().includes(lowerTerm))) ||
         party.partyCode.toLowerCase().includes(lowerTerm);
     });
+  }).sort((a, b) => {
+    // Sort by party aggregate (descending)
+    const aggregateA = (a as any).partyAggregate || 0;
+    const aggregateB = (b as any).partyAggregate || 0;
+    return aggregateB - aggregateA;
   });
 
-  // Separate parties into joined and available
+  // Separate parties into joined and available (already sorted by partyAggregate)
   const joinedParties = filteredParties.filter(party => isUserInParty(party));
   const availableParties = filteredParties.filter(party => !isUserInParty(party));
   
@@ -496,7 +508,7 @@ const Parties: React.FC = () => {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Filter Parties by Tags, Name or Description... (Press Enter to Add)"
+              placeholder="Search Parties by Tags, Name, Description, or Party Code... (Press Enter to Add as Filter)"
               className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               value={currentSearchInput}
               onChange={(e) => setCurrentSearchInput(e.target.value)}

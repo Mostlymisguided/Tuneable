@@ -43,6 +43,15 @@ const PartySchema = new mongoose.Schema({
   partiers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   partier_uuids: [{ type: String }], // UUID references for external API usage
   
+  // Kicked users - users who have been removed and cannot rejoin
+  kickedUsers: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    kickedAt: { type: Date, default: Date.now },
+    kickedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Host or admin who kicked
+    reason: { type: String }, // Optional reason for kick
+    _id: false
+  }],
+  
   // ========================================
   // PARTY-LEVEL BID METRICS (managed by BidMetricsEngine)
   // ========================================

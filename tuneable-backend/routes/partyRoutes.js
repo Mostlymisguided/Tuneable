@@ -119,6 +119,22 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
         // Check if user is the host (host can always join without code)
         const isHost = party.host.toString() === userId.toString();
         
+        // ✅ Check if user is kicked from this party
+        const isKicked = party.kickedUsers && party.kickedUsers.some(
+            ku => ku.userId && ku.userId.toString() === userId.toString()
+        );
+        
+        if (isKicked) {
+            const kickInfo = party.kickedUsers.find(
+                ku => ku.userId && ku.userId.toString() === userId.toString()
+            );
+            return res.status(403).json({ 
+                message: "You have been removed from this party and cannot rejoin",
+                kickedAt: kickInfo?.kickedAt,
+                reason: kickInfo?.reason || null
+            });
+        }
+        
         if (party.privacy === "private" && !isHost && party.partyCode !== inviteCode) {
             return res.status(403).json({ message: "Invalid invite code" });
         }
@@ -131,10 +147,18 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
         //     }
         // }
 
-        if (!party.partiers.includes(userId)) {
+        // ✅ Fix: Properly check if user is already in partiers array
+        // Convert both to strings for reliable comparison (ObjectId.includes() doesn't work correctly)
+        const userIdString = userId.toString();
+        const isAlreadyPartier = party.partiers.some(
+            partier => partier.toString() === userIdString
+        );
+
+        if (!isAlreadyPartier) {
             // Add user to party's partiers array
             party.partiers.push(userId);
             await party.save();
+            console.log(`✅ Added user ${userId} to party ${partyId} partiers array`);
             
             // Add party to user's joinedParties array
             const User = require('../models/User');
@@ -151,9 +175,20 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
                     console.log(`✅ Added party ${partyId} to user ${userId} joinedParties`);
                 }
             }
+        } else {
+            console.log(`ℹ️  User ${userId} is already a partier in party ${partyId}`);
         }
 
-        res.json({ message: "Joined successfully", party });
+        // ✅ Always return updated party with populated partiers
+        const updatedParty = await Party.findById(partyId)
+            .populate('partiers', 'username uuid')
+            .populate('host', 'username uuid')
+            .lean();
+        
+        res.json({ 
+            message: "Joined successfully", 
+            party: updatedParty 
+        });
 
     } catch (error) {
         res.status(500).json({ message: "Server error", error });
@@ -257,7 +292,21 @@ router.get('/', authMiddleware, async (req, res) => {
                     updatedAt: 1,
                     minimumBid: 1,
                     mediaSource: 1,
-                    mediaCount: 1
+                    mediaCount: 1,
+                    // Calculate total party aggregate (sum of all active media partyMediaAggregate)
+                    partyAggregate: {
+                        $reduce: {
+                            input: {
+                                $filter: {
+                                    input: { $ifNull: ['$media', []] },
+                                    as: 'item',
+                                    cond: { $eq: ['$$item.status', 'active'] }
+                                }
+                            },
+                            initialValue: 0,
+                            in: { $add: ['$$value', { $ifNull: ['$$this.partyMediaAggregate', 0] }] }
+                        }
+                    }
                 }
             }
         ]);
@@ -378,11 +427,28 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 partyMediaAggregateTopUser: media.globalMediaAggregateTopUser
             }));
             
-            // Populate partiers and host for Global Party
+            // Populate partiers, host, and kickedUsers for Global Party
             const User = require('../models/User');
             // Use actual partiers who joined, not all users
             party.partiers = await User.find({ _id: { $in: party.partiers } }).select('username uuid');
             party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid');
+            // Populate kickedUsers if they exist
+            if (party.kickedUsers && party.kickedUsers.length > 0) {
+                const kickedUserIds = party.kickedUsers.map(ku => ku.userId).filter(Boolean);
+                const kickedUsers = await User.find({ _id: { $in: kickedUserIds } }).select('username uuid');
+                const kickedByIds = party.kickedUsers.map(ku => ku.kickedBy).filter(Boolean);
+                const kickedByUsers = await User.find({ _id: { $in: kickedByIds } }).select('username uuid');
+                
+                party.kickedUsers = party.kickedUsers.map(ku => {
+                    const user = kickedUsers.find(u => u._id.toString() === ku.userId.toString());
+                    const kickedBy = kickedByUsers.find(u => u._id.toString() === ku.kickedBy.toString());
+                    return {
+                        ...ku,
+                        userId: user || ku.userId,
+                        kickedBy: kickedBy || ku.kickedBy
+                    };
+                });
+            }
             
             // Performance monitoring - log Global Party metrics
             const endTime = Date.now();
@@ -474,6 +540,16 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
                 path: 'host',
                 model: 'User',
                 select: 'username uuid',  // ✅ Include uuid for isHost comparison
+            })
+            .populate({
+                path: 'kickedUsers.userId',
+                model: 'User',
+                select: 'username uuid',
+            })
+            .populate({
+                path: 'kickedUsers.kickedBy',
+                model: 'User',
+                select: 'username uuid',
             });
         }
 
@@ -568,6 +644,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             host: party.host,
             partyCode: party.partyCode,
             partiers: party.partiers,
+            kickedUsers: party.kickedUsers || [], // ✅ Include kicked users
             startTime: party.startTime,
             endTime: party.endTime,
             watershed: party.watershed,
@@ -1772,12 +1849,16 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
         await party.save();
 
         // Broadcast party ended event via WebSocket
-        const { broadcastToParty } = require('../utils/broadcast');
-        broadcastToParty(partyId, {
-            type: 'PARTY_ENDED',
-            partyId: partyId,
-            endedAt: party.endTime
-        });
+        try {
+            broadcastToParty(partyId, {
+                type: 'PARTY_ENDED',
+                partyId: partyId,
+                endedAt: party.endTime
+            });
+        } catch (broadcastError) {
+            console.error('Error broadcasting PARTY_ENDED event:', broadcastError);
+            // Don't fail the request if broadcast fails
+        }
 
         res.json({
             message: 'Party ended successfully',
@@ -2038,6 +2119,192 @@ router.post('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) 
     } catch (err) {
         console.error('Error unvetoing media:', err);
         res.status(500).json({ error: 'Error unvetoing media', details: err.message });
+    }
+});
+
+// Kick a user from a party (host or admin only)
+router.post('/:partyId/kick/:userId', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, userId } = req.params;
+        const { reason } = req.body || {};
+        const kickerId = req.user._id;
+        const mongoose = require('mongoose');
+        const { isValidObjectId } = require('mongoose');
+        
+        // Validate ObjectIds
+        if (!isValidObjectId(partyId) || !isValidObjectId(userId)) {
+            return res.status(400).json({ error: 'Invalid party or user ID' });
+        }
+        
+        // Find party
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        
+        // Check permissions: host or admin only
+        const isHost = party.host.toString() === kickerId.toString();
+        const isAdmin = req.user.role && req.user.role.includes('admin');
+        
+        if (!isHost && !isAdmin) {
+            return res.status(403).json({ error: 'Only the party host or admin can kick users' });
+        }
+        
+        // Cannot kick self
+        if (userId === kickerId.toString()) {
+            return res.status(400).json({ error: 'You cannot kick yourself' });
+        }
+        
+        // Cannot kick the host
+        if (party.host.toString() === userId) {
+            return res.status(400).json({ error: 'Cannot kick the party host' });
+        }
+        
+        // Check if user is already kicked
+        const alreadyKicked = party.kickedUsers && party.kickedUsers.some(
+            ku => ku.userId && ku.userId.toString() === userId
+        );
+        
+        if (alreadyKicked) {
+            return res.status(400).json({ error: 'User is already kicked from this party' });
+        }
+        
+        // Remove user from partiers array
+        party.partiers = party.partiers.filter(
+            partier => partier.toString() !== userId
+        );
+        
+        // Add to kickedUsers array
+        if (!party.kickedUsers) {
+            party.kickedUsers = [];
+        }
+        party.kickedUsers.push({
+            userId: userId,
+            kickedAt: new Date(),
+            kickedBy: kickerId,
+            reason: reason || null
+        });
+        
+        await party.save();
+        
+        // Remove party from user's joinedParties array
+        const User = require('../models/User');
+        const kickedUser = await User.findById(userId).select('username uuid');
+        if (kickedUser) {
+            kickedUser.joinedParties = kickedUser.joinedParties.filter(
+                jp => jp.partyId.toString() !== partyId
+            );
+            await kickedUser.save();
+        }
+        
+        // Send notification to kicked user
+        const notificationService = require('../services/notificationService');
+        if (kickedUser) {
+            await notificationService.createNotification({
+                userId: userId,
+                type: 'warning', // Using existing warning type
+                title: 'Removed from Party',
+                message: `You have been removed from "${party.name}"${reason ? `. Reason: ${reason}` : ''}`,
+                link: `/parties`,
+                linkText: 'View Parties',
+                relatedPartyId: partyId,
+                relatedUserId: kickerId
+            }).catch(err => console.error('Error sending kick notification:', err));
+        }
+        
+        // Broadcast kick event via Socket.IO
+        try {
+            broadcastToParty(partyId, {
+                type: 'USER_KICKED',
+                userId: userId,
+                kickedBy: kickerId,
+                reason: reason || null
+            });
+        } catch (broadcastError) {
+            console.error('Error broadcasting USER_KICKED event:', broadcastError);
+            // Don't fail the request if broadcast fails
+        }
+        
+        res.json({
+            message: 'User kicked successfully',
+            kickedUserId: userId,
+            kickedUsername: kickedUser?.username || 'Unknown',
+            reason: reason || null
+        });
+        
+    } catch (err) {
+        console.error('Error kicking user:', err);
+        res.status(500).json({ error: 'Error kicking user', details: err.message });
+    }
+});
+
+// Unkick a user from a party (host or admin only)
+router.post('/:partyId/unkick/:userId', authMiddleware, async (req, res) => {
+    try {
+        const { partyId, userId } = req.params;
+        const unkickerId = req.user._id;
+        const { isValidObjectId } = require('mongoose');
+        
+        // Validate ObjectIds
+        if (!isValidObjectId(partyId) || !isValidObjectId(userId)) {
+            return res.status(400).json({ error: 'Invalid party or user ID' });
+        }
+        
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        
+        // Check permissions
+        const isHost = party.host.toString() === unkickerId.toString();
+        const isAdmin = req.user.role && req.user.role.includes('admin');
+        
+        if (!isHost && !isAdmin) {
+            return res.status(403).json({ error: 'Only the party host or admin can unkick users' });
+        }
+        
+        // Check if user is actually kicked
+        const kickEntry = party.kickedUsers && party.kickedUsers.find(
+            ku => ku.userId && ku.userId.toString() === userId
+        );
+        
+        if (!kickEntry) {
+            return res.status(400).json({ error: 'User is not kicked from this party' });
+        }
+        
+        // Remove from kickedUsers
+        party.kickedUsers = party.kickedUsers.filter(
+            ku => ku.userId && ku.userId.toString() !== userId
+        );
+        
+        await party.save();
+        
+        // Optionally send notification to unkicked user
+        const User = require('../models/User');
+        const unkickedUser = await User.findById(userId).select('username uuid');
+        const notificationService = require('../services/notificationService');
+        if (unkickedUser) {
+            await notificationService.createNotification({
+                userId: userId,
+                type: 'party_invite', // Reusing invite type for "you can rejoin" message
+                title: 'Party Access Restored',
+                message: `You can now rejoin "${party.name}"`,
+                link: `/party/${partyId}`,
+                linkText: 'View Party',
+                relatedPartyId: partyId
+            }).catch(err => console.error('Error sending unkick notification:', err));
+        }
+        
+        res.json({
+            message: 'User unkicked successfully',
+            userId: userId,
+            username: unkickedUser?.username || 'Unknown',
+            note: 'User can now rejoin the party'
+        });
+        
+    } catch (err) {
+        console.error('Error unkicking user:', err);
+        res.status(500).json({ error: 'Error unkicking user', details: err.message });
     }
 });
 
