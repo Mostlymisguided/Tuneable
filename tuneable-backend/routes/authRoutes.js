@@ -691,6 +691,9 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 // Instagram OAuth routes - only available if configured
 if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   router.get('/instagram', async (req, res, next) => {
+    console.log('📸 Instagram OAuth initiation');
+    console.log('📦 Callback URL:', process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback");
+    
     // Store invite code in session if provided
     if (req.query.invite) {
       req.session = req.session || {};
@@ -700,6 +703,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
     if (req.query.redirect) {
       req.session = req.session || {};
       req.session.oauthRedirect = req.query.redirect;
+      console.log('🔗 Custom redirect URL stored:', req.query.redirect);
     }
     if (req.query.link_account === 'true') {
       req.session = req.session || {};
@@ -715,13 +719,33 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         console.warn('⚠️ Account linking requested but no valid user token found');
       }
     }
-    passport.authenticate('instagram', { 
-      scope: ['user_profile', 'user_media'] 
-    })(req, res, next);
+    
+    // Ensure session is saved before redirect
+    if (req.session) {
+      req.session.save((err) => {
+        if (err) {
+          console.error('❌ Error saving session:', err);
+          return next(err);
+        }
+        console.log('✅ Session saved, redirecting to Instagram OAuth');
+        passport.authenticate('instagram', { 
+          scope: ['user_profile', 'user_media'] 
+        })(req, res, next);
+      });
+    } else {
+      passport.authenticate('instagram', { 
+        scope: ['user_profile', 'user_media'] 
+      })(req, res, next);
+    }
   });
 
   router.get('/instagram/callback', 
     (req, res, next) => {
+      console.log('📸 Instagram OAuth callback received');
+      console.log('📦 Query params:', req.query);
+      console.log('📦 Session ID:', req.sessionID);
+      console.log('📦 Session exists:', !!req.session);
+      
       try {
         passport.authenticate('instagram', { 
           session: false // We're using JWT, not sessions for auth
