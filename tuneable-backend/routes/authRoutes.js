@@ -80,31 +80,96 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
   });
 
   router.get('/facebook/callback', 
-    passport.authenticate('facebook', { 
-      failureRedirect: '/login?error=facebook_auth_failed',
-      session: false // We're using JWT, not sessions for auth
-    }),
-    async (req, res) => {
+    (req, res, next) => {
       try {
-        // Check if there was an error in the passport strategy
-        if (req.authInfo && req.authInfo.message) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-          const redirectUrl = req.session?.oauthRedirect 
-            ? decodeURIComponent(req.session.oauthRedirect)
-            : `${frontendUrl}/auth/callback`;
-          
-          // Clean up session
-          delete req.session?.oauthRedirect;
-          delete req.session?.linkAccount;
-          delete req.session?.linkingUserId;
-          delete req.session?.linkingUserUuid;
-          
-          // Pass error message in redirect
-          const errorMessage = encodeURIComponent(req.authInfo.message);
-          res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
-          return;
+        passport.authenticate('facebook', { 
+          session: false // We're using JWT, not sessions for auth
+        }, (err, user, info) => {
+          try {
+            // Handle errors from passport strategy
+            if (err) {
+              console.error('Facebook OAuth strategy error:', err.message);
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              // Pass error message in redirect
+              const errorMessage = encodeURIComponent(err.message);
+              return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+            }
+            
+            // Handle case where no user is returned (authentication failed)
+            if (!user) {
+              console.error('Facebook OAuth authentication failed - no user returned');
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              return res.redirect(`${redirectUrl}?error=facebook_auth_failed`);
+            }
+            
+            // Success - attach user to request and continue
+            req.user = user;
+            next();
+          } catch (callbackError) {
+            console.error('Error in Facebook OAuth callback handler:', callbackError);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            if (req.session) {
+              delete req.session.oauthRedirect;
+              delete req.session.linkAccount;
+              delete req.session.linkingUserId;
+              delete req.session.linkingUserUuid;
+            }
+            
+            return res.redirect(`${redirectUrl}?error=facebook_auth_failed`);
+          }
+        })(req, res, next);
+      } catch (authError) {
+        console.error('Error in passport.authenticate call:', authError);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = req.session?.oauthRedirect 
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        
+        // Clean up session
+        if (req.session) {
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
         }
         
+        const errorMessage = authError.message 
+          ? encodeURIComponent(authError.message)
+          : 'Facebook authentication failed';
+        return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+      }
+    },
+    async (req, res) => {
+      try {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const isLinkingAccount = req.session?.linkAccount === true;
         const linkingUserId = req.session?.linkingUserId;
