@@ -443,6 +443,41 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }
         }
         
+        // If linking account and no user found, link to the current user
+        if (isLinkingAccount && linkingUserId) {
+          const currentUser = await User.findById(linkingUserId);
+          if (currentUser) {
+            // Link Google account to current user
+            const isFirstGoogleLink = !currentUser.googleId;
+            currentUser.googleId = profile.id;
+            currentUser.googleAccessToken = accessToken;
+            currentUser.googleRefreshToken = refreshToken;
+            currentUser.oauthVerified = currentUser.oauthVerified || {};
+            currentUser.oauthVerified.google = true;
+            
+            // Update profile picture from Google only if user doesn't have one or is first time linking
+            if (profile.photos && profile.photos.length > 0 && (!currentUser.profilePic || isFirstGoogleLink)) {
+              let photoUrl = profile.photos[0].value;
+              photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
+              currentUser.profilePic = photoUrl;
+            }
+            
+            // Update names from Google only if not already set
+            if (profile.name) {
+              if (profile.name.givenName && !currentUser.givenName) {
+                currentUser.givenName = profile.name.givenName;
+              }
+              if (profile.name.familyName && !currentUser.familyName) {
+                currentUser.familyName = profile.name.familyName;
+              }
+            }
+            
+            currentUser.lastLoginAt = new Date();
+            await currentUser.save();
+            return done(null, currentUser);
+          }
+        }
+        
         // Create new user
         // Check for invite code in session (passed from OAuth initiation)
         // With passReqToCallback: true, req is available as first parameter
