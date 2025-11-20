@@ -41,6 +41,7 @@ import Notifications from './pages/Notifications';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
+import ArtistEscrowDashboard from './pages/ArtistEscrowDashboard';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -212,6 +213,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <CreatorUpload />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/artist-escrow" 
+              element={
+                <ProtectedRoute>
+                  <ArtistEscrowDashboard />
                 </ProtectedRoute>
               } 
             />

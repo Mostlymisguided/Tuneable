@@ -37,10 +37,11 @@ const TermsOfService: React.FC = () => {
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>Create and join music listening parties</li>
-                <li>Bid on songs to influence party playlists</li>
+                <li>Tip on songs to influence party playlists and support artists</li>
                 <li>Stream music from various platforms including YouTube and podcasts</li>
+                <li>Upload and host your own content (after declaring rights ownership)</li>
                 <li>Connect with other music enthusiasts</li>
-                <li>Manage a digital wallet for bidding on songs</li>
+                <li>Manage a digital wallet for tipping on songs</li>
               </ul>
             </section>
 
@@ -57,20 +58,21 @@ const TermsOfService: React.FC = () => {
                   Tuneable does <strong>not</strong>:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Host, download, or store video or audio content</li>
+                  <li>Host, download, or store video or audio content from third-party sources (YouTube, etc.)</li>
                   <li>Circumvent YouTube API restrictions or terms of service</li>
                   <li>Charge users for access to YouTube or third-party content</li>
                   <li>Replace or compete with streaming services</li>
-                  <li>Store or rehost any media content</li>
+                  <li>Store or rehost any third-party media content</li>
                 </ul>
                 <p className="mb-4">
                   Tuneable <strong>does</strong>:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Allow users to place monetary tips/bids to influence social rankings and party queues</li>
+                  <li>Allow users to place monetary tips to influence social rankings and party queues</li>
+                  <li>Host content uploaded by creators who have declared themselves as rights holders</li>
                   <li>Use public YouTube Data API metadata (title, artist, duration, thumbnails, links) for display purposes only</li>
                   <li>Embed the official YouTube player for user-initiated playback (per YouTube Terms of Service)</li>
-                  <li>Share revenue with artists and rights-holders through a tipping/support model</li>
+                  <li>Share revenue with artists and rights-holders through an escrow and tipping system (70% to artists, 30% to platform)</li>
                   <li>Facilitate community support for musicians and creators</li>
                 </ul>
 
@@ -111,7 +113,7 @@ const TermsOfService: React.FC = () => {
                   <strong>Compliance:</strong> If YouTube or Google requests that we cease using the YouTube Data API or modify 
                   our usage, we will comply immediately. Tuneable can continue operating using alternative metadata sources 
                   (MusicBrainz, Discogs, Spotify API, Apple Music API, SoundCloud, ISRC databases, user-submitted metadata, 
-                  or artist uploads) while maintaining all core functionality as a queueing engine, bidding system, and 
+                  or artist uploads) while maintaining all core functionality as a queueing engine, tipping system, and 
                   social jukebox platform.
                 </p>
               </div>
@@ -138,23 +140,37 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Bidding and Wallet System</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Tipping and Wallet System</h2>
               <div className="space-y-4 text-gray-700">
                 <h3 className="text-xl font-medium text-gray-900">4.1 Digital Wallet</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Users maintain a digital wallet balance for bidding on songs</li>
+                  <li>Users maintain a digital wallet balance for tipping on songs</li>
                   <li>Wallet funds can be added through secure payment processing via Stripe</li>
                   <li>Wallet balances are non-refundable except as required by law</li>
                   <li>Unused wallet funds remain in your account for future use</li>
                 </ul>
 
-                <h3 className="text-xl font-medium text-gray-900">4.2 Bidding Rules</h3>
+                <h3 className="text-xl font-medium text-gray-900">4.2 Tipping Rules</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Bids are placed using your wallet balance</li>
-                  <li>Bids influence song priority in party queues</li>
-                  <li>Once placed, bids cannot be refunded or transferred</li>
-                  <li>Hosts may set minimum bid amounts for their parties</li>
-                  <li>Bids are final when confirmed and deducted from your wallet</li>
+                  <li>Tips are placed using your wallet balance</li>
+                  <li>Tips influence song priority in party queues and support artists</li>
+                  <li>Once placed, tips cannot be refunded or transferred (except as required by law or platform policy)</li>
+                  <li>Hosts may set minimum tip amounts for their parties</li>
+                  <li>Tips are final when confirmed and deducted from your wallet</li>
+                  <li>70% of each tip is allocated to the artist(s) via our escrow system</li>
+                  <li>30% of each tip goes to Tuneable as a platform fee</li>
+                </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">4.3 Artist Escrow System</h3>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>When users tip on media, 70% of the tip amount is allocated to the artist's escrow balance</li>
+                  <li>Escrow allocations are split among media owners based on their ownership percentages</li>
+                  <li>For registered artists, escrow is immediately added to their balance</li>
+                  <li>For unregistered artists, escrow is stored and can be claimed when they register and verify their identity</li>
+                  <li>Artists can view their escrow balance and request payouts through their dashboard</li>
+                  <li>Payouts are processed manually by Tuneable staff</li>
+                  <li>Revenue is accrued and reserved for creators until claimed, but not held in trust</li>
+                  <li>Unclaimed allocations remain claimable indefinitely</li>
                 </ul>
               </div>
             </section>
@@ -182,7 +198,7 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Tuneable reserves the right to remove, veto, or block any media content from the platform at its sole discretion</li>
                   <li>Media may be removed for reasons including but not limited to: copyright infringement, inappropriate content, technical issues, platform policy violations, or user reports</li>
-                  <li>Removed media may result in refunded bids at Tuneable's discretion</li>
+                  <li>Removed media may result in refunded tips at Tuneable's discretion</li>
                   <li>Tuneable is not obligated to provide notice before removing content, though reasonable efforts will be made to notify affected users when possible</li>
                 </ul>
               </div>
@@ -310,15 +326,18 @@ const TermsOfService: React.FC = () => {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Revenue Sharing and Payments</h2>
               <div className="space-y-4 text-gray-700">
-                <h3 className="text-xl font-medium text-gray-900">8.1 Bid Revenue Distribution</h3>
+                <h3 className="text-xl font-medium text-gray-900">8.1 Tip Revenue Distribution</h3>
                 <p className="mb-2">
-                  Revenue from bids placed on media content is distributed as follows:
+                  Revenue from tips placed on media content is distributed as follows:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>Artists/Creators:</strong> 60% of bid revenue</li>
-                  <li><strong>Tuneable Platform:</strong> 30% of bid revenue (operating costs and platform maintenance)</li>
-                  <li><strong>Platform Development Fund:</strong> 10% of bid revenue (reserved for future features, artist tools, and platform enhancements)</li>
+                  <li><strong>Artists/Creators:</strong> 70% of tip revenue (split among media owners based on ownership percentages)</li>
+                  <li><strong>Tuneable Platform:</strong> 30% of tip revenue (operating costs and platform maintenance)</li>
                 </ul>
+                <p className="mb-2 mt-4">
+                  <strong>Multi-Artist Splits:</strong> When media has multiple owners, the 70% artist share is divided proportionally 
+                  based on the ownership percentages declared in the media's ownership information.
+                </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.2 Payment Processing</h3>
                 <ul className="list-disc pl-6 space-y-2">
@@ -330,25 +349,26 @@ const TermsOfService: React.FC = () => {
                 <h3 className="text-xl font-medium text-gray-900">8.3 Revenue Share Commitment</h3>
                 <p className="mb-2">
                   Tuneable CIC is committed to maintaining this artist-friendly revenue split, with artists receiving the majority 
-                  of bid revenue. We will provide transparent reporting on revenue distribution upon request.
+                  of tip revenue. We will provide transparent reporting on revenue distribution upon request.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.4 Future Features</h3>
                 <p className="mb-2">
-                  When live party hosting features are implemented, party hosts/venues will receive a portion of revenue from parties 
+                  When live party hosting features are implemented, party hosts/venues may receive a portion of revenue from parties 
                   they host, with the specific percentage to be determined and disclosed at launch.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.5 Payment Schedule</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Payouts to artists will be processed monthly, with a minimum threshold of £10 GBP before payment is issued</li>
+                  <li>Payouts to artists are processed manually upon request</li>
+                  <li>Minimum payout threshold: £1.00 GBP</li>
                   <li>You will receive detailed statements showing your revenue breakdown</li>
                   <li>Payment methods will be determined at the time of first payout</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">8.6 Disputes and Chargebacks</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>If a bid is disputed or charged back, the affected revenue share will be withheld pending resolution</li>
+                  <li>If a tip is disputed or charged back, the affected revenue share will be withheld pending resolution</li>
                   <li>Artists will be notified of any payment disputes affecting their content</li>
                   <li>Chargebacks may result in temporary suspension of payout processing</li>
                 </ul>
@@ -360,14 +380,18 @@ const TermsOfService: React.FC = () => {
               <div className="space-y-4 text-gray-700">
                 <h3 className="text-xl font-medium text-gray-900">8.7.1 Escrow System</h3>
                 <p className="mb-2">
-                  All tips and bid revenue directed toward artists and rights-holders are held in escrow in a segregated account 
-                  until claimed by the artist or rights-holder. This escrow system ensures that artists receive their entitled 
-                  revenue even if they have not yet registered or claimed their account on Tuneable.
+                  All tip revenue directed toward artists and rights-holders is allocated to an internal escrow ledger system. 
+                  Revenue is accrued and reserved for creators until claimed, but not held in trust. This escrow system ensures 
+                  that artists receive their entitled revenue even if they have not yet registered or claimed their account on Tuneable.
                 </p>
                 <p className="mb-2">
-                  <strong>Escrow Duration:</strong> Funds will be held in escrow for a period of 3 years from the date of the 
-                  first tip/bid. After this period, unclaimed funds may be donated to a registered music charity or music 
-                  education organization, as determined by Tuneable CIC in accordance with our community interest objectives.
+                  <strong>Escrow Allocation:</strong> When a user places a tip on media, 70% of the tip amount is automatically 
+                  allocated to the artist's escrow balance (or stored for unknown artists until they register). The allocation 
+                  happens immediately upon tip placement.
+                </p>
+                <p className="mb-2">
+                  <strong>Escrow Duration:</strong> Unclaimed escrow allocations remain claimable indefinitely. There is no 
+                  expiration period for claiming accumulated revenue.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.7.2 Artist Claim Process</h3>
@@ -377,12 +401,13 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Registering for a Tuneable account and verifying their identity</li>
                   <li>Providing proof of rights ownership (through our creator verification process)</li>
-                  <li>Completing the artist payout setup process</li>
-                  <li>Meeting the minimum payout threshold of £10 GBP</li>
+                  <li>Matching unknown artist allocations to their account (automatically done on creator verification)</li>
+                  <li>Requesting a payout through the artist escrow dashboard</li>
+                  <li>Meeting the minimum payout threshold of £1.00 GBP</li>
                 </ul>
                 <p className="mb-2">
                   Once verified, artists will receive all accumulated escrowed revenue (minus standard platform fees) 
-                  according to our payment schedule.
+                  according to our payment schedule. Payouts are processed manually by Tuneable staff.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.7.3 Platform Fees</h3>
@@ -390,7 +415,7 @@ const TermsOfService: React.FC = () => {
                   Standard platform fees apply to all escrowed and paid-out revenue:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Platform operating fee: 30% of bid revenue (as outlined in section 8.1)</li>
+                  <li>Platform operating fee: 30% of tip revenue (as outlined in section 8.1)</li>
                   <li>Payment processing fees: Standard Stripe fees apply to all payouts</li>
                   <li>No additional fees are charged for escrow services</li>
                 </ul>
@@ -445,7 +470,7 @@ const TermsOfService: React.FC = () => {
                 <li>Attempt to gain unauthorized access to the Service or other users' accounts</li>
                 <li>Interfere with or disrupt the Service or servers</li>
                 <li>Use automated systems (bots, scrapers) without permission</li>
-                <li>Manipulate bidding systems or engage in fraudulent activities</li>
+                <li>Manipulate tipping systems or engage in fraudulent activities</li>
                 <li>Impersonate others or misrepresent your affiliation</li>
                 <li>Upload malicious code or viruses</li>
                 <li>Collect user information without consent</li>
@@ -570,7 +595,7 @@ const TermsOfService: React.FC = () => {
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Loss of data, content, or account information</li>
-                  <li>Loss of wallet balance or bid funds (except as required by law)</li>
+                  <li>Loss of wallet balance or tip funds (except as required by law)</li>
                   <li>Interruption of Service or inability to access the Service</li>
                   <li>Errors, bugs, or technical malfunctions</li>
                   <li>Third-party actions or service unavailability</li>
@@ -637,7 +662,7 @@ const TermsOfService: React.FC = () => {
                   <li>Extended periods of inactivity</li>
                 </ul>
                 <p className="mt-4">
-                  Tuneable is not obligated to provide notice before removing users, though reasonable efforts will be made to notify affected users when possible. Removed users may forfeit wallet balances and bid history at Tuneable's discretion.
+                  Tuneable is not obligated to provide notice before removing users, though reasonable efforts will be made to notify affected users when possible. Removed users may forfeit wallet balances and tip history at Tuneable's discretion.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">13.2 User-Initiated Termination</h3>

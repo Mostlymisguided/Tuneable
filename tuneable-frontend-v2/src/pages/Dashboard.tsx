@@ -964,6 +964,16 @@ Join here: ${inviteLink}`.trim();
                             </div>
                             <ArrowUp className="h-4 w-4 text-white" />
                           </button>
+                          <button
+                            onClick={() => navigate('/artist-escrow')}
+                            className="flex items-center justify-between p-4 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Coins className="h-5 w-5 text-white mr-3" />
+                              <span className="text-white font-medium">Escrow Balance</span>
+                            </div>
+                            <ArrowUp className="h-4 w-4 text-white" />
+                          </button>
                           {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
                             <>
                               <button
