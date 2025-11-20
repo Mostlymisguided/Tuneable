@@ -4,7 +4,6 @@ import { toast } from 'react-toastify';
 import { 
   Coins, 
   Clock, 
-  TrendingUp, 
   AlertCircle, 
   CheckCircle, 
   Loader2,
@@ -328,7 +327,6 @@ const ArtistEscrowDashboard: React.FC = () => {
             <div className="space-y-3">
               {escrowInfo.history.map((entry, index) => {
                 const media = typeof entry.mediaId === 'object' ? entry.mediaId : null;
-                const bid = typeof entry.bidId === 'object' ? entry.bidId : null;
                 
                 return (
                   <div
