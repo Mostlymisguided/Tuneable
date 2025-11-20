@@ -242,6 +242,7 @@ router.get('/', authMiddleware, async (req, res) => {
                     updatedAt: 1,
                     minimumBid: 1,
                     mediaSource: 1,
+                    media: 1, // Include media array for partyAggregate calculation
                     // Count active media only (matching Party page display)
                     mediaCount: {
                         $size: {
@@ -250,6 +251,20 @@ router.get('/', authMiddleware, async (req, res) => {
                                 as: 'item',
                                 cond: { $eq: ['$$item.status', 'active'] }
                             }
+                        }
+                    },
+                    // Calculate total party aggregate (sum of all active media partyMediaAggregate)
+                    partyAggregate: {
+                        $reduce: {
+                            input: {
+                                $filter: {
+                                    input: { $ifNull: ['$media', []] },
+                                    as: 'item',
+                                    cond: { $eq: ['$$item.status', 'active'] }
+                                }
+                            },
+                            initialValue: 0,
+                            in: { $add: ['$$value', { $ifNull: ['$$this.partyMediaAggregate', 0] }] }
                         }
                     }
                 }
@@ -293,20 +308,7 @@ router.get('/', authMiddleware, async (req, res) => {
                     minimumBid: 1,
                     mediaSource: 1,
                     mediaCount: 1,
-                    // Calculate total party aggregate (sum of all active media partyMediaAggregate)
-                    partyAggregate: {
-                        $reduce: {
-                            input: {
-                                $filter: {
-                                    input: { $ifNull: ['$media', []] },
-                                    as: 'item',
-                                    cond: { $eq: ['$$item.status', 'active'] }
-                                }
-                            },
-                            initialValue: 0,
-                            in: { $add: ['$$value', { $ifNull: ['$$this.partyMediaAggregate', 0] }] }
-                        }
-                    }
+                    partyAggregate: 1 // Preserve partyAggregate calculated in previous stage
                 }
             }
         ]);
