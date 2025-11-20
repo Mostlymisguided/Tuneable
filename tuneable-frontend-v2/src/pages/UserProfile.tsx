@@ -1423,6 +1423,16 @@ const UserProfile: React.FC = () => {
               >
                 Tip History
               </button>
+              <button
+                onClick={() => handleViewTabChange('wallet-history')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'wallet-history'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Top Up History
+              </button>
             </nav>
           </div>
         )}
