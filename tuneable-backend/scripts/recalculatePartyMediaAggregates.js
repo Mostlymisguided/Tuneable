@@ -21,7 +21,12 @@ const bidMetricsEngine = require('../services/bidMetricsEngine');
 async function connectDB() {
   try {
     const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/tuneable';
-    console.log('Connecting to MongoDB...');
+    console.log('🔗 Connecting to MongoDB...');
+    // Log URI without credentials for security
+    const uriDisplay = mongoURI.includes('@') 
+      ? mongoURI.split('@')[0].split('://')[0] + '://***@' + mongoURI.split('@')[1]
+      : mongoURI;
+    console.log('   URI:', uriDisplay);
     await mongoose.connect(mongoURI);
     console.log('✅ Connected to MongoDB');
   } catch (error) {
@@ -33,6 +38,18 @@ async function connectDB() {
 async function recalculatePartyMediaAggregates() {
   try {
     console.log('\n🔄 Starting party media aggregate recalculation...\n');
+
+    // First, check total active bids in the database
+    const totalActiveBids = await Bid.countDocuments({ status: 'active' });
+    console.log(`📊 Total active bids in database: ${totalActiveBids}`);
+    
+    if (totalActiveBids === 0) {
+      console.log('⚠️  WARNING: No active bids found in database!');
+      console.log('   This might indicate:');
+      console.log('   - All bids were vetoed/refunded');
+      console.log('   - You\'re connected to the wrong database');
+      console.log('   - The migration script needs to be run\n');
+    }
 
     // Get all parties
     const parties = await Party.find({});

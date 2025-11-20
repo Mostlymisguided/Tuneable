@@ -187,9 +187,9 @@ class BidMetricsEngine {
     // Build aggregation pipeline based on metric requirements
     const matchStage = { status: 'active' };
     
-    if (params.userId) matchStage.userId = mongoose.Types.ObjectId(params.userId);
-    if (params.mediaId) matchStage.mediaId = mongoose.Types.ObjectId(params.mediaId);
-    if (params.partyId) matchStage.partyId = mongoose.Types.ObjectId(params.partyId);
+    if (params.userId) matchStage.userId = new mongoose.Types.ObjectId(params.userId);
+    if (params.mediaId) matchStage.mediaId = new mongoose.Types.ObjectId(params.mediaId);
+    if (params.partyId) matchStage.partyId = new mongoose.Types.ObjectId(params.partyId);
 
     const pipeline = [
       { $match: matchStage },
@@ -255,9 +255,9 @@ class BidMetricsEngine {
     // Build query based on metric requirements
     const query = { status: 'active' };
     
-    if (params.userId) query.userId = mongoose.Types.ObjectId(params.userId);
-    if (params.mediaId) query.mediaId = mongoose.Types.ObjectId(params.mediaId);
-    if (params.partyId) query.partyId = mongoose.Types.ObjectId(params.partyId);
+    if (params.userId) query.userId = new mongoose.Types.ObjectId(params.userId);
+    if (params.mediaId) query.mediaId = new mongoose.Types.ObjectId(params.mediaId);
+    if (params.partyId) query.partyId = new mongoose.Types.ObjectId(params.partyId);
 
     if (config.description.includes('Aggregate')) {
       // For aggregate top metrics, we need to compute aggregates first
@@ -347,9 +347,9 @@ class BidMetricsEngine {
     // Build aggregation pipeline
     const matchStage = { status: 'active' };
     
-    if (params.userId) matchStage.userId = mongoose.Types.ObjectId(params.userId);
-    if (params.mediaId) matchStage.mediaId = mongoose.Types.ObjectId(params.mediaId);
-    if (params.partyId) matchStage.partyId = mongoose.Types.ObjectId(params.partyId);
+    if (params.userId) matchStage.userId = new mongoose.Types.ObjectId(params.userId);
+    if (params.mediaId) matchStage.mediaId = new mongoose.Types.ObjectId(params.mediaId);
+    if (params.partyId) matchStage.partyId = new mongoose.Types.ObjectId(params.partyId);
 
     const pipeline = [
       { $match: matchStage },
