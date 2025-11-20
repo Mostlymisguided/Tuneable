@@ -2000,6 +2000,8 @@ const UserProfile: React.FC = () => {
               </div>
             )}
           </div>
+        ) : null}
+        </>
         ) : (
           /* SETTINGS MODE */
           <>
