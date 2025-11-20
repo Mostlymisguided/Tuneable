@@ -10,8 +10,8 @@ import { Music, Users, MapPin } from 'lucide-react';
 
 // Define types directly to avoid import issues
 interface PartyType {
-  id: string;
-  _id?: string; // MongoDB ObjectId
+  _id?: string; // MongoDB ObjectId (from backend)
+  id?: string; // Transformed ID (may be _id or uuid)
   uuid?: string; // UUID for external API
   name: string;
   location: string;
@@ -369,13 +369,13 @@ const Parties: React.FC = () => {
   // Component for rendering party cards
   const renderPartyCard = (party: PartyType) => (
     <div 
-      key={party.id} 
+      key={party._id || party.id || party.uuid} 
       className={`card transition-all duration-200 relative overflow-hidden ${
         isUserInParty(party) || party.type === 'global'
           ? 'hover:shadow-lg hover:scale-105 hover:bg-gray-800/50 cursor-pointer group'
           : 'hover:shadow-md'
       }`}
-      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(`/party/${party._id || party.id}`) : undefined}
+      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(`/party/${party._id || party.id || party.uuid}`) : undefined}
     >
       {/* Purple overlay for clickable cards */}
       {(isUserInParty(party) || party.type === 'global') && (
