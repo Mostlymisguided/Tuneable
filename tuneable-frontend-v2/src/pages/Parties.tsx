@@ -6,7 +6,8 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import { toast } from 'react-toastify';
-import { Music, Users, MapPin } from 'lucide-react';
+import { Music, Users, MapPin, Coins } from 'lucide-react';
+import { penceToPounds } from '../utils/currency';
 
 // Define types directly to avoid import issues
 interface PartyType {
@@ -410,6 +411,15 @@ const Parties: React.FC = () => {
               ? `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
               : `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
             }
+          </span>
+        </div>
+
+        <div className="flex items-center text-sm text-white">
+          <Coins className="h-4 w-4 mr-2" />
+          <span>
+            {party.partyAggregate !== undefined && party.partyAggregate > 0
+              ? penceToPounds(party.partyAggregate)
+              : '£0.00'}
           </span>
         </div>
 
