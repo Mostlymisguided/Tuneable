@@ -248,5 +248,249 @@ router.get('/stats', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * ========================================
+ * ADMIN ROUTES
+ * ========================================
+ */
+
+const adminMiddleware = require('../middleware/adminMiddleware');
+
+/**
+ * @route   GET /api/artist-escrow/admin/payouts
+ * @desc    Get all pending payout requests (admin only)
+ * @access  Private (admin only)
+ */
+router.get('/admin/payouts', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    // For MVP: Get all users with escrow balance > 0
+    // In Phase 2: Query PayoutRequest model
+    const usersWithEscrow = await User.find({
+      artistEscrowBalance: { $gt: 0 }
+    })
+      .select('username email artistEscrowBalance artistEscrowHistory creatorProfile')
+      .sort({ artistEscrowBalance: -1 })
+      .limit(100);
+    
+    const payoutRequests = usersWithEscrow.map(user => ({
+      userId: user._id,
+      username: user.username,
+      email: user.email,
+      artistName: user.creatorProfile?.artistName || user.username,
+      balance: user.artistEscrowBalance,
+      balancePounds: user.artistEscrowBalance / 100,
+      historyCount: user.artistEscrowHistory?.length || 0,
+      lastAllocation: user.artistEscrowHistory && user.artistEscrowHistory.length > 0
+        ? user.artistEscrowHistory[user.artistEscrowHistory.length - 1].allocatedAt
+        : null
+    }));
+    
+    res.json({
+      success: true,
+      payouts: payoutRequests,
+      totalUsers: payoutRequests.length,
+      totalAmount: payoutRequests.reduce((sum, p) => sum + p.balance, 0),
+      totalAmountPounds: payoutRequests.reduce((sum, p) => sum + p.balancePounds, 0)
+    });
+  } catch (error) {
+    console.error('Error fetching payout requests:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch payout requests',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/artist-escrow/admin/process-payout
+ * @desc    Process a payout for an artist (admin only)
+ * @access  Private (admin only)
+ * 
+ * Body: {
+ *   userId: string (required)
+ *   amount?: number (optional - defaults to full balance)
+ *   payoutMethod: string (required - 'bank_transfer', 'paypal', 'stripe', etc.)
+ *   payoutDetails: object (optional - transaction ID, notes, etc.)
+ * }
+ */
+router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId, amount, payoutMethod, payoutDetails, notes } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+    
+    if (!payoutMethod) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payout method is required'
+      });
+    }
+    
+    const user = await User.findById(userId).select('username email artistEscrowBalance artistEscrowHistory');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    const availableBalance = user.artistEscrowBalance || 0;
+    
+    if (availableBalance <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'User has no escrow balance available'
+      });
+    }
+    
+    const payoutAmountPence = amount ? Math.round(amount * 100) : availableBalance;
+    
+    if (payoutAmountPence > availableBalance) {
+      return res.status(400).json({
+        success: false,
+        error: `Payout amount (£${(payoutAmountPence / 100).toFixed(2)}) exceeds available balance (£${(availableBalance / 100).toFixed(2)})`
+      });
+    }
+    
+    if (payoutAmountPence < 100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minimum payout amount is £1.00'
+      });
+    }
+    
+    // Deduct from escrow balance
+    user.artistEscrowBalance = user.artistEscrowBalance - payoutAmountPence;
+    
+    // Update history entries to 'claimed' status
+    if (user.artistEscrowHistory) {
+      user.artistEscrowHistory = user.artistEscrowHistory.map(entry => {
+        if (entry.status === 'pending') {
+          return {
+            ...entry,
+            status: 'claimed',
+            claimedAt: new Date()
+          };
+        }
+        return entry;
+      });
+    }
+    
+    await user.save();
+    
+    // Send notification to artist
+    try {
+      const Notification = require('../models/Notification');
+      const notification = new Notification({
+        userId: user._id,
+        type: 'payout_processed',
+        title: 'Payout Processed',
+        message: `Your payout of £${(payoutAmountPence / 100).toFixed(2)} has been processed via ${payoutMethod}.`,
+        link: '/artist-escrow',
+        linkText: 'View Escrow'
+      });
+      await notification.save();
+    } catch (notifError) {
+      console.error('Failed to send payout notification:', notifError);
+    }
+    
+    console.log(`💰 Payout processed for user ${user.username}:`);
+    console.log(`   - Amount: £${(payoutAmountPence / 100).toFixed(2)}`);
+    console.log(`   - Method: ${payoutMethod}`);
+    console.log(`   - Remaining balance: £${(user.artistEscrowBalance / 100).toFixed(2)}`);
+    console.log(`   - Processed by: ${req.user.username}`);
+    
+    res.json({
+      success: true,
+      message: 'Payout processed successfully',
+      payout: {
+        userId: user._id,
+        username: user.username,
+        amount: payoutAmountPence,
+        amountPounds: payoutAmountPence / 100,
+        payoutMethod: payoutMethod,
+        remainingBalance: user.artistEscrowBalance,
+        remainingBalancePounds: user.artistEscrowBalance / 100,
+        processedAt: new Date(),
+        processedBy: req.user._id
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error processing payout:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process payout',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/artist-escrow/admin/unclaimed
+ * @desc    Get all unclaimed escrow allocations (admin only)
+ * @access  Private (admin only)
+ */
+router.get('/admin/unclaimed', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
+    
+    const unclaimed = await ArtistEscrowAllocation.find({ claimed: false })
+      .populate('mediaId', 'title artist coverArt')
+      .populate('bidId', 'amount createdAt')
+      .sort({ allocatedAt: -1 })
+      .limit(100);
+    
+    // Group by artist name
+    const grouped = {};
+    unclaimed.forEach(allocation => {
+      const artistName = allocation.artistName;
+      if (!grouped[artistName]) {
+        grouped[artistName] = {
+          artistName: artistName,
+          count: 0,
+          totalAmount: 0,
+          allocations: []
+        };
+      }
+      grouped[artistName].count++;
+      grouped[artistName].totalAmount += allocation.allocatedAmount;
+      grouped[artistName].allocations.push({
+        _id: allocation._id,
+        mediaId: allocation.mediaId,
+        bidId: allocation.bidId,
+        amount: allocation.allocatedAmount,
+        allocatedAt: allocation.allocatedAt
+      });
+    });
+    
+    const groupedArray = Object.values(grouped).sort((a, b) => b.totalAmount - a.totalAmount);
+    
+    res.json({
+      success: true,
+      unclaimed: {
+        totalAllocations: unclaimed.length,
+        totalAmount: unclaimed.reduce((sum, a) => sum + a.allocatedAmount, 0),
+        totalAmountPounds: unclaimed.reduce((sum, a) => sum + a.allocatedAmount, 0) / 100,
+        groupedByArtist: groupedArray
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching unclaimed allocations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch unclaimed allocations',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
 

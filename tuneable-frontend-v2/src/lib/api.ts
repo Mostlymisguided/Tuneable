@@ -1313,4 +1313,62 @@ export const tuneBytesAPI = {
   },
 };
 
+export const artistEscrowAPI = {
+  // Get artist escrow balance and history
+  getInfo: async () => {
+    const response = await api.get('/artist-escrow/info');
+    return response.data;
+  },
+
+  // Match unknown artist allocations to current user
+  match: async (artistName: string, youtubeChannelId?: string, externalIds?: Record<string, string>) => {
+    const response = await api.post('/artist-escrow/match', {
+      artistName,
+      youtubeChannelId,
+      externalIds
+    });
+    return response.data;
+  },
+
+  // Request payout (manual processing for MVP)
+  requestPayout: async (amount?: number, payoutMethod?: string, payoutDetails?: Record<string, any>) => {
+    const response = await api.post('/artist-escrow/request-payout', {
+      amount,
+      payoutMethod,
+      payoutDetails
+    });
+    return response.data;
+  },
+
+  // Get escrow statistics
+  getStats: async () => {
+    const response = await api.get('/artist-escrow/stats');
+    return response.data;
+  },
+
+  // Admin: Get all pending payout requests
+  getPayouts: async () => {
+    const response = await api.get('/artist-escrow/admin/payouts');
+    return response.data;
+  },
+
+  // Admin: Process a payout
+  processPayout: async (userId: string, amount?: number, payoutMethod: string = 'bank_transfer', payoutDetails?: Record<string, any>, notes?: string) => {
+    const response = await api.post('/artist-escrow/admin/process-payout', {
+      userId,
+      amount,
+      payoutMethod,
+      payoutDetails,
+      notes
+    });
+    return response.data;
+  },
+
+  // Admin: Get unclaimed allocations
+  getUnclaimed: async () => {
+    const response = await api.get('/artist-escrow/admin/unclaimed');
+    return response.data;
+  },
+};
+
 export default api;

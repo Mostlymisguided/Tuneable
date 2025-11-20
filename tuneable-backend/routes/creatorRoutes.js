@@ -217,6 +217,56 @@ router.patch('/applications/:userId/review', authMiddleware, adminMiddleware, as
     // If approved, add creator role
     if (status === 'verified' && !user.role.includes('creator')) {
       user.role.push('creator');
+      
+      // Match unknown artist escrow allocations when creator is verified
+      try {
+        const artistEscrowService = require('../services/artistEscrowService');
+        const artistName = user.creatorProfile?.artistName;
+        
+        if (artistName) {
+          // Extract YouTube channel ID from social media if available
+          const socialMedia = user.creatorProfile?.socialMedia || {};
+          const youtubeUrl = socialMedia.youtube || '';
+          let youtubeChannelId = null;
+          
+          if (youtubeUrl) {
+            const channelMatch = youtubeUrl.match(/youtube\.com\/channel\/([a-zA-Z0-9_-]+)/);
+            if (channelMatch) {
+              youtubeChannelId = channelMatch[1];
+            }
+          }
+          
+          const matchingCriteria = {};
+          if (youtubeChannelId) {
+            matchingCriteria.youtubeChannelId = youtubeChannelId;
+          }
+          
+          const matchResult = await artistEscrowService.matchUnknownArtistToUser(
+            user._id,
+            artistName,
+            matchingCriteria
+          );
+          
+          if (matchResult.matched && matchResult.count > 0) {
+            console.log(`✅ Matched ${matchResult.count} escrow allocations to verified creator ${user.username}`);
+            
+            // Send notification about matched allocations
+            const Notification = require('../models/Notification');
+            const notification = new Notification({
+              userId: user._id,
+              type: 'escrow_matched',
+              title: 'Escrow Allocations Matched',
+              message: `We found £${(matchResult.totalAmount / 100).toFixed(2)} in escrow allocations that match your artist name "${artistName}". These have been added to your escrow balance.`,
+              link: '/artist-escrow',
+              linkText: 'View Escrow Balance'
+            });
+            await notification.save();
+          }
+        }
+      } catch (escrowError) {
+        console.error('Error matching escrow allocations on creator verification:', escrowError);
+        // Don't fail verification if escrow matching fails
+      }
     }
 
     // If rejected, remove creator role

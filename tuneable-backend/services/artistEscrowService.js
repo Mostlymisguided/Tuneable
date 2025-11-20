@@ -133,6 +133,13 @@ class ArtistEscrowService {
   async _allocateToRegisteredArtist(userId, mediaId, bidId, amountPence, percentage) {
     const validatedAmount = validatePenceAmount(amountPence, 'artist escrow allocation');
     
+    // Get media for notification
+    const media = await Media.findById(mediaId).select('title artist');
+    const mediaTitle = media?.title || 'Unknown Media';
+    const artistName = Array.isArray(media?.artist) && media.artist.length > 0 
+      ? media.artist[0].name 
+      : 'Unknown Artist';
+    
     await User.findByIdAndUpdate(userId, {
       $inc: { artistEscrowBalance: validatedAmount },
       $push: {
@@ -145,6 +152,25 @@ class ArtistEscrowService {
         }
       }
     });
+    
+    // Send notification to artist (async, don't block)
+    try {
+      const Notification = require('../models/Notification');
+      const notification = new Notification({
+        userId: userId,
+        type: 'escrow_allocated',
+        title: 'Escrow Allocated',
+        message: `£${(validatedAmount / 100).toFixed(2)} has been added to your escrow balance from "${mediaTitle}"`,
+        link: `/tune/${mediaId}`,
+        linkText: 'View Media',
+        relatedMediaId: mediaId,
+        relatedBidId: bidId
+      });
+      await notification.save();
+    } catch (notifError) {
+      console.error('Failed to send escrow allocation notification:', notifError);
+      // Don't fail allocation if notification fails
+    }
     
     console.log(`   ✅ Allocated £${(validatedAmount / 100).toFixed(2)} to registered artist ${userId} (${percentage}%)`);
   }

@@ -30,6 +30,9 @@ const notificationSchema = new mongoose.Schema({
       'media_vetoed',            // Media you bid on was vetoed
       'media_unvetoed',          // Media you bid on was unvetoed
       'user_kicked',             // User was kicked from a party
+      'escrow_allocated',        // Escrow allocated for your media
+      'escrow_matched',          // Unknown artist allocations matched to your account
+      'payout_processed',        // Payout request processed
     ],
     required: true
   },
