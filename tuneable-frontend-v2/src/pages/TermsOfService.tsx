@@ -37,10 +37,10 @@ const TermsOfService: React.FC = () => {
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>Create and join music listening parties</li>
-                <li>Tip on songs to influence party playlists and support artists</li>
+                <li>Tip on tunes to influence party playlists and support artists</li>
                 <li>Stream music from various platforms including YouTube and podcasts</li>
-                <li>Upload and host your own content (after declaring rights ownership)</li>
-                <li>Connect with other music enthusiasts</li>
+                <li>Upload and host their own content (after declaring rights ownership)</li>
+                <li>Connect with other music lovers</li>
                 <li>Manage a digital wallet for tipping on songs</li>
               </ul>
             </section>
@@ -50,7 +50,7 @@ const TermsOfService: React.FC = () => {
               <div className="space-y-4 text-gray-700">
                 <h3 className="text-xl font-medium text-gray-900">2.1.1 Tuneable is Not a Streaming Service</h3>
                 <p className="mb-2">
-                  <strong>Tuneable CIC is a community-funded artist support platform, not a music streaming service.</strong> 
+                  <strong>Tuneable CIC is a community-funded artist support platform, not a music streaming service. </strong> 
                   Tuneable facilitates fan tipping, social queueing, and artist support. Playback of media content is incidental, 
                   user-initiated, and uses official third-party players only.
                 </p>
