@@ -265,7 +265,7 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('✅ Google OAuth configured successfully');
-  router.get('/google', (req, res, next) => {
+  router.get('/google', async (req, res, next) => {
     // Ensure session exists
     if (!req.session) {
       req.session = {};
@@ -281,6 +281,16 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     }
     if (req.query.link_account === 'true') {
       req.session.linkAccount = true;
+      
+      // Extract current user from JWT token (if present) and store in session
+      const currentUser = await extractUserFromToken(req);
+      if (currentUser) {
+        req.session.linkingUserId = currentUser._id;
+        req.session.linkingUserUuid = currentUser.uuid;
+        console.log('🔗 Account linking initiated for user:', currentUser.uuid);
+      } else {
+        console.warn('⚠️ Account linking requested but no valid user token found');
+      }
     }
     
     // Generate random state parameter for CSRF protection
@@ -313,41 +323,133 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
   router.get('/google/callback', 
     (req, res, next) => {
-      // Validate state parameter for CSRF protection
-      const state = req.query.state;
-      const sessionState = req.session?.oauthState;
-      
-      // Enhanced debugging
-      console.log('🔍 OAuth callback received:');
-      console.log('📦 Session ID:', req.sessionID);
-      console.log('🔐 Query state:', state);
-      console.log('💾 Session state:', sessionState);
-      console.log('📝 Session exists:', !!req.session);
-      console.log('🔑 Session keys:', req.session ? Object.keys(req.session) : 'no session');
-      
-      if (!state || !sessionState || state !== sessionState) {
-        console.error('❌ Invalid OAuth state parameter - possible CSRF attack');
-        console.error('State mismatch:', {
-          queryState: state,
-          sessionState: sessionState,
-          stateExists: !!state,
-          sessionStateExists: !!sessionState,
-          statesMatch: state === sessionState
-        });
+      try {
+        // Validate state parameter for CSRF protection
+        const state = req.query.state;
+        const sessionState = req.session?.oauthState;
+        
+        // Enhanced debugging
+        console.log('🔍 Google OAuth callback received:');
+        console.log('📦 Session ID:', req.sessionID);
+        console.log('🔐 Query state:', state);
+        console.log('💾 Session state:', sessionState);
+        console.log('📝 Session exists:', !!req.session);
+        console.log('🔑 Session keys:', req.session ? Object.keys(req.session) : 'no session');
+        
+        if (!state || !sessionState || state !== sessionState) {
+          console.error('❌ Invalid OAuth state parameter - possible CSRF attack');
+          console.error('State mismatch:', {
+            queryState: state,
+            sessionState: sessionState,
+            stateExists: !!state,
+            sessionStateExists: !!sessionState,
+            statesMatch: state === sessionState
+          });
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          return res.redirect(`${frontendUrl}/login?error=oauth_state_mismatch`);
+        }
+        
+        console.log('✅ OAuth state validated successfully');
+        
+        // Clear state from session after validation
+        delete req.session.oauthState;
+        
+        // Continue with passport authentication using custom callback to handle errors
+        passport.authenticate('google', { 
+          session: false // We're using JWT, not sessions for auth
+        }, (err, user, info) => {
+          try {
+            // Handle errors from passport strategy
+            if (err) {
+              console.error('Google OAuth strategy error:', err.message);
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              // Pass error message in redirect
+              const errorMessage = encodeURIComponent(err.message);
+              return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+            }
+            
+            if (!user) {
+              const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+              const redirectUrl = req.session?.oauthRedirect 
+                ? decodeURIComponent(req.session.oauthRedirect)
+                : `${frontendUrl}/auth/callback`;
+              
+              // Clean up session
+              if (req.session) {
+                delete req.session.oauthRedirect;
+                delete req.session.linkAccount;
+                delete req.session.linkingUserId;
+                delete req.session.linkingUserUuid;
+              }
+              
+              const errorMessage = encodeURIComponent('Google authentication failed');
+              return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+            }
+            
+            // Attach user to request for next middleware
+            req.user = user;
+            next();
+          } catch (callbackError) {
+            console.error('Error in Google OAuth callback handler:', callbackError);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            const errorMessage = encodeURIComponent('Google authentication failed');
+            return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
+          }
+        })(req, res, next);
+      } catch (error) {
+        console.error('Error in Google OAuth callback:', error);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        return res.redirect(`${frontendUrl}/login?error=oauth_state_mismatch`);
+        return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
       }
-      
-      console.log('✅ OAuth state validated successfully');
-      
-      // Clear state from session after validation
-      delete req.session.oauthState;
-      
-      // Continue with passport authentication
-      passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' })(req, res, next);
     },
     async (req, res) => {
       try {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
+        // If this is an account linking request, verify the user matches
+        if (isLinkingAccount && linkingUserId) {
+          const authenticatedUserId = req.user._id.toString();
+          
+          if (authenticatedUserId !== linkingUserId) {
+            // Google account is already linked to a different user
+            const redirectUrl = req.session?.oauthRedirect 
+              ? decodeURIComponent(req.session.oauthRedirect)
+              : `${frontendUrl}/auth/callback`;
+            
+            // Clean up session
+            delete req.session.oauthRedirect;
+            delete req.session.linkAccount;
+            delete req.session.linkingUserId;
+            delete req.session.linkingUserUuid;
+            
+            // Redirect with error message
+            const errorMessage = encodeURIComponent('This Google account is already linked to another user account. Please use a different account.');
+            res.redirect(`${redirectUrl}?error=account_already_linked&message=${errorMessage}`);
+            return;
+          }
+          
+          // User matches - account linking successful
+          console.log('✅ Account linking successful for user:', req.user.uuid);
+        }
+        
         // Generate JWT token for the authenticated user using UUID
         const token = jwt.sign(
           { 
@@ -360,11 +462,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         );
 
         // Check if we have a custom redirect URL (for account linking)
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         if (req.session?.oauthRedirect) {
           const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
           // Redirect to custom URL with token
           res.redirect(`${redirectUrl}&token=${token}`);
         } else {

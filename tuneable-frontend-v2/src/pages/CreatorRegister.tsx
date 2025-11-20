@@ -41,10 +41,12 @@ const CreatorRegister: React.FC = () => {
     facebook: boolean;
     instagram: boolean;
     soundcloud: boolean;
+    youtube: boolean;
   }>({
     facebook: false,
     instagram: false,
-    soundcloud: false
+    soundcloud: false,
+    youtube: false
   });
 
   // Form state
@@ -95,7 +97,8 @@ const CreatorRegister: React.FC = () => {
       setVerificationStatus({
         facebook: oauthVerified.facebook || false,
         instagram: oauthVerified.instagram || false,
-        soundcloud: oauthVerified.soundcloud || false
+        soundcloud: oauthVerified.soundcloud || false,
+        youtube: oauthVerified.google || false // Google OAuth verifies YouTube
       });
 
       // Auto-fill URLs from verified accounts if not already set
@@ -122,6 +125,14 @@ const CreatorRegister: React.FC = () => {
                                ((user as any).soundcloudUsername ? `https://soundcloud.com/${(user as any).soundcloudUsername}` : '');
           if (soundcloudUrl) {
             updated.socialMedia.soundcloud = soundcloudUrl;
+          }
+        }
+        if (oauthVerified.google && !prev.socialMedia.youtube) {
+          // Google OAuth can provide YouTube channel info
+          // Try to extract from user's social media or use a default YouTube URL pattern
+          const youtubeUrl = (user as any).socialMedia?.youtube || '';
+          if (youtubeUrl) {
+            updated.socialMedia.youtube = youtubeUrl;
           }
         }
         
@@ -193,7 +204,7 @@ const CreatorRegister: React.FC = () => {
   }, [searchParams, isAuthenticated, handleOAuthCallback, refreshUser, setSearchParams]);
 
   // Handle social media verification
-  const handleVerifySocial = (platform: 'facebook' | 'instagram' | 'soundcloud') => {
+  const handleVerifySocial = (platform: 'facebook' | 'instagram' | 'soundcloud' | 'youtube') => {
     if (!isAuthenticated) {
       toast.error('Please create an account first before verifying social media');
       return;
@@ -213,9 +224,12 @@ const CreatorRegister: React.FC = () => {
       `${window.location.origin}/creator/register?step=${socialStep}&platform=${platform}`
     );
     
+    // For YouTube, use Google OAuth (YouTube is part of Google)
+    const oauthPlatform = platform === 'youtube' ? 'google' : platform;
+    
     // Redirect to OAuth provider with link_account flag, token, and custom redirect
     // Note: Token is passed as query param since OAuth uses browser redirects (not API calls with headers)
-    window.location.href = `${API_URL}/api/auth/${platform}?link_account=true&redirect=${redirectUrl}&token=${encodeURIComponent(token)}`;
+    window.location.href = `${API_URL}/api/auth/${oauthPlatform}?link_account=true&redirect=${redirectUrl}&token=${encodeURIComponent(token)}`;
   };
 
   // Available options
@@ -708,9 +722,9 @@ const CreatorRegister: React.FC = () => {
   const renderStep3 = () => {
     const socialPlatforms = [
       { key: 'facebook', label: 'Facebook', icon: Facebook, canVerify: true },
-      { key: 'instagram', label: 'Instagram', icon: Instagram, canVerify: true },
+      { key: 'youtube', label: 'YouTube', icon: LinkIcon, canVerify: true },
       { key: 'soundcloud', label: 'SoundCloud', icon: Music, canVerify: true },
-      { key: 'youtube', label: 'YouTube', icon: LinkIcon, canVerify: false },
+      { key: 'instagram', label: 'Instagram', icon: Instagram, canVerify: false }, // Verify button commented out - OAuth not working yet
     ] as const;
 
     return (
@@ -754,10 +768,11 @@ const CreatorRegister: React.FC = () => {
                       className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
                       placeholder={`Your ${label} profile URL`}
                     />
-                    {canVerify && (
+                    {/* Commented out Instagram verify button - OAuth not working yet */}
+                    {canVerify && key !== 'instagram' && (
                       <button
                         type="button"
-                        onClick={() => handleVerifySocial(key as 'facebook' | 'instagram' | 'soundcloud')}
+                        onClick={() => handleVerifySocial(key as 'facebook' | 'instagram' | 'soundcloud' | 'youtube')}
                         disabled={!isAuthenticated}
                         className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
                           isVerified
