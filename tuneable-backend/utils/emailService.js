@@ -363,13 +363,13 @@ async function sendHighValueBidNotification(bid, media, user, threshold = 10) {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: ADMIN_EMAIL,
-      subject: `🔥 High-Value Bid: £${bid.amount.toFixed(2)} on ${media.title}`,
+      subject: `🔥 High-Value Tip: £${bid.amount.toFixed(2)} on ${media.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #9333ea;">🔥 High-Value Bid Placed</h2>
+          <h2 style="color: #9333ea;">🔥 High-Value Tip Placed</h2>
           
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #1f2937;">Bid Details</h3>
+            <h3 style="margin-top: 0; color: #1f2937;">Tip Details</h3>
             <p><strong>Amount:</strong> £${bid.amount.toFixed(2)}</p>
             <p><strong>Placed:</strong> ${new Date(bid.createdAt).toLocaleString()}</p>
           </div>
@@ -390,21 +390,21 @@ async function sendHighValueBidNotification(bid, media, user, threshold = 10) {
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
           <p style="color: #6b7280; font-size: 12px;">
             This is an automated notification from Tuneable. 
-            High-value bid threshold: £${threshold}
+            High-value tip threshold: £${threshold}
           </p>
         </div>
       `
     });
 
     if (error) {
-      console.error('❌ Error sending high-value bid email:', error);
+      console.error('❌ Error sending high-value tip email:', error);
       return false;
     }
 
-    console.log('✅ High-value bid notification sent:', data.id);
+    console.log('✅ High-value tip notification sent:', data.id);
     return true;
   } catch (error) {
-    console.error('❌ Error sending high-value bid email:', error.message);
+    console.error('❌ Error sending high-value tip email:', error.message);
     return false;
   }
 }
@@ -520,14 +520,14 @@ async function sendWelcomeEmail(user) {
           
           <p>Hi ${user.username},</p>
           
-          <p>Welcome to Tuneable! You're now part of the community where music lovers discover, share, and bid on amazing tunes.</p>
+          <p>Welcome to Tuneable! You're now part of the community where music lovers discover, share, and tip on amazing tunes.</p>
           
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">Get Started</h3>
             <ul style="margin: 0; padding-left: 20px;">
               <li>🎵 <strong>Discover Music:</strong> Browse trending tunes and find your next favorite song</li>
               <li>🎉 <strong>Join Parties:</strong> Create or join music parties with friends</li>
-              <li>💰 <strong>Bid on Tunes:</strong> Place bids on songs you love during parties</li>
+              <li>💰 <strong>Tip on Tunes:</strong> Place tips on songs you love during parties</li>
               <li>👤 <strong>Build Your Profile:</strong> Add your music preferences and social links</li>
             </ul>
           </div>

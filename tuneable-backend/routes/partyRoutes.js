@@ -1029,15 +1029,9 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
           // Don't fail the request if email fails
         }
 
-        // Add bid to media's bids array
+        // Add bid to media's bids array (contains ALL bids regardless of scope)
         media.bids = media.bids || [];
         media.bids.push(bid._id);
-        
-        // Also add to globalBids array if this is a global bid
-        if (party.type === 'global') {
-            media.globalBids = media.globalBids || [];
-            media.globalBids.push(bid._id);
-        }
         
         await media.save();
 
@@ -1427,12 +1421,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
                 media.globalMediaBidTopUser = userId;
             }
             
-            // Also add to globalBids array if this is a global bid
-            if (party.type === 'global') {
-                media.globalBids = media.globalBids || [];
-                media.globalBids.push(bid._id);
-            }
-            
+            // Note: media.bids array already contains this bid (added above)
+            // No need to maintain separate globalBids array - bidScope field on Bid model is sufficient
             await media.save();
 
             // Send notifications (async, don't block response)

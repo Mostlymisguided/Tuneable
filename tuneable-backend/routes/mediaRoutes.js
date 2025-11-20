@@ -2276,10 +2276,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       media.globalMediaBidTopUser = userId;
     }
     
-    // Also add to globalBids array
-    media.globalBids = media.globalBids || [];
-    media.globalBids.push(bid._id);
-    
+    // Note: media.bids array already contains this bid (added above)
+    // No need to maintain separate globalBids array - bidScope field on Bid model is sufficient
     await media.save();
 
     // Send notifications (async, don't block response)

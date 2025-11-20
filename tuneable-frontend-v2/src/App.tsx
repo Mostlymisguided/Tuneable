@@ -37,7 +37,6 @@ import CreatorRegister from './pages/CreatorRegister';
 import CreatorUpload from './pages/CreatorUpload';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
-import GlobalTunes from './pages/GlobalTunes';
 import Notifications from './pages/Notifications';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -193,14 +192,6 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <PodcastDiscovery />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/global" 
-              element={
-                <ProtectedRoute>
-                  <GlobalTunes />
                 </ProtectedRoute>
               } 
             />

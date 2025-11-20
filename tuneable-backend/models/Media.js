@@ -242,9 +242,13 @@ const mediaSchema = new mongoose.Schema({
   globalMediaAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
   
   // Reference to bids (for populating if needed)
+  // Contains ALL bids for this media (both party and global scope)
+  // To filter by scope, use Bid.find({ mediaId: X, bidScope: 'global' }) instead
   bids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
-  // Reference to global bids (subset of bids array)
+  // DEPRECATED: globalBids array is no longer maintained
+  // Use Bid.find({ mediaId: X, bidScope: 'global' }) to get global bids
+  // Kept for backward compatibility but not updated
   globalBids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bid' }],
   
   // Note: Other metrics (averages, ranks, etc.) are computed on-demand
