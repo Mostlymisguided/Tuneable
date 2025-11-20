@@ -452,7 +452,7 @@ router.post(
       
       console.log('User registered successfully:', user);
 
-      // Give beta users £11.11 credit on sign up
+      // Give beta users £1.11 credit on sign up
       try {
         const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
         await giveBetaSignupCredit(user);

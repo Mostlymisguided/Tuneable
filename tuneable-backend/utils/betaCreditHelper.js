@@ -1,7 +1,7 @@
 /**
  * Beta Credit Helper
  * 
- * Utility function to give beta users £11.11 credit on sign up
+ * Utility function to give beta users £1.11 credit on sign up
  * and create a notification explaining the credit
  */
 
@@ -14,7 +14,7 @@ const notificationService = require('../services/notificationService');
  */
 const giveBetaSignupCredit = async (user) => {
   try {
-    const BETA_SIGNUP_CREDIT_PENCE = 1111; // £11.11 in pence
+    const BETA_SIGNUP_CREDIT_PENCE = 111; // £1.11 in pence
     const rawBetaMode = process.env.VITE_BETA_MODE;
     const normalizedBetaMode = typeof rawBetaMode === 'string'
       ? rawBetaMode.trim().toLowerCase()
@@ -30,10 +30,10 @@ const giveBetaSignupCredit = async (user) => {
       return false;
     }
     
-    // Add credit to user balance
+    // Add credit to user balance (stored in pence)
     user.balance = (user.balance || 0) + BETA_SIGNUP_CREDIT_PENCE;
     await user.save();
-    console.log(`✅ Added £11.11 beta signup credit to user ${user.username}. New balance: £${(user.balance / 100).toFixed(2)}`);
+    console.log(`✅ Added £1.11 beta signup credit to user ${user.username}. New balance: £${(user.balance / 100).toFixed(2)}`);
     
     // Create notification explaining the credit
     try {
@@ -41,7 +41,7 @@ const giveBetaSignupCredit = async (user) => {
         userId: user._id,
         type: 'admin_announcement',
         title: 'Beta Wallet Credit Added',
-        message: 'You have been gifted £11.11 credit as a beta user. You can top up through the wallet and it will not cost you anything in beta mode. Ideally, when the platform goes live, you will choose to transfer your beta top ups with real money. If not, only your first £11.11 of bids will be transferred. You can top up for free but please bear this in mind and spend as you would in real life.',
+        message: 'You have been gifted £1.11 credit as a beta user. You can top up through the wallet and it will not cost you anything in beta mode. Ideally, when the platform goes live, you will choose to transfer your beta top ups with real money. If not, only your first £1.11 of bids will be transferred. You can top up for free but please bear this in mind and spend as you would in real life.',
         link: '/wallet',
         linkText: 'View Wallet',
         groupKey: `beta_signup_credit_${user._id}`
