@@ -711,6 +711,23 @@ export const userAPI = {
     return response.data;
   },
 
+  // Get user's tip history (all individual bids/tips)
+  getTipHistory: async (params?: {
+    partyId?: string;
+    mediaId?: string;
+    status?: 'active' | 'vetoed' | 'refunded';
+    startDate?: string;
+    endDate?: string;
+    bidScope?: 'party' | 'global';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/users/me/tip-history', { params });
+    return response.data;
+  },
+
   // Get creator stats (for creators/admins)
   getCreatorStats: async () => {
     const response = await api.get('/users/me/creator-stats');

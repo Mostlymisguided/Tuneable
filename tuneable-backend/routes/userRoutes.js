@@ -929,6 +929,168 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   }
 });
 
+// Get user's tip history (all individual bids/tips)
+// @route   GET /api/users/me/tip-history
+// @desc    Get chronological list of all tips/bids for the authenticated user
+// @access  Private
+router.get('/me/tip-history', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const Bid = require('../models/Bid');
+    const Media = require('../models/Media');
+    const Party = require('../models/Party');
+    
+    // Query parameters for filtering and pagination
+    const {
+      partyId,
+      mediaId,
+      status,
+      startDate,
+      endDate,
+      bidScope,
+      page = 1,
+      limit = 50,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    // Build query
+    const query = {
+      userId: user._id
+    };
+    
+    // Filter by party
+    if (partyId) {
+      query.partyId = partyId;
+    }
+    
+    // Filter by media
+    if (mediaId) {
+      query.mediaId = mediaId;
+    }
+    
+    // Filter by status
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filter by bid scope
+    if (bidScope) {
+      query.bidScope = bidScope;
+    }
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate as string);
+      }
+    }
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    // Get total count for pagination
+    const total = await Bid.countDocuments(query);
+    
+    // Fetch bids with populated media and party details
+    const bids = await Bid.find(query)
+      .populate('mediaId', 'title artist coverArt duration uuid _id tags')
+      .populate('partyId', 'name partyCode uuid _id type')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+    
+    // Calculate summary statistics
+    const allBids = await Bid.find({ userId: user._id }).lean();
+    const totalTips = allBids.length;
+    const totalAmount = allBids.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+    const averageTip = totalTips > 0 ? totalAmount / totalTips : 0;
+    const activeTips = allBids.filter(bid => bid.status === 'active').length;
+    const vetoedTips = allBids.filter(bid => bid.status === 'vetoed').length;
+    
+    // Format response
+    const formattedBids = bids.map(bid => {
+      const media = bid.mediaId && typeof bid.mediaId === 'object' ? bid.mediaId : null;
+      const party = bid.partyId && typeof bid.partyId === 'object' ? bid.partyId : null;
+      
+      return {
+      _id: bid._id,
+      uuid: bid.uuid,
+      amount: bid.amount, // In pence
+      amountPounds: (bid.amount / 100).toFixed(2),
+      status: bid.status || 'active',
+      bidScope: bid.bidScope || 'party',
+      isInitialBid: bid.isInitialBid || false,
+      createdAt: bid.createdAt,
+      updatedAt: bid.updatedAt,
+      // Media details
+      media: media ? {
+        _id: media._id,
+        uuid: media.uuid,
+        title: media.title,
+        artist: media.artist,
+        coverArt: media.coverArt,
+        duration: media.duration,
+        tags: media.tags || []
+      } : null,
+      // Party details
+      party: party ? {
+        _id: party._id,
+        uuid: party.uuid,
+        name: party.name,
+        partyCode: party.partyCode,
+        type: party.type
+      } : null,
+      // Denormalized fields (if available)
+      mediaTitle: bid.mediaTitle,
+      mediaArtist: bid.mediaArtist,
+      mediaCoverArt: bid.mediaCoverArt,
+      partyName: bid.partyName,
+      partyType: bid.partyType,
+      // Veto info (if applicable)
+      vetoedBy: bid.vetoedBy,
+      vetoedReason: bid.vetoedReason,
+      vetoedAt: bid.vetoedAt
+      };
+    });
+    
+    res.json({
+      success: true,
+      tips: formattedBids,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit))
+      },
+      stats: {
+        totalTips,
+        totalAmount, // In pence
+        totalAmountPounds: (totalAmount / 100).toFixed(2),
+        averageTip, // In pence
+        averageTipPounds: (averageTip / 100).toFixed(2),
+        activeTips,
+        vetoedTips
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching tip history:', error);
+    res.status(500).json({ 
+      error: 'Error fetching tip history', 
+      details: error.message 
+    });
+  }
+});
+
 // Get creator stats (for creators/admins)
 // @route   GET /api/users/me/creator-stats
 // @desc    Get creator statistics (media count, labels owned, bid amounts, etc.)

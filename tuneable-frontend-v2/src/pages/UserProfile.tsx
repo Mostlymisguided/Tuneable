@@ -170,9 +170,24 @@ const UserProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<any>(null);
   
+  // Tip history state
+  const [tipHistory, setTipHistory] = useState<any[]>([]);
+  const [tipHistoryStats, setTipHistoryStats] = useState<any>(null);
+  const [isLoadingTipHistory, setIsLoadingTipHistory] = useState(false);
+  const [tipHistoryFilters, setTipHistoryFilters] = useState({
+    status: '' as 'active' | 'vetoed' | 'refunded' | '',
+    bidScope: '' as 'party' | 'global' | '',
+    page: 1,
+    limit: 50
+  });
+  const [tipHistoryPagination, setTipHistoryPagination] = useState<any>(null);
+  
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
   const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
+  
+  // View mode tabs - controlled by query params
+  const viewTab = (searchParams.get('view') as 'overview' | 'tip-history') || 'overview';
   
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -309,6 +324,38 @@ const UserProfile: React.FC = () => {
     }
   };
 
+  const loadTipHistory = async () => {
+    if (!isOwnProfile) return;
+    
+    try {
+      setIsLoadingTipHistory(true);
+      const params: any = {
+        page: tipHistoryFilters.page,
+        limit: tipHistoryFilters.limit,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+      
+      if (tipHistoryFilters.status) {
+        params.status = tipHistoryFilters.status;
+      }
+      
+      if (tipHistoryFilters.bidScope) {
+        params.bidScope = tipHistoryFilters.bidScope;
+      }
+      
+      const response = await userAPI.getTipHistory(params);
+      setTipHistory(response.tips || []);
+      setTipHistoryStats(response.stats || null);
+      setTipHistoryPagination(response.pagination || null);
+    } catch (err: any) {
+      console.error('Error loading tip history:', err);
+      toast.error('Failed to load tip history');
+    } finally {
+      setIsLoadingTipHistory(false);
+    }
+  };
+
   // Settings handlers
   const handleSettingsClick = () => {
     setSearchParams({ settings: 'true', tab: 'profile' });
@@ -316,6 +363,17 @@ const UserProfile: React.FC = () => {
 
   const handleSettingsTabChange = (tab: 'profile' | 'notifications' | 'creator') => {
     setSearchParams({ settings: 'true', tab });
+  };
+
+  const handleViewTabChange = (tab: 'overview' | 'tip-history') => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('view', tab);
+      // Remove settings params when switching view tabs
+      newParams.delete('settings');
+      newParams.delete('tab');
+      return newParams;
+    });
   };
 
   const exitSettings = () => {
@@ -518,6 +576,13 @@ const UserProfile: React.FC = () => {
       }
     }
   }, [currentUser, user, searchParams, handleOAuthCallback, fetchUserProfile, setSearchParams]);
+
+  // Load tip history when viewing tip history tab
+  useEffect(() => {
+    if (viewTab === 'tip-history' && isOwnProfile && !isSettingsMode) {
+      loadTipHistory();
+    }
+  }, [viewTab, isOwnProfile, isSettingsMode, tipHistoryFilters]);
 
   const formatJoinDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
@@ -1278,6 +1343,37 @@ const UserProfile: React.FC = () => {
         {/* Conditional Rendering: Settings Mode vs Normal Mode */}
         {!isSettingsMode ? (
           <>
+        {/* View Mode Tabs - Only show for own profile */}
+        {isOwnProfile && (
+          <div className="border-b border-gray-700 mb-6">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => handleViewTabChange('overview')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'overview'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => handleViewTabChange('tip-history')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'tip-history'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Tip History
+              </button>
+            </nav>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        {viewTab === 'overview' || !isOwnProfile ? (
+          <>
         {/* Bidding Statistics */}
         {stats && (
           <div className="mb-8">
@@ -1472,6 +1568,192 @@ const UserProfile: React.FC = () => {
           </div>
         )}
           </>
+        ) : viewTab === 'tip-history' ? (
+          /* TIP HISTORY TAB */
+          <div className="space-y-6">
+            {/* Stats Summary */}
+            {tipHistoryStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <BarChart3 className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{tipHistoryStats.totalTips || 0}</div>
+                  <div className="text-xs text-gray-300">Total Tips</div>
+                </div>
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <Coins className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{penceToPounds(tipHistoryStats.totalAmount || 0)}</div>
+                  <div className="text-xs text-gray-300">Total Amount</div>
+                </div>
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <TrendingUp className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{penceToPounds(tipHistoryStats.averageTip || 0)}</div>
+                  <div className="text-xs text-gray-300">Avg Tip</div>
+                </div>
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <Activity className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{tipHistoryStats.activeTips || 0}</div>
+                  <div className="text-xs text-gray-300">Active</div>
+                </div>
+              </div>
+            )}
+
+            {/* Filters */}
+            <div className="card bg-black/20 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap gap-4 items-center">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Status</label>
+                  <select
+                    value={tipHistoryFilters.status}
+                    onChange={(e) => setTipHistoryFilters({ ...tipHistoryFilters, status: e.target.value as any, page: 1 })}
+                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="active">Active</option>
+                    <option value="vetoed">Vetoed</option>
+                    <option value="refunded">Refunded</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Scope</label>
+                  <select
+                    value={tipHistoryFilters.bidScope}
+                    onChange={(e) => setTipHistoryFilters({ ...tipHistoryFilters, bidScope: e.target.value as any, page: 1 })}
+                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="party">Party</option>
+                    <option value="global">Global</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Tip History List */}
+            {isLoadingTipHistory ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-400 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-400">Loading tip history...</p>
+              </div>
+            ) : tipHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <Music className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">No Tips Found</h3>
+                <p className="text-gray-400">You haven't placed any tips yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {tipHistory.map((tip: any) => (
+                  <div
+                    key={tip._id}
+                    className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
+                  >
+                    <div className="flex items-start space-x-4">
+                      {/* Media Cover Art */}
+                      {tip.media?.coverArt && (
+                        <img
+                          src={tip.media.coverArt}
+                          alt={tip.media.title || 'Media'}
+                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0 cursor-pointer"
+                          onClick={() => {
+                            const mediaId = tip.media?._id || tip.media?.uuid;
+                            if (mediaId) navigate(`/tune/${mediaId}`);
+                          }}
+                        />
+                      )}
+                      
+                      <div className="flex-1 min-w-0">
+                        {/* Media Title */}
+                        <h3
+                          className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors mb-1"
+                          onClick={() => {
+                            const mediaId = tip.media?._id || tip.media?.uuid;
+                            if (mediaId) navigate(`/tune/${mediaId}`);
+                          }}
+                        >
+                          {tip.media?.title || tip.mediaTitle || 'Unknown Media'}
+                        </h3>
+                        
+                        {/* Artist */}
+                        {tip.media && (
+                          <div className="text-sm text-gray-400 mb-2">
+                            <ClickableArtistDisplay media={tip.media} />
+                          </div>
+                        )}
+                        
+                        {/* Party/Scope Info */}
+                        <div className="flex items-center space-x-4 text-xs text-gray-400 mb-2">
+                          {tip.party ? (
+                            <span
+                              className="cursor-pointer hover:text-purple-300 transition-colors"
+                              onClick={() => {
+                                const partyId = tip.party?._id || tip.party?.uuid;
+                                if (partyId) navigate(`/party/${partyId}`);
+                              }}
+                            >
+                              {tip.party.type === 'global' ? '🌍 Global' : `🎉 ${tip.party.name || tip.partyName || 'Unknown Party'}`}
+                            </span>
+                          ) : (
+                            <span>{tip.bidScope === 'global' ? '🌍 Global' : '🎉 Party'}</span>
+                          )}
+                          {tip.isInitialBid && (
+                            <span className="px-2 py-0.5 bg-purple-600/30 text-purple-200 rounded text-xs">
+                              Initial Tip
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            tip.status === 'active' ? 'bg-green-600/30 text-green-200' :
+                            tip.status === 'vetoed' ? 'bg-red-600/30 text-red-200' :
+                            'bg-gray-600/30 text-gray-200'
+                          }`}>
+                            {tip.status || 'active'}
+                          </span>
+                        </div>
+                        
+                        {/* Date */}
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {new Date(tip.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      
+                      {/* Amount */}
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xl font-bold text-green-400">
+                          {penceToPounds(tip.amount || 0)}
+                        </div>
+                        {tip.status === 'vetoed' && (
+                          <div className="text-xs text-red-400 mt-1">Refunded</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {tipHistoryPagination && tipHistoryPagination.totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-6">
+                <button
+                  onClick={() => setTipHistoryFilters({ ...tipHistoryFilters, page: tipHistoryFilters.page - 1 })}
+                  disabled={tipHistoryFilters.page === 1}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-gray-400 text-sm">
+                  Page {tipHistoryPagination.page} of {tipHistoryPagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setTipHistoryFilters({ ...tipHistoryFilters, page: tipHistoryFilters.page + 1 })}
+                  disabled={tipHistoryFilters.page >= tipHistoryPagination.totalPages}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           /* SETTINGS MODE */
           <>

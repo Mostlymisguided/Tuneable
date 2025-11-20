@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -2747,12 +2747,24 @@ Join here: ${inviteLink}`.trim();
 
       {/* Tune Library Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="card flex items-center mb-4">
-          <Music className="h-6 w-6 text-purple-400 mr-2" />
-          <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
-          <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
-            {tuneLibrary.length}
-          </span>
+        <div className="card flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Music className="h-6 w-6 text-purple-400 mr-2" />
+            <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
+            <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+              {tuneLibrary.length}
+            </span>
+          </div>
+          {user && (user._id || user.uuid) && (
+            <button
+              onClick={() => navigate(`/user/${user._id || user.uuid}?view=tip-history`)}
+              className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
+            >
+              <History className="h-4 w-4" />
+              <span>View Tip History</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
         </div>
         
         {isLoadingLibrary ? (
