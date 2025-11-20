@@ -1051,24 +1051,19 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             // Media already exists in party
             if (existingPartyMediaEntry.status === 'active') {
                 // Media is already active - just add the bid to existing entry
+                // Note: partyMediaAggregate will be recalculated by BidMetricsEngine post-save hook
+                // We don't manually update it here to avoid race conditions and ensure vetoed bids are excluded
                 existingPartyMediaEntry.partyBids = existingPartyMediaEntry.partyBids || [];
                 existingPartyMediaEntry.partyBids.push(bid._id);
-                existingPartyMediaEntry.partyMediaAggregate = (existingPartyMediaEntry.partyMediaAggregate || 0) + bidAmountPence;
                 
-                // Update top bid if this is higher
+                // Update top bid if this is higher (this can be done immediately as it's a single value comparison)
                 if (bidAmountPence > (existingPartyMediaEntry.partyMediaBidTop || 0)) {
                     existingPartyMediaEntry.partyMediaBidTop = bidAmountPence;
                     existingPartyMediaEntry.partyMediaBidTopUser = userId;
                 }
                 
-                // Update aggregate top if this user's aggregate is higher
-                // Note: For existing media, we need to check user's total aggregate for this media
-                // For now, we'll just check if this single bid is higher than the current aggregate top
-                // The BidMetricsEngine will recalculate this properly
-                if (userPartyAggregate > (existingPartyMediaEntry.partyMediaAggregateTop || 0)) {
-                    existingPartyMediaEntry.partyMediaAggregateTop = userPartyAggregate;
-                    existingPartyMediaEntry.partyMediaAggregateTopUser = userId;
-                }
+                // Note: partyMediaAggregateTop will be recalculated by BidMetricsEngine
+                // We don't manually update it here to ensure accuracy
             } else if (existingPartyMediaEntry.status === 'vetoed') {
                 // Media was vetoed - reject the attempt to re-add it
                 return res.status(403).json({ 
@@ -1086,14 +1081,14 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
                 mediaId: media._id,
                 media_uuid: media.uuid,
                 addedBy: userId,
-                partyMediaAggregate: bidAmountPence, // First bid becomes the aggregate (store in pence)
+                partyMediaAggregate: bidAmountPence, // Initial value - will be recalculated by BidMetricsEngine
                 partyBids: [bid._id],
                 status: 'active',
                 queuedAt: new Date(),
                 // Top bid tracking (first bid is automatically the top bid) - schema grammar
                 partyMediaBidTop: bidAmountPence, // Store in pence
                 partyMediaBidTopUser: userId,
-                partyMediaAggregateTop: userPartyAggregate,
+                partyMediaAggregateTop: userPartyAggregate, // Initial value - will be recalculated by BidMetricsEngine
                 partyMediaAggregateTopUser: userId
             };
 
@@ -1395,7 +1390,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             console.log('🌍 Global Party bidding - skipping party.media update (virtual)');
         } else {
             // Regular party logic - update party media entry
-            partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmountPence; // Add pence to pence
+            // Note: partyMediaAggregate will be recalculated by BidMetricsEngine post-save hook
+            // We don't manually update it here to avoid race conditions and ensure vetoed bids are excluded
             partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
             partyMediaEntry.partyBids.push(bid._id);
             // Ensure status is valid (fix any legacy 'queued' status)
@@ -1975,6 +1971,32 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         }
         
         await Promise.all(refundPromises);
+
+        // Recalculate partyMediaAggregate after vetoing bids
+        // Since we used updateMany, post-save hooks won't fire, so we need to manually recalculate
+        try {
+            const bidMetricsEngine = require('../services/bidMetricsEngine');
+            const result = await bidMetricsEngine.computeMetric('PartyMediaAggregate', {
+                partyId: partyId.toString(),
+                mediaId: actualMediaId
+            });
+            // Update the aggregate to reflect only active bids (vetoed bids are now excluded)
+            await Party.findOneAndUpdate(
+                {
+                    _id: partyId,
+                    'media.mediaId': actualMediaId
+                },
+                {
+                    $set: {
+                        'media.$.partyMediaAggregate': result.amount || 0
+                    }
+                }
+            );
+            console.log(`📊 Recalculated partyMediaAggregate after veto: ${result.amount || 0} pence`);
+        } catch (metricError) {
+            console.error('Error recalculating partyMediaAggregate after veto:', metricError);
+            // Don't fail the veto if metric recalculation fails
+        }
 
         // Update the media status to vetoed instead of removing it completely
         mediaEntry.status = 'vetoed';
