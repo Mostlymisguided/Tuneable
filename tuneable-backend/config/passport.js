@@ -303,10 +303,30 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       try {
         console.log('Google profile:', profile);
         
+        // Check if this is an account linking request
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+        
         // Check if user already exists with this Google ID
         let user = await User.findOne({ googleId: profile.id });
         
         if (user) {
+          // If linking account and the Google account is already linked to a different user
+          if (isLinkingAccount && linkingUserId) {
+            if (user._id.toString() !== linkingUserId) {
+              // Google account is already linked to a different user
+              return done(new Error('This Google account is already linked to another user account. Please use a different account.'), null);
+            }
+            // Google account is already linked to the current user - just update tokens
+            user.googleAccessToken = accessToken;
+            user.googleRefreshToken = refreshToken;
+            user.oauthVerified = user.oauthVerified || {};
+            user.oauthVerified.google = true;
+            await user.save();
+            return done(null, user);
+          }
+          
+          // Not linking - just log in as the existing user
           // User exists, update their Google tokens
           user.googleAccessToken = accessToken;
           user.googleRefreshToken = refreshToken;
@@ -349,7 +369,43 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           const existingUser = await User.findOne({ email: emailValue });
           
           if (existingUser) {
-            // Link Google account to existing user
+            // If linking account, verify the email matches the current user
+            if (isLinkingAccount && linkingUserId) {
+              if (existingUser._id.toString() !== linkingUserId) {
+                // Email matches a different user - don't link, return error
+                return done(new Error('This email is already associated with another account. Please use a different Google account or contact support.'), null);
+              }
+              // Email matches current user - link Google account
+              const isFirstGoogleLink = !existingUser.googleId;
+              existingUser.googleId = profile.id;
+              existingUser.googleAccessToken = accessToken;
+              existingUser.googleRefreshToken = refreshToken;
+              existingUser.oauthVerified = existingUser.oauthVerified || {};
+              existingUser.oauthVerified.google = true;
+              
+              // Update profile picture from Google only if user doesn't have one or is first time linking
+              if (profile.photos && profile.photos.length > 0 && (!existingUser.profilePic || isFirstGoogleLink)) {
+                let photoUrl = profile.photos[0].value;
+                photoUrl = photoUrl.replace(/=s\d+-c/, '=s400-c'); // Request 400x400 size
+                existingUser.profilePic = photoUrl;
+              }
+              
+              // Update names from Google only if not already set
+              if (profile.name) {
+                if (profile.name.givenName && !existingUser.givenName) {
+                  existingUser.givenName = profile.name.givenName;
+                }
+                if (profile.name.familyName && !existingUser.familyName) {
+                  existingUser.familyName = profile.name.familyName;
+                }
+              }
+              
+              existingUser.lastLoginAt = new Date();
+              await existingUser.save();
+              return done(null, existingUser);
+            }
+            
+            // Not linking - Link Google account to existing user
             existingUser.googleId = profile.id;
             existingUser.googleAccessToken = accessToken;
             existingUser.googleRefreshToken = refreshToken;

@@ -769,7 +769,7 @@ const CreatorRegister: React.FC = () => {
                       placeholder={`Your ${label} profile URL`}
                     />
                     {/* Commented out Instagram verify button - OAuth not working yet */}
-                    {canVerify && key !== 'instagram' && (
+                    {canVerify && (key as string) !== 'instagram' && (
                       <button
                         type="button"
                         onClick={() => handleVerifySocial(key as 'facebook' | 'instagram' | 'soundcloud' | 'youtube')}
