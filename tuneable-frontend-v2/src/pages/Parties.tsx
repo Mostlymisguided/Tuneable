@@ -471,7 +471,12 @@ const Parties: React.FC = () => {
           <button
             onClick={(e) => {
               e.stopPropagation(); // Prevent card click
-              handleJoinParty(party._id || party.id, party.name, party.privacy, party.host, party.partiers);
+              const partyId = party._id || party.id || party.uuid;
+              if (partyId) {
+                handleJoinParty(partyId, party.name, party.privacy, party.host, party.partiers);
+              } else {
+                toast.error('Unable to join party: Party ID not found');
+              }
             }}
             className="btn-primary text-base"
           >
