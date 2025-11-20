@@ -59,9 +59,28 @@ class ArtistEscrowService {
       }
       
       // Validate ownership percentages sum to 100%
-      const totalPercentage = media.mediaOwners.reduce((sum, owner) => sum + owner.percentage, 0);
+      const totalPercentage = media.mediaOwners.reduce((sum, owner) => sum + (owner.percentage || 0), 0);
       if (Math.abs(totalPercentage - 100) > 0.01) {
         console.warn(`⚠️  Media ${mediaId} ownership percentages sum to ${totalPercentage}%, not 100%`);
+        // Normalize percentages if they don't sum to 100%
+        if (totalPercentage > 0) {
+          media.mediaOwners.forEach(owner => {
+            owner.percentage = (owner.percentage / totalPercentage) * 100;
+          });
+          console.log(`   ✅ Normalized ownership percentages to sum to 100%`);
+        }
+      }
+      
+      // Validate all percentages are valid (0-100)
+      const invalidOwners = media.mediaOwners.filter(owner => 
+        !owner.percentage || owner.percentage < 0 || owner.percentage > 100
+      );
+      if (invalidOwners.length > 0) {
+        console.warn(`⚠️  Media ${mediaId} has ${invalidOwners.length} owners with invalid percentages, skipping them`);
+        // Filter out invalid owners
+        media.mediaOwners = media.mediaOwners.filter(owner => 
+          owner.percentage && owner.percentage >= 0 && owner.percentage <= 100
+        );
       }
       
       const allocations = [];
