@@ -1091,6 +1091,133 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
   }
 });
 
+// Get user's wallet transaction history
+// @route   GET /api/users/me/wallet-history
+// @desc    Get chronological list of all wallet transactions for the authenticated user
+// @access  Private
+router.get('/me/wallet-history', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const WalletTransaction = require('../models/WalletTransaction');
+    
+    // Query parameters for filtering and pagination
+    const {
+      type,
+      status,
+      paymentMethod,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 50,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    // Build query
+    const query = {
+      userId: user._id
+    };
+    
+    // Filter by type
+    if (type) {
+      query.type = type;
+    }
+    
+    // Filter by status
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filter by payment method
+    if (paymentMethod) {
+      query.paymentMethod = paymentMethod;
+    }
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate);
+      }
+    }
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    // Get total count for pagination
+    const total = await WalletTransaction.countDocuments(query);
+    
+    // Fetch transactions
+    const transactions = await WalletTransaction.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+    
+    // Calculate summary statistics
+    const allTransactions = await WalletTransaction.find({ userId: user._id }).lean();
+    const totalTopUps = allTransactions
+      .filter(t => t.type === 'topup' && t.status === 'completed')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalTransactions = allTransactions.length;
+    const totalRefunds = allTransactions
+      .filter(t => t.type === 'refund' && t.status === 'completed')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    // Format response
+    const formattedTransactions = transactions.map(tx => ({
+      _id: tx._id,
+      uuid: tx.uuid,
+      amount: tx.amount, // In pence
+      amountPounds: (tx.amount / 100).toFixed(2),
+      type: tx.type,
+      status: tx.status || 'completed',
+      paymentMethod: tx.paymentMethod || 'stripe',
+      balanceBefore: tx.balanceBefore,
+      balanceBeforePounds: tx.balanceBefore ? (tx.balanceBefore / 100).toFixed(2) : null,
+      balanceAfter: tx.balanceAfter,
+      balanceAfterPounds: tx.balanceAfter ? (tx.balanceAfter / 100).toFixed(2) : null,
+      description: tx.description,
+      stripeSessionId: tx.stripeSessionId,
+      stripePaymentIntentId: tx.stripePaymentIntentId,
+      metadata: tx.metadata || {},
+      createdAt: tx.createdAt,
+      updatedAt: tx.updatedAt
+    }));
+    
+    res.json({
+      success: true,
+      transactions: formattedTransactions,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit))
+      },
+      stats: {
+        totalTopUps, // In pence
+        totalTopUpsPounds: (totalTopUps / 100).toFixed(2),
+        totalRefunds, // In pence
+        totalRefundsPounds: (totalRefunds / 100).toFixed(2),
+        totalTransactions
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching wallet history:', error);
+    res.status(500).json({ 
+      error: 'Error fetching wallet history', 
+      details: error.message 
+    });
+  }
+});
+
 // Get creator stats (for creators/admins)
 // @route   GET /api/users/me/creator-stats
 // @desc    Get creator statistics (media count, labels owned, bid amounts, etc.)

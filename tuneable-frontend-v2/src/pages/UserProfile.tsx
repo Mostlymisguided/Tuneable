@@ -182,12 +182,25 @@ const UserProfile: React.FC = () => {
   });
   const [tipHistoryPagination, setTipHistoryPagination] = useState<any>(null);
   
+  // Wallet history state
+  const [walletHistory, setWalletHistory] = useState<any[]>([]);
+  const [walletHistoryStats, setWalletHistoryStats] = useState<any>(null);
+  const [isLoadingWalletHistory, setIsLoadingWalletHistory] = useState(false);
+  const [walletHistoryFilters, setWalletHistoryFilters] = useState({
+    type: '' as 'topup' | 'refund' | 'adjustment' | 'beta_credit' | 'gift' | '',
+    status: '' as 'pending' | 'completed' | 'failed' | 'refunded' | '',
+    paymentMethod: '' as 'stripe' | 'manual' | 'beta' | 'gift' | '',
+    page: 1,
+    limit: 50
+  });
+  const [walletHistoryPagination, setWalletHistoryPagination] = useState<any>(null);
+  
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
   const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
   
   // View mode tabs - controlled by query params
-  const viewTab = (searchParams.get('view') as 'overview' | 'tip-history') || 'overview';
+  const viewTab = (searchParams.get('view') as 'overview' | 'tip-history' | 'wallet-history') || 'overview';
   
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -365,7 +378,7 @@ const UserProfile: React.FC = () => {
     setSearchParams({ settings: 'true', tab });
   };
 
-  const handleViewTabChange = (tab: 'overview' | 'tip-history') => {
+  const handleViewTabChange = (tab: 'overview' | 'tip-history' | 'wallet-history') => {
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
       newParams.set('view', tab);
@@ -583,6 +596,49 @@ const UserProfile: React.FC = () => {
       loadTipHistory();
     }
   }, [viewTab, isOwnProfile, isSettingsMode, tipHistoryFilters]);
+
+  const loadWalletHistory = async () => {
+    if (!isOwnProfile) return;
+    
+    try {
+      setIsLoadingWalletHistory(true);
+      const params: any = {
+        page: walletHistoryFilters.page,
+        limit: walletHistoryFilters.limit,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+      
+      if (walletHistoryFilters.type) {
+        params.type = walletHistoryFilters.type;
+      }
+      
+      if (walletHistoryFilters.status) {
+        params.status = walletHistoryFilters.status;
+      }
+      
+      if (walletHistoryFilters.paymentMethod) {
+        params.paymentMethod = walletHistoryFilters.paymentMethod;
+      }
+      
+      const response = await userAPI.getWalletHistory(params);
+      setWalletHistory(response.transactions || []);
+      setWalletHistoryStats(response.stats || null);
+      setWalletHistoryPagination(response.pagination || null);
+    } catch (err: any) {
+      console.error('Error loading wallet history:', err);
+      toast.error('Failed to load wallet history');
+    } finally {
+      setIsLoadingWalletHistory(false);
+    }
+  };
+
+  // Load wallet history when viewing wallet history tab
+  useEffect(() => {
+    if (viewTab === 'wallet-history' && isOwnProfile && !isSettingsMode) {
+      loadWalletHistory();
+    }
+  }, [viewTab, isOwnProfile, isSettingsMode, walletHistoryFilters]);
 
   const formatJoinDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
@@ -1747,6 +1803,196 @@ const UserProfile: React.FC = () => {
                 <button
                   onClick={() => setTipHistoryFilters({ ...tipHistoryFilters, page: tipHistoryFilters.page + 1 })}
                   disabled={tipHistoryFilters.page >= tipHistoryPagination.totalPages}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        ) : viewTab === 'wallet-history' ? (
+          /* WALLET HISTORY TAB */
+          <div className="space-y-6">
+            {/* Stats Summary */}
+            {walletHistoryStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <BarChart3 className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{walletHistoryStats.totalTransactions || 0}</div>
+                  <div className="text-xs text-gray-300">Total Transactions</div>
+                </div>
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <Coins className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{penceToPounds(walletHistoryStats.totalTopUps || 0)}</div>
+                  <div className="text-xs text-gray-300">Total Top-ups</div>
+                </div>
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <TrendingUp className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{penceToPounds(walletHistoryStats.totalRefunds || 0)}</div>
+                  <div className="text-xs text-gray-300">Total Refunds</div>
+                </div>
+                <div className="card bg-black/20 rounded-lg p-4 text-center">
+                  <Activity className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
+                  <div className="text-xl font-bold text-white">{penceToPounds((walletHistoryStats.totalTopUps || 0) - (walletHistoryStats.totalRefunds || 0))}</div>
+                  <div className="text-xs text-gray-300">Net Top-ups</div>
+                </div>
+              </div>
+            )}
+
+            {/* Filters */}
+            <div className="card bg-black/20 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap gap-4 items-center">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Type</label>
+                  <select
+                    value={walletHistoryFilters.type}
+                    onChange={(e) => setWalletHistoryFilters({ ...walletHistoryFilters, type: e.target.value as any, page: 1 })}
+                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="topup">Top-up</option>
+                    <option value="refund">Refund</option>
+                    <option value="adjustment">Adjustment</option>
+                    <option value="beta_credit">Beta Credit</option>
+                    <option value="gift">Gift</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Status</label>
+                  <select
+                    value={walletHistoryFilters.status}
+                    onChange={(e) => setWalletHistoryFilters({ ...walletHistoryFilters, status: e.target.value as any, page: 1 })}
+                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                    <option value="refunded">Refunded</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Payment Method</label>
+                  <select
+                    value={walletHistoryFilters.paymentMethod}
+                    onChange={(e) => setWalletHistoryFilters({ ...walletHistoryFilters, paymentMethod: e.target.value as any, page: 1 })}
+                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="stripe">Stripe</option>
+                    <option value="manual">Manual</option>
+                    <option value="beta">Beta</option>
+                    <option value="gift">Gift</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Wallet History List */}
+            {isLoadingWalletHistory ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-400 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-400">Loading wallet history...</p>
+              </div>
+            ) : walletHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <Coins className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">No Transactions Found</h3>
+                <p className="text-gray-400">You haven't made any wallet transactions yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {walletHistory.map((tx: any) => (
+                  <div
+                    key={tx._id}
+                    className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        {/* Transaction Type and Status */}
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            tx.type === 'topup' ? 'bg-green-600/30 text-green-200' :
+                            tx.type === 'refund' ? 'bg-red-600/30 text-red-200' :
+                            tx.type === 'beta_credit' ? 'bg-purple-600/30 text-purple-200' :
+                            tx.type === 'adjustment' ? 'bg-blue-600/30 text-blue-200' :
+                            'bg-gray-600/30 text-gray-200'
+                          }`}>
+                            {tx.type === 'topup' ? 'Top-up' :
+                             tx.type === 'refund' ? 'Refund' :
+                             tx.type === 'beta_credit' ? 'Beta Credit' :
+                             tx.type === 'adjustment' ? 'Adjustment' :
+                             tx.type === 'gift' ? 'Gift' : tx.type}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            tx.status === 'completed' ? 'bg-green-600/30 text-green-200' :
+                            tx.status === 'pending' ? 'bg-yellow-600/30 text-yellow-200' :
+                            tx.status === 'failed' ? 'bg-red-600/30 text-red-200' :
+                            'bg-gray-600/30 text-gray-200'
+                          }`}>
+                            {tx.status || 'completed'}
+                          </span>
+                          {tx.paymentMethod && (
+                            <span className="px-2 py-0.5 bg-gray-600/30 text-gray-200 rounded text-xs">
+                              {tx.paymentMethod === 'stripe' ? '💳 Stripe' :
+                               tx.paymentMethod === 'manual' ? '✋ Manual' :
+                               tx.paymentMethod === 'beta' ? '🧪 Beta' :
+                               tx.paymentMethod === 'gift' ? '🎁 Gift' : tx.paymentMethod}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Description */}
+                        {tx.description && (
+                          <p className="text-sm text-gray-300 mb-2">{tx.description}</p>
+                        )}
+                        
+                        {/* Balance Before/After */}
+                        {tx.balanceBefore !== null && tx.balanceAfter !== null && (
+                          <div className="flex items-center space-x-4 text-xs text-gray-400 mb-2">
+                            <span>Balance: {penceToPounds(tx.balanceBefore)} → {penceToPounds(tx.balanceAfter)}</span>
+                          </div>
+                        )}
+                        
+                        {/* Date */}
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {new Date(tx.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      
+                      {/* Amount */}
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <div className={`text-xl font-bold ${
+                          tx.type === 'topup' || tx.type === 'beta_credit' || tx.type === 'gift' ? 'text-green-400' :
+                          tx.type === 'refund' ? 'text-red-400' :
+                          'text-blue-400'
+                        }`}>
+                          {tx.type === 'refund' ? '-' : '+'}{penceToPounds(tx.amount || 0)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {walletHistoryPagination && walletHistoryPagination.totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-6">
+                <button
+                  onClick={() => setWalletHistoryFilters({ ...walletHistoryFilters, page: walletHistoryFilters.page - 1 })}
+                  disabled={walletHistoryFilters.page === 1}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-gray-400 text-sm">
+                  Page {walletHistoryPagination.page} of {walletHistoryPagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setWalletHistoryFilters({ ...walletHistoryFilters, page: walletHistoryFilters.page + 1 })}
+                  disabled={walletHistoryFilters.page >= walletHistoryPagination.totalPages}
                   className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next

@@ -3,6 +3,7 @@ const router = express.Router();
 const Stripe = require('stripe');
 const authMiddleware = require('../middleware/authMiddleware');
 const User = require('../models/User'); // Import user model
+const WalletTransaction = require('../models/WalletTransaction'); // Import wallet transaction model
 const { sendPaymentNotification } = require('../utils/emailService');
 require('dotenv').config();
 
@@ -97,20 +98,57 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         // Convert pounds to pence for storage
         const amountPence = Math.round(amountPounds * 100);
 
+        // Find user first to get current balance
+        const user = await User.findOne({ uuid: userId });
+        
+        if (!user) {
+          console.error(`User not found for wallet top-up: ${userId}`);
+          return;
+        }
+        
+        const balanceBefore = user.balance || 0;
+        
         // Update user balance - find by UUID instead of _id
         // Balance is stored in pence
-        const user = await User.findOneAndUpdate(
+        const updatedUser = await User.findOneAndUpdate(
           { uuid: userId },  // Find by UUID instead of _id
           { $inc: { balance: amountPence } },  // Store in pence
           { new: true }
         );
 
-        if (user) {
-          console.log(`Wallet top-up successful: User ${userId} added £${amountPounds}, new balance: £${(user.balance / 100).toFixed(2)}`);
+        if (updatedUser) {
+          console.log(`Wallet top-up successful: User ${userId} added £${amountPounds}, new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
+          
+          // Create wallet transaction record
+          try {
+            await WalletTransaction.create({
+              userId: updatedUser._id,
+              user_uuid: updatedUser.uuid,
+              amount: amountPence,
+              type: 'topup',
+              status: 'completed',
+              paymentMethod: 'stripe',
+              stripeSessionId: session.id,
+              stripePaymentIntentId: session.payment_intent,
+              balanceBefore: balanceBefore,
+              balanceAfter: updatedUser.balance,
+              description: `Wallet top-up via Stripe`,
+              username: updatedUser.username,
+              metadata: {
+                currency: session.currency || 'gbp',
+                customerEmail: session.customer_email,
+                customerDetails: session.customer_details
+              }
+            });
+            console.log(`✅ Created wallet transaction record for top-up: ${session.id}`);
+          } catch (txError) {
+            console.error('❌ Failed to create wallet transaction record:', txError);
+            // Don't fail the webhook if transaction record creation fails
+          }
           
           // Send email notification to admin
           try {
-            await sendPaymentNotification(user, amountPounds);
+            await sendPaymentNotification(updatedUser, amountPounds);
           } catch (emailError) {
             console.error('Failed to send payment notification email:', emailError);
             // Don't fail the request if email fails
@@ -128,22 +166,50 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 // Development endpoint to manually update balance (for testing)
 router.post('/update-balance', authMiddleware, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, description } = req.body;
     const userId = req.user._id;  // Use _id here since it's internal only, not passed to Stripe
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
+    // Get current balance before update
+    const userBefore = await User.findById(userId);
+    if (!userBefore) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const balanceBefore = userBefore.balance || 0;
+    const amountPence = Math.round(amount * 100); // Convert to pence if provided in pounds
+
     // Update user balance
     const user = await User.findByIdAndUpdate(
       userId,
-      { $inc: { balance: amount } },
+      { $inc: { balance: amountPence } },
       { new: true }
     );
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create wallet transaction record
+    try {
+      await WalletTransaction.create({
+        userId: user._id,
+        user_uuid: user.uuid,
+        amount: amountPence,
+        type: 'adjustment',
+        status: 'completed',
+        paymentMethod: 'manual',
+        balanceBefore: balanceBefore,
+        balanceAfter: user.balance,
+        description: description || 'Manual balance adjustment',
+        username: user.username
+      });
+    } catch (txError) {
+      console.error('Failed to create wallet transaction record:', txError);
+      // Don't fail the request if transaction record creation fails
     }
 
     res.json({ message: 'Balance updated successfully', balance: user.balance });
@@ -163,15 +229,43 @@ router.post('/confirm-payment', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
+    // Get current balance before update
+    const userBefore = await User.findById(userId);
+    if (!userBefore) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const balanceBefore = userBefore.balance || 0;
+    const amountPence = Math.round(amount * 100); // Convert to pence if provided in pounds
+
     // Update user balance
     const user = await User.findByIdAndUpdate(
       userId,
-      { $inc: { balance: amount } },
+      { $inc: { balance: amountPence } },
       { new: true }
     );
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create wallet transaction record
+    try {
+      await WalletTransaction.create({
+        userId: user._id,
+        user_uuid: user.uuid,
+        amount: amountPence,
+        type: 'topup',
+        status: 'completed',
+        paymentMethod: 'manual',
+        balanceBefore: balanceBefore,
+        balanceAfter: user.balance,
+        description: 'Payment confirmed and balance updated',
+        username: user.username
+      });
+    } catch (txError) {
+      console.error('Failed to create wallet transaction record:', txError);
+      // Don't fail the request if transaction record creation fails
     }
 
     res.json({ message: 'Payment successful, balance updated', balance: user.balance });

@@ -728,6 +728,22 @@ export const userAPI = {
     return response.data;
   },
 
+  // Get user's wallet transaction history
+  getWalletHistory: async (params?: {
+    type?: 'topup' | 'refund' | 'adjustment' | 'beta_credit' | 'gift';
+    status?: 'pending' | 'completed' | 'failed' | 'refunded';
+    paymentMethod?: 'stripe' | 'manual' | 'beta' | 'gift';
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/users/me/wallet-history', { params });
+    return response.data;
+  },
+
   // Get creator stats (for creators/admins)
   getCreatorStats: async () => {
     const response = await api.get('/users/me/creator-stats');

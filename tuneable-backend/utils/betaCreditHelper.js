@@ -6,6 +6,7 @@
  */
 
 const notificationService = require('../services/notificationService');
+const WalletTransaction = require('../models/WalletTransaction');
 
 /**
  * Give beta signup credit to a new user
@@ -30,10 +31,33 @@ const giveBetaSignupCredit = async (user) => {
       return false;
     }
     
+    // Get balance before update
+    const balanceBefore = user.balance || 0;
+    
     // Add credit to user balance (stored in pence)
-    user.balance = (user.balance || 0) + BETA_SIGNUP_CREDIT_PENCE;
+    user.balance = balanceBefore + BETA_SIGNUP_CREDIT_PENCE;
     await user.save();
     console.log(`✅ Added £1.11 beta signup credit to user ${user.username}. New balance: £${(user.balance / 100).toFixed(2)}`);
+    
+    // Create wallet transaction record
+    try {
+      await WalletTransaction.create({
+        userId: user._id,
+        user_uuid: user.uuid,
+        amount: BETA_SIGNUP_CREDIT_PENCE,
+        type: 'beta_credit',
+        status: 'completed',
+        paymentMethod: 'beta',
+        balanceBefore: balanceBefore,
+        balanceAfter: user.balance,
+        description: 'Beta signup credit (£1.11)',
+        username: user.username
+      });
+      console.log(`✅ Created wallet transaction record for beta credit: ${user.username}`);
+    } catch (txError) {
+      console.error('❌ Failed to create wallet transaction record for beta credit:', txError);
+      // Don't fail if transaction record creation fails
+    }
     
     // Create notification explaining the credit
     try {
