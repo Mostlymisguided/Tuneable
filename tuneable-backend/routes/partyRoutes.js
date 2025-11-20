@@ -397,12 +397,15 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             const Media = require('../models/Media');
             const Bid = require('../models/Bid');
             
+            // Query all media with bids, but only populate ACTIVE bids
+            // This ensures we only count active bids in the aggregate calculation
             const allMediaWithBids = await Media.find({
                 bids: { $exists: true, $ne: [] }
             })
             .populate({
                 path: 'bids',
                 model: 'Bid',
+                match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
                 populate: {
                     path: 'userId',
                     select: 'username profilePic uuid homeLocation secondaryLocation'
@@ -413,19 +416,65 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
             .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
 
             // Convert to party media format for consistent frontend handling
-            party.media = allMediaWithBids.map(media => ({
-                mediaId: media,
-                media_uuid: media.uuid,
-                addedBy: media.addedBy?._id || media.addedBy,
-                partyMediaAggregate: media.globalMediaAggregate || 0,
-                partyBids: media.bids || [],
-                status: 'active',
-                queuedAt: media.createdAt || new Date(),
-                partyMediaBidTop: media.globalMediaBidTop || 0,
-                partyMediaBidTopUser: media.globalMediaBidTopUser,
-                partyMediaAggregateTop: media.globalMediaAggregateTop || 0,
-                partyMediaAggregateTopUser: media.globalMediaAggregateTopUser
-            }));
+            // Recalculate partyMediaAggregate from active bids on-the-fly to ensure accuracy
+            party.media = allMediaWithBids
+                .map(media => {
+                    // Filter to only active bids (populate match may not filter all cases)
+                    const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
+                    
+                    // Skip media with no active bids
+                    if (activeBids.length === 0) {
+                        return null;
+                    }
+                    
+                    // Recalculate globalMediaAggregate from active bids only (in pence)
+                    // This ensures accuracy regardless of stale stored values
+                    const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
+                        return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
+                    }, 0);
+                    
+                    // Calculate top bid from active bids
+                    const topBid = activeBids.reduce((max, bid) => {
+                        return (bid.amount || 0) > (max.amount || 0) ? bid : max;
+                    }, activeBids[0] || { amount: 0 });
+                    
+                    // Calculate user aggregates to find top aggregate user
+                    const userAggregates = {};
+                    activeBids.forEach(bid => {
+                        const userId = bid.userId?._id?.toString() || bid.userId?.toString();
+                        if (userId) {
+                            if (!userAggregates[userId]) {
+                                userAggregates[userId] = {
+                                    userId: bid.userId?._id || bid.userId,
+                                    total: 0
+                                };
+                            }
+                            userAggregates[userId].total += (bid.amount || 0);
+                        }
+                    });
+                    
+                    // Find user with highest aggregate
+                    const topAggregateUser = Object.values(userAggregates).reduce(
+                        (max, user) => user.total > max.total ? user : max,
+                        { total: 0, userId: null }
+                    );
+                    
+                    return {
+                        mediaId: media,
+                        media_uuid: media.uuid,
+                        addedBy: media.addedBy?._id || media.addedBy,
+                        // Use calculated aggregate from active bids (accurate, not stale)
+                        partyMediaAggregate: calculatedGlobalMediaAggregate,
+                        partyBids: activeBids, // Only include active bids
+                        status: 'active',
+                        queuedAt: media.createdAt || new Date(),
+                        partyMediaBidTop: topBid.amount || 0,
+                        partyMediaBidTopUser: topBid.userId?._id || topBid.userId || null,
+                        partyMediaAggregateTop: topAggregateUser.total || 0,
+                        partyMediaAggregateTopUser: topAggregateUser.userId || null
+                    };
+                })
+                .filter(media => media !== null); // Remove media with no active bids
             
             // Populate partiers, host, and kickedUsers for Global Party
             const User = require('../models/User');
@@ -1193,12 +1242,23 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
                 return res.status(404).json({ error: 'Media not found' });
             }
 
+            // Get active bids for this media to calculate accurate aggregate
+            const activeBids = await Bid.find({
+                mediaId: populatedMedia._id,
+                status: 'active'
+            });
+            
+            // Calculate partyMediaAggregate from active bids (accurate, not stale)
+            const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
+                return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
+            }, 0);
+
             // Create a virtual party media entry for Global Party
             partyMediaEntry = {
                 mediaId: populatedMedia._id,
                 media_uuid: populatedMedia.uuid,
-                partyMediaAggregate: populatedMedia.globalMediaAggregate || 0,
-                partyBids: populatedMedia.bids || [],
+                partyMediaAggregate: calculatedGlobalMediaAggregate, // Use calculated value from active bids
+                partyBids: activeBids, // Only include active bids
                 status: 'active'
             };
 
@@ -2439,6 +2499,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
             .populate({
                 path: 'bids',
                 model: 'Bid',
+                match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
                 populate: {
                     path: 'userId',
                     select: 'username profilePic uuid homeLocation secondaryLocation'
@@ -2493,6 +2554,20 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
             // For Global Party, process all media with bids
             processedMedia = allMediaWithBids
                 .map((media) => {
+                    // Filter to only active bids (populate match may not filter all cases)
+                    const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
+                    
+                    // Skip media with no active bids
+                    if (activeBids.length === 0) {
+                        return null;
+                    }
+                    
+                    // Recalculate globalMediaAggregate from active bids only (in pence)
+                    // This ensures accuracy regardless of stale stored values
+                    const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
+                        return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
+                    }, 0);
+                    
                     const availablePlatforms = Object.entries(media.sources || {})
                         .filter(([key, value]) => value)
                         .map(([key, value]) => ({ platform: key, url: value }));
@@ -2517,10 +2592,10 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         coverArt: media.coverArt,
                         sources: media.sources,
                         availablePlatforms,
-                        globalMediaAggregate: media.globalMediaAggregate || 0, // Schema grammar
-                        partyMediaAggregate: media.globalMediaAggregate || 0, // For Global Party, use global aggregate
+                        globalMediaAggregate: calculatedGlobalMediaAggregate, // Use calculated value (accurate, not stale)
+                        partyMediaAggregate: calculatedGlobalMediaAggregate, // For Global Party, use calculated global aggregate
                         timePeriodBidValue, // Bid value for the specific time period
-                        bids: media.bids || [], // Include populated bids for TopBidders component
+                        bids: activeBids, // Only include active bids for TopBidders component
                         tags: media.tags || [], // Include tags for display
                         category: media.category || null, // Include category for display
                         addedBy: media.addedBy,
@@ -2533,6 +2608,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
                         contentType: media.contentType || 'music'
                     };
                 })
+                .filter(media => media !== null) // Remove media with no active bids
                 .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
         } else {
             // Regular party logic - process party media
