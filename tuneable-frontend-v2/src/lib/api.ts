@@ -68,7 +68,8 @@ interface User {
 }
 
 interface Party {
-  id: string;
+  _id?: string; // MongoDB ObjectId (from backend)
+  id?: string; // Transformed ID (may be _id or uuid)
   name: string;
   location: string;
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };

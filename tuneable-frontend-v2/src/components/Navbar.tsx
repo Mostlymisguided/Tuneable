@@ -23,7 +23,11 @@ const Navbar: React.FC = () => {
         const res = await partyAPI.getParties();
         const globalParty = (res.parties || []).find((p: any) => p.type === 'global');
         if (globalParty) {
-          setGlobalPartyId(globalParty._id || globalParty.id);
+          // Handle both _id (MongoDB) and id (transformed) formats
+          const partyId = globalParty._id || globalParty.id;
+          if (partyId) {
+            setGlobalPartyId(partyId);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch Global Party ID:', error);
