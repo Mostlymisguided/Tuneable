@@ -40,6 +40,26 @@ const userSchema = new mongoose.Schema({
     discoveryRank: Number, // 1st, 2nd, 3rd bidder, etc.
     reason: { type: String, enum: ['discovery', 'popularity_growth'] }
   }],
+  // ========================================
+  // ARTIST ESCROW (Phase 1: Internal Ledger)
+  // ========================================
+  artistEscrowBalance: { 
+    type: Number, 
+    default: 0 
+  }, // Artist revenue in PENCE (integer), not pounds - unclaimed until payout
+  // Example: 1050 represents £10.50, 3300 represents £33.00
+  artistEscrowHistory: [{
+    mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media' },
+    bidId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bid' },
+    amount: { type: Number, required: true }, // In pence
+    allocatedAt: { type: Date, default: Date.now },
+    claimedAt: { type: Date },
+    status: { type: String, enum: ['pending', 'claimed'], default: 'pending' },
+    _id: false
+  }],
+  stripeConnectAccountId: { 
+    type: String 
+  }, // For future Stripe Connect migration (Phase 2)
   homeLocation: {
     city: { type: String },
     region: { type: String }, // State, province, or region

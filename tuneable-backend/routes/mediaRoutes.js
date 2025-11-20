@@ -2181,6 +2181,18 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
 
     await bid.save();
 
+    // Allocate artist escrow for this bid (async, don't block response)
+    try {
+      const artistEscrowService = require('../services/artistEscrowService');
+      artistEscrowService.allocateEscrowForBid(bid._id, media._id, bidAmountPence).catch(error => {
+        console.error('Failed to allocate escrow for bid:', bid._id, error);
+        // Don't fail the bid if escrow allocation fails - log and continue
+      });
+    } catch (error) {
+      console.error('Error setting up escrow allocation:', error);
+      // Don't fail the bid if escrow setup fails
+    }
+
     // Calculate and award TuneBytes for this bid (async, don't block response)
     try {
       const tuneBytesService = require('../services/tuneBytesService');
