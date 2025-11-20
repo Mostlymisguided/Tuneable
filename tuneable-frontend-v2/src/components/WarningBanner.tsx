@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AlertTriangle, X, Info, AlertCircle, Ban } from 'lucide-react';
 import { userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,32 +18,44 @@ interface Warning {
 }
 
 const WarningBanner: React.FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const location = useLocation();
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    if (!user) {
+    // Don't fetch warnings if:
+    // 1. No user is logged in
+    // 2. No token is available (OAuth callback in progress)
+    // 3. We're on the auth callback page
+    if (!user || !token || location.pathname === '/auth/callback') {
       setIsLoading(false);
       return;
     }
 
+    // Small delay to ensure token is fully available in API interceptor
     const fetchWarnings = async () => {
       try {
+        // Wait a bit to ensure token is available in localStorage for API calls
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const data = await userAPI.getWarnings();
         // Filter to only unacknowledged warnings
         const unacknowledged = data.warnings.filter((w: Warning) => !w.acknowledgedAt);
         setWarnings(unacknowledged);
-      } catch (error) {
-        console.error('Error fetching warnings:', error);
+      } catch (error: any) {
+        // Only log non-403 errors (403 might be expected during OAuth callback)
+        if (error?.response?.status !== 403) {
+          console.error('Error fetching warnings:', error);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchWarnings();
-  }, [user]);
+  }, [user, token, location.pathname]);
 
   const handleAcknowledge = async (index: number) => {
     try {
