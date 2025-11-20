@@ -57,11 +57,12 @@ const PartySchema = new mongoose.Schema({
   // ========================================
   
   // Party scope metrics (stored for performance)
-  partyBidTop: { type: Number, default: 0 }, // PartyBidTop - highest bid across all media in party
+  // NOTE: All monetary amounts stored in PENCE (integer), not pounds
+  partyBidTop: { type: Number, default: 0 }, // PartyBidTop - highest bid across all media in party (in pence)
   partyBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User who made highest bid
-  partyUserAggregateTop: { type: Number, default: 0 }, // PartyUserAggregateTop - highest user aggregate in party
+  partyUserAggregateTop: { type: Number, default: 0 }, // PartyUserAggregateTop - highest user aggregate in party (in pence)
   partyUserAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
-  partyUserBidTop: { type: Number, default: 0 }, // PartyUserBidTop - highest user bid in party
+  partyUserBidTop: { type: Number, default: 0 }, // PartyUserBidTop - highest user bid in party (in pence)
   partyUserBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User who made highest bid
   
   // Bids are stored in Party.media[].partyBids[] - organized by media for efficient queue rendering
@@ -79,13 +80,14 @@ const PartySchema = new mongoose.Schema({
       // ========================================
       // PARTY-SPECIFIC BID METRICS (managed by BidMetricsEngine)
       // ========================================
+      // NOTE: All monetary amounts stored in PENCE (integer), not pounds
       
       // Party-media scope metrics (stored for performance)
-      partyMediaAggregate: { type: Number, default: 0 }, // PartyMediaAggregate - total bid value for this media in party
-      partyMediaBidTop: { type: Number, default: 0 }, // PartyMediaBidTop - highest individual bid for this media in party
+      partyMediaAggregate: { type: Number, default: 0 }, // PartyMediaAggregate - total bid value for this media in party (in pence)
+      partyMediaBidTop: { type: Number, default: 0 }, // PartyMediaBidTop - highest individual bid for this media in party (in pence)
       partyMediaBidTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User who made highest bid
       
-      partyMediaAggregateTop: { type: Number, default: 0 }, // PartyMediaAggregateTop - highest user aggregate for this media in party
+      partyMediaAggregateTop: { type: Number, default: 0 }, // PartyMediaAggregateTop - highest user aggregate for this media in party (in pence)
       partyMediaAggregateTopUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // User with highest aggregate
       
       // Note: Other party metrics are computed on-demand via BidMetricsEngine

@@ -4,6 +4,15 @@
  * This service provides dynamic computation of bid metrics based on the
  * bid metrics schema. It handles both stored and computed metrics,
  * providing a unified interface for all bid-related calculations.
+ * 
+ * IMPORTANT: All monetary amounts (amounts, aggregates, tops) are stored
+ * and computed in PENCE (integer), not pounds. This includes:
+ * - Bid amounts from the Bid collection (already in pence)
+ * - Computed aggregates (sums of bid amounts in pence)
+ * - Stored metric values (stored as pence integers)
+ * 
+ * Conversion to pounds for display should happen in the frontend using
+ * the currency utility functions (penceToPounds, penceToPoundsNumber).
  */
 
 const mongoose = require('mongoose');
@@ -12,6 +21,7 @@ const Media = require('../models/Media');
 const Party = require('../models/Party');
 const User = require('../models/User');
 const { BidMetricsSchema } = require('../utils/bidMetricsSchema');
+const { validatePenceAmount } = require('../utils/penceValidation');
 
 class BidMetricsEngine {
   constructor() {
@@ -26,7 +36,9 @@ class BidMetricsEngine {
    * @param {string} params.userId - User ID (if required by metric)
    * @param {string} params.mediaId - Media ID (if required by metric)
    * @param {string} params.partyId - Party ID (if required by metric)
-   * @returns {Promise<Object>} Computed metric result with full context
+   * @returns {Promise<Object>} Computed metric result with full context.
+   *                            All monetary amounts in result.amount are in PENCE (integer).
+   *                            Example: { amount: 150, currency: 'GBP', ... } represents £1.50
    */
   async computeMetric(metricName, params = {}) {
     const config = BidMetricsSchema.getMetricConfig(metricName);
@@ -70,7 +82,8 @@ class BidMetricsEngine {
 
   /**
    * Update all relevant metrics when a bid is created/updated/deleted
-   * @param {Object} bidData - The bid data that changed
+   * All stored metric values are in PENCE (integers)
+   * @param {Object} bidData - The bid data that changed (bidData.amount should be in pence)
    * @param {string} operation - 'create', 'update', or 'delete'
    */
   async updateMetricsForBidChange(bidData, operation = 'create') {
@@ -95,6 +108,7 @@ class BidMetricsEngine {
 
   /**
    * Recompute all stored metrics for a specific media item
+   * All metric values are stored in PENCE (integers)
    * @param {string} mediaId - Media ID to recompute metrics for
    */
   async recomputeMediaMetrics(mediaId) {
@@ -118,6 +132,7 @@ class BidMetricsEngine {
 
   /**
    * Recompute all stored metrics for a specific party
+   * All metric values are stored in PENCE (integers)
    * @param {string} partyId - Party ID to recompute metrics for
    */
   async recomputePartyMetrics(partyId) {
@@ -143,12 +158,28 @@ class BidMetricsEngine {
   // PRIVATE METHODS
   // ========================================
 
+  /**
+   * Validate that required entity IDs are provided
+   * @param {Object} config - Metric configuration
+   * @param {Object} params - Parameters for computation
+   */
   _validateRequiredEntities(config, params) {
     for (const entity of config.entities) {
       if (!params[`${entity}Id`]) {
         throw new Error(`Metric ${config.name} requires ${entity}Id parameter`);
       }
     }
+  }
+
+  /**
+   * Validate that an amount is a valid integer in pence
+   * Delegates to the shared validation utility
+   * @param {number} amount - Amount to validate (should be in pence)
+   * @param {string} context - Context for error messages
+   * @returns {number} Validated amount as integer
+   */
+  _validatePenceAmount(amount, context = 'amount') {
+    return validatePenceAmount(amount, context, true); // allowZero = true
   }
 
   _generateCacheKey(metricName, params) {
@@ -183,6 +214,13 @@ class BidMetricsEngine {
     keysToDelete.forEach(key => this.cache.delete(key));
   }
 
+  /**
+   * Compute an aggregate metric (sum of bid amounts)
+   * @param {string} metricName - Name of the metric
+   * @param {Object} params - Parameters (userId, mediaId, partyId)
+   * @param {Object} config - Metric configuration
+   * @returns {Promise<Object>} Result with amount in PENCE (integer) and context
+   */
   async _computeAggregateMetric(metricName, params, config) {
     // Build aggregation pipeline based on metric requirements
     const matchStage = { status: 'active' };
@@ -193,11 +231,14 @@ class BidMetricsEngine {
 
     const pipeline = [
       { $match: matchStage },
-      { $group: { _id: null, total: { $sum: "$amount" } } }
+      { $group: { _id: null, total: { $sum: "$amount" } } } // Sum of amounts (already in pence)
     ];
 
     const result = await Bid.aggregate(pipeline);
-    const amount = result.length > 0 ? result[0].total : 0;
+    const amount = this._validatePenceAmount(
+      result.length > 0 ? result[0].total : 0,
+      `${metricName} aggregate`
+    );
     
     // Debug logging for PartyMediaAggregate to help diagnose tip total issues
     if (metricName === 'PartyMediaAggregate' && params.partyId && params.mediaId) {
@@ -251,6 +292,13 @@ class BidMetricsEngine {
     return context;
   }
 
+  /**
+   * Compute a top metric (highest bid amount or highest aggregate)
+   * @param {string} metricName - Name of the metric
+   * @param {Object} params - Parameters (userId, mediaId, partyId)
+   * @param {Object} config - Metric configuration
+   * @returns {Promise<Object>} Result with amount in PENCE (integer) and context
+   */
   async _computeTopMetric(metricName, params, config) {
     // Build query based on metric requirements
     const query = { status: 'active' };
@@ -293,9 +341,12 @@ class BidMetricsEngine {
       ];
       
       const result = await Bid.aggregate(aggregationPipeline);
-      const amount = result.length > 0 ? result[0].total : 0;
+      const amount = this._validatePenceAmount(
+        result.length > 0 ? result[0].total : 0,
+        `${metricName} top aggregate`
+      );
       
-      // Build full context
+      // Build full context (amount is in pence)
       const context = { amount, currency: 'GBP' };
       
       // Add user information if available
@@ -312,9 +363,12 @@ class BidMetricsEngine {
     } else {
       // For individual bid top metrics
       const result = await Bid.findOne(query).sort({ amount: -1 });
-      const amount = result ? result.amount : 0;
+      const amount = this._validatePenceAmount(
+        result ? result.amount : 0,
+        `${metricName} top bid`
+      );
       
-      // Build full context
+      // Build full context (amount is in pence)
       const context = { amount, currency: 'GBP' };
       
       // Add user information if available
@@ -341,6 +395,12 @@ class BidMetricsEngine {
     }
   }
 
+  /**
+   * Compute an average metric (average of bid amounts)
+   * @param {string} metricName - Name of the metric
+   * @param {Object} params - Parameters (userId, mediaId, partyId)
+   * @returns {Promise<number>} Average amount in PENCE (may be decimal, should be rounded when stored)
+   */
   async _computeAverageMetric(metricName, params) {
     const config = BidMetricsSchema.getMetricConfig(metricName);
     
@@ -353,11 +413,14 @@ class BidMetricsEngine {
 
     const pipeline = [
       { $match: matchStage },
-      { $group: { _id: null, average: { $avg: "$amount" } } }
+      { $group: { _id: null, average: { $avg: "$amount" } } } // Average of amounts (in pence)
     ];
 
     const result = await Bid.aggregate(pipeline);
-    return result.length > 0 ? result[0].average : 0;
+    const average = result.length > 0 ? result[0].average : 0;
+    // Note: Average may be decimal (e.g., 1.5 pence), but this is acceptable for averages
+    // When storing as an aggregate, use Math.round() to convert to integer
+    return average;
   }
 
   async _computeRankMetric(metricName, params) {
@@ -367,6 +430,13 @@ class BidMetricsEngine {
     return 0;
   }
 
+  /**
+   * Update a stored metric after a bid change
+   * All metric values are stored in PENCE (integers)
+   * @param {string} metricName - Name of the metric to update
+   * @param {Object} bidData - The bid data that changed
+   * @param {string} operation - 'create', 'update', or 'delete'
+   */
   async _updateStoredMetric(metricName, bidData, operation) {
     const config = BidMetricsSchema.getMetricConfig(metricName);
     
@@ -390,6 +460,13 @@ class BidMetricsEngine {
     }
   }
 
+  /**
+   * Update a global media metric (stored in Media model)
+   * Stores metric value in PENCE (integer)
+   * @param {string} metricName - Name of the metric
+   * @param {Object} bidData - Bid data that triggered the update
+   * @param {string} operation - Operation type
+   */
   async _updateGlobalMediaMetric(metricName, bidData, operation) {
     const mediaId = bidData.mediaId;
     const result = await this.computeMetric(metricName, { mediaId });
@@ -398,8 +475,8 @@ class BidMetricsEngine {
     const updateFields = {};
     const fieldName = this._getMetricFieldName(metricName);
     
-    // Store the main metric value
-    updateFields[fieldName] = result.amount;
+    // Store the main metric value (validate and ensure it's an integer in pence)
+    updateFields[fieldName] = this._validatePenceAmount(result.amount, `${metricName} for media ${mediaId}`);
     
     // Store user references for gamification (if applicable)
     if (metricName === 'GlobalMediaBidTop' && result.userId) {
@@ -413,6 +490,13 @@ class BidMetricsEngine {
     console.log(`📊 Updated ${metricName} for media ${mediaId}: ${result.amount}`);
   }
 
+  /**
+   * Update a party-media metric (stored in Party.media array)
+   * Stores metric value in PENCE (integer)
+   * @param {string} metricName - Name of the metric
+   * @param {Object} bidData - Bid data that triggered the update
+   * @param {string} operation - Operation type
+   */
   async _updatePartyMediaMetric(metricName, bidData, operation) {
     const partyId = bidData.partyId;
     const mediaId = bidData.mediaId;
@@ -422,11 +506,11 @@ class BidMetricsEngine {
     const updateFields = {};
     const fieldName = this._getMetricFieldName(metricName);
     
-    // Store the main metric value - FIX: handle 0 correctly (0 is a valid value for pence)
-    // result.amount can be 0, so we need to check for undefined/null, not falsy
-    const metricValue = (result.amount !== undefined && result.amount !== null) 
-      ? result.amount 
-      : (typeof result === 'number' ? result : 0);
+    // Store the main metric value (validate and ensure it's an integer in pence)
+    // Note: 0 is a valid value for pence, so we handle it explicitly
+    const metricValue = (result.amount !== undefined && result.amount !== null)
+      ? this._validatePenceAmount(result.amount, `${metricName} for party ${partyId}, media ${mediaId}`)
+      : 0;
     updateFields[`media.$.${fieldName}`] = metricValue;
     
     // Store user references for gamification (if applicable)
@@ -461,29 +545,45 @@ class BidMetricsEngine {
     await this._updatePartyLevelMetrics(partyId, bidData, operation);
   }
 
+  /**
+   * Update party-level metrics (stored at Party root)
+   * All metric values are stored in PENCE (integers)
+   * @param {string} partyId - Party ID
+   * @param {Object} bidData - Bid data that triggered the update
+   * @param {string} operation - Operation type
+   */
   async _updatePartyLevelMetrics(partyId, bidData, operation) {
     // Update party-level metrics based on the bid change
     try {
       const updateFields = {};
       
-      // Compute PartyBidTop (highest bid across all media)
+      // Compute PartyBidTop (highest bid across all media) - stored in pence
       const partyBidTopResult = await this.computeMetric('PartyBidTop', { partyId });
-      updateFields.partyBidTop = partyBidTopResult.amount || partyBidTopResult;
+      updateFields.partyBidTop = this._validatePenceAmount(
+        partyBidTopResult.amount || 0,
+        'PartyBidTop'
+      );
       if (partyBidTopResult.userId) {
         updateFields.partyBidTopUser = partyBidTopResult.userId;
       }
       
-      // Compute PartyUserAggregateTop (highest user aggregate in party)
+      // Compute PartyUserAggregateTop (highest user aggregate in party) - stored in pence
       const partyUserAggregateTopResult = await this.computeMetric('PartyUserAggregateTop', { partyId });
-      updateFields.partyUserAggregateTop = partyUserAggregateTopResult.amount || partyUserAggregateTopResult;
+      updateFields.partyUserAggregateTop = this._validatePenceAmount(
+        partyUserAggregateTopResult.amount || 0,
+        'PartyUserAggregateTop'
+      );
       if (partyUserAggregateTopResult.userId) {
         updateFields.partyUserAggregateTopUser = partyUserAggregateTopResult.userId;
       }
       
-      // Compute PartyUserBidTop (highest user bid in party)
+      // Compute PartyUserBidTop (highest user bid in party) - stored in pence
       // This is computed by finding the highest bid amount any single user has made
       const partyUserBidTopResult = await this.computeMetric('PartyUserBidTop', { partyId });
-      updateFields.partyUserBidTop = partyUserBidTopResult.amount || partyUserBidTopResult;
+      updateFields.partyUserBidTop = this._validatePenceAmount(
+        partyUserBidTopResult.amount || 0,
+        'PartyUserBidTop'
+      );
       if (partyUserBidTopResult.userId) {
         updateFields.partyUserBidTopUser = partyUserBidTopResult.userId;
       }
@@ -496,15 +596,26 @@ class BidMetricsEngine {
     }
   }
 
+  /**
+   * Update a bid-level metric (stored in Bid model)
+   * Stores metric value in PENCE (integer)
+   * @param {string} metricName - Name of the metric
+   * @param {Object} bidData - Bid data that triggered the update
+   * @param {string} operation - Operation type
+   */
   async _updateBidMetric(metricName, bidData, operation) {
     const bidId = bidData._id || bidData.id;
-    const newValue = await this.computeMetric(metricName, bidData);
+    const result = await this.computeMetric(metricName, bidData);
     
-    // Update Bid model with the new metric value
+    // Update Bid model with the new metric value (validate it's in pence)
     const updateField = this._getMetricFieldName(metricName);
-    await Bid.findByIdAndUpdate(bidId, { [updateField]: newValue });
+    const metricValue = this._validatePenceAmount(
+      result.amount || result, // Some metrics return number directly
+      `${metricName} for bid ${bidId}`
+    );
+    await Bid.findByIdAndUpdate(bidId, { [updateField]: metricValue });
     
-    console.log(`📊 Updated ${metricName} for bid ${bidId}: ${newValue}`);
+    console.log(`📊 Updated ${metricName} for bid ${bidId}: ${metricValue} pence`);
   }
 
   _getMetricFieldName(metricName) {
