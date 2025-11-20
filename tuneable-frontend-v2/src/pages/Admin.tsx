@@ -185,26 +185,45 @@ const Admin: React.FC = () => {
         userAPI.getInviteRequests('pending'),
       ]);
 
+      // Calculate counts properly - use total if available, otherwise count from array
+      const mediaCount = mediaRes.total ?? (Array.isArray(mediaRes.reports) ? mediaRes.reports.filter((r: any) => r.status === 'pending').length : 0);
+      const userCount = userRes.total ?? (Array.isArray(userRes.reports) ? userRes.reports.filter((r: any) => r.status === 'pending').length : 0);
+      const labelCount = labelRes.total ?? (Array.isArray(labelRes.reports) ? labelRes.reports.filter((r: any) => r.status === 'pending').length : 0);
+      const collectiveCount = collectiveRes.total ?? (Array.isArray(collectiveRes.reports) ? collectiveRes.reports.filter((r: any) => r.status === 'pending').length : 0);
+      const invitesCount = Array.isArray(invitesRes.requests)
+        ? invitesRes.requests.filter((req: any) => req.status === 'pending').length
+        : 0;
+
       setReportsSummary((prev) => ({
         ...prev,
-        media: mediaRes.total ?? mediaRes.reports?.length ?? 0,
-        user: userRes.total ?? userRes.reports?.length ?? 0,
-        label: labelRes.total ?? labelRes.reports?.length ?? 0,
-        collective: collectiveRes.total ?? collectiveRes.reports?.length ?? 0,
-        invites: Array.isArray(invitesRes.requests)
-          ? invitesRes.requests.filter((req: any) => req.status === 'pending').length
-          : 0,
+        media: mediaCount,
+        user: userCount,
+        label: labelCount,
+        collective: collectiveCount,
+        invites: invitesCount,
       }));
     } catch (error) {
       console.error('Error refreshing report counts:', error);
+      // On error, reset counts to 0 to ensure dots disappear
+      setReportsSummary((prev) => ({
+        ...prev,
+        media: 0,
+        user: 0,
+        label: 0,
+        collective: 0,
+        invites: 0,
+      }));
     }
   }, [isAdmin]);
 
   useEffect(() => {
-    if (isAdmin) {
-      void refreshReportCounts();
+    if (activeTab === 'reports' && isAdmin) {
+      // Refresh all counts when entering reports tab
+      refreshReportCounts();
+      loadCreatorApplications();
+      loadClaims();
     }
-  }, [isAdmin, reportsSubTab, refreshReportCounts]);
+  }, [activeTab, isAdmin, refreshReportCounts]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -430,7 +449,10 @@ const Admin: React.FC = () => {
     try {
       await creatorAPI.reviewApplication(userId, status, reviewNotes);
       toast.success(`Application ${status}!`);
-      loadCreatorApplications(); // Reload
+      // Reload to update counts
+      await loadCreatorApplications();
+      // Refresh report counts to ensure main tab dot updates
+      refreshReportCounts();
     } catch (error: any) {
       console.error('Error reviewing application:', error);
       toast.error(error.response?.data?.error || 'Failed to review application');
@@ -441,7 +463,10 @@ const Admin: React.FC = () => {
     try {
       await claimAPI.reviewClaim(claimId, status, reviewNotes);
       toast.success(`Claim ${status}!`);
-      loadClaims(); // Reload
+      // Reload to update counts
+      await loadClaims();
+      // Refresh report counts to ensure main tab dot updates
+      refreshReportCounts();
     } catch (error: any) {
       console.error('Error reviewing claim:', error);
       toast.error(error.response?.data?.error || 'Failed to review claim');
@@ -2436,7 +2461,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Music className="h-4 w-4 mr-2" />
-                    <span>Tune Reports</span>
+                    <span className="flex items-center">
+                      Tune Reports
+                      {reportsSummary.media > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('user')}
@@ -2447,7 +2479,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Users className="h-4 w-4 mr-2" />
-                    <span>User Reports</span>
+                    <span className="flex items-center">
+                      User Reports
+                      {reportsSummary.user > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('label')}
@@ -2458,7 +2497,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Building className="h-4 w-4 mr-2" />
-                    <span>Label Reports</span>
+                    <span className="flex items-center">
+                      Label Reports
+                      {reportsSummary.label > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('collective')}
@@ -2469,7 +2515,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Users className="h-4 w-4 mr-2" />
-                    <span>Collective Reports</span>
+                    <span className="flex items-center">
+                      Collective Reports
+                      {reportsSummary.collective > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('claims')}
@@ -2480,7 +2533,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Music className="h-4 w-4 mr-2" />
-                    <span>Tune Claims</span>
+                    <span className="flex items-center">
+                      Tune Claims
+                      {reportsSummary.claims > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('applications')}
@@ -2491,7 +2551,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Award className="h-4 w-4 mr-2" />
-                    <span>Creator Applications</span>
+                    <span className="flex items-center">
+                      Creator Applications
+                      {reportsSummary.applications > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <button
                     onClick={() => setReportsSubTab('invites')}
@@ -2502,7 +2569,14 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Mail className="h-4 w-4 mr-2" />
-                    <span>Invite Requests</span>
+                    <span className="flex items-center">
+                      Invite Requests
+                      {reportsSummary.invites > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
                   </button>
                 </nav>
               </div>

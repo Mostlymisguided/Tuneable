@@ -109,11 +109,15 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
       const reportsList = (data.reports || []) as Report[];
       setReports(reportsList);
 
-      const totalFromApi = data.total ?? reportsList.length ?? 0;
+      // Always fetch pending count separately for accurate notification dot
       if (onPendingCountChange) {
-        if (statusFilter === '' || statusFilter === 'pending') {
-          onPendingCountChange(totalFromApi);
-        } else {
+        try {
+          const pendingData = await reportAPI.getReports('pending', undefined, reportType);
+          const pendingCount = pendingData.total ?? (pendingData.reports?.length ?? 0);
+          onPendingCountChange(pendingCount);
+        } catch (pendingError) {
+          console.error('Error fetching pending count:', pendingError);
+          // Fallback to counting from current list if separate fetch fails
           const pendingCount = reportsList.filter((report) => report.status === 'pending').length;
           onPendingCountChange(pendingCount);
         }
