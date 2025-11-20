@@ -192,7 +192,7 @@ Join here: ${inviteLink}`.trim();
   const handleFacebookShare = useCallback(() => {
     const quote = user?.personalInviteCode 
       ? `Support your favourite Artists on Tuneable! Join with this invite code: ${user.personalInviteCode}`
-      : 'Support your favourite Artists on Tuneable! Join the social music platform for bidding on beats.';
+      : 'Support your favourite Artists on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;
@@ -335,7 +335,7 @@ Join here: ${inviteLink}`.trim();
           setMinimumBid(globalParty.minimumBid);
         }
       } catch (error) {
-        console.error('Error fetching global party minimum bid:', error);
+        console.error('Error fetching global party minimum tip:', error);
         // Keep default 0.01 if fetch fails
       }
     };
@@ -577,13 +577,13 @@ Join here: ${inviteLink}`.trim();
 
     try {
       await mediaAPI.placeGlobalBid(item.mediaUuid || item.mediaId, amount);
-      toast.success(`Bid of £${amount.toFixed(2)} placed successfully!`);
+      toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
       // Reload library to update bid amounts
       const data = await userAPI.getTuneLibrary();
       setTuneLibrary(data.library || []);
     } catch (error: any) {
       console.error('Error placing bid:', error);
-      toast.error(error.response?.data?.error || 'Failed to place bid');
+      toast.error(error.response?.data?.error || 'Failed to place tip');
     }
   };
 
@@ -2752,8 +2752,8 @@ Join here: ${inviteLink}`.trim();
         ) : tuneLibrary.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
-            <p>You haven't bid on any media yet.</p>
-            <p className="text-sm mt-2">Start bidding on tunes to build your library!</p>
+            <p>You haven't tipped on any media yet.</p>
+            <p className="text-sm mt-2">Start tipping on tunes to build your library!</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -2874,7 +2874,7 @@ Join here: ${inviteLink}`.trim();
                       <button
                         onClick={() => handleIncreaseBid(item)}
                         className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                        title="Increase bid"
+                        title="Increase tip"
                       >
                         <Plus className="h-3 w-3 mr-1" />
                         Tip
