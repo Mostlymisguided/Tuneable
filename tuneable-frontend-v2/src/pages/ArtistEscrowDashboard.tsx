@@ -7,7 +7,6 @@ import {
   AlertCircle, 
   CheckCircle, 
   Loader2,
-  DollarSign,
   History,
   Search,
   RefreshCw,
@@ -195,7 +194,7 @@ const ArtistEscrowDashboard: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <DollarSign className="h-5 w-5" />
+                    <Coins className="h-5 w-5" />
                     <span>Request Payout</span>
                   </>
                 )}
