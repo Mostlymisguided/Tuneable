@@ -1171,7 +1171,7 @@ const UserProfile: React.FC = () => {
             {/* User Info */}
             <div className="flex-1 text-white">
               <div className="">
-                <h1 className="text-4xl font-bold">{user.username}</h1>
+                <h1 className="text-4xl font-bold mb-1">{user.username}</h1>
                 {(user.givenName || user.familyName) && (
                   <p className="text-xl text-gray-300 mb-2">
                     {user.givenName} {user.familyName}

@@ -113,8 +113,18 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
       if (onPendingCountChange) {
         try {
           const pendingData = await reportAPI.getReports('pending', undefined, reportType);
-          const pendingCount = pendingData.total ?? (pendingData.reports?.length ?? 0);
-          onPendingCountChange(pendingCount);
+          // Double-check: filter the reports array to ensure only pending reports are counted
+          const pendingReports = pendingData.reports || [];
+          const actualPendingCount = pendingReports.filter((r: any) => r.status === 'pending').length;
+          const pendingCount = pendingData.total ?? actualPendingCount;
+          
+          // Use the actual filtered count if it differs from total (safety check)
+          // This ensures we don't count dismissed/resolved reports
+          const finalCount = actualPendingCount > 0 && actualPendingCount !== pendingCount 
+            ? actualPendingCount 
+            : pendingCount;
+          
+          onPendingCountChange(finalCount);
         } catch (pendingError) {
           console.error('Error fetching pending count:', pendingError);
           // Fallback to counting from current list if separate fetch fails
@@ -134,6 +144,11 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
   const handleUpdateStatus = async (reportId: string, newStatus: string) => {
     try {
       setUpdatingReport(true);
+      
+      // Get the current report to check if it was pending
+      const currentReport = reports.find(r => r._id === reportId);
+      const wasPending = currentReport?.status === 'pending';
+      
       await reportAPI.updateReport(reportId, {
         status: newStatus,
         adminNotes: adminNotes || undefined
@@ -141,7 +156,22 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
       toast.success(`Report ${newStatus}`);
       setSelectedReport(null);
       setAdminNotes('');
-      loadReports();
+      
+      // Immediately update local count if report was pending and is now dismissed/resolved
+      if (onPendingCountChange && wasPending && (newStatus === 'dismissed' || newStatus === 'resolved')) {
+        // Get current count and decrement it immediately for better UX
+        // We'll fetch the actual count in loadReports() to ensure accuracy
+        const currentPendingData = await reportAPI.getReports('pending', undefined, reportType).catch(() => null);
+        if (currentPendingData) {
+          const pendingReports = currentPendingData.reports || [];
+          const actualPendingCount = pendingReports.filter((r: any) => r.status === 'pending').length;
+          const pendingCount = currentPendingData.total ?? actualPendingCount;
+          onPendingCountChange(pendingCount);
+        }
+      }
+      
+      // Then reload reports to get fresh data
+      await loadReports();
     } catch (error) {
       console.error('Error updating report:', error);
       toast.error('Failed to update report');
