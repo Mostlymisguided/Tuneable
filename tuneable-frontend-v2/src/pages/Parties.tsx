@@ -481,6 +481,11 @@ const Parties: React.FC = () => {
           <button
             onClick={(e) => {
               e.stopPropagation(); // Prevent card click
+              if (!user) {
+                toast.info('Please log in to join parties');
+                navigate('/login');
+                return;
+              }
               const partyId = party._id || party.id || party.uuid;
               if (partyId) {
                 handleJoinParty(partyId, party.name, party.privacy, party.host, party.partiers);
@@ -490,7 +495,7 @@ const Parties: React.FC = () => {
             }}
             className="btn-primary text-base"
           >
-            Join Party
+            {user ? 'Join Party' : 'Login to Join'}
           </button>
         )}
       </div>

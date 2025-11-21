@@ -732,6 +732,11 @@ const Party: React.FC = () => {
   };
 
   const handleAddMediaToParty = async (media: any) => {
+    if (!user) {
+      toast.info('Please log in to add media to parties');
+      navigate('/login');
+      return;
+    }
     if (!partyId) return;
     
     let category = media.category || 'Unknown';
@@ -802,6 +807,14 @@ const Party: React.FC = () => {
     
     // ✅ Set loading state IMMEDIATELY to disable button
     setIsBidding(true);
+    
+    // Check if user is logged in
+    if (!user) {
+      toast.info('Please log in to place tips');
+      navigate('/login');
+      setIsBidding(false); // Reset on early return
+      return;
+    }
     
     // Use ref values to avoid state update race conditions
     const currentPendingMedia = pendingMediaRef.current || pendingMedia;

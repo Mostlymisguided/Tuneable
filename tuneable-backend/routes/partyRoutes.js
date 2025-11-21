@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const Party = require('../models/Party');
 const Media = require('../models/Media');
@@ -199,26 +200,31 @@ router.post("/join/:partyId", authMiddleware, async (req, res) => {
 /**
  * Route: GET /
  * Fetch all parties
- * Access: Protected (requires valid token)
+ * Access: Public (optional auth - shows private parties if logged in)
  */
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', optionalAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user?._id; // Optional - may be null for unauthenticated users
         
-        // Get user's joined parties to filter private parties
-        const User = require('../models/User');
-        const user = await User.findById(userId).select('joinedParties');
-        const joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId) || [];
+        // Get user's joined parties to filter private parties (only if logged in)
+        let joinedPartyIds = [];
+        if (userId) {
+            const User = require('../models/User');
+            const user = await User.findById(userId).select('joinedParties');
+            joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId) || [];
+        }
         
         // Use aggregation to get parties with media counts in a single query
         const partiesWithCounts = await Party.aggregate([
             {
                 $match: {
-                    // Show public parties OR private parties the user has joined OR parties the user hosts
+                    // Show public parties OR (if logged in) private parties the user has joined OR parties the user hosts
                     $or: [
                         { privacy: 'public' },
-                        { privacy: 'private', _id: { $in: joinedPartyIds } },
-                        { privacy: 'private', host: userId }
+                        ...(userId ? [
+                            { privacy: 'private', _id: { $in: joinedPartyIds } },
+                            { privacy: 'private', host: userId }
+                        ] : [])
                     ]
                 }
             },
@@ -375,9 +381,11 @@ router.get('/search-by-code/:code', authMiddleware, async (req, res) => {
 });
 
 // FETCH PARTY DETAILS
-router.get('/:id/details', authMiddleware, async (req, res) => {
+// Access: Public (optional auth - shows private parties if logged in and joined)
+router.get('/:id/details', optionalAuthMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?._id; // Optional - may be null for unauthenticated users
 
         // Check if this is the Global Party
         const isGlobalParty = await Party.getGlobalParty();
@@ -606,6 +614,31 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
 
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Check if party is private and user is not authenticated or not joined
+        if (party.privacy === 'private' && !isRequestingGlobalParty) {
+            if (!userId) {
+                return res.status(403).json({ 
+                    error: 'Private party', 
+                    message: 'This is a private party. Please log in and join to view it.' 
+                });
+            }
+            
+            // Check if user is host, partier, or has joined
+            const User = require('../models/User');
+            const user = await User.findById(userId).select('joinedParties');
+            const joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId.toString()) || [];
+            const isHost = party.host.toString() === userId.toString();
+            const isPartier = party.partiers.some(p => p.toString() === userId.toString());
+            const hasJoined = joinedPartyIds.includes(party._id.toString());
+            
+            if (!isHost && !isPartier && !hasJoined) {
+                return res.status(403).json({ 
+                    error: 'Access denied', 
+                    message: 'You must join this private party to view it.' 
+                });
+            }
         }
 
         console.log('Fetched Party Details:', JSON.stringify(party, null, 2));

@@ -158,19 +158,11 @@ const AppContent = () => {
             />
             <Route 
               path="/parties" 
-              element={
-                <ProtectedRoute>
-                  <Parties />
-                </ProtectedRoute>
-              } 
+              element={<Parties />} 
             />
             <Route 
               path="/party/:partyId" 
-              element={
-                <ProtectedRoute>
-                  <Party />
-                </ProtectedRoute>
-              } 
+              element={<Party />} 
             />
             <Route 
               path="/create-party" 
