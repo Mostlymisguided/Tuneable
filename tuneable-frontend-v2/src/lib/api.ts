@@ -126,12 +126,19 @@ api.interceptors.response.use(
       const isAuthEndpoint = error.config?.url?.includes('/users/login') || 
                              error.config?.url?.includes('/users/register');
       
-      if (!isAuthEndpoint) {
+      // Only redirect if user had a token (meaning they were authenticated but token expired/invalid)
+      // If no token exists, the route might be public and we shouldn't redirect
+      const hadToken = localStorage.getItem('token');
+      
+      if (!isAuthEndpoint && hadToken) {
         // Clear auth data and redirect to login for other endpoints
+        // Only do this if user was previously authenticated (had a token)
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+      // If no token existed, don't redirect - let the component handle the error
+      // This allows public routes (party details, tune profiles) to work without auth
     }
     return Promise.reject(error);
   }
