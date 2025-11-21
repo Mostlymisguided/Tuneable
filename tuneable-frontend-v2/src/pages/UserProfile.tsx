@@ -201,6 +201,9 @@ const UserProfile: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Username validation state
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  
   // Notification preferences state
   const [notificationPrefs, setNotificationPrefs] = useState({
     bid_received: true,
@@ -878,8 +881,43 @@ const UserProfile: React.FC = () => {
     }
   };
 
+  // Validate username format
+  const validateUsername = (username: string): string | null => {
+    const trimmed = username.trim();
+    
+    if (!trimmed) {
+      return 'Username cannot be empty';
+    }
+    
+    if (trimmed.length < 3) {
+      return 'Username must be at least 3 characters';
+    }
+    
+    if (trimmed.length > 20) {
+      return 'Username must be no more than 20 characters';
+    }
+    
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(trimmed)) {
+      return 'Username can only contain letters, numbers, underscores, and hyphens';
+    }
+    
+    return null; // Valid
+  };
+
   const handleSaveProfileInternal = async () => {
     try {
+      // Validate username before submitting
+      if (editForm.username && editForm.username !== user?.username) {
+        const usernameValidationError = validateUsername(editForm.username);
+        if (usernameValidationError) {
+          setUsernameError(usernameValidationError);
+          toast.error(usernameValidationError);
+          return;
+        }
+        setUsernameError(null);
+      }
+      
       // Format the data for the backend - socialMedia is now top-level
       const { socialMedia, homeLocation, secondaryLocation, ...otherFields } = editForm;
       const formattedData = {
@@ -893,6 +931,7 @@ const UserProfile: React.FC = () => {
       
       await authAPI.updateProfile(formattedData);
       toast.success('Profile updated successfully!');
+      setUsernameError(null); // Clear any errors on success
       // Only update modal state if NOT in settings mode
       if (!isSettingsMode) {
       setIsEditingProfile(false);
@@ -901,7 +940,14 @@ const UserProfile: React.FC = () => {
       await fetchUserProfile();
     } catch (err: any) {
       console.error('Error updating profile:', err);
-      toast.error(err.response?.data?.error || 'Failed to update profile');
+      const errorMessage = err.response?.data?.error || 'Failed to update profile';
+      
+      // Set username-specific error if field is specified
+      if (err.response?.data?.field === 'username') {
+        setUsernameError(errorMessage);
+      }
+      
+      toast.error(errorMessage);
       throw err; // Re-throw so caller can handle it
     }
   };
@@ -1973,10 +2019,31 @@ const UserProfile: React.FC = () => {
                   <input
                     type="text"
                     value={editForm.username}
-                    onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                    className="input"
+                    onChange={(e) => {
+                      const newUsername = e.target.value;
+                      setEditForm({ ...editForm, username: newUsername });
+                      // Clear error when user starts typing
+                      if (usernameError) {
+                        setUsernameError(null);
+                      }
+                      // Real-time validation (only if changed from original)
+                      if (newUsername !== user?.username && newUsername.trim()) {
+                        const error = validateUsername(newUsername);
+                        setUsernameError(error);
+                      }
+                    }}
+                    className={`input ${usernameError ? 'border-red-500' : editForm.username && editForm.username !== user?.username && !usernameError ? 'border-green-500' : ''}`}
                     placeholder="Enter username"
                   />
+                  {usernameError && (
+                    <p className="mt-1 text-sm text-red-400">{usernameError}</p>
+                  )}
+                  {!usernameError && editForm.username && editForm.username !== user?.username && (
+                    <p className="mt-1 text-sm text-green-400">Username looks good!</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-400">
+                    3-20 characters, letters, numbers, underscores, and hyphens only
+                  </p>
                 </div>
 
                 {/* Name Fields */}
@@ -2690,10 +2757,31 @@ const UserProfile: React.FC = () => {
                 <input
                   type="text"
                   value={editForm.username}
-                  onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                  className="input"
+                  onChange={(e) => {
+                    const newUsername = e.target.value;
+                    setEditForm({ ...editForm, username: newUsername });
+                    // Clear error when user starts typing
+                    if (usernameError) {
+                      setUsernameError(null);
+                    }
+                    // Real-time validation (only if changed from original)
+                    if (newUsername !== user?.username && newUsername.trim()) {
+                      const error = validateUsername(newUsername);
+                      setUsernameError(error);
+                    }
+                  }}
+                  className={`input ${usernameError ? 'border-red-500' : editForm.username && editForm.username !== user?.username && !usernameError ? 'border-green-500' : ''}`}
                   placeholder="Enter username"
                 />
+                {usernameError && (
+                  <p className="mt-1 text-sm text-red-400">{usernameError}</p>
+                )}
+                {!usernameError && editForm.username && editForm.username !== user?.username && (
+                  <p className="mt-1 text-sm text-green-400">Username looks good!</p>
+                )}
+                <p className="mt-1 text-xs text-gray-400">
+                  3-20 characters, letters, numbers, underscores, and hyphens only
+                </p>
               </div>
 
               {/* Given Name */}

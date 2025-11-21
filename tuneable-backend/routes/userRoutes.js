@@ -1729,10 +1729,57 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { profilePic, homeLocation, secondaryLocation, locations, ...updatedFields } = req.body; // Ensure profilePic isn't overwritten
+    const { profilePic, homeLocation, secondaryLocation, locations, username, ...updatedFields } = req.body; // Extract username separately for validation
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Handle username update with validation
+    if (username !== undefined && username !== user.username) {
+      // Trim whitespace
+      const trimmedUsername = username.trim();
+      
+      // Validate username format
+      // Allow: alphanumeric, underscores, hyphens
+      // Length: 3-20 characters
+      const usernameRegex = /^[a-zA-Z0-9_-]{3,20}$/;
+      
+      if (!trimmedUsername) {
+        return res.status(400).json({ error: 'Username cannot be empty', field: 'username' });
+      }
+      
+      if (trimmedUsername.length < 3) {
+        return res.status(400).json({ error: 'Username must be at least 3 characters long', field: 'username' });
+      }
+      
+      if (trimmedUsername.length > 20) {
+        return res.status(400).json({ error: 'Username must be no more than 20 characters long', field: 'username' });
+      }
+      
+      if (!usernameRegex.test(trimmedUsername)) {
+        return res.status(400).json({ 
+          error: 'Username can only contain letters, numbers, underscores, and hyphens', 
+          field: 'username' 
+        });
+      }
+      
+      // Check for uniqueness (case-insensitive)
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existingUser = await User.findOne({ 
+        username: { $regex: new RegExp(`^${escapeRegex(trimmedUsername)}$`, 'i') },
+        _id: { $ne: user._id } // Exclude current user
+      });
+      
+      if (existingUser) {
+        return res.status(400).json({ 
+          error: 'Username already in use', 
+          field: 'username' 
+        });
+      }
+      
+      // Username is valid and unique, update it
+      user.username = trimmedUsername;
+    }
 
     // Handle location updates
     // Support both new format (homeLocation/secondaryLocation) and legacy (locations)
@@ -1772,13 +1819,30 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
     }
 
-    // Update other fields
+    // Update other fields (excluding username which is already handled above)
     Object.assign(user, updatedFields);
-    await user.save();
+    
+    // Save user with validation
+    try {
+      await user.save();
+    } catch (saveError) {
+      // Handle MongoDB duplicate key error (race condition)
+      if (saveError.code === 11000) {
+        const field = Object.keys(saveError.keyPattern)[0];
+        if (field === 'username') {
+          return res.status(400).json({ 
+            error: 'Username already in use', 
+            field: 'username' 
+          });
+        }
+      }
+      throw saveError;
+    }
 
     const updatedUser = await User.findById(user._id).select('-password');
     res.json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (error) {
+    console.error('Error updating profile:', error);
     res.status(500).json({ error: 'Error updating profile', details: error.message });
   }
 });
