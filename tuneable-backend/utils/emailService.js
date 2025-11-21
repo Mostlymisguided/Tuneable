@@ -356,21 +356,27 @@ async function sendPaymentNotification(user, amount, currency = 'gbp') {
 }
 
 // Send high-value bid notification
+// Note: bid.amount is stored in PENCE (integer), threshold is in POUNDS
 async function sendHighValueBidNotification(bid, media, user, threshold = 10) {
-  if (bid.amount < threshold) return false; // Only send for high-value bids
+  // Convert threshold from pounds to pence for comparison
+  const thresholdPence = Math.round(threshold * 100);
+  if (bid.amount < thresholdPence) return false; // Only send for high-value bids
+
+  // Convert bid amount from pence to pounds for display
+  const bidAmountPounds = bid.amount / 100;
 
   try {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: ADMIN_EMAIL,
-      subject: `🔥 High-Value Tip: £${bid.amount.toFixed(2)} on ${media.title}`,
+      subject: `🔥 High-Value Tip: £${bidAmountPounds.toFixed(2)} on ${media.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #9333ea;">🔥 High-Value Tip Placed</h2>
           
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">Tip Details</h3>
-            <p><strong>Amount:</strong> £${bid.amount.toFixed(2)}</p>
+            <p><strong>Amount:</strong> £${bidAmountPounds.toFixed(2)}</p>
             <p><strong>Placed:</strong> ${new Date(bid.createdAt).toLocaleString()}</p>
           </div>
 

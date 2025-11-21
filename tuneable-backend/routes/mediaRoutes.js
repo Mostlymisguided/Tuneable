@@ -2244,18 +2244,18 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         mediaId: media._id,
         media_uuid: media.uuid,
         addedBy: userId,
-        partyMediaAggregate: amount,
+        partyMediaAggregate: bidAmountPence, // Use pence
         partyBids: [bid._id],
         status: 'active',
         queuedAt: new Date(),
-        partyMediaBidTop: amount,
+        partyMediaBidTop: bidAmountPence, // Use pence
         partyMediaBidTopUser: userId,
-        partyMediaAggregateTop: amount,
+        partyMediaAggregateTop: bidAmountPence, // Use pence
         partyMediaAggregateTopUser: userId
       };
       globalParty.media.push(partyMediaEntry);
     } else {
-      partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + amount;
+      partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmountPence; // Use pence
       partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
       partyMediaEntry.partyBids.push(bid._id);
       // Ensure status is valid (fix any legacy 'queued' status)
@@ -2274,9 +2274,9 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     await globalParty.save();
 
     // Store previous top bid info for outbid notification
-    const previousTopBidAmount = media.globalMediaBidTop || 0;
+    const previousTopBidAmount = media.globalMediaBidTop || 0; // Already in pence
     const previousTopBidderId = media.globalMediaBidTopUser;
-    const wasNewTopBid = amount > previousTopBidAmount;
+    const wasNewTopBid = bidAmountPence > previousTopBidAmount; // Compare pence to pence
 
     // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
@@ -2284,7 +2284,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     
     // Update top bid if this is higher
     if (wasNewTopBid) {
-      media.globalMediaBidTop = amount;
+      media.globalMediaBidTop = bidAmountPence; // Use pence
       media.globalMediaBidTopUser = userId;
     }
     
@@ -2304,7 +2304,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           userId.toString(),
           media._id.toString(),
           bid._id.toString(),
-          amount,
+          bidAmountPence, // Use pence
           media.title
         ).catch(err => console.error('Error sending bid received notification:', err));
       }
@@ -2315,7 +2315,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           previousTopBidderId.toString(),
           media._id.toString(),
           bid._id.toString(),
-          amount,
+          bidAmountPence, // Use pence
           media.title
         ).catch(err => console.error('Error sending outbid notification:', err));
       }
@@ -2328,10 +2328,12 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     await user.save();
 
     // Send high-value bid notification
+    // Note: bid.amount is in pence, threshold is in pounds (£10 = 1000 pence)
     const { sendHighValueBidNotification } = require('../utils/emailService');
-    if (amount >= 10) {
+    const HIGH_VALUE_THRESHOLD_PENCE = 1000; // £10 in pence
+    if (bidAmountPence >= HIGH_VALUE_THRESHOLD_PENCE) {
       try {
-        await sendHighValueBidNotification(bid, media, user, 10);
+        await sendHighValueBidNotification(bid, media, user, 10); // Pass threshold in pounds
       } catch (emailError) {
         console.error('Failed to send high-value bid notification:', emailError);
       }
