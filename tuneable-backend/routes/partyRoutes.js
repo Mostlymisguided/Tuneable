@@ -1018,7 +1018,6 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             // Merge tags if provided
             if (videoTags && videoTags.length > 0) {
                 media.tags = mergeTags(media.tags, videoTags);
-                await media.save();
                 console.log(`✅ Merged tags into existing media: "${media.title}" (${media._id})`);
             }
             console.log(`✅ Using existing media: "${media.title}" (${media._id})`);
@@ -1038,7 +1037,6 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
                 contentForm: 'tune'
             });
             
-            await media.save();
             console.log(`✅ Created new media: "${media.title}" (${media._id})`);
         }
 
@@ -1238,7 +1236,11 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             media.globalMediaAggregateTop = userGlobalAggregate;
             media.globalMediaAggregateTopUser = userId;
         }
+        
+        // Save media once with all changes (tags, bids, global bid tracking)
+        // This ensures tags are preserved through all modifications
         await media.save();
+        console.log(`✅ Saved media with tags: "${media.title}" - tags: [${(media.tags || []).join(', ')}]`);
 
         // Note: For first bid on new media, the bidder is typically the owner, so no bid_received notification needed
 
@@ -1559,8 +1561,12 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         if (media) {
             // Merge tags if provided
             if (tags && Array.isArray(tags) && tags.length > 0) {
+                const tagsBefore = media.tags || [];
                 media.tags = mergeTags(media.tags, tags);
                 console.log(`✅ Merged tags into media: "${media.title}" (${media._id})`);
+                console.log(`   Tags before: [${tagsBefore.join(', ')}]`);
+                console.log(`   New tags: [${tags.join(', ')}]`);
+                console.log(`   Tags after: [${(media.tags || []).join(', ')}]`);
             }
             
             // Store previous top bid info for outbid notification
@@ -1581,6 +1587,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
             // Note: media.bids array already contains this bid (added above)
             // No need to maintain separate globalBids array - bidScope field on Bid model is sufficient
             await media.save();
+            console.log(`✅ Saved media with tags: "${media.title}" (${media._id}) - final tags: [${(media.tags || []).join(', ')}]`);
 
             // Send notifications (async, don't block response)
             try {
