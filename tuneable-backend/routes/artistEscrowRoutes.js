@@ -429,8 +429,8 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
       });
     }
     
-    // Find the payout request
-    const payoutRequest = await PayoutRequest.findById(requestId).populate('userId', 'username email artistEscrowBalance artistEscrowHistory');
+    // Find the payout request (don't populate user yet - will fetch fresh data)
+    const payoutRequest = await PayoutRequest.findById(requestId);
     
     if (!payoutRequest) {
       return res.status(404).json({
@@ -446,7 +446,9 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
       });
     }
     
-    const user = payoutRequest.userId;
+    // Fetch fresh user data to ensure we have latest balance
+    const user = await User.findById(payoutRequest.userId).select('username email artistEscrowBalance artistEscrowHistory creatorProfile');
+    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -454,36 +456,73 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
       });
     }
     
-    const availableBalance = user.artistEscrowBalance || 0;
     const requestedAmount = payoutRequest.requestedAmount;
     
     if (status === 'completed') {
-      // Validate balance
-      if (availableBalance < requestedAmount) {
+      // Use atomic update to prevent race conditions - deduct balance atomically
+      // This ensures balance is sufficient and update happens in one operation
+      const balanceBefore = user.artistEscrowBalance || 0;
+      
+      const updatedUser = await User.findOneAndUpdate(
+        { 
+          _id: user._id, 
+          artistEscrowBalance: { $gte: requestedAmount } // Only update if balance is sufficient
+        },
+        { 
+          $inc: { artistEscrowBalance: -requestedAmount } // Atomic decrement
+        },
+        { new: true, select: 'artistEscrowBalance artistEscrowHistory username email creatorProfile' }
+      );
+      
+      if (!updatedUser) {
+        // Balance check failed - user balance was insufficient or changed
         return res.status(400).json({
           success: false,
-          error: `User's current balance (£${(availableBalance / 100).toFixed(2)}) is less than requested amount (£${(requestedAmount / 100).toFixed(2)})`
+          error: `User's current balance (£${(balanceBefore / 100).toFixed(2)}) is less than requested amount (£${(requestedAmount / 100).toFixed(2)}) or balance was modified`
         });
       }
       
-      // Deduct from escrow balance
-      user.artistEscrowBalance = user.artistEscrowBalance - requestedAmount;
+      // Reload user to ensure we have the full history array (might be needed for proper subdocument handling)
+      const userWithHistory = await User.findById(user._id).select('artistEscrowBalance artistEscrowHistory username email creatorProfile');
       
-      // Update history entries to 'claimed' status
-      if (user.artistEscrowHistory) {
-        user.artistEscrowHistory = user.artistEscrowHistory.map(entry => {
-          if (entry.status === 'pending') {
-            return {
-              ...entry,
-              status: 'claimed',
-              claimedAt: new Date()
-            };
+      // Update history entries - only mark entries that were actually paid (FIFO)
+      // Mark history entries as claimed in order until payout amount is covered
+      if (userWithHistory && userWithHistory.artistEscrowHistory && userWithHistory.artistEscrowHistory.length > 0) {
+        let remainingPayout = requestedAmount;
+        let historyModified = false;
+        
+        // Process history entries in order (oldest first for FIFO)
+        const historyEntries = userWithHistory.artistEscrowHistory.slice(); // Create a copy
+        const updatedHistory = historyEntries.map(entry => {
+          // Convert subdocument to plain object if needed
+          const entryObj = entry.toObject ? entry.toObject() : (typeof entry === 'object' ? entry : {});
+          
+          // Only process pending entries that haven't been claimed yet
+          if (entryObj.status === 'pending' && remainingPayout > 0 && entryObj.amount) {
+            const entryAmount = entryObj.amount;
+            // Mark entry as claimed if the payout covers this entry
+            if (entryAmount <= remainingPayout) {
+              remainingPayout -= entryAmount;
+              historyModified = true;
+              return {
+                ...entryObj,
+                status: 'claimed',
+                claimedAt: new Date()
+              };
+            }
           }
-          return entry;
+          return entryObj;
         });
+        
+        // Update history if any entries were marked as claimed
+        if (historyModified) {
+          userWithHistory.artistEscrowHistory = updatedHistory;
+          await userWithHistory.save();
+        }
       }
       
-      await user.save();
+      // Use the user with history for response (or updatedUser if no history was modified)
+      const finalUser = userWithHistory || updatedUser;
       
       // Update payout request
       payoutRequest.status = 'completed';
@@ -494,11 +533,15 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
       if (notes) payoutRequest.notes = notes;
       await payoutRequest.save();
       
-      // Send notification to artist
+      // Populate user reference for email notification
+      await payoutRequest.populate('userId', 'username email artistEscrowBalance creatorProfile');
+      const userForEmail = payoutRequest.userId || finalUser;
+      
+      // Send in-app notification to artist
       try {
         const Notification = require('../models/Notification');
         const notification = new Notification({
-          userId: user._id,
+          userId: userForEmail._id,
           type: 'payout_processed',
           title: 'Payout Processed',
           message: `Your payout of £${(requestedAmount / 100).toFixed(2)} has been processed via ${payoutRequest.payoutMethod}.`,
@@ -510,11 +553,23 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
         console.error('Failed to send payout notification:', notifError);
       }
       
-      console.log(`✅ Payout completed for user ${user.username}:`);
+      // Send email notification to artist
+      try {
+        const { sendPayoutCompletedNotification } = require('../utils/emailService');
+        await sendPayoutCompletedNotification(payoutRequest, userForEmail);
+      } catch (emailError) {
+        console.error('Failed to send payout completed email:', emailError);
+        // Don't fail the request if email fails
+      }
+      
+      const remainingBalance = finalUser.artistEscrowBalance || 0;
+      
+      console.log(`✅ Payout completed for user ${userForEmail.username}:`);
       console.log(`   - Request ID: ${payoutRequest._id}`);
       console.log(`   - Amount: £${(requestedAmount / 100).toFixed(2)}`);
       console.log(`   - Method: ${payoutRequest.payoutMethod}`);
-      console.log(`   - Remaining balance: £${(user.artistEscrowBalance / 100).toFixed(2)}`);
+      console.log(`   - Balance before: £${(balanceBefore / 100).toFixed(2)}`);
+      console.log(`   - Balance after: £${(remainingBalance / 100).toFixed(2)}`);
       console.log(`   - Processed by: ${req.user.username}`);
       
       res.json({
@@ -522,13 +577,13 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
         message: 'Payout processed successfully',
         payout: {
           requestId: payoutRequest._id,
-          userId: user._id,
-          username: user.username,
+          userId: userForEmail._id,
+          username: userForEmail.username,
           amount: requestedAmount,
           amountPounds: requestedAmount / 100,
           payoutMethod: payoutRequest.payoutMethod,
-          remainingBalance: user.artistEscrowBalance,
-          remainingBalancePounds: user.artistEscrowBalance / 100,
+          remainingBalance: remainingBalance,
+          remainingBalancePounds: remainingBalance / 100,
           processedAt: payoutRequest.processedAt,
           processedBy: {
             _id: req.user._id,
@@ -545,11 +600,15 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
       if (notes) payoutRequest.notes = notes;
       await payoutRequest.save();
       
-      // Send notification to artist
+      // Populate user reference for email notification
+      await payoutRequest.populate('userId', 'username email artistEscrowBalance creatorProfile');
+      const userForEmail = payoutRequest.userId || user;
+      
+      // Send in-app notification to artist
       try {
         const Notification = require('../models/Notification');
         const notification = new Notification({
-          userId: user._id,
+          userId: userForEmail._id,
           type: 'payout_rejected',
           title: 'Payout Request Rejected',
           message: `Your payout request of £${(requestedAmount / 100).toFixed(2)} has been rejected.${notes ? ` Reason: ${notes}` : ''}`,
@@ -561,7 +620,16 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
         console.error('Failed to send rejection notification:', notifError);
       }
       
-      console.log(`❌ Payout rejected for user ${user.username}:`);
+      // Send email notification to artist
+      try {
+        const { sendPayoutRejectedNotification } = require('../utils/emailService');
+        await sendPayoutRejectedNotification(payoutRequest, userForEmail, notes);
+      } catch (emailError) {
+        console.error('Failed to send payout rejected email:', emailError);
+        // Don't fail the request if email fails
+      }
+      
+      console.log(`❌ Payout rejected for user ${userForEmail.username}:`);
       console.log(`   - Request ID: ${payoutRequest._id}`);
       console.log(`   - Amount: £${(requestedAmount / 100).toFixed(2)}`);
       console.log(`   - Reason: ${notes || 'Not specified'}`);
@@ -572,8 +640,8 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
         message: 'Payout request rejected',
         payout: {
           requestId: payoutRequest._id,
-          userId: user._id,
-          username: user.username,
+          userId: userForEmail._id,
+          username: userForEmail.username,
           amount: requestedAmount,
           amountPounds: requestedAmount / 100,
           status: 'rejected',

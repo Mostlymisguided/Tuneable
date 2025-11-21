@@ -10,7 +10,12 @@ import {
   History,
   Search,
   RefreshCw,
-  Info
+  Info,
+  X,
+  CreditCard,
+  Building2,
+  Mail,
+  Globe
 } from 'lucide-react';
 import { artistEscrowAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,6 +42,27 @@ interface EscrowInfo {
   }>;
 }
 
+type PayoutMethod = 'paypal' | 'bank_transfer' | 'wise' | 'stripe' | 'other';
+
+interface PayoutFormData {
+  payoutMethod: PayoutMethod;
+  amount: string; // Optional, empty means full balance
+  // PayPal fields
+  paypalEmail: string;
+  // Bank Transfer fields
+  accountName: string;
+  accountNumber: string;
+  sortCode: string;
+  iban: string;
+  swiftCode: string;
+  bankName: string;
+  // Wise fields
+  wiseEmail: string;
+  wiseAccountId: string;
+  // Other fields
+  otherDetails: string;
+}
+
 const ArtistEscrowDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -47,6 +73,22 @@ const ArtistEscrowDashboard: React.FC = () => {
   const [artistName, setArtistName] = useState('');
   const [youtubeChannelId, setYoutubeChannelId] = useState('');
   const [showMatchForm, setShowMatchForm] = useState(false);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  
+  const [payoutForm, setPayoutForm] = useState<PayoutFormData>({
+    payoutMethod: 'paypal',
+    amount: '',
+    paypalEmail: '',
+    accountName: '',
+    accountNumber: '',
+    sortCode: '',
+    iban: '',
+    swiftCode: '',
+    bankName: '',
+    wiseEmail: '',
+    wiseAccountId: '',
+    otherDetails: ''
+  });
 
   useEffect(() => {
     if (user) {
@@ -105,18 +147,151 @@ const ArtistEscrowDashboard: React.FC = () => {
     }
   };
 
+  const validatePayoutForm = (): boolean => {
+    const { payoutMethod, amount, paypalEmail, accountName, accountNumber, sortCode, iban, wiseEmail, otherDetails } = payoutForm;
+    
+    // Validate amount if provided
+    if (amount) {
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        toast.error('Please enter a valid amount');
+        return false;
+      }
+      if (amountNum < 1) {
+        toast.error('Minimum payout amount is £1.00');
+        return false;
+      }
+      if (escrowInfo && amountNum > escrowInfo.balancePounds) {
+        toast.error(`Amount exceeds available balance of ${penceToPounds(escrowInfo.balance)}`);
+        return false;
+      }
+    }
+
+    // Validate method-specific fields
+    switch (payoutMethod) {
+      case 'paypal':
+        if (!paypalEmail.trim()) {
+          toast.error('Please enter your PayPal email address');
+          return false;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail)) {
+          toast.error('Please enter a valid email address');
+          return false;
+        }
+        break;
+      
+      case 'bank_transfer':
+        if (!accountName.trim()) {
+          toast.error('Please enter the account holder name');
+          return false;
+        }
+        // Require either UK details (account number + sort code) OR international (IBAN)
+        const hasUKDetails = accountNumber.trim() && sortCode.trim();
+        const hasInternational = iban.trim();
+        if (!hasUKDetails && !hasInternational) {
+          toast.error('Please enter either UK bank details (Account Number + Sort Code) or International details (IBAN)');
+          return false;
+        }
+        if (hasUKDetails && (!accountNumber.trim() || !sortCode.trim())) {
+          toast.error('Please enter both Account Number and Sort Code for UK transfers');
+          return false;
+        }
+        break;
+      
+      case 'wise':
+        if (!wiseEmail.trim() && !wiseAccountId.trim()) {
+          toast.error('Please enter either your Wise email or Wise account ID');
+          return false;
+        }
+        if (wiseEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(wiseEmail)) {
+          toast.error('Please enter a valid email address');
+          return false;
+        }
+        break;
+      
+      case 'other':
+        if (!otherDetails.trim()) {
+          toast.error('Please provide payment details');
+          return false;
+        }
+        break;
+    }
+
+    return true;
+  };
+
+  const buildPayoutDetails = (): Record<string, any> => {
+    const { payoutMethod, paypalEmail, accountName, accountNumber, sortCode, iban, swiftCode, bankName, wiseEmail, wiseAccountId, otherDetails } = payoutForm;
+    
+    const details: Record<string, any> = {};
+
+    switch (payoutMethod) {
+      case 'paypal':
+        details.email = paypalEmail.trim();
+        break;
+      
+      case 'bank_transfer':
+        details.accountName = accountName.trim();
+        if (accountNumber.trim()) details.accountNumber = accountNumber.trim();
+        if (sortCode.trim()) details.sortCode = sortCode.trim();
+        if (iban.trim()) details.iban = iban.trim();
+        if (swiftCode.trim()) details.swiftCode = swiftCode.trim();
+        if (bankName.trim()) details.bankName = bankName.trim();
+        break;
+      
+      case 'wise':
+        if (wiseEmail.trim()) details.email = wiseEmail.trim();
+        if (wiseAccountId.trim()) details.accountId = wiseAccountId.trim();
+        break;
+      
+      case 'other':
+        details.details = otherDetails.trim();
+        break;
+    }
+
+    return details;
+  };
+
   const handleRequestPayout = async () => {
     if (!escrowInfo || escrowInfo.balance <= 0) {
       toast.error('No escrow balance available for payout');
       return;
     }
 
+    if (!validatePayoutForm()) {
+      return;
+    }
+
     try {
       setIsRequestingPayout(true);
-      const response = await artistEscrowAPI.requestPayout();
+      
+      const amount = payoutForm.amount ? parseFloat(payoutForm.amount) : undefined;
+      const payoutDetails = buildPayoutDetails();
+      
+      const response = await artistEscrowAPI.requestPayout(
+        amount,
+        payoutForm.payoutMethod,
+        payoutDetails
+      );
       
       if (response.success) {
         toast.success(response.message || 'Payout request submitted successfully');
+        setShowPayoutModal(false);
+        // Reset form
+        setPayoutForm({
+          payoutMethod: 'paypal',
+          amount: '',
+          paypalEmail: '',
+          accountName: '',
+          accountNumber: '',
+          sortCode: '',
+          iban: '',
+          swiftCode: '',
+          bankName: '',
+          wiseEmail: '',
+          wiseAccountId: '',
+          otherDetails: ''
+        });
         fetchEscrowInfo(); // Refresh data
       }
     } catch (error: any) {
@@ -125,6 +300,13 @@ const ArtistEscrowDashboard: React.FC = () => {
     } finally {
       setIsRequestingPayout(false);
     }
+  };
+
+  const handlePayoutFormChange = (field: keyof PayoutFormData, value: string) => {
+    setPayoutForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   if (isLoading) {
@@ -183,7 +365,7 @@ const ArtistEscrowDashboard: React.FC = () => {
             </div>
             {hasBalance && (
               <button
-                onClick={handleRequestPayout}
+                onClick={() => setShowPayoutModal(true)}
                 disabled={isRequestingPayout}
                 className="px-6 py-3 bg-yellow-500 text-gray-900 font-semibold rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
@@ -202,6 +384,300 @@ const ArtistEscrowDashboard: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Payout Request Modal */}
+        {showPayoutModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+              <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">Request Payout</h2>
+                <button
+                  onClick={() => setShowPayoutModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  disabled={isRequestingPayout}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Available Balance Info */}
+                <div className="bg-purple-900/30 border border-purple-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-300 mb-1">Available Balance</p>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {penceToPounds(escrowInfo.balance)}
+                  </p>
+                </div>
+
+                {/* Amount (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Payout Amount (optional)
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Leave empty to request your full balance
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">£</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      max={escrowInfo.balancePounds}
+                      value={payoutForm.amount}
+                      onChange={(e) => handlePayoutFormChange('amount', e.target.value)}
+                      placeholder={escrowInfo.balancePounds.toFixed(2)}
+                      className="w-full pl-8 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={isRequestingPayout}
+                    />
+                  </div>
+                </div>
+
+                {/* Payout Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Payout Method *
+                  </label>
+                  <select
+                    value={payoutForm.payoutMethod}
+                    onChange={(e) => handlePayoutFormChange('payoutMethod', e.target.value as PayoutMethod)}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    disabled={isRequestingPayout}
+                  >
+                    <option value="paypal">PayPal</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="wise">Wise (formerly TransferWise)</option>
+                    <option value="stripe">Stripe</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                {/* PayPal Fields */}
+                {payoutForm.payoutMethod === 'paypal' && (
+                  <div className="space-y-4 bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Mail className="h-5 w-5 text-blue-400" />
+                      <h3 className="font-semibold text-blue-300">PayPal Details</h3>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        PayPal Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        value={payoutForm.paypalEmail}
+                        onChange={(e) => handlePayoutFormChange('paypalEmail', e.target.value)}
+                        placeholder="your.email@example.com"
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={isRequestingPayout}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Bank Transfer Fields */}
+                {payoutForm.payoutMethod === 'bank_transfer' && (
+                  <div className="space-y-4 bg-green-900/20 border border-green-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Building2 className="h-5 w-5 text-green-400" />
+                      <h3 className="font-semibold text-green-300">Bank Account Details</h3>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Account Holder Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={payoutForm.accountName}
+                        onChange={(e) => handlePayoutFormChange('accountName', e.target.value)}
+                        placeholder="John Doe"
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                        disabled={isRequestingPayout}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Account Number (UK)
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.accountNumber}
+                          onChange={(e) => handlePayoutFormChange('accountNumber', e.target.value)}
+                          placeholder="12345678"
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          disabled={isRequestingPayout}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Sort Code (UK)
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.sortCode}
+                          onChange={(e) => handlePayoutFormChange('sortCode', e.target.value)}
+                          placeholder="12-34-56"
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          disabled={isRequestingPayout}
+                        />
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-gray-700">
+                      <p className="text-sm text-gray-400 mb-3">Or International Bank Details:</p>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          IBAN
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.iban}
+                          onChange={(e) => handlePayoutFormChange('iban', e.target.value)}
+                          placeholder="GB82 WEST 1234 5698 7654 32"
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          disabled={isRequestingPayout}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            SWIFT/BIC Code
+                          </label>
+                          <input
+                            type="text"
+                            value={payoutForm.swiftCode}
+                            onChange={(e) => handlePayoutFormChange('swiftCode', e.target.value)}
+                            placeholder="NWBKGB2L"
+                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                            disabled={isRequestingPayout}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Bank Name
+                          </label>
+                          <input
+                            type="text"
+                            value={payoutForm.bankName}
+                            onChange={(e) => handlePayoutFormChange('bankName', e.target.value)}
+                            placeholder="Bank Name"
+                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                            disabled={isRequestingPayout}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Wise Fields */}
+                {payoutForm.payoutMethod === 'wise' && (
+                  <div className="space-y-4 bg-purple-900/20 border border-purple-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Globe className="h-5 w-5 text-purple-400" />
+                      <h3 className="font-semibold text-purple-300">Wise Details</h3>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Wise Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={payoutForm.wiseEmail}
+                        onChange={(e) => handlePayoutFormChange('wiseEmail', e.target.value)}
+                        placeholder="your.email@example.com"
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        disabled={isRequestingPayout}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Wise Account ID (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={payoutForm.wiseAccountId}
+                        onChange={(e) => handlePayoutFormChange('wiseAccountId', e.target.value)}
+                        placeholder="Wise account ID"
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        disabled={isRequestingPayout}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Provide either email or account ID
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Fields */}
+                {payoutForm.payoutMethod === 'other' && (
+                  <div className="space-y-4 bg-gray-700/50 border border-gray-600 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <CreditCard className="h-5 w-5 text-gray-400" />
+                      <h3 className="font-semibold text-gray-300">Payment Details</h3>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Payment Details *
+                      </label>
+                      <textarea
+                        value={payoutForm.otherDetails}
+                        onChange={(e) => handlePayoutFormChange('otherDetails', e.target.value)}
+                        placeholder="Please provide your payment details (e.g., account information, payment method, etc.)"
+                        rows={4}
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        disabled={isRequestingPayout}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Note */}
+                <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+                  <div className="flex items-start space-x-2">
+                    <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-gray-300">
+                      <p className="mb-1">
+                        <strong className="text-white">Processing Time:</strong> Payouts are processed manually by our team, typically within 3-5 business days.
+                      </p>
+                      <p>
+                        <strong className="text-white">Security:</strong> Your payment details are encrypted and securely stored. We will only use this information to process your payout.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowPayoutModal(false)}
+                    disabled={isRequestingPayout}
+                    className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRequestPayout}
+                    disabled={isRequestingPayout}
+                    className="flex-1 px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isRequestingPayout ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Coins className="h-5 w-5" />
+                        <span>Submit Payout Request</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Unclaimed Allocations Alert */}
         {hasUnclaimed && (

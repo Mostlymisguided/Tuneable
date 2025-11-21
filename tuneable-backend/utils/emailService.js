@@ -1018,6 +1018,146 @@ async function sendPayoutRequestNotification(payoutRequest, user) {
   }
 }
 
+// Send payout completed notification to artist
+async function sendPayoutCompletedNotification(payoutRequest, user) {
+  try {
+    const unsubscribeFooter = await getUnsubscribeFooter(user);
+    
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: `✅ Payout Processed: £${(payoutRequest.requestedAmount / 100).toFixed(2)}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #10b981;">✅ Payout Processed</h2>
+          
+          <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <p style="margin: 0; color: #166534; font-size: 18px;">
+              Your payout request has been processed successfully!
+            </p>
+          </div>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Payout Details</h3>
+            <p><strong>Request ID:</strong> ${payoutRequest._id}</p>
+            <p><strong>Amount:</strong> £${(payoutRequest.requestedAmount / 100).toFixed(2)}</p>
+            <p><strong>Payout Method:</strong> ${payoutRequest.payoutMethod || 'Not specified'}</p>
+            <p><strong>Processed:</strong> ${new Date(payoutRequest.processedAt).toLocaleString()}</p>
+            ${payoutRequest.notes ? `<p><strong>Notes:</strong> ${payoutRequest.notes}</p>` : ''}
+          </div>
+
+          ${payoutRequest.payoutDetails && payoutRequest.payoutDetails.transactionId ? `
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #1f2937;">Transaction Information</h3>
+              <p><strong>Transaction ID:</strong> ${payoutRequest.payoutDetails.transactionId}</p>
+            </div>
+          ` : ''}
+
+          <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>Remaining Balance:</strong> £${((user.artistEscrowBalance || 0) / 100).toFixed(2)}
+            </p>
+            <p style="margin: 10px 0 0 0;">
+              <a href="${FRONTEND_URL}/artist-escrow" style="color: #3b82f6; text-decoration: underline;">
+                View Escrow Dashboard →
+              </a>
+            </p>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from Tuneable.
+          </p>
+          ${unsubscribeFooter}
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending payout completed email:', error);
+      return false;
+    }
+
+    console.log('✅ Payout completed notification sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending payout completed email:', error.message);
+    return false;
+  }
+}
+
+// Send payout rejected notification to artist
+async function sendPayoutRejectedNotification(payoutRequest, user, reason) {
+  try {
+    const unsubscribeFooter = await getUnsubscribeFooter(user);
+    
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: `❌ Payout Request Rejected: £${(payoutRequest.requestedAmount / 100).toFixed(2)}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #ef4444;">❌ Payout Request Rejected</h2>
+          
+          <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+            <p style="margin: 0; color: #991b1b;">
+              Your payout request has been rejected.
+            </p>
+          </div>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Request Details</h3>
+            <p><strong>Request ID:</strong> ${payoutRequest._id}</p>
+            <p><strong>Amount:</strong> £${(payoutRequest.requestedAmount / 100).toFixed(2)}</p>
+            <p><strong>Requested:</strong> ${new Date(payoutRequest.requestedAt).toLocaleString()}</p>
+            <p><strong>Rejected:</strong> ${new Date(payoutRequest.processedAt).toLocaleString()}</p>
+          </div>
+
+          ${reason ? `
+            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #991b1b;">Rejection Reason</h3>
+              <p style="color: #7f1d1d;">${reason}</p>
+            </div>
+          ` : ''}
+
+          <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>Your escrow balance remains unchanged:</strong> £${((user.artistEscrowBalance || 0) / 100).toFixed(2)}
+            </p>
+            <p style="margin: 10px 0 0 0;">
+              <a href="${FRONTEND_URL}/artist-escrow" style="color: #3b82f6; text-decoration: underline;">
+                View Escrow Dashboard →
+              </a>
+            </p>
+            ${reason ? `
+              <p style="margin: 10px 0 0 0; color: #1e40af;">
+                If you believe this is an error, please contact support.
+              </p>
+            ` : ''}
+          </div>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from Tuneable.
+          </p>
+          ${unsubscribeFooter}
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending payout rejected email:', error);
+      return false;
+    }
+
+    console.log('✅ Payout rejected notification sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending payout rejected email:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -1034,5 +1174,7 @@ module.exports = {
   sendInviteRejectionEmail,
   sendInviteEmail,
   sendWarningEmail,
-  sendPayoutRequestNotification
+  sendPayoutRequestNotification,
+  sendPayoutCompletedNotification,
+  sendPayoutRejectedNotification
 };
