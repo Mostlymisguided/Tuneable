@@ -35,7 +35,33 @@ const deriveCodeFromPartyId = (objectId) => {
     return crypto.createHash('md5').update(objectId.toString()).digest('hex').substring(0, 6).toUpperCase();
   };
 
+/**
+ * Helper function to merge tags into existing media tags array
+ * - Deduplicates tags (case-insensitive)
+ * - Trims whitespace
+ * - Preserves existing tags
+ * @param {Array} existingTags - Current tags array from media
+ * @param {Array} newTags - New tags to merge in
+ * @returns {Array} Merged tags array
+ */
+const mergeTags = (existingTags, newTags) => {
+  if (!newTags || !Array.isArray(newTags) || newTags.length === 0) {
+    return existingTags || [];
+  }
   
+  const existing = (existingTags || []).map(t => t.toLowerCase().trim());
+  const merged = [...(existingTags || [])];
+  
+  newTags.forEach(tag => {
+    const lowerTag = tag.toLowerCase().trim();
+    if (lowerTag && !existing.includes(lowerTag)) {
+      merged.push(tag.trim());
+      existing.push(lowerTag);
+    }
+  });
+  
+  return merged;
+};
 
 /**
  * Route: POST /
@@ -989,6 +1015,12 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         if (existingMedia) {
             // Use existing media
             media = existingMedia;
+            // Merge tags if provided
+            if (videoTags && videoTags.length > 0) {
+                media.tags = mergeTags(media.tags, videoTags);
+                await media.save();
+                console.log(`✅ Merged tags into existing media: "${media.title}" (${media._id})`);
+            }
             console.log(`✅ Using existing media: "${media.title}" (${media._id})`);
         } else {
             // Create new media item
@@ -1242,7 +1274,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
 router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
-        const { bidAmount } = req.body;
+        const { bidAmount, tags } = req.body;
         const userId = req.user._id;
 
         if (!mongoose.isValidObjectId(partyId)) {
@@ -1525,6 +1557,12 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
         // Update media global bid value
         const media = await Media.findById(actualMediaId);
         if (media) {
+            // Merge tags if provided
+            if (tags && Array.isArray(tags) && tags.length > 0) {
+                media.tags = mergeTags(media.tags, tags);
+                console.log(`✅ Merged tags into media: "${media.title}" (${media._id})`);
+            }
+            
             // Store previous top bid info for outbid notification
             const previousTopBidAmount = media.globalMediaBidTop || 0; // Already in pence
             const previousTopBidderId = media.globalMediaBidTopUser;

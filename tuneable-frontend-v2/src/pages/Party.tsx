@@ -898,7 +898,7 @@ const Party: React.FC = () => {
         }
         
         try {
-          await partyAPI.placeBid(partyId, queueItemId, bidAmount);
+          await partyAPI.placeBid(partyId, queueItemId, bidAmount, tags);
           const mediaTitle = safePendingMedia?.title || 'media';
           toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
           

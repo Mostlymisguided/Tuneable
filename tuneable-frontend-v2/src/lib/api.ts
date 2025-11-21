@@ -261,9 +261,10 @@ export const partyAPI = {
     return response.data;
   },
   
-  placeBid: async (partyId: string, mediaId: string, bidAmount: number) => {
+  placeBid: async (partyId: string, mediaId: string, bidAmount: number, tags?: string[]) => {
     const response = await api.post(`/parties/${partyId}/media/${mediaId}/bid`, {
-      bidAmount
+      bidAmount,
+      ...(tags && tags.length > 0 ? { tags } : {})
     });
     return response.data;
   },
