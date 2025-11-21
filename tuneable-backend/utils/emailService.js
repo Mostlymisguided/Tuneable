@@ -950,6 +950,74 @@ async function sendWarningEmail(userEmail, warningData) {
   }
 }
 
+// Send payout request notification to admin
+async function sendPayoutRequestNotification(payoutRequest, user) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: ADMIN_EMAIL,
+      subject: `💰 New Payout Request: £${(payoutRequest.requestedAmount / 100).toFixed(2)} from ${user.creatorProfile?.artistName || user.username}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">💰 New Payout Request</h2>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Request Details</h3>
+            <p><strong>Request ID:</strong> ${payoutRequest._id}</p>
+            <p><strong>Amount:</strong> £${(payoutRequest.requestedAmount / 100).toFixed(2)}</p>
+            <p><strong>Requested:</strong> ${new Date(payoutRequest.requestedAt).toLocaleString()}</p>
+            <p><strong>Payout Method:</strong> ${payoutRequest.payoutMethod || 'Not specified'}</p>
+          </div>
+
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Artist Information</h3>
+            <p><strong>Artist Name:</strong> ${user.creatorProfile?.artistName || user.username}</p>
+            <p><strong>Username:</strong> @${user.username}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Available Balance:</strong> £${((user.artistEscrowBalance || 0) / 100).toFixed(2)}</p>
+          </div>
+
+          ${payoutRequest.payoutDetails && Object.keys(payoutRequest.payoutDetails).length > 0 ? `
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #1f2937;">Payout Details</h3>
+              ${Object.entries(payoutRequest.payoutDetails).map(([key, value]) => 
+                `<p><strong>${key}:</strong> ${value}</p>`
+              ).join('')}
+            </div>
+          ` : ''}
+
+          <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>Action Required:</strong> Process this payout request in the admin panel.
+            </p>
+            <p style="margin: 10px 0 0 0;">
+              <a href="${FRONTEND_URL}/admin?tab=payouts" style="color: #3b82f6; text-decoration: underline;">
+                View Payout Request →
+              </a>
+            </p>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from Tuneable.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending payout request email:', error);
+      return false;
+    }
+
+    console.log('✅ Payout request notification sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending payout request email:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -965,5 +1033,6 @@ module.exports = {
   sendInviteApprovalEmail,
   sendInviteRejectionEmail,
   sendInviteEmail,
-  sendWarningEmail
+  sendWarningEmail,
+  sendPayoutRequestNotification
 };

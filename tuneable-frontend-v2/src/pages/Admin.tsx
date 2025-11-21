@@ -26,7 +26,7 @@ import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import IssueWarningModal from '../components/IssueWarningModal';
-import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, reportAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
@@ -124,6 +124,17 @@ const Admin: React.FC = () => {
   // Warning modal state
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [selectedUserForWarning, setSelectedUserForWarning] = useState<{ id: string; username: string } | null>(null);
+
+  // Payout management state
+  const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
+  const [isLoadingPayouts, setIsLoadingPayouts] = useState(false);
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState<'pending' | 'processing' | 'completed' | 'rejected' | 'all'>('pending');
+  const [selectedPayoutRequest, setSelectedPayoutRequest] = useState<any | null>(null);
+  const [processingPayout, setProcessingPayout] = useState(false);
+  const [payoutAction, setPayoutAction] = useState<'complete' | 'reject' | null>(null);
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState('bank_transfer');
+  const [payoutDetails, setPayoutDetails] = useState<Record<string, string>>({});
 
   useEffect(() => {
     checkAdminStatus();
@@ -742,6 +753,51 @@ const Admin: React.FC = () => {
     }
   }, [activeTab, reportsSubTab, isAdmin]);
 
+  const loadPayouts = async () => {
+    try {
+      setIsLoadingPayouts(true);
+      const response = await artistEscrowAPI.getPayouts(payoutStatusFilter);
+      setPayoutRequests(response.payouts || []);
+    } catch (error: any) {
+      console.error('Error loading payouts:', error);
+      toast.error(error.response?.data?.error || 'Failed to load payout requests');
+      setPayoutRequests([]);
+    } finally {
+      setIsLoadingPayouts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'payouts' && isAdmin) {
+      loadPayouts();
+    }
+  }, [activeTab, payoutStatusFilter, isAdmin]);
+
+  const handleProcessPayout = async (requestId: string, status: 'completed' | 'rejected') => {
+    try {
+      setProcessingPayout(true);
+      await artistEscrowAPI.processPayout(
+        requestId,
+        status,
+        payoutMethod,
+        Object.keys(payoutDetails).length > 0 ? payoutDetails : undefined,
+        payoutNotes || undefined
+      );
+      toast.success(`Payout ${status === 'completed' ? 'processed' : 'rejected'} successfully`);
+      setSelectedPayoutRequest(null);
+      setPayoutAction(null);
+      setPayoutNotes('');
+      setPayoutMethod('bank_transfer');
+      setPayoutDetails({});
+      await loadPayouts();
+    } catch (error: any) {
+      console.error('Error processing payout:', error);
+      toast.error(error.response?.data?.error || 'Failed to process payout');
+    } finally {
+      setProcessingPayout(false);
+    }
+  };
+
   const getLabelSortIcon = (field: string) => {
     if (labelSortField !== field) {
       return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
@@ -808,6 +864,7 @@ const Admin: React.FC = () => {
     { id: 'media-management', name: 'Media', icon: Music },
     { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
     { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
+    { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -2861,6 +2918,227 @@ const Admin: React.FC = () => {
                   }))
                 }
               />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'payouts' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <DollarSign className="h-8 w-8 text-yellow-400 mr-3" />
+                <h2 className="text-2xl font-bold text-white">Artist Payout Requests</h2>
+              </div>
+              <div className="flex items-center space-x-4">
+                <select
+                  value={payoutStatusFilter}
+                  onChange={(e) => setPayoutStatusFilter(e.target.value as any)}
+                  className="bg-gray-800 text-white border border-gray-600 rounded-lg px-4 py-2"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="completed">Completed</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="all">All</option>
+                </select>
+                <button
+                  onClick={loadPayouts}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {isLoadingPayouts ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+              </div>
+            ) : payoutRequests.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <p className="text-gray-400">No payout requests found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {payoutRequests.map((request) => (
+                  <div
+                    key={request._id}
+                    className="bg-gray-800 rounded-lg p-6 border border-gray-700"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <h3 className="text-lg font-semibold text-white">
+                            {request.artistName || request.username}
+                          </h3>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            request.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                            request.status === 'processing' ? 'bg-blue-500/20 text-blue-400' :
+                            request.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {request.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-400">Amount</p>
+                            <p className="text-white font-semibold">£{request.requestedAmountPounds.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400">Available Balance</p>
+                            <p className="text-white">£{request.availableBalancePounds.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400">Payout Method</p>
+                            <p className="text-white">{request.payoutMethod || 'Not specified'}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400">Requested</p>
+                            <p className="text-white">{new Date(request.requestedAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        {request.email && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-400">Email: {request.email}</p>
+                          </div>
+                        )}
+                        {request.payoutDetails && Object.keys(request.payoutDetails).length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-400 mb-1">Payout Details:</p>
+                            <div className="bg-gray-900 rounded p-2 text-xs">
+                              {Object.entries(request.payoutDetails).map(([key, value]) => (
+                                <p key={key} className="text-gray-300">
+                                  <span className="text-gray-500">{key}:</span> {String(value)}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {request.notes && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-400">Notes: {request.notes}</p>
+                          </div>
+                        )}
+                        {request.processedBy && (
+                          <div className="mt-3 text-sm text-gray-400">
+                            Processed by {request.processedBy.username} on {new Date(request.processedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                      {request.status === 'pending' && (
+                        <div className="flex flex-col space-y-2 ml-4">
+                          <button
+                            onClick={() => {
+                              setSelectedPayoutRequest(request);
+                              setPayoutAction('complete');
+                              setPayoutMethod(request.payoutMethod || 'bank_transfer');
+                              setPayoutDetails(request.payoutDetails || {});
+                            }}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            Complete
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedPayoutRequest(request);
+                              setPayoutAction('reject');
+                            }}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Process Payout Modal */}
+            {selectedPayoutRequest && payoutAction && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
+                  <h3 className="text-xl font-bold text-white mb-4">
+                    {payoutAction === 'complete' ? 'Complete Payout' : 'Reject Payout'}
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">Artist</p>
+                      <p className="text-white">{selectedPayoutRequest.artistName || selectedPayoutRequest.username}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">Amount</p>
+                      <p className="text-white font-semibold">£{selectedPayoutRequest.requestedAmountPounds.toFixed(2)}</p>
+                    </div>
+                    {payoutAction === 'complete' && (
+                      <>
+                        <div>
+                          <label className="block text-gray-400 text-sm mb-1">Payout Method</label>
+                          <select
+                            value={payoutMethod}
+                            onChange={(e) => setPayoutMethod(e.target.value)}
+                            className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2"
+                          >
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="stripe">Stripe</option>
+                            <option value="manual">Manual</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 text-sm mb-1">Transaction ID / Reference (optional)</label>
+                          <input
+                            type="text"
+                            value={payoutDetails.transactionId || ''}
+                            onChange={(e) => setPayoutDetails({ ...payoutDetails, transactionId: e.target.value })}
+                            className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2"
+                            placeholder="Enter transaction ID or reference"
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <label className="block text-gray-400 text-sm mb-1">
+                        {payoutAction === 'complete' ? 'Notes (optional)' : 'Rejection Reason'}
+                      </label>
+                      <textarea
+                        value={payoutNotes}
+                        onChange={(e) => setPayoutNotes(e.target.value)}
+                        className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 h-24"
+                        placeholder={payoutAction === 'complete' ? 'Add any notes about this payout...' : 'Explain why this payout is being rejected...'}
+                      />
+                    </div>
+                    <div className="flex space-x-3 pt-4">
+                      <button
+                        onClick={() => {
+                          setSelectedPayoutRequest(null);
+                          setPayoutAction(null);
+                          setPayoutNotes('');
+                          setPayoutMethod('bank_transfer');
+                          setPayoutDetails({});
+                        }}
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleProcessPayout(selectedPayoutRequest._id, payoutAction === 'complete' ? 'completed' : 'rejected')}
+                        disabled={processingPayout || (payoutAction === 'reject' && !payoutNotes.trim())}
+                        className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                          payoutAction === 'complete'
+                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                            : 'bg-red-600 hover:bg-red-700 text-white'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {processingPayout ? 'Processing...' : payoutAction === 'complete' ? 'Complete Payout' : 'Reject Payout'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}

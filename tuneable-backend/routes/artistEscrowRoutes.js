@@ -116,7 +116,7 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
     const userId = req.user._id;
     const { amount, payoutMethod, payoutDetails } = req.body;
     
-    const user = await User.findById(userId).select('artistEscrowBalance username email');
+    const user = await User.findById(userId).select('artistEscrowBalance username email creatorProfile');
     
     if (!user) {
       return res.status(404).json({
@@ -150,21 +150,75 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
       });
     }
     
-    // For MVP: Create a payout request record (manual processing)
-    // In Phase 2: This would trigger Stripe Connect transfer
+    // Check for existing pending request
+    const PayoutRequest = require('../models/PayoutRequest');
+    const existingRequest = await PayoutRequest.findOne({
+      userId: userId,
+      status: { $in: ['pending', 'processing'] }
+    });
     
-    // TODO: Create PayoutRequest model for tracking manual payouts
-    // For now, just return success and log for admin processing
+    if (existingRequest) {
+      return res.status(400).json({
+        success: false,
+        error: 'You already have a pending payout request. Please wait for it to be processed.'
+      });
+    }
     
-    console.log(`💰 Payout request from user ${user.username} (${user.email}):`);
+    // Create payout request record
+    const payoutRequest = new PayoutRequest({
+      userId: userId,
+      user_uuid: user.uuid,
+      requestedAmount: requestedAmount,
+      payoutMethod: payoutMethod || 'bank_transfer',
+      payoutDetails: payoutDetails || {},
+      status: 'pending',
+      username: user.username,
+      email: user.email,
+      artistName: user.creatorProfile?.artistName || user.username
+    });
+    
+    await payoutRequest.save();
+    
+    // Send notification to admin
+    try {
+      const Notification = require('../models/Notification');
+      const adminUsers = await User.find({ role: 'admin' }).select('_id');
+      
+      for (const admin of adminUsers) {
+        const notification = new Notification({
+          userId: admin._id,
+          type: 'payout_requested',
+          title: 'New Payout Request',
+          message: `${user.creatorProfile?.artistName || user.username} requested a payout of £${(requestedAmount / 100).toFixed(2)}`,
+          link: '/admin?tab=payouts',
+          linkText: 'View Payout Request'
+        });
+        await notification.save();
+      }
+    } catch (notifError) {
+      console.error('Failed to send payout request notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+    
+    // Send email notification to admin
+    try {
+      const { sendPayoutRequestNotification } = require('../utils/emailService');
+      await sendPayoutRequestNotification(payoutRequest, user);
+    } catch (emailError) {
+      console.error('Failed to send payout request email:', emailError);
+      // Don't fail the request if email fails
+    }
+    
+    console.log(`💰 Payout request created for user ${user.username} (${user.email}):`);
+    console.log(`   - Request ID: ${payoutRequest._id}`);
     console.log(`   - Requested: £${(requestedAmount / 100).toFixed(2)}`);
     console.log(`   - Available: £${(availableBalance / 100).toFixed(2)}`);
-    console.log(`   - Method: ${payoutMethod || 'not specified'}`);
-    console.log(`   - Details:`, payoutDetails || 'none');
+    console.log(`   - Method: ${payoutMethod || 'bank_transfer'}`);
     
     res.json({
       success: true,
       message: 'Payout request submitted. You will be notified when it is processed.',
+      requestId: payoutRequest._id,
       requestedAmount: requestedAmount,
       requestedAmountPounds: requestedAmount / 100,
       availableBalance: availableBalance,
@@ -258,39 +312,80 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 
 /**
  * @route   GET /api/artist-escrow/admin/payouts
- * @desc    Get all pending payout requests (admin only)
+ * @desc    Get all payout requests (admin only)
  * @access  Private (admin only)
+ * 
+ * Query params:
+ *   status: 'pending' | 'processing' | 'completed' | 'rejected' (optional, defaults to 'pending')
  */
 router.get('/admin/payouts', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    // For MVP: Get all users with escrow balance > 0
-    // In Phase 2: Query PayoutRequest model
-    const usersWithEscrow = await User.find({
-      artistEscrowBalance: { $gt: 0 }
-    })
-      .select('username email artistEscrowBalance artistEscrowHistory creatorProfile')
-      .sort({ artistEscrowBalance: -1 })
+    const PayoutRequest = require('../models/PayoutRequest');
+    const statusFilter = req.query.status || 'pending';
+    
+    // Validate status filter
+    const validStatuses = ['pending', 'processing', 'completed', 'rejected', 'all'];
+    if (!validStatuses.includes(statusFilter)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status filter. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+    
+    // Build query
+    const query = {};
+    if (statusFilter !== 'all') {
+      query.status = statusFilter;
+    }
+    
+    // Get payout requests with populated user data
+    const payoutRequests = await PayoutRequest.find(query)
+      .populate('userId', 'username email artistEscrowBalance creatorProfile')
+      .populate('processedBy', 'username')
+      .sort({ requestedAt: -1 })
       .limit(100);
     
-    const payoutRequests = usersWithEscrow.map(user => ({
-      userId: user._id,
-      username: user.username,
-      email: user.email,
-      artistName: user.creatorProfile?.artistName || user.username,
-      balance: user.artistEscrowBalance,
-      balancePounds: user.artistEscrowBalance / 100,
-      historyCount: user.artistEscrowHistory?.length || 0,
-      lastAllocation: user.artistEscrowHistory && user.artistEscrowHistory.length > 0
-        ? user.artistEscrowHistory[user.artistEscrowHistory.length - 1].allocatedAt
-        : null
-    }));
+    // Format response
+    const formattedRequests = payoutRequests.map(request => {
+      const user = request.userId;
+      return {
+        _id: request._id,
+        uuid: request.uuid,
+        userId: request.userId._id || request.userId,
+        username: request.username || user?.username,
+        email: request.email || user?.email,
+        artistName: request.artistName || user?.creatorProfile?.artistName || user?.username,
+        requestedAmount: request.requestedAmount,
+        requestedAmountPounds: request.requestedAmount / 100,
+        availableBalance: user?.artistEscrowBalance || 0,
+        availableBalancePounds: (user?.artistEscrowBalance || 0) / 100,
+        payoutMethod: request.payoutMethod,
+        payoutDetails: request.payoutDetails,
+        status: request.status,
+        requestedAt: request.requestedAt,
+        processedBy: request.processedBy ? {
+          _id: request.processedBy._id,
+          username: request.processedBy.username
+        } : null,
+        processedAt: request.processedAt,
+        notes: request.notes,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt
+      };
+    });
+    
+    // Calculate totals
+    const pendingRequests = formattedRequests.filter(r => r.status === 'pending');
+    const totalPendingAmount = pendingRequests.reduce((sum, r) => sum + r.requestedAmount, 0);
     
     res.json({
       success: true,
-      payouts: payoutRequests,
-      totalUsers: payoutRequests.length,
-      totalAmount: payoutRequests.reduce((sum, p) => sum + p.balance, 0),
-      totalAmountPounds: payoutRequests.reduce((sum, p) => sum + p.balancePounds, 0)
+      payouts: formattedRequests,
+      totalRequests: formattedRequests.length,
+      pendingCount: pendingRequests.length,
+      totalPendingAmount: totalPendingAmount,
+      totalPendingAmountPounds: totalPendingAmount / 100,
+      filter: statusFilter
     });
   } catch (error) {
     console.error('Error fetching payout requests:', error);
@@ -308,120 +403,189 @@ router.get('/admin/payouts', authMiddleware, adminMiddleware, async (req, res) =
  * @access  Private (admin only)
  * 
  * Body: {
- *   userId: string (required)
- *   amount?: number (optional - defaults to full balance)
- *   payoutMethod: string (required - 'bank_transfer', 'paypal', 'stripe', etc.)
- *   payoutDetails: object (optional - transaction ID, notes, etc.)
+ *   requestId: string (required) - PayoutRequest ID
+ *   status: 'completed' | 'rejected' (required)
+ *   payoutMethod?: string (optional - override from request)
+ *   payoutDetails?: object (optional - transaction ID, etc.)
+ *   notes?: string (optional - admin notes or rejection reason)
  * }
  */
 router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { userId, amount, payoutMethod, payoutDetails, notes } = req.body;
+    const PayoutRequest = require('../models/PayoutRequest');
+    const { requestId, status, payoutMethod, payoutDetails, notes } = req.body;
     
-    if (!userId) {
+    if (!requestId) {
       return res.status(400).json({
         success: false,
-        error: 'User ID is required'
+        error: 'Payout request ID is required'
       });
     }
     
-    if (!payoutMethod) {
+    if (!status || !['completed', 'rejected'].includes(status)) {
       return res.status(400).json({
         success: false,
-        error: 'Payout method is required'
+        error: 'Status is required and must be "completed" or "rejected"'
       });
     }
     
-    const user = await User.findById(userId).select('username email artistEscrowBalance artistEscrowHistory');
+    // Find the payout request
+    const payoutRequest = await PayoutRequest.findById(requestId).populate('userId', 'username email artistEscrowBalance artistEscrowHistory');
     
+    if (!payoutRequest) {
+      return res.status(404).json({
+        success: false,
+        error: 'Payout request not found'
+      });
+    }
+    
+    if (payoutRequest.status !== 'pending' && payoutRequest.status !== 'processing') {
+      return res.status(400).json({
+        success: false,
+        error: `Payout request is already ${payoutRequest.status}`
+      });
+    }
+    
+    const user = payoutRequest.userId;
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: 'User not found for this payout request'
       });
     }
     
     const availableBalance = user.artistEscrowBalance || 0;
+    const requestedAmount = payoutRequest.requestedAmount;
     
-    if (availableBalance <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'User has no escrow balance available'
-      });
-    }
-    
-    const payoutAmountPence = amount ? Math.round(amount * 100) : availableBalance;
-    
-    if (payoutAmountPence > availableBalance) {
-      return res.status(400).json({
-        success: false,
-        error: `Payout amount (£${(payoutAmountPence / 100).toFixed(2)}) exceeds available balance (£${(availableBalance / 100).toFixed(2)})`
-      });
-    }
-    
-    if (payoutAmountPence < 100) {
-      return res.status(400).json({
-        success: false,
-        error: 'Minimum payout amount is £1.00'
-      });
-    }
-    
-    // Deduct from escrow balance
-    user.artistEscrowBalance = user.artistEscrowBalance - payoutAmountPence;
-    
-    // Update history entries to 'claimed' status
-    if (user.artistEscrowHistory) {
-      user.artistEscrowHistory = user.artistEscrowHistory.map(entry => {
-        if (entry.status === 'pending') {
-          return {
-            ...entry,
-            status: 'claimed',
-            claimedAt: new Date()
-          };
-        }
-        return entry;
-      });
-    }
-    
-    await user.save();
-    
-    // Send notification to artist
-    try {
-      const Notification = require('../models/Notification');
-      const notification = new Notification({
-        userId: user._id,
-        type: 'payout_processed',
-        title: 'Payout Processed',
-        message: `Your payout of £${(payoutAmountPence / 100).toFixed(2)} has been processed via ${payoutMethod}.`,
-        link: '/artist-escrow',
-        linkText: 'View Escrow'
-      });
-      await notification.save();
-    } catch (notifError) {
-      console.error('Failed to send payout notification:', notifError);
-    }
-    
-    console.log(`💰 Payout processed for user ${user.username}:`);
-    console.log(`   - Amount: £${(payoutAmountPence / 100).toFixed(2)}`);
-    console.log(`   - Method: ${payoutMethod}`);
-    console.log(`   - Remaining balance: £${(user.artistEscrowBalance / 100).toFixed(2)}`);
-    console.log(`   - Processed by: ${req.user.username}`);
-    
-    res.json({
-      success: true,
-      message: 'Payout processed successfully',
-      payout: {
-        userId: user._id,
-        username: user.username,
-        amount: payoutAmountPence,
-        amountPounds: payoutAmountPence / 100,
-        payoutMethod: payoutMethod,
-        remainingBalance: user.artistEscrowBalance,
-        remainingBalancePounds: user.artistEscrowBalance / 100,
-        processedAt: new Date(),
-        processedBy: req.user._id
+    if (status === 'completed') {
+      // Validate balance
+      if (availableBalance < requestedAmount) {
+        return res.status(400).json({
+          success: false,
+          error: `User's current balance (£${(availableBalance / 100).toFixed(2)}) is less than requested amount (£${(requestedAmount / 100).toFixed(2)})`
+        });
       }
-    });
+      
+      // Deduct from escrow balance
+      user.artistEscrowBalance = user.artistEscrowBalance - requestedAmount;
+      
+      // Update history entries to 'claimed' status
+      if (user.artistEscrowHistory) {
+        user.artistEscrowHistory = user.artistEscrowHistory.map(entry => {
+          if (entry.status === 'pending') {
+            return {
+              ...entry,
+              status: 'claimed',
+              claimedAt: new Date()
+            };
+          }
+          return entry;
+        });
+      }
+      
+      await user.save();
+      
+      // Update payout request
+      payoutRequest.status = 'completed';
+      payoutRequest.processedBy = req.user._id;
+      payoutRequest.processedAt = new Date();
+      if (payoutMethod) payoutRequest.payoutMethod = payoutMethod;
+      if (payoutDetails) payoutRequest.payoutDetails = { ...payoutRequest.payoutDetails, ...payoutDetails };
+      if (notes) payoutRequest.notes = notes;
+      await payoutRequest.save();
+      
+      // Send notification to artist
+      try {
+        const Notification = require('../models/Notification');
+        const notification = new Notification({
+          userId: user._id,
+          type: 'payout_processed',
+          title: 'Payout Processed',
+          message: `Your payout of £${(requestedAmount / 100).toFixed(2)} has been processed via ${payoutRequest.payoutMethod}.`,
+          link: '/artist-escrow',
+          linkText: 'View Escrow'
+        });
+        await notification.save();
+      } catch (notifError) {
+        console.error('Failed to send payout notification:', notifError);
+      }
+      
+      console.log(`✅ Payout completed for user ${user.username}:`);
+      console.log(`   - Request ID: ${payoutRequest._id}`);
+      console.log(`   - Amount: £${(requestedAmount / 100).toFixed(2)}`);
+      console.log(`   - Method: ${payoutRequest.payoutMethod}`);
+      console.log(`   - Remaining balance: £${(user.artistEscrowBalance / 100).toFixed(2)}`);
+      console.log(`   - Processed by: ${req.user.username}`);
+      
+      res.json({
+        success: true,
+        message: 'Payout processed successfully',
+        payout: {
+          requestId: payoutRequest._id,
+          userId: user._id,
+          username: user.username,
+          amount: requestedAmount,
+          amountPounds: requestedAmount / 100,
+          payoutMethod: payoutRequest.payoutMethod,
+          remainingBalance: user.artistEscrowBalance,
+          remainingBalancePounds: user.artistEscrowBalance / 100,
+          processedAt: payoutRequest.processedAt,
+          processedBy: {
+            _id: req.user._id,
+            username: req.user.username
+          }
+        }
+      });
+      
+    } else if (status === 'rejected') {
+      // Update payout request to rejected
+      payoutRequest.status = 'rejected';
+      payoutRequest.processedBy = req.user._id;
+      payoutRequest.processedAt = new Date();
+      if (notes) payoutRequest.notes = notes;
+      await payoutRequest.save();
+      
+      // Send notification to artist
+      try {
+        const Notification = require('../models/Notification');
+        const notification = new Notification({
+          userId: user._id,
+          type: 'payout_rejected',
+          title: 'Payout Request Rejected',
+          message: `Your payout request of £${(requestedAmount / 100).toFixed(2)} has been rejected.${notes ? ` Reason: ${notes}` : ''}`,
+          link: '/artist-escrow',
+          linkText: 'View Escrow'
+        });
+        await notification.save();
+      } catch (notifError) {
+        console.error('Failed to send rejection notification:', notifError);
+      }
+      
+      console.log(`❌ Payout rejected for user ${user.username}:`);
+      console.log(`   - Request ID: ${payoutRequest._id}`);
+      console.log(`   - Amount: £${(requestedAmount / 100).toFixed(2)}`);
+      console.log(`   - Reason: ${notes || 'Not specified'}`);
+      console.log(`   - Rejected by: ${req.user.username}`);
+      
+      res.json({
+        success: true,
+        message: 'Payout request rejected',
+        payout: {
+          requestId: payoutRequest._id,
+          userId: user._id,
+          username: user.username,
+          amount: requestedAmount,
+          amountPounds: requestedAmount / 100,
+          status: 'rejected',
+          rejectedAt: payoutRequest.processedAt,
+          rejectedBy: {
+            _id: req.user._id,
+            username: req.user.username
+          },
+          reason: notes
+        }
+      });
+    }
     
   } catch (error) {
     console.error('Error processing payout:', error);

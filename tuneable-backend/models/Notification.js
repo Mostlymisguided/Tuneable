@@ -32,7 +32,9 @@ const notificationSchema = new mongoose.Schema({
       'user_kicked',             // User was kicked from a party
       'escrow_allocated',        // Escrow allocated for your media
       'escrow_matched',          // Unknown artist allocations matched to your account
+      'payout_requested',        // Payout request submitted (admin notification)
       'payout_processed',        // Payout request processed
+      'payout_rejected',         // Payout request rejected
     ],
     required: true
   },
