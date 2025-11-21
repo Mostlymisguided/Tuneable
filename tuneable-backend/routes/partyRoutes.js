@@ -1242,7 +1242,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         await media.save();
         console.log(`✅ Saved media with tags: "${media.title}" - tags: [${(media.tags || []).join(', ')}]`);
 
-        // Note: For first bid on new media, the bidder is typically the owner, so no bid_received notification needed
+        // Note: For first tip on new media, the tipper is typically the owner, so no tip_received notification needed
 
         // Update user balance (already in pence, no conversion needed)
         user.balance = user.balance - bidAmountPence;
@@ -1569,7 +1569,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
                 console.log(`   Tags after: [${(media.tags || []).join(', ')}]`);
             }
             
-            // Store previous top bid info for outbid notification
+            // Store previous top tip info for outtipped notification
             const previousTopBidAmount = media.globalMediaBidTop || 0; // Already in pence
             const previousTopBidderId = media.globalMediaBidTopUser;
             const wasNewTopBid = bidAmountPence > previousTopBidAmount; // Compare pence to pence
@@ -1603,10 +1603,10 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
                         bid._id.toString(),
                         bidAmount,
                         populatedMedia.title
-                    ).catch(err => console.error('Error sending bid received notification:', err));
+                    ).catch(err => console.error('Error sending tip received notification:', err));
                 }
                 
-                // Notify previous top bidder if they were outbid (and it's not the same user)
+                // Notify previous top tipper if they were outtipped (and it's not the same user)
                 if (wasNewTopBid && previousTopBidderId && previousTopBidderId.toString() !== userId.toString()) {
                     notificationService.notifyOutbid(
                         previousTopBidderId.toString(),
@@ -1614,7 +1614,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
                         bid._id.toString(),
                         bidAmount,
                         populatedMedia.title
-                    ).catch(err => console.error('Error sending outbid notification:', err));
+                    ).catch(err => console.error('Error sending outtipped notification:', err));
                 }
             } catch (error) {
                 console.error('Error setting up notifications:', error);

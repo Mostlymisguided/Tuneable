@@ -1376,7 +1376,7 @@ const UserProfile: React.FC = () => {
         {/* Tab Content */}
         {viewTab === 'overview' || !isOwnProfile ? (
           <>
-        {/* Bidding Statistics */}
+        {/* Tipping Statistics */}
         {stats && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
@@ -2602,8 +2602,8 @@ const UserProfile: React.FC = () => {
                   <h3 className="text-lg font-semibold text-white mb-3">Notification Types</h3>
                   
                   {[
-                    { key: 'bid_received', label: 'Bid Received', desc: 'When someone bids on your media' },
-                    { key: 'bid_outbid', label: 'Outbid', desc: 'When you are outbid on media' },
+                    { key: 'bid_received', label: 'Tip Received', desc: 'When someone tips on your media' },
+                    { key: 'bid_outbid', label: 'Outtipped', desc: 'When you are outtipped on media' },
                     { key: 'comment_reply', label: 'Comment Replies', desc: 'When someone replies to your comment' },
                     { key: 'tune_bytes_earned', label: 'TuneBytes Earned', desc: 'When you earn TuneBytes' },
                   ].map(({ key, label, desc }) => (

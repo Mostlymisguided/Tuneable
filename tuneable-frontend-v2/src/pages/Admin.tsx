@@ -1608,7 +1608,7 @@ const Admin: React.FC = () => {
         {activeTab === 'bids' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Bid Management</h2>
+              <h2 className="text-2xl font-bold text-white">Tip Management</h2>
               <button
                 onClick={loadBids}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
@@ -1685,7 +1685,7 @@ const Admin: React.FC = () => {
             ) : bids.length === 0 ? (
               <div className="bg-gray-800 rounded-lg p-8 text-center">
                 <DollarSign className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No bids found</p>
+                <p className="text-gray-400">No tips found</p>
               </div>
             ) : (
               <div className="bg-gray-800 rounded-lg overflow-hidden">
@@ -1821,15 +1821,15 @@ const Admin: React.FC = () => {
                                     if (reason !== null) { // Allow empty string but not cancel
                                       try {
                                         await userAPI.vetoBid(bid._id, reason || undefined);
-                                        toast.success(`Bid vetoed successfully. User refunded ${penceToPounds(bid.amount)}.`);
+                                        toast.success(`Tip vetoed successfully. User refunded ${penceToPounds(bid.amount)}.`);
                                         loadBids();
                                       } catch (error: any) {
-                                        toast.error(error.response?.data?.error || 'Failed to veto bid');
+                                        toast.error(error.response?.data?.error || 'Failed to veto tip');
                                       }
                                     }
                                   }}
                                   className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
-                                  title="Veto bid"
+                                  title="Veto tip"
                                 >
                                   Veto
                                 </button>
@@ -1842,7 +1842,7 @@ const Admin: React.FC = () => {
                                   {bid.party?._id && bid.media?._id && (
                                     <button
                                       onClick={async () => {
-                                        if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can bid again.`)) {
+                                        if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
                                           try {
                                             await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
                                             toast.success(`Media unvetoed successfully. Users have been notified.`);
@@ -2452,7 +2452,7 @@ const Admin: React.FC = () => {
                               {bid.party?._id && bid.media?._id && (
                                 <button
                                   onClick={async () => {
-                                    if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can bid again.`)) {
+                                    if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
                                       try {
                                         await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
                                         toast.success(`Media unvetoed successfully. Users have been notified.`);

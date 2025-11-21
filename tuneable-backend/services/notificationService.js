@@ -136,12 +136,12 @@ const createNotification = async (params) => {
 };
 
 /**
- * Create bid received notification
+ * Create tip received notification
  * @param {string} mediaOwnerId - User ID of media owner
- * @param {string} bidderId - User ID of bidder
+ * @param {string} bidderId - User ID of tipper
  * @param {string} mediaId - Media ID
- * @param {string} bidId - Bid ID
- * @param {number} bidAmount - Bid amount
+ * @param {string} bidId - Tip ID
+ * @param {number} bidAmount - Tip amount
  * @param {string} mediaTitle - Media title
  */
 const notifyBidReceived = async (mediaOwnerId, bidderId, mediaId, bidId, bidAmount, mediaTitle) => {
@@ -156,8 +156,8 @@ const notifyBidReceived = async (mediaOwnerId, bidderId, mediaId, bidId, bidAmou
     await createNotification({
       userId: mediaOwnerId,
       type: 'bid_received',
-      title: 'New Bid Received',
-      message: `${bidder?.username || 'Someone'} placed a £${bidAmount.toFixed(2)} bid on "${mediaTitle}"`,
+      title: 'New Tip Received',
+      message: `${bidder?.username || 'Someone'} placed a £${bidAmount.toFixed(2)} tip on "${mediaTitle}"`,
       link: `/tune/${mediaLinkId}`,
       linkText: 'View Media',
       relatedMediaId: mediaId,
@@ -166,16 +166,16 @@ const notifyBidReceived = async (mediaOwnerId, bidderId, mediaId, bidId, bidAmou
       groupKey: `bid_received_${mediaId}`
     });
   } catch (error) {
-    console.error('Error creating bid received notification:', error);
+    console.error('Error creating tip received notification:', error);
   }
 };
 
 /**
- * Create outbid notification
- * @param {string} userId - User ID who was outbid
+ * Create outtipped notification
+ * @param {string} userId - User ID who was outtipped
  * @param {string} mediaId - Media ID
- * @param {string} bidId - New top bid ID
- * @param {number} newTopBid - New top bid amount
+ * @param {string} bidId - New top tip ID
+ * @param {number} newTopBid - New top tip amount
  * @param {string} mediaTitle - Media title
  */
 const notifyOutbid = async (userId, mediaId, bidId, newTopBid, mediaTitle) => {
@@ -189,8 +189,8 @@ const notifyOutbid = async (userId, mediaId, bidId, newTopBid, mediaTitle) => {
     await createNotification({
       userId,
       type: 'bid_outbid',
-      title: 'You Were Outbid',
-      message: `Someone placed a higher bid (£${newTopBid.toFixed(2)}) on "${mediaTitle}"`,
+      title: 'You Were Outtipped',
+      message: `Someone placed a higher tip (£${newTopBid.toFixed(2)}) on "${mediaTitle}"`,
       link: `/tune/${mediaLinkId}`,
       linkText: 'View Media',
       relatedMediaId: mediaId,
@@ -198,7 +198,7 @@ const notifyOutbid = async (userId, mediaId, bidId, newTopBid, mediaTitle) => {
       groupKey: `bid_outbid_${mediaId}_${userId}`
     });
   } catch (error) {
-    console.error('Error creating outbid notification:', error);
+    console.error('Error creating outtipped notification:', error);
   }
 };
 
@@ -350,8 +350,8 @@ const notifyTuneBytesEarned = async (userId, amount, reason, mediaId = null, med
 };
 
 /**
- * Notify users that media they bid on was vetoed
- * @param {string} userId - User ID who bid on the media
+ * Notify users that media they tipped on was vetoed
+ * @param {string} userId - User ID who tipped on the media
  * @param {string} mediaId - Media ID
  * @param {string} mediaTitle - Media title
  * @param {string} partyId - Party ID
@@ -369,7 +369,7 @@ const notifyMediaVetoed = async (userId, mediaId, mediaTitle, partyId, partyName
     const mediaLinkId = media?.uuid || mediaId;
     const partyLinkId = party?.uuid || partyId;
     
-    let message = `"${mediaTitle}" was vetoed from "${partyName}". Your bid of £${(refundAmount / 100).toFixed(2)} has been refunded.`;
+    let message = `"${mediaTitle}" was vetoed from "${partyName}". Your tip of £${(refundAmount / 100).toFixed(2)} has been refunded.`;
     if (reason) {
       message += ` Reason: ${reason}`;
     }
@@ -391,8 +391,8 @@ const notifyMediaVetoed = async (userId, mediaId, mediaTitle, partyId, partyName
 };
 
 /**
- * Notify users that media they bid on was unvetoed
- * @param {string} userId - User ID who bid on the media
+ * Notify users that media they tipped on was unvetoed
+ * @param {string} userId - User ID who tipped on the media
  * @param {string} mediaId - Media ID
  * @param {string} mediaTitle - Media title
  * @param {string} partyId - Party ID
@@ -412,7 +412,7 @@ const notifyMediaUnvetoed = async (userId, mediaId, mediaTitle, partyId, partyNa
       userId,
       type: 'media_unvetoed',
       title: 'Media Unvetoed',
-      message: `"${mediaTitle}" has been unvetoed in "${partyName}". You can bid on it again if you'd like.`,
+      message: `"${mediaTitle}" has been unvetoed in "${partyName}". You can tip on it again if you'd like.`,
       link: `/party/${partyLinkId}`,
       linkText: 'View Party',
       relatedMediaId: mediaId,

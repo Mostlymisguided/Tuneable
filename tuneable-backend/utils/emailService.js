@@ -360,7 +360,7 @@ async function sendPaymentNotification(user, amount, currency = 'gbp') {
 async function sendHighValueBidNotification(bid, media, user, threshold = 10) {
   // Convert threshold from pounds to pence for comparison
   const thresholdPence = Math.round(threshold * 100);
-  if (bid.amount < thresholdPence) return false; // Only send for high-value bids
+  if (bid.amount < thresholdPence) return false; // Only send for high-value tips
 
   // Convert bid amount from pence to pounds for display
   const bidAmountPounds = bid.amount / 100;

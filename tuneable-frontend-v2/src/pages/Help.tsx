@@ -13,9 +13,9 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">What is Tuneable?</h3>
             <p className="text-gray-300">
-              Tuneable is a music discovery and bidding platform where you can bid on songs, join parties, 
-              and discover new music. Your bids help determine what gets played, and you earn TuneByte Tokens when 
-              others bid on tunes you've bid on.
+              Tuneable is a music discovery and tipping platform where you can tip on songs, join parties, 
+              and discover new music. Your tips help determine what gets played, and you earn TuneByte Tokens when 
+              others tip on tunes you've tipped on.
             </p>
           </div>
           <div>
@@ -32,20 +32,20 @@ const Help: React.FC = () => {
     {
       id: 'bidding',
       icon: <CreditCard className="h-6 w-6" />,
-      title: 'Bidding & Credits',
+      title: 'Tipping & Credits',
       content: (
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">How Bidding Works</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">How Tipping Works</h3>
             <p className="text-gray-300">
-              When you bid on a song, you're voting for it to be moved up the charts. Higher bids give songs more weight 
-              in the charts. The minimum bid is usually £0.01, but party hosts can set their own minimum.
+              When you tip on a song, you're voting for it to be moved up the charts. Higher tips give songs more weight 
+              in the charts. The minimum tip is usually £0.01, but party hosts can set their own minimum.
             </p>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Earning Credits</h3>
             <p className="text-gray-300">
-              You earn TuneByte Tokens when other users bid on tunes you've bid on. The more your tunes get bid on, 
+              You earn TuneByte Tokens when other users tip on tunes you've tipped on. The more your tunes get tipped on, 
               the more you earn. TuneByte Tokens will be able to be exchanged for perks and Artist rewards in the future.
             </p>
           </div>
@@ -69,7 +69,7 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Joining a Party</h3>
             <p className="text-gray-300">
               Browse available parties from the Parties page. Click on any party to view the queue and 
-              start bidding on songs. You can bid on songs already in the queue or search for new tracks 
+              start tipping on songs. You can tip on songs already in the queue or search for new tracks 
               to add.
             </p>
           </div>
@@ -132,7 +132,7 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Managing Your Profile</h3>
             <p className="text-gray-300">
               Edit your profile from your user page. You can update your username, profile picture, 
-              location, and bio. Your profile shows your bidding statistics, top tunes, and activity.
+              location, and bio. Your profile shows your tipping statistics, top tunes, and activity.
             </p>
           </div>
           <div>

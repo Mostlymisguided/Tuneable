@@ -14,8 +14,8 @@ interface User {
 
 const notificationTypes = [
   { value: 'admin_announcement', label: 'Admin Announcement' },
-  { value: 'bid_received', label: 'Bid Received' },
-  { value: 'bid_outbid', label: 'Bid Outbid' },
+  { value: 'bid_received', label: 'Tip Received' },
+  { value: 'bid_outbid', label: 'Outtipped' },
   { value: 'comment_reply', label: 'Comment Reply' },
   { value: 'creator_approved', label: 'Creator Approved' },
   { value: 'creator_rejected', label: 'Creator Rejected' },

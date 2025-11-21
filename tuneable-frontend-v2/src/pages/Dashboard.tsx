@@ -556,17 +556,17 @@ Join here: ${inviteLink}`.trim();
 
   const handleIncreaseBid = async (item: LibraryItem) => {
     if (!user) {
-      toast.info('Please log in to place a bid');
+      toast.info('Please log in to place a tip');
       navigate('/login');
       return;
     }
 
-    const amountStr = prompt(`Enter bid amount for "${item.title}" (minimum £${minimumBid.toFixed(2)}):`);
+    const amountStr = prompt(`Enter tip amount for "${item.title}" (minimum £${minimumBid.toFixed(2)}):`);
     if (!amountStr) return;
 
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount < minimumBid) {
-      toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
     }
 
@@ -711,7 +711,7 @@ Join here: ${inviteLink}`.trim();
         : undefined;
 
       await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia);
-      toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} bid!`);
+      toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} tip!`);
       
       // Clear search
       setAddTuneQuery('');

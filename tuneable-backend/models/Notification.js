@@ -13,8 +13,8 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     enum: [
       'admin_announcement',      // Admin sends to all users
-      'bid_received',            // Someone bid on your media
-      'bid_outbid',              // You were outbid on media
+      'bid_received',            // Someone tipped on your media
+      'bid_outbid',              // You were outtipped on media
       'comment_reply',           // Reply to your comment
       'creator_approved',        // Creator application approved
       'creator_rejected',        // Creator application rejected
@@ -27,8 +27,8 @@ const notificationSchema = new mongoose.Schema({
       'label_invite',            // Invited to label
       'collective_invite',       // Invited to collective
       'warning',                 // Admin warning issued to user
-      'media_vetoed',            // Media you bid on was vetoed
-      'media_unvetoed',          // Media you bid on was unvetoed
+      'media_vetoed',            // Media you tipped on was vetoed
+      'media_unvetoed',          // Media you tipped on was unvetoed
       'user_kicked',             // User was kicked from a party
       'escrow_allocated',        // Escrow allocated for your media
       'escrow_matched',          // Unknown artist allocations matched to your account
@@ -65,7 +65,7 @@ const notificationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   
   // For aggregating similar notifications
-  groupKey: { type: String }, // e.g., "bid_outbid_media_123"
+  groupKey: { type: String }, // e.g., "tip_outtipped_media_123"
 }, { timestamps: true });
 
 // Indexes for efficient queries

@@ -1421,7 +1421,7 @@ const Party: React.FC = () => {
     }
 
     try {
-      const confirmationMessage = `Are you sure you want to unveto "${mediaData.title || 'this media'}"? Users who bid on it will be notified and can bid again.`;
+      const confirmationMessage = `Are you sure you want to unveto "${mediaData.title || 'this media'}"? Users who tipped on it will be notified and can tip again.`;
       if (!window.confirm(confirmationMessage)) return;
 
       await partyAPI.unvetoMedia(partyId!, mediaId);
@@ -2409,7 +2409,7 @@ const Party: React.FC = () => {
                         onClick={handleRefresh}
                         disabled={isRefreshing}
                         className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                        title="Refresh party data to see new bids"
+                        title="Refresh party data to see new tips"
                       >
                         <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
@@ -2425,7 +2425,7 @@ const Party: React.FC = () => {
                       onClick={handleRefresh}
                       disabled={isRefreshing}
                       className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                      title="Refresh party data to see new bids"
+                      title="Refresh party data to see new tips"
                     >
                       <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                       <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>

@@ -1201,15 +1201,15 @@ const TuneProfile: React.FC = () => {
       // TODO: Update backend to accept tags for existing media bids
       await mediaAPI.placeGlobalBid(mediaId, parsedGlobalBidAmount);
       
-      toast.success(`Placed £${parsedGlobalBidAmount.toFixed(2)} bid on "${media?.title}"!`);
+      toast.success(`Placed £${parsedGlobalBidAmount.toFixed(2)} tip on "${media?.title}"!`);
       
       // Refresh media data to show updated metrics
       await fetchMediaProfile();
       await loadTopParties();
       
     } catch (err: any) {
-      console.error('Error placing global bid:', err);
-      toast.error(err.response?.data?.error || 'Failed to place bid');
+      console.error('Error placing global tip:', err);
+      toast.error(err.response?.data?.error || 'Failed to place tip');
     } finally {
       setIsPlacingGlobalBid(false);
     }
