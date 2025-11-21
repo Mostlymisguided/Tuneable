@@ -1341,8 +1341,9 @@ const TuneProfile: React.FC = () => {
             
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
-              <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2 md:px-4">{media.title}</h1>
-              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2 md:px-4">
+              <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
+              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2
+              ">
                 <ClickableArtistDisplay media={media} />
               </div>
               

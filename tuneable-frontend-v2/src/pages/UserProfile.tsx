@@ -28,11 +28,7 @@ import {
   CheckCircle,
   Flag,
   Users,
-  Award,
-  AlertTriangle,
-  Info,
-  Ban,
-  AlertCircle
+  Award
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
@@ -168,8 +164,6 @@ const UserProfile: React.FC = () => {
   const [showAllTunes, setShowAllTunes] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<any>(null);
-  
   // Tip history state
   const [tipHistory, setTipHistory] = useState<any[]>([]);
   const [tipHistoryStats, setTipHistoryStats] = useState<any>(null);
@@ -510,16 +504,6 @@ const UserProfile: React.FC = () => {
       loadLabelAffiliations();
       loadCollectiveMemberships();
       
-      // Load warnings if viewing own profile
-      const ownProfile = currentUser && response.user && (currentUser._id === response.user._id || currentUser.uuid === response.user.uuid || currentUser.uuid === response.user.id || currentUser._id === response.user.id);
-      if (ownProfile) {
-        try {
-          const warningsData = await userAPI.getWarnings();
-          setWarnings(warningsData);
-        } catch (err) {
-          console.error('Error loading warnings:', err);
-        }
-      }
     } catch (err: any) {
       console.error('Error fetching user profile:', err);
       setError(err.response?.data?.error || 'Failed to load user profile');
@@ -987,100 +971,6 @@ const UserProfile: React.FC = () => {
         {/* Beta Warning Banner */}
         {isBetaMode && isOwnProfile && (
           <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
-        )}
-
-        {/* Warnings Section - Only show if user has warnings and is viewing own profile */}
-        {isOwnProfile && warnings && warnings.warnings && warnings.warnings.length > 0 && (
-          <div className="mb-6 card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-400" />
-                <span>Account Warnings</span>
-              </h3>
-              <div className="text-sm text-gray-400">
-                {warnings.warningCount > 0 && (
-                  <span className="text-yellow-400 mr-3">
-                    {warnings.warningCount} warning{warnings.warningCount !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {warnings.finalWarningCount > 0 && (
-                  <span className="text-red-400">
-                    {warnings.finalWarningCount} final warning{warnings.finalWarningCount !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {warnings.warnings.length > 3 && (
-                  <button
-                    onClick={() => {
-                      // Show all warnings in a modal or expandable section
-                      const allWarnings = warnings.warnings.map((w: any, i: number) => 
-                        `${i + 1}. ${w.type.replace('_', ' ').toUpperCase()}: ${w.message}${w.reason ? ` (Reason: ${w.reason})` : ''} - ${new Date(w.issuedAt).toLocaleDateString()}`
-                      ).join('\n\n');
-                      alert(`All Warnings:\n\n${allWarnings}`);
-                    }}
-                    className="ml-3 text-xs text-purple-400 hover:text-purple-300 underline"
-                  >
-                    View All ({warnings.warnings.length})
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="space-y-3">
-              {warnings.warnings.slice(0, 3).map((warning: any, idx: number) => {
-                const getWarningConfig = (type: string) => {
-                  switch (type) {
-                    case 'info':
-                      return { icon: Info, color: 'text-blue-400', bgColor: 'bg-blue-900/30', borderColor: 'border-blue-500' };
-                    case 'warning':
-                      return { icon: AlertTriangle, color: 'text-yellow-400', bgColor: 'bg-yellow-900/30', borderColor: 'border-yellow-500' };
-                    case 'final_warning':
-                      return { icon: AlertCircle, color: 'text-red-400', bgColor: 'bg-red-900/30', borderColor: 'border-red-500' };
-                    case 'suspension_notice':
-                      return { icon: Ban, color: 'text-red-500', bgColor: 'bg-red-900/40', borderColor: 'border-red-600' };
-                    default:
-                      return { icon: Info, color: 'text-gray-400', bgColor: 'bg-gray-900/30', borderColor: 'border-gray-500' };
-                  }
-                };
-                const config = getWarningConfig(warning.type);
-                const Icon = config.icon;
-                return (
-                  <div key={idx} className={`${config.bgColor} border-2 ${config.borderColor} rounded-lg p-3`}>
-                    <div className="flex items-start space-x-3">
-                      <Icon className={`h-5 w-5 ${config.color} flex-shrink-0 mt-0.5`} />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-sm font-semibold ${config.color}`}>
-                            {warning.type === 'info' && 'Information'}
-                            {warning.type === 'warning' && 'Warning'}
-                            {warning.type === 'final_warning' && 'Final Warning'}
-                            {warning.type === 'suspension_notice' && 'Account Suspension'}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {new Date(warning.issuedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-300 mb-1">{warning.message}</p>
-                        {warning.reason && (
-                          <p className="text-xs text-gray-400">
-                            <strong>Reason:</strong> {warning.reason}
-                          </p>
-                        )}
-                        {warning.expiresAt && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            Expires: {new Date(warning.expiresAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {warnings.warnings.length > 3 && (
-                <p className="text-xs text-gray-400 text-center">
-                  +{warnings.warnings.length - 3} more warning{warnings.warnings.length - 3 !== 1 ? 's' : ''}
-                </p>
-              )}
-            </div>
-          </div>
         )}
 
         {/* User Profile Header */}
