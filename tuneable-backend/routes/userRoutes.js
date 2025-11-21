@@ -2300,8 +2300,8 @@ router.post('/request-invite', async (req, res) => {
   try {
     const { email, name, reason } = req.body;
     
-    if (!email || !name || !reason) {
-      return res.status(400).json({ error: 'Email, name, and reason are required' });
+    if (!email || !name) {
+      return res.status(400).json({ error: 'Email and name are required' });
     }
     
     // Check if email already has a pending request
@@ -2330,7 +2330,7 @@ router.post('/request-invite', async (req, res) => {
     const inviteRequest = new InviteRequest({
       email: email.toLowerCase().trim(),
       name: name.trim(),
-      reason: reason.trim(),
+      reason: reason ? reason.trim() : null,
       ipAddress: ip
     });
     

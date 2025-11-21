@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Mail, User, Send, CheckCircle, ArrowLeft, Smile } from 'lucide-react';
+import { Mail, User, Send, CheckCircle, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const RequestInvite: React.FC = () => {
@@ -11,7 +11,6 @@ const RequestInvite: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    reason: '',
   });
 
   const navigate = useNavigate();
@@ -33,7 +32,7 @@ const RequestInvite: React.FC = () => {
       return;
     }
     
-    // If user type, the joke field will appear below
+    // If user type, the form can be submitted
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,11 +45,6 @@ const RequestInvite: React.FC = () => {
 
     if (userType !== 'user') {
       toast.error('Please select how you want to use Tuneable');
-      return;
-    }
-
-    if (!formData.reason || formData.reason.trim().length === 0) {
-      toast.error('Please tell us a joke');
       return;
     }
 
@@ -108,7 +102,7 @@ const RequestInvite: React.FC = () => {
                 onClick={() => {
                   setSubmitted(false);
                   setUserType(null);
-                  setFormData({ name: '', email: '', reason: '' });
+                  setFormData({ name: '', email: '' });
                 }}
                 className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all"
               >
@@ -222,28 +216,6 @@ const RequestInvite: React.FC = () => {
               </div>
             </div>
 
-            {/* Joke field - only show if "as a user" is selected */}
-            {userType === 'user' && (
-              <div>
-                <label htmlFor="reason" className="block text-sm font-medium text-gray-300 mb-2">
-                  Please tell us a joke so that we know you might be human *
-                </label>
-                <div className="relative">
-                  <Smile className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <textarea
-                    id="reason"
-                    name="reason"
-                    required
-                    rows={3}
-                    value={formData.reason}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                    placeholder="Any joke will do..."
-                  />
-                </div>
-              
-              </div>
-            )}
 
             {/* Submit Button - only show if user type is selected */}
             {userType === 'user' && (

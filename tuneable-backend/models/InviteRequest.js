@@ -20,7 +20,7 @@ const inviteRequestSchema = new mongoose.Schema({
   },
   reason: { 
     type: String, 
-    required: true 
+    required: false 
   },
   status: {
     type: String,

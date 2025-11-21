@@ -3078,15 +3078,6 @@ const Party: React.FC = () => {
 
       {/* YouTube Player is now integrated back into PersistentWebPlayer component */}
 
-      {/* Footer */}
-      <div className="bg-gray-800 border-t border-gray-700 mt-12">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-          <div className="flex items-center justify-center text-gray-400 text-xs sm:text-sm">
-            <span>6,968 songs • 35.5 days • 105.72 GB</span>
-          </div>
-        </div>
-      </div>
-
       {/* Bid Confirmation Modal */}
       {pendingMedia && showBidConfirmationModal && party && Number.isFinite(confirmationBidAmount) && confirmationBidAmount > 0 && (
         <BidConfirmationModal
