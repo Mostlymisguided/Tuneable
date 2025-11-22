@@ -2915,13 +2915,19 @@ router.get('/share/:id', async (req, res) => {
     // This ensures Facebook's crawler NEVER gets redirected before reading meta tags
     const isShareRoute = /\/api\/media\/share\//i.test(requestUrl);
     
-    // If it's a Facebook crawler, Instagram crawler, has fbclid (Facebook link tracking), any other bot,
-    // OR is accessing the share route, don't redirect - serve meta tags instead
-    // ALWAYS serve meta tags - only redirect if it's definitely a regular browser with typical UA
-    // AND it's not accessing the share route
-    const isCrawler = isFacebookCrawler || isInstagramCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
-                     isFacebookShareDebugger || isShareRoute ||
+    // CRITICAL: For /api/media/share/ route, ALWAYS treat as crawler - NEVER redirect
+    // This ensures Facebook's crawler ALWAYS gets meta tags, never redirected
+    if (isShareRoute) {
+      // Share route = always serve meta tags, never redirect
+      var isCrawler = true;
+    } else {
+      // For other routes, use normal detection
+      // If it's a Facebook crawler, Instagram crawler, has fbclid, coming from Facebook, any other bot,
+      // don't redirect - serve meta tags instead
+      var isCrawler = isFacebookCrawler || isInstagramCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
+                     isFacebookShareDebugger || isFromFacebook ||
                      (isGenericBot && !looksLikeBrowser) || !looksLikeBrowser;
+    }
     
     // For debugging - log what we detect
     const shouldServeMetaTags = isCrawler; // Serve meta tags without redirect for crawlers
@@ -3079,12 +3085,16 @@ router.get('/share/:id', async (req, res) => {
       ogDescription: ogDescription,
       ogUrl: ogUrl,
       isFacebookCrawler: isFacebookCrawler,
+      isInstagramCrawler: isInstagramCrawler,
       isOtherSocialBot: isOtherSocialBot,
       hasFbclid: hasFbclid,
       hasFacebookHeader: hasFacebookHeader,
+      isFromFacebook: isFromFacebook,
+      isShareRoute: isShareRoute,
       isCrawler: isCrawler,
       shouldServeMetaTags: shouldServeMetaTags,
-      userAgent: userAgent.substring(0, 150) // First 150 chars of UA
+      userAgent: userAgent.substring(0, 150), // First 150 chars of UA
+      referer: referer.substring(0, 100) // First 100 chars of referer
     });
 
     // Serve HTML with proper meta tags
@@ -3122,15 +3132,21 @@ router.get('/share/:id', async (req, res) => {
   <meta name="twitter:image" content="${ogImage}" />
   
   ${!isCrawler ? `
-  <!-- Redirect to frontend after a short delay (only for regular browsers, not crawlers) -->
+  <!-- Redirect to frontend after a delay (only for regular browsers, not crawlers) -->
   <!-- Note: Meta tags above are already served, so crawlers can read them before redirect -->
-  <meta http-equiv="refresh" content="3;url=${ogUrl}">
+  <!-- Increased delay to 5 seconds to ensure crawlers have time to read meta tags -->
+  <meta http-equiv="refresh" content="5;url=${ogUrl}">
   
   <!-- Fallback redirect via JavaScript (delayed to allow crawlers to read meta tags) -->
   <script>
+    // Only redirect if this is definitely a browser (not a crawler)
+    // Crawlers typically don't execute JavaScript, but we add this as a fallback
     setTimeout(function() {
-      window.location.href = "${ogUrl}";
-    }, 3000); // 3 second delay to allow crawlers to read meta tags
+      // Double-check we're not a crawler before redirecting
+      if (navigator.userAgent && !/bot|crawler|spider|facebookexternalhit|facebot|instagram/i.test(navigator.userAgent.toLowerCase())) {
+        window.location.href = "${ogUrl}";
+      }
+    }, 5000); // 5 second delay to allow crawlers to read meta tags
   </script>
   ` : ''}
 </head>
