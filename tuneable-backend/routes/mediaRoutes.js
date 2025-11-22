@@ -2884,8 +2884,26 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
 // @desc    Serve HTML with Open Graph meta tags for Facebook sharing
 // @access  Public
 router.get('/share/:id', async (req, res) => {
+  // Log immediately to ensure route is being hit
+  console.log('🔵 SHARE ROUTE HIT:', {
+    id: req.params.id,
+    url: req.url,
+    userAgent: req.headers['user-agent']?.substring(0, 100),
+    referer: req.headers['referer'],
+    query: req.query
+  });
+  
   try {
     const { id } = req.params;
+    
+    // Clean up ID - remove any extra slashes or whitespace
+    const cleanId = id ? id.trim().replace(/^\/+|\/+$/g, '') : null;
+    
+    if (!cleanId) {
+      console.error('❌ No ID provided in share route');
+      return res.status(400).send('Invalid media ID');
+    }
+    
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     
     // Detect if this is Facebook's crawler (or other social media crawlers)
@@ -2917,17 +2935,8 @@ router.get('/share/:id', async (req, res) => {
     
     // CRITICAL: For /api/media/share/ route, ALWAYS treat as crawler - NEVER redirect
     // This ensures Facebook's crawler ALWAYS gets meta tags, never redirected
-    if (isShareRoute) {
-      // Share route = always serve meta tags, never redirect
-      var isCrawler = true;
-    } else {
-      // For other routes, use normal detection
-      // If it's a Facebook crawler, Instagram crawler, has fbclid, coming from Facebook, any other bot,
-      // don't redirect - serve meta tags instead
-      var isCrawler = isFacebookCrawler || isInstagramCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
-                     isFacebookShareDebugger || isFromFacebook ||
-                     (isGenericBot && !looksLikeBrowser) || !looksLikeBrowser;
-    }
+    // NO EXCEPTIONS - share route NEVER redirects
+    const isCrawler = true; // ALWAYS true for share route - never redirect
     
     // For debugging - log what we detect
     const shouldServeMetaTags = isCrawler; // Serve meta tags without redirect for crawlers
@@ -2941,24 +2950,25 @@ router.get('/share/:id', async (req, res) => {
       // ObjectId format (shorter, 24 characters)
       media = await Media.findById(id);
     } else {
-      // For crawlers, return a proper error page with meta tags
-      if (isCrawler) {
-        return res.status(400).send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <meta property="og:title" content="Tuneable - Invalid ID" />
-            <meta property="og:description" content="The tune you're looking for could not be found." />
-            <meta property="og:url" content="${frontendUrl}" />
-            <title>Tuneable - Invalid ID</title>
-          </head>
-          <body>
-            <p>Invalid media ID.</p>
-          </body>
-          </html>
-        `);
-      }
+      // For share route, always return error page with meta tags (never redirect)
+      console.error('❌ Invalid media ID in share route:', cleanId);
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb#">
+        <head>
+          <meta charset="UTF-8">
+          <meta property="og:title" content="Tuneable - Invalid ID" />
+          <meta property="og:description" content="The tune you're looking for could not be found." />
+          <meta property="og:url" content="${frontendUrl}" />
+          <meta property="og:image" content="${DEFAULT_COVER_ART}" />
+          <meta property="fb:app_id" content="${process.env.FACEBOOK_APP_ID || '2050833255363564'}" />
+          <title>Tuneable - Invalid ID</title>
+        </head>
+        <body>
+          <p>Invalid media ID.</p>
+        </body>
+        </html>
+      `);
       // For regular browsers, redirect
       return res.status(400).send(`
         <!DOCTYPE html>
@@ -2976,24 +2986,25 @@ router.get('/share/:id', async (req, res) => {
     }
 
     if (!media) {
-      // For crawlers, return a proper error page with meta tags
-      if (isCrawler) {
-        return res.status(404).send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <meta property="og:title" content="Tuneable - Tune Not Found" />
-            <meta property="og:description" content="The tune you're looking for could not be found." />
-            <meta property="og:url" content="${frontendUrl}/tune/${id}" />
-            <title>Tuneable - Tune Not Found</title>
-          </head>
-          <body>
-            <p>Tune not found.</p>
-          </body>
-          </html>
-        `);
-      }
+      // For share route, always return error page with meta tags (never redirect)
+      console.error('❌ Media not found in share route:', cleanId);
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb#">
+        <head>
+          <meta charset="UTF-8">
+          <meta property="og:title" content="Tuneable - Tune Not Found" />
+          <meta property="og:description" content="The tune you're looking for could not be found." />
+          <meta property="og:url" content="${frontendUrl}/tune/${cleanId}" />
+          <meta property="og:image" content="${DEFAULT_COVER_ART}" />
+          <meta property="fb:app_id" content="${process.env.FACEBOOK_APP_ID || '2050833255363564'}" />
+          <title>Tuneable - Tune Not Found</title>
+        </head>
+        <body>
+          <p>Tune not found.</p>
+        </body>
+        </html>
+      `);
       // For regular browsers, redirect
       return res.send(`
         <!DOCTYPE html>
