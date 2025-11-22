@@ -2994,16 +2994,31 @@ router.get('/share/:id', async (req, res) => {
     // Get cover art using the utility function (handles fallback chain)
     const coverArtUrl = getMediaCoverArt(media);
     
-    // Get absolute image URL
+    // Get absolute image URL - ensure it's always a full URL
     const getAbsoluteImageUrl = (imageUrl) => {
-      if (!imageUrl) return DEFAULT_COVER_ART;
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        return imageUrl;
+      if (!imageUrl || imageUrl.trim() === '') {
+        console.warn('⚠️ No cover art URL, using default');
+        return DEFAULT_COVER_ART;
       }
-      if (imageUrl.startsWith('/')) {
-        return `${frontendUrl}${imageUrl}`;
+      
+      const trimmed = imageUrl.trim();
+      
+      // Already a full URL
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
       }
-      return `${frontendUrl}/${imageUrl}`;
+      
+      // Relative path starting with /
+      if (trimmed.startsWith('/')) {
+        // If it's already a full path like /uploads/..., use frontend URL
+        if (trimmed.startsWith('/uploads/') || trimmed.startsWith('/cover-art/')) {
+          return `${frontendUrl}${trimmed}`;
+        }
+        return `${frontendUrl}${trimmed}`;
+      }
+      
+      // Relative path without leading slash
+      return `${frontendUrl}/${trimmed}`;
     };
 
     // Helper function to escape HTML
@@ -3018,10 +3033,19 @@ router.get('/share/:id', async (req, res) => {
     };
 
     // Use creatorDisplay field (already a formatted string from artist/featuring arrays)
-    const artistText = media.creatorDisplay ? ` by ${media.creatorDisplay}` : '';
-    const mediaTitle = media.title || 'Untitled Tune';
+    // If creatorDisplay doesn't exist, try to build it from artist array
+    let creatorDisplay = media.creatorDisplay;
+    if (!creatorDisplay && media.artist && Array.isArray(media.artist) && media.artist.length > 0) {
+      creatorDisplay = media.artist.map(a => a.name || a).join(', ');
+    }
     
+    const artistText = creatorDisplay ? ` by ${creatorDisplay}` : '';
+    const mediaTitle = (media.title && media.title.trim()) || 'Untitled Tune';
+    
+    // Ensure we have a valid cover art URL
     const ogImage = getAbsoluteImageUrl(coverArtUrl);
+    
+    // Build title and description
     const ogTitle = escapeHtml(`${mediaTitle}${artistText} | Tuneable`);
     const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${mediaTitle}"${artistText} and join the community.`);
     // Use _id for shorter URLs
@@ -3032,12 +3056,15 @@ router.get('/share/:id', async (req, res) => {
     // Log for debugging (including production for troubleshooting)
     console.log('🔍 Share route debug:', {
       mediaId: id,
-      mediaTitle: media.title,
-      creatorDisplay: media.creatorDisplay,
+      mediaFound: !!media,
+      mediaTitle: media?.title,
+      mediaCreatorDisplay: media?.creatorDisplay,
+      computedCreatorDisplay: creatorDisplay,
       coverArtUrl: coverArtUrl,
       ogImage: ogImage,
       ogTitle: ogTitle,
       ogDescription: ogDescription,
+      ogUrl: ogUrl,
       isFacebookCrawler: isFacebookCrawler,
       isOtherSocialBot: isOtherSocialBot,
       hasFbclid: hasFbclid,
@@ -3103,11 +3130,43 @@ router.get('/share/:id', async (req, res) => {
 </body>
 </html>`;
 
-    res.setHeader('Content-Type', 'text/html');
+    // Ensure we always send HTML with proper headers
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
     res.send(html);
   } catch (error) {
-    console.error('Error serving share page:', error);
+    console.error('❌ Error serving share page:', error);
+    console.error('Error stack:', error.stack);
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    // Detect if this is a crawler even in error case
+    const userAgent = req.headers['user-agent'] || '';
+    const hasFbclid = !!req.query.fbclid;
+    const isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot|bot|crawler|spider|scraper/i.test(userAgent) || hasFbclid;
+    
+    // For crawlers, serve error page with meta tags instead of redirecting
+    if (isCrawler) {
+      return res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta property="og:title" content="Tuneable - Error" />
+          <meta property="og:description" content="Sorry, there was an error loading this tune." />
+          <meta property="og:url" content="${frontendUrl}" />
+          <meta property="og:image" content="${DEFAULT_COVER_ART}" />
+          <meta property="og:site_name" content="Tuneable" />
+          <meta property="fb:app_id" content="${process.env.FACEBOOK_APP_ID ? process.env.FACEBOOK_APP_ID : '2050833255363564'}" />
+          <title>Tuneable - Error</title>
+        </head>
+        <body>
+          <p>Sorry, there was an error loading this tune.</p>
+        </body>
+        </html>
+      `);
+    }
+    
+    // For regular browsers, redirect
     res.status(500).send(`
       <!DOCTYPE html>
       <html>
