@@ -2890,14 +2890,28 @@ router.get('/share/:id', async (req, res) => {
     
     // Detect if this is Facebook's crawler (or other social media crawlers)
     const userAgent = req.headers['user-agent'] || '';
-    // Expanded crawler detection - Facebook uses multiple user agents
-    const isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot|facebook|bot|crawler|spider|scraper/i.test(userAgent);
+    // Facebook uses facebookexternalhit/1.1 or facebookexternalhit/2.0 or Facebot
+    // Also check for any request with fbclid parameter (Facebook link tracking)
+    const isFacebookCrawler = /facebookexternalhit|Facebot/i.test(userAgent);
+    const isOtherSocialBot = /Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot/i.test(userAgent);
     
-    // Also check for Facebook's specific headers
-    const isFacebookShareDebugger = req.headers['x-facebook-request-id'] || req.query.fbclid;
+    // Check for Facebook's specific headers or query params
+    const hasFbclid = !!req.query.fbclid;
+    const hasFacebookHeader = !!req.headers['x-facebook-request-id'];
     
-    // If Facebook Share Debugger or has fbclid param, treat as crawler
-    const shouldServeMetaTags = isCrawler || isFacebookShareDebugger;
+    // More lenient detection - if user-agent contains 'facebook', 'bot', 'crawler', 'spider', or 'scraper'
+    // OR if it's missing a typical browser user-agent, treat as potential crawler
+    const isGenericBot = /bot|crawler|spider|scraper|facebook/i.test(userAgent);
+    const looksLikeBrowser = /mozilla|chrome|safari|firefox|edge|opera/i.test(userAgent);
+    
+    // If it's a Facebook crawler, has fbclid (Facebook link tracking), any other bot,
+    // OR doesn't look like a browser, don't redirect - serve meta tags instead
+    // ALWAYS serve meta tags - only redirect if it's definitely a regular browser with typical UA
+    const isCrawler = isFacebookCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
+                     (isGenericBot && !looksLikeBrowser) || !looksLikeBrowser;
+    
+    // For debugging - log what we detect
+    const shouldServeMetaTags = isCrawler; // Serve meta tags without redirect for crawlers
 
     // Find media by _id (ObjectId) or UUID (for backward compatibility)
     let media;
@@ -2909,7 +2923,7 @@ router.get('/share/:id', async (req, res) => {
       media = await Media.findById(id);
     } else {
       // For crawlers, return a proper error page with meta tags
-      if (shouldServeMetaTags) {
+      if (isCrawler) {
         return res.status(400).send(`
           <!DOCTYPE html>
           <html>
@@ -2944,7 +2958,7 @@ router.get('/share/:id', async (req, res) => {
 
     if (!media) {
       // For crawlers, return a proper error page with meta tags
-      if (shouldServeMetaTags) {
+      if (isCrawler) {
         return res.status(404).send(`
           <!DOCTYPE html>
           <html>
@@ -3024,10 +3038,13 @@ router.get('/share/:id', async (req, res) => {
       ogImage: ogImage,
       ogTitle: ogTitle,
       ogDescription: ogDescription,
+      isFacebookCrawler: isFacebookCrawler,
+      isOtherSocialBot: isOtherSocialBot,
+      hasFbclid: hasFbclid,
+      hasFacebookHeader: hasFacebookHeader,
       isCrawler: isCrawler,
-      isFacebookShareDebugger: isFacebookShareDebugger,
       shouldServeMetaTags: shouldServeMetaTags,
-      userAgent: userAgent.substring(0, 100) // First 100 chars of UA
+      userAgent: userAgent.substring(0, 150) // First 150 chars of UA
     });
 
     // Serve HTML with proper meta tags
@@ -3054,7 +3071,7 @@ router.get('/share/:id', async (req, res) => {
   <meta property="og:image:alt" content="${escapeHtml(mediaTitle + artistText)}" />
   <meta property="og:site_name" content="Tuneable" />
   <meta property="og:locale" content="en_US" />
-  ${process.env.FACEBOOK_APP_ID ? `  <meta property="fb:app_id" content="${escapeHtml(process.env.FACEBOOK_APP_ID)}" />` : ''}
+  <meta property="fb:app_id" content="${process.env.FACEBOOK_APP_ID ? escapeHtml(process.env.FACEBOOK_APP_ID) : '2050833255363564'}" />
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
@@ -3063,7 +3080,7 @@ router.get('/share/:id', async (req, res) => {
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />
   
-  ${!shouldServeMetaTags ? `
+  ${!isCrawler ? `
   <!-- Redirect to frontend after a short delay (only for regular browsers, not crawlers) -->
   <meta http-equiv="refresh" content="0;url=${ogUrl}">
   
@@ -3074,7 +3091,7 @@ router.get('/share/:id', async (req, res) => {
   ` : ''}
 </head>
 <body>
-  ${shouldServeMetaTags ? `
+  ${isCrawler ? `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center;">
     <h1>${escapedTitle}</h1>
     <p>${ogDescription}</p>
