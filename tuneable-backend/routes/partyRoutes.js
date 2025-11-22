@@ -515,8 +515,8 @@ router.get('/:id/details', optionalAuthMiddleware, async (req, res) => {
             
             // Populate partiers, host, and kickedUsers for Global Party
             const User = require('../models/User');
-            // Use actual partiers who joined, not all users
-            party.partiers = await User.find({ _id: { $in: party.partiers } }).select('username uuid');
+            // Use actual partiers who joined, not all users - filter out deleted users
+            party.partiers = (await User.find({ _id: { $in: party.partiers } }).select('username uuid')).filter(user => user !== null);
             party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid');
             // Populate kickedUsers if they exist
             if (party.kickedUsers && party.kickedUsers.length > 0) {
@@ -637,6 +637,11 @@ router.get('/:id/details', optionalAuthMiddleware, async (req, res) => {
                 model: 'User',
                 select: 'username uuid',
             });
+            
+            // ✅ Filter out deleted users from partiers array (populate returns null for deleted users)
+            if (party.partiers && Array.isArray(party.partiers)) {
+                party.partiers = party.partiers.filter(partier => partier !== null && partier !== undefined);
+            }
         }
 
         if (!party) {
@@ -657,7 +662,11 @@ router.get('/:id/details', optionalAuthMiddleware, async (req, res) => {
             const user = await User.findById(userId).select('joinedParties');
             const joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId.toString()) || [];
             const isHost = party.host.toString() === userId.toString();
-            const isPartier = party.partiers.some(p => p.toString() === userId.toString());
+            const isPartier = party.partiers.some(p => {
+                if (!p) return false;
+                const partierId = typeof p === 'object' ? p._id.toString() : p.toString();
+                return partierId === userId.toString();
+            });
             const hasJoined = joinedPartyIds.includes(party._id.toString());
             
             if (!isHost && !isPartier && !hasJoined) {

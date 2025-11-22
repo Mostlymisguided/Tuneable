@@ -407,10 +407,13 @@ const Parties: React.FC = () => {
         <div className="flex items-center text-sm text-white">
           <Users className="h-4 w-4 mr-2" />
           <span>
-            {party.type === 'global' 
-              ? `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
-              : `${Array.isArray(party.partiers) ? party.partiers.length : 0} partiers`
-            }
+            {(() => {
+              // Count only active (non-null, non-undefined) partiers
+              const activePartiers = Array.isArray(party.partiers) 
+                ? party.partiers.filter(p => p !== null && p !== undefined && (typeof p === 'object' ? p._id || p.id : true))
+                : [];
+              return `${activePartiers.length} partiers`;
+            })()}
           </span>
         </div>
 

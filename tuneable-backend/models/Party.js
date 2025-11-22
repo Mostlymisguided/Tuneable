@@ -41,7 +41,6 @@ const PartySchema = new mongoose.Schema({
     }
   },  */
   partiers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  partier_uuids: [{ type: String }], // UUID references for external API usage
   
   // Kicked users - users who have been removed and cannot rejoin
   kickedUsers: [{
