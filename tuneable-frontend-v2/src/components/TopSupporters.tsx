@@ -45,25 +45,11 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
         user: bid.userId,
         totalAmount: 0,
         bidCount: 0,
-        firstBidDate: bid.createdAt || new Date().toISOString(),
-        lastBidDate: bid.createdAt || new Date().toISOString(),
       };
     }
     
     acc[userId].totalAmount += amount;
     acc[userId].bidCount += 1;
-    
-    // Track earliest and latest bid dates
-    const currentBidDate = new Date(bid.createdAt || new Date());
-    const firstBidDate = new Date(acc[userId].firstBidDate);
-    const lastBidDate = new Date(acc[userId].lastBidDate);
-    
-    if (currentBidDate < firstBidDate) {
-      acc[userId].firstBidDate = bid.createdAt;
-    }
-    if (currentBidDate > lastBidDate) {
-      acc[userId].lastBidDate = bid.createdAt;
-    }
     
     return acc;
   }, {} as Record<string, any>);
@@ -76,21 +62,6 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
   if (topSupporters.length === 0) {
     return null;
   }
-
-  // Format date to relative time
-  const getRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
 
   return (
     <div className="space-y-2 md:space-y-3">
@@ -139,8 +110,6 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
                   </>
                 )}
                 <span>{supporter.bidCount} {supporter.bidCount === 1 ? 'Tip' : 'Tips'}</span>
-                <span className="hidden md:inline">•</span>
-                <span className="truncate">Since {getRelativeTime(supporter.firstBidDate)}</span>
               </div>
             </div>
           </div>
