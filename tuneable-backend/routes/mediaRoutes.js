@@ -2890,6 +2890,8 @@ router.get('/share/:id', async (req, res) => {
     
     // Detect if this is Facebook's crawler (or other social media crawlers)
     const userAgent = req.headers['user-agent'] || '';
+    const requestUrl = req.url || '';
+    
     // Facebook uses facebookexternalhit/1.1 or facebookexternalhit/2.0 or Facebot
     // Also check for any request with fbclid parameter (Facebook link tracking)
     const isFacebookCrawler = /facebookexternalhit|Facebot/i.test(userAgent);
@@ -2897,17 +2899,27 @@ router.get('/share/:id', async (req, res) => {
     
     // Check for Facebook's specific headers or query params
     const hasFbclid = !!req.query.fbclid;
-    const hasFacebookHeader = !!req.headers['x-facebook-request-id'];
+    const hasFacebookHeader = !!req.headers['x-facebook-request-id'] || !!req.headers['x-forwarded-for'];
+    
+    // Facebook Sharing Debugger might not have typical user-agent - check for fbclid in URL
+    // This is a reliable indicator that Facebook is accessing the link
+    const isFacebookShareDebugger = hasFbclid || /fbclid=/i.test(requestUrl);
     
     // More lenient detection - if user-agent contains 'facebook', 'bot', 'crawler', 'spider', or 'scraper'
     // OR if it's missing a typical browser user-agent, treat as potential crawler
     const isGenericBot = /bot|crawler|spider|scraper|facebook/i.test(userAgent);
     const looksLikeBrowser = /mozilla|chrome|safari|firefox|edge|opera/i.test(userAgent);
     
+    // CRITICAL: If URL contains /api/media/share/ - ALWAYS treat as potential crawler
+    // This ensures Facebook's crawler NEVER gets redirected before reading meta tags
+    const isShareRoute = /\/api\/media\/share\//i.test(requestUrl);
+    
     // If it's a Facebook crawler, has fbclid (Facebook link tracking), any other bot,
-    // OR doesn't look like a browser, don't redirect - serve meta tags instead
+    // OR is accessing the share route, don't redirect - serve meta tags instead
     // ALWAYS serve meta tags - only redirect if it's definitely a regular browser with typical UA
+    // AND it's not accessing the share route
     const isCrawler = isFacebookCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
+                     isFacebookShareDebugger || isShareRoute ||
                      (isGenericBot && !looksLikeBrowser) || !looksLikeBrowser;
     
     // For debugging - log what we detect
