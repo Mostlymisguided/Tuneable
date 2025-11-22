@@ -2895,6 +2895,7 @@ router.get('/share/:id', async (req, res) => {
     // Facebook uses facebookexternalhit/1.1 or facebookexternalhit/2.0 or Facebot
     // Also check for any request with fbclid parameter (Facebook link tracking)
     const isFacebookCrawler = /facebookexternalhit|Facebot/i.test(userAgent);
+    const isInstagramCrawler = /InstagramExternalHit|Instagram/i.test(userAgent);
     const isOtherSocialBot = /Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot/i.test(userAgent);
     
     // Check for Facebook's specific headers or query params
@@ -2914,11 +2915,11 @@ router.get('/share/:id', async (req, res) => {
     // This ensures Facebook's crawler NEVER gets redirected before reading meta tags
     const isShareRoute = /\/api\/media\/share\//i.test(requestUrl);
     
-    // If it's a Facebook crawler, has fbclid (Facebook link tracking), any other bot,
+    // If it's a Facebook crawler, Instagram crawler, has fbclid (Facebook link tracking), any other bot,
     // OR is accessing the share route, don't redirect - serve meta tags instead
     // ALWAYS serve meta tags - only redirect if it's definitely a regular browser with typical UA
     // AND it's not accessing the share route
-    const isCrawler = isFacebookCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
+    const isCrawler = isFacebookCrawler || isInstagramCrawler || isOtherSocialBot || hasFbclid || hasFacebookHeader || 
                      isFacebookShareDebugger || isShareRoute ||
                      (isGenericBot && !looksLikeBrowser) || !looksLikeBrowser;
     
