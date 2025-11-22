@@ -1238,11 +1238,13 @@ const TuneProfile: React.FC = () => {
   };
 
   // Share functionality
-  // Use backend share route for Facebook to get proper meta tags
-  const shareUrl = media?.uuid 
-    ? `${window.location.origin}/api/media/share/${media.uuid}`
+  // Use frontend URL for sharing (canonical URL that users will see)
+  // Backend route /api/media/share/:id is for Facebook's crawler to get meta tags
+  // Use _id instead of uuid for shorter URLs
+  const shareUrl = media?._id 
+    ? `${window.location.origin}/tune/${media._id}`
     : window.location.href;
-  const shareText = `Support your Favourite Tunes and Artists on Tuneable! Check out "${media?.title}"${media?.artist ? ` by ${media.artist}` : ''} and join the community.`;
+  const shareText = `Support your Favourite Tunes and Artists on Tuneable! Check out "${media?.title}"${getCreatorDisplay(media) ? ` by ${getCreatorDisplay(media)}` : ''} and join the community.`;
 
   // Update Open Graph meta tags for better Facebook sharing
   useEffect(() => {
@@ -1263,8 +1265,8 @@ const TuneProfile: React.FC = () => {
     const ogImage = getAbsoluteImageUrl(media.coverArt);
     const ogTitle = `${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`;
     const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media?.uuid 
-      ? `${window.location.origin}/tune/${media.uuid}`
+    const ogUrl = media?._id 
+      ? `${window.location.origin}/tune/${media._id}`
       : window.location.href;
 
     // Create or update meta tags
@@ -1333,18 +1335,20 @@ const TuneProfile: React.FC = () => {
       const encodedUrl = encodeURIComponent(shareUrl);
       const encodedText = encodeURIComponent(shareText);
 
-      // For Facebook, use the backend share route to ensure proper meta tags
+      // For Facebook, use the backend share route so Facebook's crawler can get meta tags
+      // The backend route sets og:url to the frontend URL, so users will be redirected there
       // For other platforms, use the frontend URL directly
-      const frontendUrl = media?.uuid 
-        ? `${window.location.origin}/tune/${media.uuid}`
-        : window.location.href;
-      const encodedFrontendUrl = encodeURIComponent(frontendUrl);
+      // Use _id instead of uuid for shorter URLs
+      const facebookShareUrl = media?._id 
+        ? `${window.location.origin}/api/media/share/${media._id}`
+        : shareUrl;
+      const encodedFacebookUrl = encodeURIComponent(facebookShareUrl);
       
       const shareUrls: Record<string, string> = {
-        twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedFrontendUrl}`,
-        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}&hashtag=Tuneable`,
-        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedFrontendUrl}`,
-        whatsapp: `https://wa.me/?text=${encodedText}%20${encodedFrontendUrl}`,
+        twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedFacebookUrl}&quote=${encodedText}&hashtag=Tuneable`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+        whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
       };
 
       if (shareUrls[platform]) {

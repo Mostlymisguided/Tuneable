@@ -2880,16 +2880,37 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
   }
 });
 
-// @route   GET /api/media/share/:uuid
+// @route   GET /api/media/share/:id
 // @desc    Serve HTML with Open Graph meta tags for Facebook sharing
 // @access  Public
-router.get('/share/:uuid', async (req, res) => {
+router.get('/share/:id', async (req, res) => {
   try {
-    const { uuid } = req.params;
+    const { id } = req.params;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    // Find media by UUID
-    const media = await Media.findOne({ uuid });
+    // Find media by _id (ObjectId) or UUID (for backward compatibility)
+    let media;
+    if (id.includes('-') && id.length > 20) {
+      // UUID format (has dashes and is longer)
+      media = await Media.findOne({ uuid: id });
+    } else if (isValidObjectId(id)) {
+      // ObjectId format (shorter, 24 characters)
+      media = await Media.findById(id);
+    } else {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta http-equiv="refresh" content="0;url=${frontendUrl}">
+          <title>Tuneable - Invalid ID</title>
+        </head>
+        <body>
+          <p>Invalid media ID. Redirecting to <a href="${frontendUrl}">Tuneable</a>...</p>
+        </body>
+        </html>
+      `);
+    }
 
     if (!media) {
       // Return a basic HTML page that redirects to frontend
@@ -2898,11 +2919,11 @@ router.get('/share/:uuid', async (req, res) => {
         <html>
         <head>
           <meta charset="UTF-8">
-          <meta http-equiv="refresh" content="0;url=${frontendUrl}/tune/${uuid}">
+          <meta http-equiv="refresh" content="0;url=${frontendUrl}/tune/${id}">
           <title>Tuneable - Tune Not Found</title>
         </head>
         <body>
-          <p>Redirecting to <a href="${frontendUrl}/tune/${uuid}">Tuneable</a>...</p>
+          <p>Redirecting to <a href="${frontendUrl}/tune/${id}">Tuneable</a>...</p>
         </body>
         </html>
       `);
@@ -2940,9 +2961,10 @@ router.get('/share/:uuid', async (req, res) => {
     const ogImage = getAbsoluteImageUrl(coverArtUrl);
     const ogTitle = escapeHtml(`${media.title}${artistText} | Tuneable`);
     const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${media.title}"${artistText} and join the community.`);
-    const ogUrl = `${frontendUrl}/tune/${media.uuid}`;
+    // Use _id for shorter URLs
+    const ogUrl = `${frontendUrl}/tune/${media._id}`;
     const escapedTitle = escapeHtml(media.title);
-    const escapedUuid = escapeHtml(media.uuid);
+    const escapedId = escapeHtml(media._id.toString());
 
     // Serve HTML with proper meta tags
     const html = `
