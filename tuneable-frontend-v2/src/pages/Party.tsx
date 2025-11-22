@@ -1662,6 +1662,41 @@ const Party: React.FC = () => {
       }, 0);
   };
 
+  const calculateAverageTip = () => {
+    const media = getPartyMedia();
+    if (!media || media.length === 0) return 0;
+    
+    // Get all active media entries
+    const activeMedia = media.filter((item: any) => item.status === 'active');
+    
+    // Count total bids and sum total amounts across all active media
+    let totalBids = 0;
+    let totalAmount = 0;
+    
+    activeMedia.forEach((item: any) => {
+      // Get bids from party-specific bids array
+      const bids = item.partyBids || item.bids || [];
+      if (Array.isArray(bids)) {
+        bids.forEach((bid: any) => {
+          // Only count active bids
+          if (bid && bid.status !== 'vetoed') {
+            totalBids++;
+            const amount = typeof bid.amount === 'number' ? bid.amount : 0;
+            totalAmount += amount;
+          }
+        });
+      }
+      
+      // Also check if partyMediaAggregate exists (fallback calculation)
+      // If we have aggregate but no bid count, we can't calculate average accurately
+      // So we'll rely on the bids array above
+    });
+    
+    // Calculate average (return in pence for consistency)
+    if (totalBids === 0) return 0;
+    return totalAmount / totalBids;
+  };
+
 
   if (isLoading) {
     return (
@@ -1690,44 +1725,59 @@ const Party: React.FC = () => {
   return (
     <div className="min-h-screen ">
       {/* Party Header */}
-      <div className=" justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
-       
-                <h1 className="text-xl sm:text-3xl font-bold text-white">{party.name}</h1>
-         
+      <div className="justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
+        <h1 className="inline-block text-xl sm:text-3xl font-bold text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 shadow-lg">
+          {party.name}
+        </h1>
       </div>
 
       
       
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
         <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-2">
-              <Music className="h-6 w-6 text-white" />
+          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-purple-600/30 rounded-lg">
+                <Music className="h-5 w-5 text-purple-300" />
+              </div>
               <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">
-                  {getDisplayMedia().length}
-                </div>
-                <div className="text-xs sm:text-sm text-gray-300">
+                <div className="text-xl sm:text-2xl font-bold text-white">{getDisplayMedia().length}</div>
+                <div className="text-xs text-gray-400">
                   {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-2">
-              <Users className="h-6 w-6 text-white" />
+          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-purple-600/30 rounded-lg">
+                <Users className="h-5 w-5 text-purple-300" />
+              </div>
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white">{party.partiers.length}</div>
-                <div className="text-xs sm:text-sm text-gray-300">Partiers</div>
+                <div className="text-xs text-gray-400">Partiers</div>
               </div>
             </div>
           </div>
-          <div className="bg-purple-800/50 px-3 py-2 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-2">
-              <Coins className="h-6 w-6 text-yellow-400" />
+          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)]">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-yellow-600/30 rounded-lg">
+                <Coins className="h-5 w-5 text-yellow-300" />
+              </div>
               <div>
                 <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(calculateTotalBids())}</div>
-                <div className="text-xs sm:text-sm text-gray-300">Total Tips</div>
+                <div className="text-xs text-gray-400">Total Tips</div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-green-600/30 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-green-300" />
+              </div>
+              <div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(calculateAverageTip())}</div>
+                <div className="text-xs text-gray-400">Avg Tip</div>
               </div>
             </div>
           </div>

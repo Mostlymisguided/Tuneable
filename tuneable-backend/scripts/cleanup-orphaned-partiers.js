@@ -17,13 +17,13 @@ const Party = require('../models/Party');
 const User = require('../models/User');
 require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tuneable';
+const MONGO_URI = process.env.MONGO_URI || 'connectionstring';
 const isDryRun = process.argv.includes('--dry-run');
 
 async function cleanupOrphanedPartiers() {
     try {
         console.log('🔌 Connecting to MongoDB...');
-        await mongoose.connect(MONGODB_URI);
+        await mongoose.connect(MONGO_URI);
         console.log('✅ Connected to MongoDB\n');
 
         if (isDryRun) {
@@ -38,7 +38,9 @@ async function cleanupOrphanedPartiers() {
 
         // Step 2: Clean up Party.partiers arrays
         console.log('🧹 Step 2: Cleaning up Party.partiers arrays...');
-        const allParties = await Party.find({});
+        // Use lean() to get plain JavaScript objects without Mongoose validation
+        // This allows us to read documents even if they have invalid enum values
+        const allParties = await Party.find({}).lean();
         console.log(`   Found ${allParties.length} parties to check\n`);
 
         let partiesUpdated = 0;
@@ -65,19 +67,74 @@ async function cleanupOrphanedPartiers() {
             const newCount = party.partiers.length;
             const removed = originalCount - newCount;
 
-            if (removed > 0) {
-                totalOrphanedRemoved += removed;
-                console.log(`   🗑️  Party "${party.name}" (${party._id}):`);
-                console.log(`      Removed ${removed} orphaned partier(s) (${originalCount} → ${newCount})`);
+            // ✅ Also fix invalid media status values (e.g., 'queued' → 'active')
+            let statusFixed = 0;
+            const invalidStatusIndices = [];
+            if (party.media && Array.isArray(party.media)) {
+                party.media.forEach((mediaItem, index) => {
+                    // Track invalid status values (legacy 'queued' status)
+                    if (mediaItem.status && !['active', 'vetoed'].includes(mediaItem.status)) {
+                        const oldStatus = mediaItem.status;
+                        invalidStatusIndices.push({ index, oldStatus });
+                        statusFixed++;
+                        if (statusFixed <= 3) {
+                            console.log(`      ⚠️  Found invalid media status: "${oldStatus}" → will fix to "active"`);
+                        }
+                    }
+                });
+            }
+
+            if (removed > 0 || statusFixed > 0) {
+                if (removed > 0) {
+                    totalOrphanedRemoved += removed;
+                    console.log(`   🗑️  Party "${party.name}" (${party._id}):`);
+                    console.log(`      Removed ${removed} orphaned partier(s) (${originalCount} → ${newCount})`);
+                    
+                    if (removed <= 5) {
+                        console.log(`      Orphaned IDs: ${orphanedIds.join(', ')}`);
+                    } else {
+                        console.log(`      Orphaned IDs: ${orphanedIds.slice(0, 5).join(', ')}... (${removed} total)`);
+                    }
+                }
                 
-                if (removed <= 5) {
-                    console.log(`      Orphaned IDs: ${orphanedIds.join(', ')}`);
-                } else {
-                    console.log(`      Orphaned IDs: ${orphanedIds.slice(0, 5).join(', ')}... (${removed} total)`);
+                if (statusFixed > 0) {
+                    if (removed === 0) {
+                        console.log(`   ⚠️  Party "${party.name}" (${party._id}):`);
+                    }
+                    console.log(`      Fixed ${statusFixed} invalid media status value(s)`);
                 }
 
                 if (!isDryRun) {
-                    await party.save();
+                    // Use direct MongoDB update to avoid Mongoose validation errors
+                    // Convert ObjectIds back to MongoDB format if needed
+                    const db = mongoose.connection.db;
+                    const partiesCollection = db.collection('parties');
+                    
+                    // Convert partiers to ObjectIds if they're strings
+                    const partiersToUpdate = party.partiers.map(p => {
+                        if (typeof p === 'string') {
+                            return new mongoose.Types.ObjectId(p);
+                        }
+                        return p;
+                    });
+                    
+                    // Update partiers array
+                    await partiesCollection.updateOne(
+                        { _id: new mongoose.Types.ObjectId(party._id) },
+                        { $set: { partiers: partiersToUpdate } }
+                    );
+                    
+                    // Also fix invalid media status values if any were found
+                    if (statusFixed > 0 && invalidStatusIndices.length > 0) {
+                        // Update each invalid status value using the tracked indices
+                        for (const { index, oldStatus } of invalidStatusIndices) {
+                            await partiesCollection.updateOne(
+                                { _id: new mongoose.Types.ObjectId(party._id) },
+                                { $set: { [`media.${index}.status`]: 'active' } }
+                            );
+                        }
+                    }
+                    
                     partiesUpdated++;
                 }
             }
