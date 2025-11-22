@@ -2882,5 +2882,126 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/media/share/:uuid
+// @desc    Serve HTML with Open Graph meta tags for Facebook sharing
+// @access  Public
+router.get('/share/:uuid', async (req, res) => {
+  try {
+    const { uuid } = req.params;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const DEFAULT_COVER_ART = 'https://uploads.tuneable.stream/cover-art/default-cover.png';
+
+    // Find media by UUID
+    const media = await Media.findOne({ uuid });
+
+    if (!media) {
+      // Return a basic HTML page that redirects to frontend
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta http-equiv="refresh" content="0;url=${frontendUrl}/tune/${uuid}">
+          <title>Tuneable - Tune Not Found</title>
+        </head>
+        <body>
+          <p>Redirecting to <a href="${frontendUrl}/tune/${uuid}">Tuneable</a>...</p>
+        </body>
+        </html>
+      `);
+    }
+
+    // Get absolute image URL
+    const getAbsoluteImageUrl = (imageUrl) => {
+      if (!imageUrl) return DEFAULT_COVER_ART;
+      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+        return imageUrl;
+      }
+      if (imageUrl.startsWith('/')) {
+        return `${frontendUrl}${imageUrl}`;
+      }
+      return `${frontendUrl}/${imageUrl}`;
+    };
+
+    // Helper function to escape HTML
+    const escapeHtml = (text) => {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
+    const ogImage = getAbsoluteImageUrl(media.coverArt);
+    const ogTitle = escapeHtml(`${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`);
+    const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${media.title}"${media.artist ? ` by ${media.artist}` : ''} and join the community.`);
+    const ogUrl = `${frontendUrl}/tune/${media.uuid}`;
+    const escapedTitle = escapeHtml(media.title);
+    const escapedUuid = escapeHtml(media.uuid);
+
+    // Serve HTML with proper meta tags
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${ogTitle}</title>
+        <meta name="description" content="${ogDescription}">
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="music.song" />
+        <meta property="og:url" content="${ogUrl}" />
+        <meta property="og:title" content="${ogTitle}" />
+        <meta property="og:description" content="${ogDescription}" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta property="og:site_name" content="Tuneable" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content="${ogUrl}" />
+        <meta name="twitter:title" content="${ogTitle}" />
+        <meta name="twitter:description" content="${ogDescription}" />
+        <meta name="twitter:image" content="${ogImage}" />
+        
+        <!-- Redirect to frontend after a short delay -->
+        <meta http-equiv="refresh" content="0;url=${ogUrl}">
+        
+        <!-- Fallback redirect via JavaScript -->
+        <script>
+          window.location.href = "${ogUrl}";
+        </script>
+      </head>
+      <body>
+        <p>Redirecting to <a href="${ogUrl}">${escapedTitle}</a> on Tuneable...</p>
+      </body>
+      </html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('Error serving share page:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="refresh" content="0;url=${frontendUrl}">
+        <title>Tuneable - Error</title>
+      </head>
+      <body>
+        <p>Error loading tune. Redirecting to <a href="${frontendUrl}">Tuneable</a>...</p>
+      </body>
+      </html>
+    `);
+  }
+});
+
 module.exports = router;
 

@@ -1737,18 +1737,38 @@ const Party: React.FC = () => {
   };
 
   const handleShare = (platform: string) => {
-    const encodedUrl = encodeURIComponent(shareUrl);
-    const encodedText = encodeURIComponent(shareText);
+    try {
+      const encodedUrl = encodeURIComponent(shareUrl);
+      const encodedText = encodeURIComponent(shareText);
 
-    const shareUrls: Record<string, string> = {
-      twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
-      whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
-    };
+      const shareUrls: Record<string, string> = {
+        twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}&hashtag=Tuneable`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+        whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
+      };
 
-    if (shareUrls[platform]) {
-      window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+      if (shareUrls[platform]) {
+        const shareWindow = window.open(
+          shareUrls[platform], 
+          '_blank', 
+          'width=600,height=400,menubar=no,toolbar=no,resizable=yes,scrollbars=yes'
+        );
+        
+        // Check if popup was blocked
+        if (!shareWindow || shareWindow.closed || typeof shareWindow.closed === 'undefined') {
+          toast.warning('Popup blocked. Please allow popups for this site to share.');
+        } else {
+          // Track share event (placeholder for analytics)
+          if (platform === 'facebook' && party?._id) {
+            // Example: analytics.track('Share', { platform: 'facebook', partyId: party._id });
+            console.log('Facebook share tracked:', { partyId: party._id, url: shareUrl });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error sharing to ${platform}:`, error);
+      toast.error(`Failed to open ${platform} share. Please try again.`);
     }
   };
 

@@ -1238,8 +1238,75 @@ const TuneProfile: React.FC = () => {
   };
 
   // Share functionality
-  const shareUrl = window.location.href;
-  const shareText = `Check out "${media?.title}" by ${media?.artist || 'Unknown Artist'} on Tuneable!`;
+  // Use backend share route for Facebook to get proper meta tags
+  const shareUrl = media?.uuid 
+    ? `${window.location.origin}/api/media/share/${media.uuid}`
+    : window.location.href;
+  const shareText = `Support your Favourite Tunes and Artists on Tuneable! Check out "${media?.title}"${media?.artist ? ` by ${media.artist}` : ''} and join the community.`;
+
+  // Update Open Graph meta tags for better Facebook sharing
+  useEffect(() => {
+    if (!media) return;
+
+    // Helper function to get absolute image URL
+    const getAbsoluteImageUrl = (imageUrl: string | undefined): string => {
+      if (!imageUrl) return `${window.location.origin}${DEFAULT_COVER_ART}`;
+      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+        return imageUrl;
+      }
+      if (imageUrl.startsWith('/')) {
+        return `${window.location.origin}${imageUrl}`;
+      }
+      return `${window.location.origin}/${imageUrl}`;
+    };
+
+    const ogImage = getAbsoluteImageUrl(media.coverArt);
+    const ogTitle = `${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`;
+    const ogDescription = shareText; // Already includes the new caption
+    const ogUrl = media?.uuid 
+      ? `${window.location.origin}/tune/${media.uuid}`
+      : window.location.href;
+
+    // Create or update meta tags
+    const updateMetaTag = (property: string, content: string) => {
+      let meta = document.querySelector(`meta[property="${property}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('property', property);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
+
+    // Update Open Graph tags
+    updateMetaTag('og:title', ogTitle);
+    updateMetaTag('og:description', ogDescription);
+    updateMetaTag('og:image', ogImage);
+    updateMetaTag('og:url', ogUrl);
+    updateMetaTag('og:type', 'music.song');
+    updateMetaTag('og:site_name', 'Tuneable');
+
+    // Update Twitter Card tags for better cross-platform sharing
+    const updateTwitterTag = (name: string, content: string) => {
+      let meta = document.querySelector(`meta[name="${name}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', name);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
+
+    updateTwitterTag('twitter:card', 'summary_large_image');
+    updateTwitterTag('twitter:title', ogTitle);
+    updateTwitterTag('twitter:description', ogDescription);
+    updateTwitterTag('twitter:image', ogImage);
+
+    // Cleanup function to restore default meta tags when component unmounts
+    return () => {
+      // Optionally restore default tags here if needed
+    };
+  }, [media, shareUrl, shareText]);
 
   const handleNativeShare = async () => {
     if (navigator.share) {
@@ -1262,20 +1329,48 @@ const TuneProfile: React.FC = () => {
   };
 
   const handleShare = (platform: string) => {
-    const encodedUrl = encodeURIComponent(shareUrl);
-    const encodedText = encodeURIComponent(shareText);
+    try {
+      const encodedUrl = encodeURIComponent(shareUrl);
+      const encodedText = encodeURIComponent(shareText);
 
-    const shareUrls: Record<string, string> = {
-      twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
-      whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
-    };
+      // For Facebook, use the backend share route to ensure proper meta tags
+      // For other platforms, use the frontend URL directly
+      const frontendUrl = media?.uuid 
+        ? `${window.location.origin}/tune/${media.uuid}`
+        : window.location.href;
+      const encodedFrontendUrl = encodeURIComponent(frontendUrl);
+      
+      const shareUrls: Record<string, string> = {
+        twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedFrontendUrl}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}&hashtag=Tuneable`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedFrontendUrl}`,
+        whatsapp: `https://wa.me/?text=${encodedText}%20${encodedFrontendUrl}`,
+      };
 
-    if (shareUrls[platform]) {
-      window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+      if (shareUrls[platform]) {
+        const shareWindow = window.open(
+          shareUrls[platform], 
+          '_blank', 
+          'width=600,height=400,menubar=no,toolbar=no,resizable=yes,scrollbars=yes'
+        );
+        
+        // Check if popup was blocked
+        if (!shareWindow || shareWindow.closed || typeof shareWindow.closed === 'undefined') {
+          toast.warning('Popup blocked. Please allow popups for this site to share.');
+        } else {
+          // Track share event (placeholder for analytics)
+          if (platform === 'facebook' && media?._id) {
+            // Example: analytics.track('Share', { platform: 'facebook', mediaId: media._id });
+            console.log('Facebook share tracked:', { mediaId: media._id, url: shareUrl });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error sharing to ${platform}:`, error);
+      toast.error(`Failed to open ${platform} share. Please try again.`);
+    } finally {
+      setShowShareDropdown(false);
     }
-    setShowShareDropdown(false);
   };
 
   const handleCopyLink = async () => {
