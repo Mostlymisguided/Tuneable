@@ -31,7 +31,14 @@ import {
   Users,
   Upload,
   Minus,
-  Plus
+  Plus,
+  Share2,
+  Copy,
+  Check,
+  ChevronDown,
+  Twitter,
+  Facebook,
+  Linkedin
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import TopBidders from '../components/TopBidders';
@@ -250,6 +257,11 @@ const TuneProfile: React.FC = () => {
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
 
+  // Share functionality state
+  const [isMobile, setIsMobile] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
+
   // Cover art upload state
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
@@ -405,6 +417,16 @@ const TuneProfile: React.FC = () => {
 
     return () => clearTimeout(timeoutId);
   }, [collectiveSearchQuery, collectiveSearchField]);
+
+  // Detect mobile device for share functionality
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Search creators/artists by artistName
   const searchArtists = async (query: string) => {
@@ -1215,6 +1237,80 @@ const TuneProfile: React.FC = () => {
     }
   };
 
+  // Share functionality
+  const shareUrl = window.location.href;
+  const shareText = `Check out "${media?.title}" by ${media?.artist || 'Unknown Artist'} on Tuneable!`;
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: media?.title || 'Tuneable Tune',
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err: any) {
+        // User cancelled or error occurred
+        if (err.name !== 'AbortError') {
+          console.error('Error sharing:', err);
+        }
+      }
+    } else {
+      // Fallback to copy link if native share not available
+      handleCopyLink();
+    }
+  };
+
+  const handleShare = (platform: string) => {
+    const encodedUrl = encodeURIComponent(shareUrl);
+    const encodedText = encodeURIComponent(shareText);
+
+    const shareUrls: Record<string, string> = {
+      twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+      whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
+    };
+
+    if (shareUrls[platform]) {
+      window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+    }
+    setShowShareDropdown(false);
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopySuccess(true);
+      toast.success('Link copied to clipboard!');
+      setTimeout(() => setCopySuccess(false), 2000);
+      setShowShareDropdown(false);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      toast.error('Failed to copy link');
+    }
+  };
+
+  // Ref for share dropdown to handle click outside
+  const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside share dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (shareDropdownRef.current && !shareDropdownRef.current.contains(event.target as Node)) {
+        setShowShareDropdown(false);
+      }
+    };
+
+    if (showShareDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showShareDropdown]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -1265,14 +1361,15 @@ const TuneProfile: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
         {/* Tune Profile Header */}
-        <div className="mb-6 md:mb-8">  
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 md:mb-6">
+        <div className="mb-6">  
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <button
               onClick={() => navigate(-1)}
               className="px-3 md:px-4 py-2 rounded-lg font-medium transition-colors bg-black/20 border-white/20 border border-gray-500 text-white hover:bg-gray-700/30 text-sm md:text-base"
             >
               Back
             </button>
+            
             {/* Edit Tune & Report Buttons */}
             <div className="flex flex-wrap justify-end gap-2 md:flex-nowrap md:items-center">
             
@@ -1440,6 +1537,81 @@ const TuneProfile: React.FC = () => {
           </div>
         </div>
 
+        {/* Share Button - Centered below header */}
+        <div className="flex justify-center mb-6" ref={shareDropdownRef}>
+            {isMobile ? (
+              <button
+                onClick={handleNativeShare}
+                className="px-3 md:px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all flex items-center space-x-2 text-sm md:text-base"
+              >
+                <Share2 className="h-4 w-4" />
+                <span className="inline">Share</span>
+              </button>
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={() => setShowShareDropdown(!showShareDropdown)}
+                  className="px-3 md:px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all flex items-center space-x-2 text-sm md:text-base"
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span className="inline">Share</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showShareDropdown && (
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-48 bg-gray-900/95 border-2 border-purple-500/50 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={() => handleShare('twitter')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
+                    >
+                      <Twitter className="h-5 w-5 text-blue-400" />
+                      <span>Twitter/X</span>
+                    </button>
+                    <button
+                      onClick={() => handleShare('facebook')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
+                    >
+                      <Facebook className="h-5 w-5 text-blue-500" />
+                      <span>Facebook</span>
+                    </button>
+                    <button
+                      onClick={() => handleShare('linkedin')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
+                    >
+                      <Linkedin className="h-5 w-5 text-blue-600" />
+                      <span>LinkedIn</span>
+                    </button>
+                    <button
+                      onClick={() => handleShare('whatsapp')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
+                    >
+                      <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                      </svg>
+                      <span>WhatsApp</span>
+                    </button>
+                    <button
+                      onClick={handleCopyLink}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white border-t border-gray-700/50"
+                    >
+                      {copySuccess ? (
+                        <>
+                          <Check className="h-5 w-5 text-green-400" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-5 w-5 text-gray-400" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
         {/* Tab Navigation - Only show when in edit mode */}
         {isEditMode && canEditTune() && (
           <div className="mb-6 border-b border-gray-700">
@@ -1484,7 +1656,7 @@ const TuneProfile: React.FC = () => {
           <>
         {/* Global Tip Section - Support This Tune */}
         {user && (
-          <div className="mb-8 px-2 md:px-0">
+          <div className="mb-6 px-2 md:px-0">
             <div className="max-w-2xl mx-auto">
               <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
                 <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
@@ -1495,7 +1667,7 @@ const TuneProfile: React.FC = () => {
                   Boost this tune's global ranking and support the artist
                 </p>
                 
-                <div className="flex flex-row items-center justify-center space-y-0 space-x-3 mb-4">
+                <div className="flex flex-row items-center justify-center mb-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -1505,12 +1677,11 @@ const TuneProfile: React.FC = () => {
                       setHasInitializedBidInput(true);
                     }}
                     disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-                    className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                    className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl transition-colors flex items-center justify-center"
                   >
                     <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
                   </button>
-                  <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                    <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
+                  <div className="flex items-center bg-gray-800 overflow-hidden">
                     <input
                       type="number"
                       step="0.01"
@@ -1520,7 +1691,7 @@ const TuneProfile: React.FC = () => {
                         setHasInitializedBidInput(true);
                         setGlobalBidInput(e.target.value);
                       }}
-                      className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
+                      className="w-24 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <button
@@ -1536,14 +1707,14 @@ const TuneProfile: React.FC = () => {
                       const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
                       return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
                     })()}
-                    className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                    className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl transition-colors flex items-center justify-center"
                   >
                     <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
                   </button>
                   <button
                     onClick={handleGlobalBid}
                     disabled={isPlacingGlobalBid || !isGlobalBidValid}
-                    className="w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
+                    className="w-auto px-6 md:px-8 ml-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
                   >
                     {isPlacingGlobalBid ? (
                       <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
@@ -2056,7 +2227,7 @@ const TuneProfile: React.FC = () => {
                                 setHasInitializedBidInput(true);
                                 setGlobalBidInput(e.target.value);
                               }}
-                              className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600"
+                              className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
                           <button
