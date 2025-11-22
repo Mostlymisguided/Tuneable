@@ -303,9 +303,6 @@ const normalizeLanguageInput = (value) => {
   return lower;
 };
 
-// Default cover art URL for media without cover art (matches frontend constant)
-const DEFAULT_COVER_ART = 'https://uploads.tuneable.stream/cover-art/default-cover.png';
-
 // Configure media upload
 const mediaUpload = createMediaUpload();
 const coverArtUpload = createCoverArtUpload();
