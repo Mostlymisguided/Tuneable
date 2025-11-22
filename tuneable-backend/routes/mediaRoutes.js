@@ -3087,9 +3087,10 @@ router.get('/share/:id', async (req, res) => {
     });
 
     // Serve HTML with proper meta tags
-    // Important: Meta tags must be in <head> before any redirect meta tags
+    // CRITICAL: Meta tags MUST be in <head> before any redirect meta tags
+    // Facebook's crawler needs time to read meta tags before redirect
     const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# music: http://ogp.me/ns/music#">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3097,7 +3098,7 @@ router.get('/share/:id', async (req, res) => {
   <title>${ogTitle}</title>
   <meta name="description" content="${ogDescription}">
   
-  <!-- Open Graph / Facebook - MUST be in this order -->
+  <!-- Open Graph / Facebook - MUST be in this order for Facebook -->
   <meta property="og:type" content="music.song" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:title" content="${ogTitle}" />
@@ -3121,11 +3122,14 @@ router.get('/share/:id', async (req, res) => {
   
   ${!isCrawler ? `
   <!-- Redirect to frontend after a short delay (only for regular browsers, not crawlers) -->
-  <meta http-equiv="refresh" content="0;url=${ogUrl}">
+  <!-- Note: Meta tags above are already served, so crawlers can read them before redirect -->
+  <meta http-equiv="refresh" content="3;url=${ogUrl}">
   
-  <!-- Fallback redirect via JavaScript -->
+  <!-- Fallback redirect via JavaScript (delayed to allow crawlers to read meta tags) -->
   <script>
-    window.location.href = "${ogUrl}";
+    setTimeout(function() {
+      window.location.href = "${ogUrl}";
+    }, 3000); // 3 second delay to allow crawlers to read meta tags
   </script>
   ` : ''}
 </head>
