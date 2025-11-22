@@ -2887,6 +2887,10 @@ router.get('/share/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
+    // Detect if this is Facebook's crawler (or other social media crawlers)
+    const userAgent = req.headers['user-agent'] || '';
+    const isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot/i.test(userAgent);
 
     // Find media by _id (ObjectId) or UUID (for backward compatibility)
     let media;
@@ -2897,6 +2901,25 @@ router.get('/share/:id', async (req, res) => {
       // ObjectId format (shorter, 24 characters)
       media = await Media.findById(id);
     } else {
+      // For crawlers, return a proper error page with meta tags
+      if (isCrawler) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta property="og:title" content="Tuneable - Invalid ID" />
+            <meta property="og:description" content="The tune you're looking for could not be found." />
+            <meta property="og:url" content="${frontendUrl}" />
+            <title>Tuneable - Invalid ID</title>
+          </head>
+          <body>
+            <p>Invalid media ID.</p>
+          </body>
+          </html>
+        `);
+      }
+      // For regular browsers, redirect
       return res.status(400).send(`
         <!DOCTYPE html>
         <html>
@@ -2913,7 +2936,25 @@ router.get('/share/:id', async (req, res) => {
     }
 
     if (!media) {
-      // Return a basic HTML page that redirects to frontend
+      // For crawlers, return a proper error page with meta tags
+      if (isCrawler) {
+        return res.status(404).send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta property="og:title" content="Tuneable - Tune Not Found" />
+            <meta property="og:description" content="The tune you're looking for could not be found." />
+            <meta property="og:url" content="${frontendUrl}/tune/${id}" />
+            <title>Tuneable - Tune Not Found</title>
+          </head>
+          <body>
+            <p>Tune not found.</p>
+          </body>
+          </html>
+        `);
+      }
+      // For regular browsers, redirect
       return res.send(`
         <!DOCTYPE html>
         <html>
@@ -2943,6 +2984,18 @@ router.get('/share/:id', async (req, res) => {
       }
       return `${frontendUrl}/${imageUrl}`;
     };
+    
+    // Log for debugging (only in development)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔍 Share route debug:', {
+        mediaId: id,
+        mediaTitle: media.title,
+        creatorDisplay: media.creatorDisplay,
+        coverArtUrl: coverArtUrl,
+        isCrawler: isCrawler,
+        userAgent: userAgent
+      });
+    }
 
     // Helper function to escape HTML
     const escapeHtml = (text) => {
@@ -2994,16 +3047,26 @@ router.get('/share/:id', async (req, res) => {
         <meta name="twitter:description" content="${ogDescription}" />
         <meta name="twitter:image" content="${ogImage}" />
         
-        <!-- Redirect to frontend after a short delay -->
+        ${!isCrawler ? `
+        <!-- Redirect to frontend after a short delay (only for regular browsers, not crawlers) -->
         <meta http-equiv="refresh" content="0;url=${ogUrl}">
         
         <!-- Fallback redirect via JavaScript -->
         <script>
           window.location.href = "${ogUrl}";
         </script>
+        ` : ''}
       </head>
       <body>
+        ${isCrawler ? `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center;">
+          <h1>${escapedTitle}</h1>
+          <p>${ogDescription}</p>
+          <p><a href="${ogUrl}">Listen on Tuneable</a></p>
+        </div>
+        ` : `
         <p>Redirecting to <a href="${ogUrl}">${escapedTitle}</a> on Tuneable...</p>
+        `}
       </body>
       </html>
     `;
