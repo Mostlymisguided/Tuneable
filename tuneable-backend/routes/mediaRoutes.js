@@ -13,6 +13,7 @@ const { isValidObjectId } = require('../utils/validators');
 const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
+const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const MetadataExtractor = require('../utils/metadataExtractor');
 const { canUploadMedia, canEditMedia } = require('../utils/permissionHelpers');
 
@@ -2889,7 +2890,6 @@ router.get('/share/:uuid', async (req, res) => {
   try {
     const { uuid } = req.params;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const DEFAULT_COVER_ART = 'https://uploads.tuneable.stream/cover-art/default-cover.png';
 
     // Find media by UUID
     const media = await Media.findOne({ uuid });
@@ -2911,6 +2911,9 @@ router.get('/share/:uuid', async (req, res) => {
       `);
     }
 
+    // Get cover art using the utility function (handles fallback chain)
+    const coverArtUrl = getMediaCoverArt(media);
+    
     // Get absolute image URL
     const getAbsoluteImageUrl = (imageUrl) => {
       if (!imageUrl) return DEFAULT_COVER_ART;
@@ -2934,9 +2937,12 @@ router.get('/share/:uuid', async (req, res) => {
         .replace(/'/g, '&#039;');
     };
 
-    const ogImage = getAbsoluteImageUrl(media.coverArt);
-    const ogTitle = escapeHtml(`${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`);
-    const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${media.title}"${media.artist ? ` by ${media.artist}` : ''} and join the community.`);
+    // Use creatorDisplay field (already a formatted string from artist/featuring arrays)
+    const artistText = media.creatorDisplay ? ` by ${media.creatorDisplay}` : '';
+    
+    const ogImage = getAbsoluteImageUrl(coverArtUrl);
+    const ogTitle = escapeHtml(`${media.title}${artistText} | Tuneable`);
+    const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${media.title}"${artistText} and join the community.`);
     const ogUrl = `${frontendUrl}/tune/${media.uuid}`;
     const escapedTitle = escapeHtml(media.title);
     const escapedUuid = escapeHtml(media.uuid);
@@ -2960,6 +2966,7 @@ router.get('/share/:uuid', async (req, res) => {
         <meta property="og:site_name" content="Tuneable" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
+        ${process.env.FACEBOOK_APP_ID ? `<meta property="fb:app_id" content="${escapeHtml(process.env.FACEBOOK_APP_ID)}" />` : ''}
         
         <!-- Twitter Card -->
         <meta name="twitter:card" content="summary_large_image" />
