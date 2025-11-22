@@ -2885,12 +2885,17 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
 // @access  Public
 router.get('/share/:id', async (req, res) => {
   // Log immediately to ensure route is being hit
-  console.log('🔵 SHARE ROUTE HIT:', {
+  // This will appear in BACKEND server logs, not browser console
+  console.log('🔵🔵🔵 SHARE ROUTE HIT 🔵🔵🔵');
+  console.log('Request details:', {
     id: req.params.id,
     url: req.url,
+    path: req.path,
+    originalUrl: req.originalUrl,
     userAgent: req.headers['user-agent']?.substring(0, 100),
     referer: req.headers['referer'],
-    query: req.query
+    query: req.query,
+    headers: Object.keys(req.headers)
   });
   
   try {
