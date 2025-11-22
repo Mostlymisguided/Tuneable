@@ -1244,7 +1244,8 @@ const TuneProfile: React.FC = () => {
   const shareUrl = media?._id 
     ? `${window.location.origin}/tune/${media._id}`
     : window.location.href;
-  const shareText = `Support your Favourite Tunes and Artists on Tuneable! Check out "${media?.title}"${getCreatorDisplay(media) ? ` by ${getCreatorDisplay(media)}` : ''} and join the community.`;
+  const creatorDisplay = media ? getCreatorDisplay(media) : null;
+  const shareText = `Support your Favourite Tunes and Artists on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and join the community.`;
 
   // Update Open Graph meta tags for better Facebook sharing
   useEffect(() => {

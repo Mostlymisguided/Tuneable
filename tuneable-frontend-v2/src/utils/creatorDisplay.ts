@@ -3,6 +3,11 @@
  * Uses creatorDisplay if available, otherwise falls back to formatting artist/featuring arrays
  */
 export function getCreatorDisplay(media: any): string {
+  // Handle null/undefined media
+  if (!media) {
+    return 'Unknown Artist';
+  }
+  
   // If creatorDisplay is set, use it
   if (media.creatorDisplay) {
     return media.creatorDisplay;
