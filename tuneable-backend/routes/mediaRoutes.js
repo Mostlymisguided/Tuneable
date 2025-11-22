@@ -2890,7 +2890,14 @@ router.get('/share/:id', async (req, res) => {
     
     // Detect if this is Facebook's crawler (or other social media crawlers)
     const userAgent = req.headers['user-agent'] || '';
-    const isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot/i.test(userAgent);
+    // Expanded crawler detection - Facebook uses multiple user agents
+    const isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|SkypeUriPreview|Applebot|Googlebot|facebook|bot|crawler|spider|scraper/i.test(userAgent);
+    
+    // Also check for Facebook's specific headers
+    const isFacebookShareDebugger = req.headers['x-facebook-request-id'] || req.query.fbclid;
+    
+    // If Facebook Share Debugger or has fbclid param, treat as crawler
+    const shouldServeMetaTags = isCrawler || isFacebookShareDebugger;
 
     // Find media by _id (ObjectId) or UUID (for backward compatibility)
     let media;
@@ -2902,7 +2909,7 @@ router.get('/share/:id', async (req, res) => {
       media = await Media.findById(id);
     } else {
       // For crawlers, return a proper error page with meta tags
-      if (isCrawler) {
+      if (shouldServeMetaTags) {
         return res.status(400).send(`
           <!DOCTYPE html>
           <html>
@@ -2937,7 +2944,7 @@ router.get('/share/:id', async (req, res) => {
 
     if (!media) {
       // For crawlers, return a proper error page with meta tags
-      if (isCrawler) {
+      if (shouldServeMetaTags) {
         return res.status(404).send(`
           <!DOCTYPE html>
           <html>
@@ -2984,18 +2991,6 @@ router.get('/share/:id', async (req, res) => {
       }
       return `${frontendUrl}/${imageUrl}`;
     };
-    
-    // Log for debugging (only in development)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('🔍 Share route debug:', {
-        mediaId: id,
-        mediaTitle: media.title,
-        creatorDisplay: media.creatorDisplay,
-        coverArtUrl: coverArtUrl,
-        isCrawler: isCrawler,
-        userAgent: userAgent
-      });
-    }
 
     // Helper function to escape HTML
     const escapeHtml = (text) => {
@@ -3010,66 +3005,86 @@ router.get('/share/:id', async (req, res) => {
 
     // Use creatorDisplay field (already a formatted string from artist/featuring arrays)
     const artistText = media.creatorDisplay ? ` by ${media.creatorDisplay}` : '';
+    const mediaTitle = media.title || 'Untitled Tune';
     
     const ogImage = getAbsoluteImageUrl(coverArtUrl);
-    const ogTitle = escapeHtml(`${media.title}${artistText} | Tuneable`);
-    const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${media.title}"${artistText} and join the community.`);
+    const ogTitle = escapeHtml(`${mediaTitle}${artistText} | Tuneable`);
+    const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${mediaTitle}"${artistText} and join the community.`);
     // Use _id for shorter URLs
     const ogUrl = `${frontendUrl}/tune/${media._id}`;
-    const escapedTitle = escapeHtml(media.title);
+    const escapedTitle = escapeHtml(mediaTitle);
     const escapedId = escapeHtml(media._id.toString());
+    
+    // Log for debugging (including production for troubleshooting)
+    console.log('🔍 Share route debug:', {
+      mediaId: id,
+      mediaTitle: media.title,
+      creatorDisplay: media.creatorDisplay,
+      coverArtUrl: coverArtUrl,
+      ogImage: ogImage,
+      ogTitle: ogTitle,
+      ogDescription: ogDescription,
+      isCrawler: isCrawler,
+      isFacebookShareDebugger: isFacebookShareDebugger,
+      shouldServeMetaTags: shouldServeMetaTags,
+      userAgent: userAgent.substring(0, 100) // First 100 chars of UA
+    });
 
     // Serve HTML with proper meta tags
-    const html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${ogTitle}</title>
-        <meta name="description" content="${ogDescription}">
-        
-        <!-- Open Graph / Facebook -->
-        <meta property="og:type" content="music.song" />
-        <meta property="og:url" content="${ogUrl}" />
-        <meta property="og:title" content="${ogTitle}" />
-        <meta property="og:description" content="${ogDescription}" />
-        <meta property="og:image" content="${ogImage}" />
-        <meta property="og:site_name" content="Tuneable" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        ${process.env.FACEBOOK_APP_ID ? `<meta property="fb:app_id" content="${escapeHtml(process.env.FACEBOOK_APP_ID)}" />` : ''}
-        
-        <!-- Twitter Card -->
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:url" content="${ogUrl}" />
-        <meta name="twitter:title" content="${ogTitle}" />
-        <meta name="twitter:description" content="${ogDescription}" />
-        <meta name="twitter:image" content="${ogImage}" />
-        
-        ${!isCrawler ? `
-        <!-- Redirect to frontend after a short delay (only for regular browsers, not crawlers) -->
-        <meta http-equiv="refresh" content="0;url=${ogUrl}">
-        
-        <!-- Fallback redirect via JavaScript -->
-        <script>
-          window.location.href = "${ogUrl}";
-        </script>
-        ` : ''}
-      </head>
-      <body>
-        ${isCrawler ? `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center;">
-          <h1>${escapedTitle}</h1>
-          <p>${ogDescription}</p>
-          <p><a href="${ogUrl}">Listen on Tuneable</a></p>
-        </div>
-        ` : `
-        <p>Redirecting to <a href="${ogUrl}">${escapedTitle}</a> on Tuneable...</p>
-        `}
-      </body>
-      </html>
-    `;
+    // Important: Meta tags must be in <head> before any redirect meta tags
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="canonical" href="${ogUrl}" />
+  <title>${ogTitle}</title>
+  <meta name="description" content="${ogDescription}">
+  
+  <!-- Open Graph / Facebook - MUST be in this order -->
+  <meta property="og:type" content="music.song" />
+  <meta property="og:url" content="${ogUrl}" />
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogDescription}" />
+  <meta property="og:image" content="${ogImage}" />
+  <meta property="og:image:secure_url" content="${ogImage}" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${escapeHtml(mediaTitle + artistText)}" />
+  <meta property="og:site_name" content="Tuneable" />
+  <meta property="og:locale" content="en_US" />
+  ${process.env.FACEBOOK_APP_ID ? `  <meta property="fb:app_id" content="${escapeHtml(process.env.FACEBOOK_APP_ID)}" />` : ''}
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="${ogUrl}" />
+  <meta name="twitter:title" content="${ogTitle}" />
+  <meta name="twitter:description" content="${ogDescription}" />
+  <meta name="twitter:image" content="${ogImage}" />
+  
+  ${!shouldServeMetaTags ? `
+  <!-- Redirect to frontend after a short delay (only for regular browsers, not crawlers) -->
+  <meta http-equiv="refresh" content="0;url=${ogUrl}">
+  
+  <!-- Fallback redirect via JavaScript -->
+  <script>
+    window.location.href = "${ogUrl}";
+  </script>
+  ` : ''}
+</head>
+<body>
+  ${shouldServeMetaTags ? `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center;">
+    <h1>${escapedTitle}</h1>
+    <p>${ogDescription}</p>
+    <p><a href="${ogUrl}">Listen on Tuneable</a></p>
+  </div>
+  ` : `
+  <p>Redirecting to <a href="${ogUrl}">${escapedTitle}</a> on Tuneable...</p>
+  `}
+</body>
+</html>`;
 
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
