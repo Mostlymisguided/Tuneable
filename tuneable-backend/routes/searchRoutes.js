@@ -5,6 +5,8 @@ const Media = require('../models/Media'); // Unified media model
 const { transformResponse } = require('../utils/uuidTransform');
 const { getQuotaStatus, getQuotaHistory, resetQuota } = require('../services/quotaTracker');
 const authMiddleware = require('../middleware/authMiddleware');
+const { getCoverArtUrl, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
+const { extractYouTubeVideoId, getYouTubeThumbnail } = require('../utils/youtubeUtils');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
@@ -87,7 +89,7 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
                 uuid: mediaItem.uuid, // Include UUID for frontend
                 title: mediaItem.title,
                 artist: artistName,
-                coverArt: mediaItem.coverArt || (source === 'youtube' && sources.youtube ? `https://img.youtube.com/vi/${sources.youtube.split('v=')[1]?.split('&')[0]}/hqdefault.jpg` : ''),
+                coverArt: getCoverArtUrl(mediaItem, sources),
                 duration: mediaItem.duration || 0,
                 sources: sources,
                 globalMediaAggregate: mediaItem.globalMediaAggregate || 0,
@@ -198,7 +200,7 @@ router.get('/', async (req, res) => {
                         artist: video.channelTitle || "Unknown Artist",
                         coverArt: video.coverArt?.includes("http") 
                             ? video.coverArt 
-                            : `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`,
+                            : (getYouTubeThumbnail(video.id) || DEFAULT_COVER_ART),
                         duration: video.duration || 111,
                         sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` },
                         tags: [],
@@ -257,25 +259,7 @@ router.post('/clear-cache', (req, res) => {
     }
 });
 
-// Helper function to extract YouTube video ID from URL
-const extractVideoId = (url) => {
-    if (!url) return null;
-    
-    // Handle various YouTube URL formats
-    const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-        /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-    ];
-
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) {
-            return match[1];
-        }
-    }
-    
-    return null;
-};
+// Using centralized extractYouTubeVideoId from utils/youtubeUtils.js
 
 // Helper function to transform Media document to search result format
 const transformMediaToSearchResult = (media) => {
@@ -299,7 +283,7 @@ const transformMediaToSearchResult = (media) => {
         uuid: media.uuid, // Include UUID for frontend
         title: media.title,
         artist: artistName,
-        coverArt: media.coverArt || (sources.youtube ? `https://img.youtube.com/vi/${extractVideoId(sources.youtube)}/hqdefault.jpg` : ''),
+        coverArt: getCoverArtUrl(media, sources),
         duration: media.duration || 0,
         sources: sources,
         globalMediaAggregate: media.globalMediaAggregate || 0,
@@ -321,7 +305,7 @@ router.get('/youtube-url', async (req, res) => {
         console.log(`Processing YouTube URL: ${url}`);
         
         // Extract video ID from URL
-        const videoId = extractVideoId(url);
+        const videoId = extractYouTubeVideoId(url);
         if (!videoId) {
             return res.status(400).json({ error: 'Invalid YouTube URL format' });
         }
@@ -360,7 +344,7 @@ router.get('/youtube-url', async (req, res) => {
             id: videoId,
             title: videoDetails.title || 'Unknown Title',
             artist: videoDetails.channelTitle || 'Unknown Artist',
-            coverArt: videoDetails.thumbnail || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            coverArt: videoDetails.thumbnail || getYouTubeThumbnail(videoId) || DEFAULT_COVER_ART,
             duration: videoDetails.duration || 0,
             sources: { youtube: url },
             tags: [],

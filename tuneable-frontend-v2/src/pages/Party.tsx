@@ -2860,7 +2860,7 @@ const Party: React.FC = () => {
                         >
                           <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
                           <img
-                            src={mediaData.coverArt || '/default-cover.jpg'}
+                            src={mediaData.coverArt || 'https://uploads.tuneable.stream/cover-art/default-cover.png'}
                             alt={mediaData.title || 'Unknown Media'}
                             className="w-10 h-10 rounded object-cover"
                             width="40"

@@ -684,7 +684,7 @@ const PersistentWebPlayer: React.FC = () => {
                 className="flex w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 shadow-lg hover:opacity-80 transition-opacity"
               >
                 <img
-                  src={currentMedia.coverArt || '/default-cover.jpg'}
+                  src={currentMedia.coverArt || 'https://uploads.tuneable.stream/cover-art/default-cover.png'}
                   alt={currentMedia.title}
                   className="w-full h-full object-cover"
                 />

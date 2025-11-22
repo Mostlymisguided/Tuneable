@@ -479,8 +479,9 @@ export const mediaAPI = {
     description?: string;
     sources?: { [key: string]: string };
   }) => {
-    // Use admin endpoint for updates (supports title and artist updates)
-    const response = await api.put(`/media/admin/${mediaId}`, updates);
+    // Use regular endpoint which supports all field updates (tags, genres, elements, etc.)
+    // This endpoint checks permissions: admin OR media owner OR verified creator
+    const response = await api.put(`/media/${mediaId}`, updates);
     return response.data;
   },
 

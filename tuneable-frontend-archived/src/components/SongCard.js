@@ -5,7 +5,7 @@ import API from '../api';
 
 const getCoverArt = (song) => {
   console.log("🖼 Checking coverArt for song:", song);
-  if (!song) return "/default-cover.jpg"; // ✅ Prevent crashes
+  if (!song) return "https://uploads.tuneable.stream/cover-art/default-cover.png"; // ✅ Prevent crashes
 
   if (song.coverArt && song.coverArt.startsWith("http")) {
       console.log("✅ Using song coverArt:", song.coverArt);
@@ -13,7 +13,7 @@ const getCoverArt = (song) => {
   }
 
   console.log("❌ No coverArt found, using default.");
-  return "/default-cover.jpg"; // ✅ Final fallback
+  return "https://uploads.tuneable.stream/cover-art/default-cover.png"; // ✅ Final fallback
 };
 
 /* ✅ Function to extract YouTube thumbnail from URL

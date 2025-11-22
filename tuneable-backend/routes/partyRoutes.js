@@ -13,6 +13,7 @@ const User = require('../models/User');
 const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcastToParty } = require('../utils/socketIO');
+const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolvePartyId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
@@ -703,7 +704,7 @@ router.get('/:id/details', optionalAuthMiddleware, async (req, res) => {
                 featuring: entry.mediaId.featuring || [], // Featuring artists array
                 creatorDisplay: entry.mediaId.creatorDisplay, // Creator display string
                 duration: entry.mediaId.duration || '666',
-                coverArt: entry.mediaId.coverArt || '/default-cover.jpg',
+                coverArt: entry.mediaId.coverArt || DEFAULT_COVER_ART,
                 sources: sourcesObj, // ✅ Store sources as object { youtube: '...', upload: '...' }
                 globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Global total (schema grammar)
                 partyMediaAggregate: entry.partyMediaAggregate || 0, // ✅ Party-media aggregate (schema grammar)
@@ -968,14 +969,22 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
         }
 
         // Extract cover art and duration
-        let extractedCoverArt = '/default-cover.jpg';
+        const { getYouTubeThumbnailFromUrl } = require('../utils/youtubeUtils');
+        const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
+        
+        let extractedCoverArt = DEFAULT_COVER_ART;
         let extractedDuration = duration || 180;
 
         if (platform === 'youtube' && url) {
-            const videoId = url.split('v=')[1]?.split('&')[0];
+            const thumbnail = getYouTubeThumbnailFromUrl(url);
+            if (thumbnail) {
+                extractedCoverArt = thumbnail;
+            }
+            
+            // Extract video ID for getting duration
+            const { extractYouTubeVideoId } = require('../utils/youtubeUtils');
+            const videoId = extractYouTubeVideoId(url);
             if (videoId) {
-                extractedCoverArt = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                
                 try {
                     const videoDetails = await getVideoDetails(videoId);
                     extractedDuration = videoDetails.duration || duration || 180;
