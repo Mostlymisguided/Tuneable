@@ -148,7 +148,7 @@ const ArtistEscrowDashboard: React.FC = () => {
   };
 
   const validatePayoutForm = (): boolean => {
-    const { payoutMethod, amount, paypalEmail, accountName, accountNumber, sortCode, iban, wiseEmail, otherDetails } = payoutForm;
+    const { payoutMethod, amount, paypalEmail, accountName, accountNumber, sortCode, iban, wiseEmail, wiseAccountId, otherDetails } = payoutForm;
     
     // Validate amount if provided
     if (amount) {
