@@ -12,15 +12,13 @@ import {
   TrendingUp,
   Coins,
   Users,
-  Play,
   Share2,
   Copy,
   Check,
   ChevronDown,
   Twitter,
   Facebook,
-  Linkedin,
-  Loader2
+  Linkedin
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
