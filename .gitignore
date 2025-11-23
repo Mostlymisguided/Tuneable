@@ -43,6 +43,9 @@ build/
 
 generateToken.js
 
+# Scripts with hardcoded credentials
+tuneable-backend/scripts/copy-production-to-dev.js
+
 # Editor / backup files
 *.backup
 *.old
