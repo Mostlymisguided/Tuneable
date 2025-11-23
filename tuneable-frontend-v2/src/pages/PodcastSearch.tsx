@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
@@ -9,8 +9,7 @@ import {
   Calendar,
   Music,
   Loader,
-  X,
-  ExternalLink
+  X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';

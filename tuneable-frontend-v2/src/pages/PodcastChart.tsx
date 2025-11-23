@@ -8,8 +8,7 @@ import {
   Play, 
   Calendar,
   Music,
-  X,
-  ChevronDown
+  X
 } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
