@@ -1410,6 +1410,14 @@ const Party: React.FC = () => {
       await fetchPartyDetails();
     } catch (error: any) {
       console.error('Error vetoing media:', error);
+      
+      // Handle 401 Unauthorized errors with a more helpful message
+      if (error.response?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+        // The API interceptor will handle the redirect to login
+        return;
+      }
+      
       toast.error(error.response?.data?.error || 'Failed to veto media');
     }
   };

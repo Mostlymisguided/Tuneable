@@ -135,7 +135,10 @@ api.interceptors.response.use(
         // Only do this if user was previously authenticated (had a token)
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Add a small delay to allow any error messages to be displayed first
+        setTimeout(() => {
+          window.location.href = '/login?expired=true';
+        }, 100);
       }
       // If no token existed, don't redirect - let the component handle the error
       // This allows public routes (party details, tune profiles) to work without auth
