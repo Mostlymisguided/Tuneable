@@ -23,10 +23,7 @@ import {
   Facebook,
   Linkedin,
   Coins,
-  Users,
-  Minus,
-  Plus,
-  Loader2
+  Users
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -79,13 +76,11 @@ const Podcasts: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
   // Tipping state
   const [bidModalOpen, setBidModalOpen] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
-  const [bidAmount, setBidAmount] = useState('');
   const [isPlacingBid, setIsPlacingBid] = useState(false);
 
   // Share state
@@ -168,7 +163,6 @@ const Podcasts: React.FC = () => {
     }
 
     setIsSearching(true);
-    setHasSearched(true);
     setShowSearchResults(true);
     try {
       const params = new URLSearchParams();
@@ -259,7 +253,6 @@ const Podcasts: React.FC = () => {
       return;
     }
     setSelectedEpisode(episode);
-    setBidAmount('0.01');
     setBidModalOpen(true);
   };
 
@@ -269,12 +262,15 @@ const Podcasts: React.FC = () => {
     setIsPlacingBid(true);
     try {
       const episodeId = selectedEpisode._id || selectedEpisode.id;
+      if (!episodeId) {
+        toast.error('Episode ID not found');
+        return;
+      }
       await mediaAPI.placeGlobalBid(episodeId, amount);
       
       toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
       setBidModalOpen(false);
       setSelectedEpisode(null);
-      setBidAmount('');
       
       // Refresh chart
       fetchChart();
@@ -843,7 +839,6 @@ const Podcasts: React.FC = () => {
         onClose={() => {
           setBidModalOpen(false);
           setSelectedEpisode(null);
-          setBidAmount('');
         }}
         onConfirm={handlePlaceBid}
         songTitle={selectedEpisode?.title || ''}
