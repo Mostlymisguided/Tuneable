@@ -82,7 +82,7 @@ class PodcastAdapter {
     return {
       title: taddyEpisode.name || 'Untitled Episode',
       contentType: ['spoken'],
-      contentForm: ['episode'],
+      contentForm: ['podcastepisode'],
       mediaType: ['mp3'],
       
       // Creators
@@ -133,7 +133,7 @@ class PodcastAdapter {
     return {
       title: piEpisode.title || 'Untitled Episode',
       contentType: ['spoken'],
-      contentForm: ['episode'],
+      contentForm: ['podcastepisode'],
       mediaType: ['mp3'],
       
       // Creators
@@ -186,7 +186,7 @@ class PodcastAdapter {
     return {
       title: rssItem.title || 'Untitled Episode',
       contentType: ['spoken'],
-      contentForm: ['episode'],
+      contentForm: ['podcastepisode'],
       mediaType: ['mp3'],
       
       // Creators (may need manual parsing from author field)
@@ -238,7 +238,7 @@ class PodcastAdapter {
     return {
       title: appleEpisode.trackName || 'Untitled Episode',
       contentType: ['spoken'],
-      contentForm: ['episode'],
+      contentForm: ['podcastepisode'],
       mediaType: ['mp3'],
       
       // Creators
@@ -317,8 +317,8 @@ class PodcastAdapter {
     const series = new Media({
       title: seriesData.title,
       contentType: ['spoken'],
-      contentForm: ['podcast'],
-      mediaType: [], // Series doesn't have direct media
+      contentForm: ['podcastseries'],
+      mediaType: ['collection'], // Series is a collection/container, not a direct media file
       
       host: seriesData.author ? 
         [{ name: seriesData.author, userId: null, verified: false }] : [],
@@ -397,7 +397,7 @@ class PodcastAdapter {
   async getSeriesEpisodes(seriesId) {
     return await Media.find({
       podcastSeries: seriesId,
-      contentForm: 'episode'
+      contentForm: 'podcastepisode'
     }).sort({ episodeNumber: -1, releaseDate: -1 });
   }
   

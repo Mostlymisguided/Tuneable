@@ -484,7 +484,6 @@ const Party: React.FC = () => {
   // Alias for consistency
   // const fetchParty = fetchPartyDetails; // OLD - no longer used
 
-  // Share and copy party code features removed
 
   // Sorting functions
   const fetchSortedMedia = async (timePeriod: string) => {
@@ -1811,14 +1810,23 @@ const Party: React.FC = () => {
 
   return (
     <div className="min-h-screen ">
+      
+
+      {/* Party Header */}
+      <div className="justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
+        <h1 className="inline-block text-xl sm:text-3xl font-bold text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 shadow-lg">
+          {party.name}
+        </h1>
+      </div>
+
       {/* Share Button - Dropdown Menu */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 pb-2">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 p-2">
         <div className="flex justify-center">
           <div className="relative">
             {isMobile && 'share' in navigator ? (
               <button
                 onClick={handleNativeShare}
-                className="px-4 py-2 rounded-lg bg-purple-600/80 hover:bg-purple-700 border border-purple-400/30 shadow-lg flex items-center gap-2 transition-colors"
+                className="px-4 py-2 rounded-lg bg-gray-900/80 hover:bg-gray-800 border border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.3)] flex items-center gap-2 transition-colors"
               >
                 <Share2 className="h-4 w-4 text-white" />
                 <span className="text-sm font-semibold text-white">Share</span>
@@ -1897,15 +1905,6 @@ const Party: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Party Header */}
-      <div className="justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
-        <h1 className="inline-block text-xl sm:text-3xl font-bold text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 shadow-lg">
-          {party.name}
-        </h1>
-      </div>
-
-      
       
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
         <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">

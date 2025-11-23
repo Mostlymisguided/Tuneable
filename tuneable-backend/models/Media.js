@@ -30,7 +30,7 @@ const mediaSchema = new mongoose.Schema({
   
   contentForm: { 
     type: [String], 
-    enum: ['tune', 'album', 'podcast', 'episode', 'audiobook', 'interview', 
+    enum: ['tune', 'album', 'podcast', 'podcastseries', 'episode', 'podcastepisode', 'audiobook', 'interview', 
            'performance', 'mix', 'remix', 'meme', 'article', 'book', 'video'],
     required: true 
   },
@@ -38,7 +38,7 @@ const mediaSchema = new mongoose.Schema({
   mediaType: { 
     type: [String], 
     enum: ['mp3', 'wav', 'flac', 'mp4', 'mov', 'avi', 'jpeg', 'png', 'gif', 
-           'pdf', 'epub', 'html', 'json'],
+           'pdf', 'epub', 'html', 'json', 'collection'],
     required: true 
   },
   

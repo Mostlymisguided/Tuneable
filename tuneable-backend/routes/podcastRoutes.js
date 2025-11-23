@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { check, validationResult } = require('express-validator');
-const PodcastEpisode = require('../models/PodcastEpisode');
+const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -10,6 +10,8 @@ const authMiddleware = require('../middleware/authMiddleware');
 const podcastIndexService = require('../services/podcastIndexService');
 const applePodcastsService = require('../services/applePodcastsService');
 const taddyService = require('../services/taddyService');
+const podcastAdapter = require('../services/podcastAdapter');
+const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
 
 const router = express.Router();
 
@@ -23,15 +25,20 @@ router.get('/trending', async (req, res) => {
     const { limit = 50, category } = req.query;
     const limitNum = parseInt(limit);
     
-    let query = {};
+    const query = {
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    };
+    
     if (category) {
-      query.podcastCategory = new RegExp(category, 'i');
+      query.category = new RegExp(category, 'i');
     }
     
-    const episodes = await PodcastEpisode.find(query)
+    const episodes = await Media.find(query)
       .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
       .limit(limitNum)
       .populate('addedBy', 'username')
+      .populate('podcastSeries', 'title coverArt')
       .lean();
     
     res.json({ episodes, count: episodes.length });
@@ -41,7 +48,7 @@ router.get('/trending', async (req, res) => {
   }
 });
 
-// Search podcast episodes in our database
+// Search podcast episodes in our database (legacy route - use /search-episodes for new implementation)
 router.get('/search', async (req, res) => {
   try {
     const { q, limit = 50, category } = req.query;
@@ -51,38 +58,27 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
     
-    let query = {};
+    const query: any = {
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] },
+      $or: [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { 'host.name': { $regex: q, $options: 'i' } },
+        { creatorNames: { $regex: q, $options: 'i' } }
+      ]
+    };
+    
     if (category) {
-      query.podcastCategory = new RegExp(category, 'i');
+      query.category = new RegExp(category, 'i');
     }
     
-    // Try text search first
-    let episodes = await PodcastEpisode.find(
-      { ...query, $text: { $search: q } },
-      { score: { $meta: 'textScore' } }
-    )
-    .sort({ score: { $meta: 'textScore' } })
-    .limit(limitNum)
-    .populate('addedBy', 'username')
-    .lean();
-    
-    // Fallback to regex search if text search fails or returns no results
-    if (episodes.length === 0) {
-      const searchRegex = new RegExp(q, 'i');
-      episodes = await PodcastEpisode.find({
-        ...query,
-        $or: [
-          { title: searchRegex },
-          { description: searchRegex },
-          { podcastTitle: searchRegex },
-          { podcastAuthor: searchRegex }
-        ]
-      })
+    const episodes = await Media.find(query)
       .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
       .limit(limitNum)
       .populate('addedBy', 'username')
+      .populate('podcastSeries', 'title coverArt')
       .lean();
-    }
     
     res.json({ episodes, count: episodes.length });
   } catch (error) {
@@ -91,16 +87,20 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Get podcast charts by type
+// Get podcast charts by type (legacy route - use /chart for new implementation)
 router.get('/charts/:type', async (req, res) => {
   try {
     const { type } = req.params;
     const { limit = 50, category, timeRange = 'all' } = req.query;
     const limitNum = parseInt(limit);
     
-    let query = {};
+    const query = {
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    };
+    
     if (category) {
-      query.podcastCategory = new RegExp(category, 'i');
+      query.category = new RegExp(category, 'i');
     }
     
     // Add time range filter
@@ -126,7 +126,7 @@ router.get('/charts/:type', async (req, res) => {
       }
       
       if (startDate) {
-        query.createdAt = { $gte: startDate };
+        query.releaseDate = { $gte: startDate };
       }
     }
     
@@ -139,19 +139,20 @@ router.get('/charts/:type', async (req, res) => {
         sortBy = { playCount: -1, globalMediaAggregate: -1 };
         break;
       case 'recent':
-        sortBy = { createdAt: -1 };
+        sortBy = { releaseDate: -1 };
         break;
       case 'trending':
-        sortBy = { globalMediaAggregate: -1, playCount: -1, createdAt: -1 };
+        sortBy = { globalMediaAggregate: -1, playCount: -1, releaseDate: -1 };
         break;
       default:
         return res.status(400).json({ error: 'Invalid chart type' });
     }
     
-    const episodes = await PodcastEpisode.find(query)
+    const episodes = await Media.find(query)
       .sort(sortBy)
       .limit(limitNum)
       .populate('addedBy', 'username')
+      .populate('podcastSeries', 'title coverArt')
       .lean();
     
     res.json({ episodes, count: episodes.length, type, timeRange });
@@ -161,7 +162,7 @@ router.get('/charts/:type', async (req, res) => {
   }
 });
 
-// Boost a podcast episode
+// Boost a podcast episode (global bid)
 router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
   try {
     const { episodeId } = req.params;
@@ -172,17 +173,37 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Boost amount must be greater than 0' });
     }
     
-    const episode = await PodcastEpisode.findById(episodeId);
+    const episode = await Media.findOne({
+      _id: episodeId,
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    });
+    
     if (!episode) {
       return res.status(404).json({ error: 'Episode not found' });
     }
     
-    // Create bid
+    // Get Global Party for global bids
+    const Party = require('../models/Party');
+    const globalParty = await Party.findOne({ type: 'global' });
+    
+    if (!globalParty) {
+      return res.status(500).json({ error: 'Global party not found' });
+    }
+    
+    // Create bid (using mediaId, not episodeId)
     const bid = new Bid({
       userId,
-      episodeId,
-      amount,
-      type: 'boost'
+      partyId: globalParty._id,
+      mediaId: episode._id,
+      amount: Math.round(amount * 100), // Convert to pence
+      bidScope: 'global',
+      partyType: 'global',
+      username: req.user.username,
+      partyName: globalParty.name,
+      mediaTitle: episode.title,
+      mediaArtist: episode.host && episode.host.length > 0 ? episode.host[0].name : '',
+      mediaCoverArt: episode.coverArt || ''
     });
     
     await bid.save();
@@ -197,10 +218,8 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       console.error('Error setting up TuneBytes calculation:', error);
     }
     
-    // Update episode
-    episode.globalMediaAggregate += amount;
-    episode.bids = episode.bids || [];
-    episode.bids.push(bid._id);
+    // Update episode global aggregate
+    episode.globalMediaAggregate = (episode.globalMediaAggregate || 0) + Math.round(amount * 100);
     await episode.save();
     
     res.json({ message: 'Episode boosted successfully!', episode });
@@ -229,7 +248,13 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       return res.status(400).json({ error: 'Bid amount must be greater than 0' });
     }
     
-    const episode = await PodcastEpisode.findById(episodeId);
+    // Find episode using Media model
+    const episode = await Media.findOne({
+      _id: episodeId,
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    });
+    
     if (!episode) {
       console.log('❌ Episode not found:', episodeId);
       return res.status(404).json({ error: 'Episode not found' });
@@ -252,7 +277,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     }
     console.log('✅ User is in party');
     
-    // Check if episode is already in party (episodes are now Media)
+    // Check if episode is already in party
     let partyMediaEntry = party.media.find(entry => 
       entry.mediaId && entry.mediaId.toString() === episodeId
     );
@@ -270,13 +295,22 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       party.media.push(partyMediaEntry);
     }
     
-    // Create bid
+    // Convert amount to pence
+    const amountInPence = Math.round(amount * 100);
+    
+    // Create bid (using mediaId, not episodeId)
     const bid = new Bid({
       userId,
       partyId,
-      episodeId,
-      amount,
-      type: 'party_bid'
+      mediaId: episode._id,
+      amount: amountInPence,
+      bidScope: 'party',
+      partyType: party.type,
+      username: req.user.username,
+      partyName: party.name,
+      mediaTitle: episode.title,
+      mediaArtist: episode.host && episode.host.length > 0 ? episode.host[0].name : '',
+      mediaCoverArt: episode.coverArt || ''
     });
     
     await bid.save();
@@ -291,15 +325,13 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       console.error('Error setting up TuneBytes calculation:', error);
     }
     
-    // Update party episode entry
-    partyEpisodeEntry.partyBidValue += amount;
-    partyEpisodeEntry.partyBids.push(bid._id);
+    // Update party media entry
+    partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + amountInPence;
+    partyMediaEntry.partyBids.push(bid._id);
     await party.save();
     
-    // Update global episode
-    episode.globalMediaAggregate += amount;
-    episode.bids = episode.bids || [];
-    episode.bids.push(bid._id);
+    // Update global episode aggregate
+    episode.globalMediaAggregate = (episode.globalMediaAggregate || 0) + amountInPence;
     await episode.save();
     
     res.json({ message: 'Episode added to party and bid placed!', episode });
@@ -312,8 +344,12 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
 // Get categories list
 router.get('/categories/list', async (req, res) => {
   try {
-    const categories = await PodcastEpisode.distinct('podcastCategory');
-    res.json({ categories: categories.filter(Boolean) });
+    const categories = await Media.distinct('category', {
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] },
+      category: { $ne: null }
+    });
+    res.json({ categories: categories.filter(Boolean).sort() });
   } catch (error) {
     console.error('Error getting categories:', error);
     res.status(500).json({ error: 'Failed to get categories' });
@@ -410,38 +446,52 @@ router.post('/discovery/podcastindex/import-episodes', authMiddleware, async (re
     const importedEpisodes = [];
     const skippedEpisodes = [];
 
+    // Prepare series data if available
+    let seriesData = null;
+    if (podcastData) {
+      seriesData = {
+        title: podcastData.title || 'Unknown Podcast',
+        description: podcastData.description || '',
+        author: podcastData.author || '',
+        image: podcastData.image || null,
+        categories: podcastData.categories || [],
+        language: podcastData.language || 'en',
+        rssUrl: podcastData.url || '',
+        podcastIndexId: podcastId
+      };
+    }
+
     for (const piEpisode of result.episodes) {
       try {
-        // Convert to our format
+        // Use podcastAdapter to import (handles deduplication and Media model)
         const episodeData = podcastIndexService.convertEpisodeToOurFormat(piEpisode, podcastData);
         
-        // Check if episode already exists
-        const existingEpisode = await PodcastEpisode.findOne({
-          $or: [
-            { guid: episodeData.guid },
-            { podcastIndexId: episodeData.podcastIndexId }
-          ]
-        });
-
-        if (existingEpisode) {
-          skippedEpisodes.push({
-            title: episodeData.title,
-            reason: 'Already exists'
-          });
-          continue;
+        let importedEpisode;
+        if (seriesData) {
+          // Import with series linkage
+          const result = await podcastAdapter.importEpisodeWithSeries(
+            'podcastIndex',
+            episodeData,
+            seriesData,
+            userId
+          );
+          importedEpisode = result.episode;
+        } else {
+          // Import without series
+          importedEpisode = await podcastAdapter.importEpisode(
+            'podcastIndex',
+            episodeData,
+            userId
+          );
         }
 
-        // Create new episode
-        const episode = new PodcastEpisode({
-          ...episodeData,
-          addedBy: userId
-        });
-
-        await episode.save();
         importedEpisodes.push({
-          id: episode._id,
-          title: episode.title,
-          podcastTitle: episode.podcastTitle
+          id: importedEpisode._id,
+          title: importedEpisode.title,
+          podcastSeries: importedEpisode.podcastSeries ? {
+            id: importedEpisode.podcastSeries._id,
+            title: importedEpisode.podcastSeries.title
+          } : null
         });
 
       } catch (episodeError) {
@@ -607,6 +657,12 @@ router.post('/discovery/apple/test-import', async (req, res) => {
     const importedEpisodes = [];
     const skippedEpisodes = [];
 
+    // Prepare series data if available
+    let seriesData = null;
+    if (podcastData) {
+      seriesData = applePodcastsService.convertPodcastToOurFormat(podcastData);
+    }
+
     for (const appleEpisode of result.episodes) {
       try {
         console.log('Processing Apple episode:', {
@@ -624,33 +680,31 @@ router.post('/discovery/apple/test-import', async (req, res) => {
           title: episodeData.title
         });
         
-        // Check if episode already exists
-        const existingEpisode = await PodcastEpisode.findOne({
-          $or: [
-            { guid: episodeData.guid },
-            { appleId: episodeData.appleId }
-          ]
-        });
-
-        if (existingEpisode) {
-          skippedEpisodes.push({
-            title: episodeData.title,
-            reason: 'Already exists'
-          });
-          continue;
+        // Use podcastAdapter to import (handles deduplication and Media model)
+        let importedEpisode;
+        if (seriesData) {
+          const result = await podcastAdapter.importEpisodeWithSeries(
+            'apple',
+            episodeData,
+            seriesData,
+            userId
+          );
+          importedEpisode = result.episode;
+        } else {
+          importedEpisode = await podcastAdapter.importEpisode(
+            'apple',
+            episodeData,
+            userId
+          );
         }
 
-        // Create new episode
-        const episode = new PodcastEpisode({
-          ...episodeData,
-          addedBy: userId
-        });
-
-        await episode.save();
         importedEpisodes.push({
-          id: episode._id,
-          title: episode.title,
-          podcastTitle: episode.podcastTitle
+          id: importedEpisode._id,
+          title: importedEpisode.title,
+          podcastSeries: importedEpisode.podcastSeries ? {
+            id: importedEpisode.podcastSeries._id,
+            title: importedEpisode.podcastSeries.title
+          } : null
         });
 
       } catch (episodeError) {
@@ -731,33 +785,37 @@ router.post('/discovery/apple/import-episodes', authMiddleware, async (req, res)
           title: episodeData.title
         });
         
-        // Check if episode already exists
-        const existingEpisode = await PodcastEpisode.findOne({
-          $or: [
-            { guid: episodeData.guid },
-            { appleId: episodeData.appleId }
-          ]
-        });
-
-        if (existingEpisode) {
-          skippedEpisodes.push({
-            title: episodeData.title,
-            reason: 'Already exists'
-          });
-          continue;
+        // Prepare series data if available
+        let seriesData = null;
+        if (podcastData) {
+          seriesData = applePodcastsService.convertPodcastToOurFormat(podcastData);
+        }
+        
+        // Use podcastAdapter to import (handles deduplication and Media model)
+        let importedEpisode;
+        if (seriesData) {
+          const result = await podcastAdapter.importEpisodeWithSeries(
+            'apple',
+            episodeData,
+            seriesData,
+            userId
+          );
+          importedEpisode = result.episode;
+        } else {
+          importedEpisode = await podcastAdapter.importEpisode(
+            'apple',
+            episodeData,
+            userId
+          );
         }
 
-        // Create new episode
-        const episode = new PodcastEpisode({
-          ...episodeData,
-          addedBy: userId
-        });
-
-        await episode.save();
         importedEpisodes.push({
-          id: episode._id,
-          title: episode.title,
-          podcastTitle: episode.podcastTitle
+          id: importedEpisode._id,
+          title: importedEpisode.title,
+          podcastSeries: importedEpisode.podcastSeries ? {
+            id: importedEpisode.podcastSeries._id,
+            title: importedEpisode.podcastSeries.title
+          } : null
         });
 
       } catch (episodeError) {
@@ -983,40 +1041,56 @@ router.post('/discovery/taddy/import-episodes', authMiddleware, async (req, res)
     const importedEpisodes = [];
     const skippedEpisodes = [];
 
+    // Prepare series data if available
+    let seriesData = null;
+    if (podcastData) {
+      seriesData = {
+        title: podcastData.name || 'Unknown Podcast',
+        description: podcastData.description || '',
+        author: '', // Taddy doesn't provide author in this format
+        image: podcastData.imageUrl || null,
+        categories: podcastData.categories || [],
+        language: podcastData.language || 'en',
+        rssUrl: podcastData.rssUrl || '',
+        taddyUuid: podcastUuid || specificEpisode?.podcastSeriesUuid
+      };
+    }
+
     for (const taddyEpisode of episodesToProcess) {
       try {
         console.log('Processing Taddy episode:', {
-          uuid: taddyEpisode.taddyUuid,
-          title: taddyEpisode.title
+          uuid: taddyEpisode.uuid || taddyEpisode.taddyUuid,
+          title: taddyEpisode.name || taddyEpisode.title
         });
 
-        // Check if episode already exists
-        const existingEpisode = await PodcastEpisode.findOne({
-          $or: [
-            { guid: taddyEpisode.guid },
-            { taddyUuid: taddyEpisode.taddyUuid }
-          ]
-        });
-
-        if (existingEpisode) {
-          skippedEpisodes.push({
-            title: taddyEpisode.title,
-            reason: 'Already exists'
-          });
-          continue;
+        // Convert to Media format using adapter
+        const episodeData = podcastAdapter.fromTaddy(taddyEpisode);
+        
+        // Use podcastAdapter to import (handles deduplication and Media model)
+        let importedEpisode;
+        if (seriesData) {
+          const result = await podcastAdapter.importEpisodeWithSeries(
+            'taddy',
+            episodeData,
+            seriesData,
+            userId
+          );
+          importedEpisode = result.episode;
+        } else {
+          importedEpisode = await podcastAdapter.importEpisode(
+            'taddy',
+            episodeData,
+            userId
+          );
         }
 
-        // Create new episode
-        const episode = new PodcastEpisode({
-          ...taddyEpisode,
-          addedBy: userId
-        });
-
-        await episode.save();
         importedEpisodes.push({
-          id: episode._id,
-          title: episode.title,
-          podcastTitle: episode.podcastTitle
+          id: importedEpisode._id,
+          title: importedEpisode.title,
+          podcastSeries: importedEpisode.podcastSeries ? {
+            id: importedEpisode.podcastSeries._id,
+            title: importedEpisode.podcastSeries.title
+          } : null
         });
 
       } catch (episodeError) {
@@ -1040,6 +1114,281 @@ router.post('/discovery/taddy/import-episodes', authMiddleware, async (req, res)
   } catch (error) {
     console.error('Error importing Taddy episodes:', error);
     res.status(500).json({ error: 'Failed to import episodes from Taddy' });
+  }
+});
+
+// ============================================================================
+// NEW PODCAST FEATURES (Using Media Model)
+// ============================================================================
+
+// Import podcast episode/series from URL (link pasting)
+router.post('/import-link', authMiddleware, async (req, res) => {
+  try {
+    const { url } = req.body;
+    const userId = req.user._id;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'URL is required' });
+    }
+
+    // Parse the URL
+    const parsedUrl = parsePodcastUrl(url);
+    if (!parsedUrl) {
+      return res.status(400).json({ error: 'Invalid podcast URL. Supported: Apple Podcasts, RSS feeds' });
+    }
+
+    let result;
+
+    // Handle Apple Podcasts
+    if (parsedUrl.type === 'apple') {
+      if (parsedUrl.isEpisode && parsedUrl.episodeId && parsedUrl.seriesId) {
+        // Import specific episode
+        const episodesResult = await applePodcastsService.getPodcastEpisodes(parsedUrl.seriesId, 200);
+        if (!episodesResult.success) {
+          return res.status(500).json({ error: 'Failed to fetch episode from Apple Podcasts' });
+        }
+
+        // Find the specific episode
+        const episode = episodesResult.episodes.find(
+          ep => ep.trackId?.toString() === parsedUrl.episodeId
+        );
+
+        if (!episode) {
+          return res.status(404).json({ error: 'Episode not found' });
+        }
+
+        // Get podcast data
+        const podcastResult = await applePodcastsService.getPodcastById(parsedUrl.seriesId);
+        const podcastData = podcastResult.podcast || {};
+
+        // Convert and import
+        const episodeData = applePodcastsService.convertEpisodeToOurFormat(episode, podcastData);
+        const seriesData = applePodcastsService.convertPodcastToOurFormat(podcastData);
+
+        const { episode: importedEpisode, series: importedSeries } = 
+          await podcastAdapter.importEpisodeWithSeries('apple', episodeData, seriesData, userId);
+
+        result = {
+          success: true,
+          type: 'episode',
+          episode: importedEpisode,
+          series: importedSeries
+        };
+      } else if (parsedUrl.isSeries && parsedUrl.seriesId) {
+        // Import series (and optionally episodes)
+        const podcastResult = await applePodcastsService.getPodcastById(parsedUrl.seriesId);
+        if (!podcastResult.success || !podcastResult.podcast) {
+          return res.status(404).json({ error: 'Podcast series not found' });
+        }
+
+        const seriesData = applePodcastsService.convertPodcastToOurFormat(podcastResult.podcast);
+        const series = await podcastAdapter.createOrFindSeries(seriesData, userId);
+
+        result = {
+          success: true,
+          type: 'series',
+          series: series
+        };
+      }
+    } else if (parsedUrl.type === 'rss') {
+      // RSS feed - for now, return info that RSS parsing needs to be implemented
+      return res.status(501).json({ 
+        error: 'RSS feed parsing not yet implemented. Please use Apple Podcasts URLs for now.' 
+      });
+    } else {
+      return res.status(400).json({ error: 'Unsupported URL type. Please use Apple Podcasts URLs.' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error importing from URL:', error);
+    res.status(500).json({ error: 'Failed to import podcast from URL: ' + error.message });
+  }
+});
+
+// Global podcast chart with filtering
+router.get('/chart', async (req, res) => {
+  try {
+    const { 
+      limit = 50, 
+      category, 
+      genre, 
+      tag,
+      timeRange = 'all',
+      sortBy = 'globalMediaAggregate' // 'globalMediaAggregate', 'playCount', 'popularity', 'releaseDate'
+    } = req.query;
+    
+    const limitNum = Math.min(parseInt(limit), 200);
+    
+    // Build query for podcast episodes
+    const query = {
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    };
+
+    // Category filter (if using category field)
+    if (category) {
+      query.category = new RegExp(category, 'i');
+    }
+
+    // Genre filter
+    if (genre) {
+      query.genres = { $in: [new RegExp(genre, 'i')] };
+    }
+
+    // Tag filter
+    if (tag) {
+      query.tags = { $in: [new RegExp(tag, 'i')] };
+    }
+
+    // Time range filter
+    if (timeRange !== 'all') {
+      const now = new Date();
+      let startDate;
+      
+      switch (timeRange) {
+        case 'day':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = null;
+      }
+      
+      if (startDate) {
+        query.releaseDate = { $gte: startDate };
+      }
+    }
+
+    // Build sort object
+    let sortObj = {};
+    switch (sortBy) {
+      case 'globalMediaAggregate':
+        sortObj = { globalMediaAggregate: -1, popularity: -1 };
+        break;
+      case 'playCount':
+        sortObj = { playCount: -1, globalMediaAggregate: -1 };
+        break;
+      case 'popularity':
+        sortObj = { popularity: -1, globalMediaAggregate: -1 };
+        break;
+      case 'releaseDate':
+        sortObj = { releaseDate: -1 };
+        break;
+      default:
+        sortObj = { globalMediaAggregate: -1, popularity: -1 };
+    }
+
+    const episodes = await Media.find(query)
+      .sort(sortObj)
+      .limit(limitNum)
+      .populate('addedBy', 'username')
+      .populate('podcastSeries', 'title coverArt')
+      .lean();
+
+    // Get available categories/genres/tags for filtering
+    const [categories, genres, tags] = await Promise.all([
+      Media.distinct('category', { 
+        contentType: { $in: ['spoken'] },
+        contentForm: { $in: ['podcastepisode'] },
+        category: { $ne: null }
+      }),
+      Media.distinct('genres', { 
+        contentType: { $in: ['spoken'] },
+        contentForm: { $in: ['podcastepisode'] }
+      }).then(results => {
+        // Flatten nested arrays
+        const flat = results.flat();
+        return [...new Set(flat)].sort();
+      }),
+      Media.distinct('tags', { 
+        contentType: { $in: ['spoken'] },
+        contentForm: { $in: ['podcastepisode'] }
+      }).then(results => {
+        const flat = results.flat();
+        return [...new Set(flat)].sort();
+      })
+    ]);
+
+    res.json({
+      episodes,
+      count: episodes.length,
+      filters: {
+        categories: categories.filter(c => c).sort(),
+        genres: genres,
+        tags: tags
+      },
+      appliedFilters: {
+        category,
+        genre,
+        tag,
+        timeRange,
+        sortBy
+      }
+    });
+  } catch (error) {
+    console.error('Error getting podcast chart:', error);
+    res.status(500).json({ error: 'Failed to get podcast chart' });
+  }
+});
+
+// Separate podcast search (using Media model)
+router.get('/search-episodes', async (req, res) => {
+  try {
+    const { q, limit = 50, category, genre, tag } = req.query;
+    const limitNum = Math.min(parseInt(limit), 200);
+    
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+    }
+    
+    // Build search query
+    const searchQuery = {
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] },
+      $or: [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { 'host.name': { $regex: q, $options: 'i' } },
+        { creatorNames: { $regex: q, $options: 'i' } }
+      ]
+    };
+
+    // Add filters
+    if (category) {
+      searchQuery.category = new RegExp(category, 'i');
+    }
+    if (genre) {
+      searchQuery.genres = { $in: [new RegExp(genre, 'i')] };
+    }
+    if (tag) {
+      searchQuery.tags = { $in: [new RegExp(tag, 'i')] };
+    }
+    
+    const episodes = await Media.find(searchQuery)
+      .sort({ globalMediaAggregate: -1, popularity: -1, releaseDate: -1 })
+      .limit(limitNum)
+      .populate('addedBy', 'username')
+      .populate('podcastSeries', 'title coverArt')
+      .lean();
+    
+    res.json({ 
+      episodes, 
+      count: episodes.length,
+      query: q,
+      filters: { category, genre, tag }
+    });
+  } catch (error) {
+    console.error('Error searching podcast episodes:', error);
+    res.status(500).json({ error: 'Failed to search podcast episodes' });
   }
 });
 
