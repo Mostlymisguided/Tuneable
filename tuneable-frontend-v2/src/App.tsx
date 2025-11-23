@@ -26,8 +26,7 @@ import CreateParty from './pages/CreateParty';
 import Payment from './pages/Payment';
 import Search from './pages/Search';
 import Wallet from './pages/Wallet';
-import PodcastDiscovery from './pages/PodcastDiscovery';
-import PodcastChart from './pages/PodcastChart';
+import Podcasts from './pages/Podcasts';
 import PodcastSearch from './pages/PodcastSearch';
 import TuneProfile from './pages/TuneProfile';
 import UserProfile from './pages/UserProfile';
@@ -182,15 +181,7 @@ const AppContent = () => {
             />
             <Route 
               path="/podcasts" 
-              element={
-                <ProtectedRoute>
-                  <PodcastDiscovery />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/podcasts/chart" 
-              element={<PodcastChart />} 
+              element={<Podcasts />} 
             />
             <Route 
               path="/podcasts/search" 
