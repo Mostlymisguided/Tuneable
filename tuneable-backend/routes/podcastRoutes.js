@@ -1197,6 +1197,50 @@ router.get('/chart', async (req, res) => {
   }
 });
 
+// Import single episode from external source (for Import & Tip flow)
+router.post('/discovery/import-single-episode', authMiddleware, async (req, res) => {
+  try {
+    const { source, episodeData, seriesData } = req.body;
+    const userId = req.user._id;
+
+    if (!source || !episodeData) {
+      return res.status(400).json({ error: 'Source and episode data are required' });
+    }
+
+    if (!['taddy', 'podcastindex', 'apple'].includes(source.toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid source. Must be taddy, podcastindex, or apple' });
+    }
+
+    let importedEpisode;
+    
+    if (seriesData) {
+      // Import with series linkage
+      importedEpisode = await podcastAdapter.importEpisodeWithSeries(
+        source,
+        episodeData,
+        seriesData,
+        userId
+      );
+    } else {
+      // Import episode only
+      importedEpisode = await podcastAdapter.importEpisode(
+        source,
+        episodeData,
+        userId
+      );
+    }
+
+    res.json({
+      success: true,
+      episode: importedEpisode,
+      message: 'Episode imported successfully'
+    });
+  } catch (error) {
+    console.error('Error importing single episode:', error);
+    res.status(500).json({ error: 'Failed to import episode', details: error.message });
+  }
+});
+
 // Separate podcast search (using Media model)
 router.get('/search-episodes', async (req, res) => {
   try {

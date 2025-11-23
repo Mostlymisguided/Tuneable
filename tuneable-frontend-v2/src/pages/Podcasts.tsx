@@ -29,13 +29,13 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 
 interface PodcastEpisode {
-  _id: string;
+  _id?: string;
   id?: string;
   title: string;
   description?: string;
   coverArt?: string;
   duration?: number;
-  globalMediaAggregate: number;
+  globalMediaAggregate?: number;
   playCount?: number;
   popularity?: number;
   releaseDate?: string;
@@ -49,6 +49,20 @@ interface PodcastEpisode {
   tags?: string[];
   category?: string;
   creatorDisplay?: string;
+  // External source fields
+  source?: 'local' | 'podcastindex' | 'taddy' | 'apple';
+  isExternal?: boolean;
+  podcastTitle?: string;
+  podcastAuthor?: string;
+  podcastImage?: string;
+  // External IDs for import
+  podcastIndexId?: number;
+  feedId?: number;
+  taddyUuid?: string;
+  appleId?: string;
+  collectionId?: string;
+  // Raw data for import
+  rawData?: any;
 }
 
 const Podcasts: React.FC = () => {
@@ -164,27 +178,133 @@ const Podcasts: React.FC = () => {
 
     setIsSearching(true);
     setShowSearchResults(true);
+    const allResults: PodcastEpisode[] = [];
+    const seenGuids = new Set<string>();
+
     try {
-      const params = new URLSearchParams();
-      params.append('q', searchQuery);
-      if (filters.category) params.append('category', filters.category);
-      if (filters.genre) params.append('genre', filters.genre);
-      if (filters.tag) params.append('tag', filters.tag);
-      params.append('limit', '50');
+      // Helper to deduplicate and add results
+      const addResults = (episodes: PodcastEpisode[], source: string) => {
+        episodes.forEach(ep => {
+          // Create a unique key for deduplication (title + podcast title)
+          const key = `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase();
+          if (!seenGuids.has(key)) {
+            seenGuids.add(key);
+            allResults.push({
+              ...ep,
+              source: source as any,
+              isExternal: true,
+              globalMediaAggregate: ep.globalMediaAggregate || 0
+            });
+          }
+        });
+      };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
-      );
+      // Step 1: Search local database first
+      try {
+        const params = new URLSearchParams();
+        params.append('q', searchQuery);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.genre) params.append('genre', filters.genre);
+        if (filters.tag) params.append('tag', filters.tag);
+        params.append('limit', '50');
 
-      if (!response.ok) {
-        throw new Error('Failed to search podcast episodes');
+        const localResponse = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
+        );
+
+        if (localResponse.ok) {
+          const localData = await localResponse.json();
+          const localEpisodes = (localData.episodes || []).map((ep: PodcastEpisode) => ({
+            ...ep,
+            source: 'local' as const,
+            isExternal: false
+          }));
+          addResults(localEpisodes, 'local');
+        }
+      } catch (error) {
+        console.error('Error searching local database:', error);
       }
 
-      const data = await response.json();
-      setSearchResults(data.episodes || []);
+      // Step 2: Search Podcast Index (primary external source)
+      try {
+        const piParams = new URLSearchParams();
+        piParams.append('q', searchQuery);
+        piParams.append('max', '20');
+
+        const piResponse = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/podcastindex/search-episodes?${piParams}`
+        );
+
+        if (piResponse.ok) {
+          const piData = await piResponse.json();
+          // Store raw data for import
+          const episodesWithRaw = (piData.episodes || []).map((ep: any) => ({
+            ...ep,
+            rawData: ep // Store full episode data for import
+          }));
+          addResults(episodesWithRaw, 'podcastindex');
+        }
+      } catch (error) {
+        console.error('Error searching Podcast Index:', error);
+      }
+
+      // Step 3: Search Taddy (if configured, fallback)
+      try {
+        const taddyParams = new URLSearchParams();
+        taddyParams.append('q', searchQuery);
+        taddyParams.append('max', '20');
+
+        const taddyResponse = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/taddy/search-episodes?${taddyParams}`
+        );
+
+        if (taddyResponse.ok) {
+          const taddyData = await taddyResponse.json();
+          // Store raw data for import
+          const episodesWithRaw = (taddyData.episodes || []).map((ep: any) => ({
+            ...ep,
+            rawData: ep // Store full episode data for import
+          }));
+          addResults(episodesWithRaw, 'taddy');
+        }
+      } catch (error) {
+        console.error('Error searching Taddy:', error);
+      }
+
+      // Step 4: Search Apple (last resort fallback)
+      try {
+        const appleParams = new URLSearchParams();
+        appleParams.append('q', searchQuery);
+        appleParams.append('max', '20');
+
+        const appleResponse = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/apple/search-episodes?${appleParams}`
+        );
+
+        if (appleResponse.ok) {
+          const appleData = await appleResponse.json();
+          // Store raw data for import
+          const episodesWithRaw = (appleData.episodes || []).map((ep: any) => ({
+            ...ep,
+            rawData: ep // Store full episode data for import
+          }));
+          addResults(episodesWithRaw, 'apple');
+        }
+      } catch (error) {
+        console.error('Error searching Apple:', error);
+      }
+
+      setSearchResults(allResults);
       
-      if (data.episodes && data.episodes.length === 0) {
+      if (allResults.length === 0) {
         toast.info('No episodes found. Try a different search term.');
+      } else {
+        const sourceCounts = allResults.reduce((acc, ep) => {
+          acc[ep.source || 'unknown'] = (acc[ep.source || 'unknown'] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        const sources = Object.entries(sourceCounts).map(([source, count]) => `${source} (${count})`).join(', ');
+        toast.success(`Found ${allResults.length} episodes from: ${sources}`);
       }
     } catch (error: any) {
       console.error('Error searching:', error);
@@ -242,6 +362,136 @@ const Podcasts: React.FC = () => {
       toast.error(error.message || 'Failed to import podcast from URL');
     } finally {
       setIsImportingLink(false);
+    }
+  };
+
+  const handleImportAndTip = async (episode: PodcastEpisode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please log in to import and tip podcast episodes');
+      navigate('/login');
+      return;
+    }
+
+    // If already in database, just open tip modal
+    if (!episode.isExternal && episode._id) {
+      setSelectedEpisode(episode);
+      setBidModalOpen(true);
+      return;
+    }
+
+    // Import external episode first
+    setIsPlacingBid(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Prepare episode data based on source - use rawData if available
+      let episodeData: any = episode.rawData || {};
+      let seriesData: any = null;
+
+      // If no rawData, construct from episode fields
+      if (!episode.rawData) {
+        if (episode.source === 'podcastindex') {
+          episodeData = {
+            title: episode.title,
+            description: episode.description,
+            feedTitle: episode.podcastTitle,
+            feedId: episode.feedId,
+            feedImage: episode.podcastImage,
+            feedAuthor: episode.podcastAuthor,
+            duration: episode.duration || 0,
+            enclosureUrl: (episode as any).audioUrl || '',
+            datePublished: episode.releaseDate ? Math.floor(new Date(episode.releaseDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+            id: episode.podcastIndexId,
+            guid: (episode as any).guid || ''
+          };
+        } else if (episode.source === 'taddy') {
+          episodeData = {
+            uuid: episode.taddyUuid,
+            name: episode.title,
+            description: episode.description,
+            podcastSeriesUuid: (episode as any).podcastSeriesUuid
+          };
+        } else if (episode.source === 'apple') {
+          episodeData = {
+            trackName: episode.title,
+            description: episode.description,
+            collectionName: episode.podcastTitle,
+            collectionId: episode.collectionId,
+            artworkUrl600: episode.podcastImage,
+            artistName: episode.podcastAuthor,
+            trackTimeMillis: (episode.duration || 0) * 1000,
+            trackId: episode.appleId,
+            releaseDate: episode.releaseDate || new Date().toISOString()
+          };
+        }
+      }
+
+      // Prepare series data if available
+      if (episode.podcastTitle && (episode.source === 'podcastindex' || episode.source === 'apple')) {
+        seriesData = {
+          title: episode.podcastTitle,
+          description: '',
+          author: episode.podcastAuthor || '',
+          image: episode.podcastImage || null,
+          categories: episode.genres || [],
+          language: 'en'
+        };
+        if (episode.source === 'podcastindex') {
+          seriesData.podcastIndexId = episode.feedId?.toString();
+        }
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/import-single-episode`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            source: episode.source,
+            episodeData,
+            seriesData
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to import episode');
+      }
+
+      const data = await response.json();
+      const importedEpisode = data.episode;
+
+      toast.success(`Imported: ${importedEpisode.title}`);
+      
+      // Update the episode in search results
+      const updatedEpisode: PodcastEpisode = {
+        ...episode,
+        _id: importedEpisode._id,
+        isExternal: false,
+        source: 'local',
+        globalMediaAggregate: importedEpisode.globalMediaAggregate || 0
+      };
+      
+      // Update search results
+      setSearchResults(prev => prev.map(ep => 
+        ep.title === episode.title && ep.podcastTitle === episode.podcastTitle
+          ? updatedEpisode
+          : ep
+      ));
+
+      // Open tip modal with imported episode
+      setSelectedEpisode(updatedEpisode);
+      setBidModalOpen(true);
+    } catch (error: any) {
+      console.error('Error importing episode:', error);
+      toast.error(error.message || 'Failed to import episode');
+    } finally {
+      setIsPlacingBid(false);
     }
   };
 
@@ -733,7 +983,7 @@ const Podcasts: React.FC = () => {
                     onClick={() => handleEpisodeClick(episode)}
                   >
                     <img
-                      src={episode.coverArt || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART}
+                      src={episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART}
                       alt={episode.title}
                       className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
                     />
@@ -753,15 +1003,31 @@ const Podcasts: React.FC = () => {
                           >
                             {episode.title}
                           </h3>
+                          {episode.isExternal && episode.source && (
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${
+                              episode.source === 'podcastindex' ? 'bg-blue-600/30 text-blue-300' :
+                              episode.source === 'taddy' ? 'bg-green-600/30 text-green-300' :
+                              episode.source === 'apple' ? 'bg-gray-600/30 text-gray-300' :
+                              'bg-purple-600/30 text-purple-300'
+                            }`}>
+                              {episode.source === 'podcastindex' ? 'Podcast Index' :
+                               episode.source === 'taddy' ? 'Taddy' :
+                               episode.source === 'apple' ? 'Apple' : episode.source}
+                            </span>
+                          )}
                         </div>
-                        {episode.podcastSeries && (
-                          <p className="text-purple-300 text-sm mb-2">{episode.podcastSeries.title}</p>
-                        )}
-                        {episode.host && episode.host.length > 0 && (
-                          <p className="text-gray-400 text-sm">
-                            Host: {episode.host.map(h => h.name).join(', ')}
+                        {(episode.podcastSeries || episode.podcastTitle) && (
+                          <p className="text-purple-300 text-sm mb-2">
+                            {episode.podcastSeries?.title || episode.podcastTitle}
                           </p>
                         )}
+                        {(episode.host && episode.host.length > 0) || episode.podcastAuthor ? (
+                          <p className="text-gray-400 text-sm">
+                            {episode.host && episode.host.length > 0 
+                              ? `Host: ${episode.host.map(h => h.name).join(', ')}`
+                              : episode.podcastAuthor ? `Author: ${episode.podcastAuthor}` : ''}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
@@ -815,14 +1081,24 @@ const Podcasts: React.FC = () => {
                       </div>
                     ) : null}
 
-                    {/* Tip Button */}
+                    {/* Tip/Import & Tip Button */}
                     {user && (
                       <button
-                        onClick={(e) => handleTipClick(episode, e)}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+                        onClick={(e) => episode.isExternal ? handleImportAndTip(episode, e) : handleTipClick(episode, e)}
+                        disabled={isPlacingBid}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2"
                       >
-                        <Coins className="h-4 w-4" />
-                        <span>Tip Episode</span>
+                        {isPlacingBid ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin" />
+                            <span>Adding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Coins className="h-4 w-4" />
+                            <span>{episode.isExternal ? 'Add & Tip' : 'Tip Episode'}</span>
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
