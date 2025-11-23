@@ -69,8 +69,7 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed">
               We're currently in beta testing mode. 
-              You can top up for free but please spend as you would in real life.
-              When we launch, you will be able to transfer your username and activity.
+              Please report any bugs / features not working as expected.
             </p>
           </div>
           {dismissible && (
