@@ -94,7 +94,7 @@ const Home: React.FC = () => {
                 Tip on Tunes
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Tip to Get Your Favorite Tunes to the Top
+                Tip Your Favorite Tunes to the Top
               </p>
             </div>
 
@@ -117,7 +117,7 @@ const Home: React.FC = () => {
                 Earn TuneBytes
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Get Rewarded for Discovering Popular Music
+                Rewards for Discovering Popular Music
               </p>
             </div>
 
