@@ -238,6 +238,12 @@ const Home: React.FC = () => {
               <p className="text-gray-400">&copy; 2025 Tuneable. All rights reserved.</p>
             </div>
             <div className="flex space-x-6">
+              <Link 
+                to="/join-us" 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Join Us
+              </Link>
               <a 
                 href="https://discord.gg/hwGMZV89up"
                 target="_blank"

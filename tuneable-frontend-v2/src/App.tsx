@@ -43,6 +43,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import ArtistEscrowDashboard from './pages/ArtistEscrowDashboard';
+import JoinUs from './pages/JoinUs';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -148,6 +149,7 @@ const AppContent = () => {
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/join-us" element={<JoinUs />} />
             <Route 
               path="/dashboard" 
               element={
