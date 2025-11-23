@@ -58,7 +58,7 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
     
-    const query: any = {
+    const query = {
       contentType: { $in: ['spoken'] },
       contentForm: { $in: ['podcastepisode'] },
       $or: [
