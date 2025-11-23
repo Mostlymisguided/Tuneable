@@ -2147,11 +2147,36 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         }
         
         // Find all active bids for this media in this party
-        const bidsToRefund = await Bid.find({
-            mediaId: actualMediaId,
-            partyId: partyId,
-            status: 'active'
-        }).populate('userId', 'balance uuid username');
+        // For global party, also include bids from deleted parties (orphaned bids)
+        let bidsToRefund;
+        if (party.type === 'global') {
+            // For global party, find all active bids for this media
+            // This includes bids that might reference deleted parties
+            bidsToRefund = await Bid.find({
+                mediaId: actualMediaId,
+                status: 'active'
+            }).populate('userId', 'balance uuid username');
+            
+            // Filter to only include bids that either:
+            // 1. Reference the global party, OR
+            // 2. Reference a party that no longer exists (orphaned)
+            const validPartyIds = new Set();
+            const allParties = await Party.find({}).select('_id');
+            allParties.forEach(p => validPartyIds.add(p._id.toString()));
+            
+            bidsToRefund = bidsToRefund.filter(bid => {
+                const bidPartyId = bid.partyId ? bid.partyId.toString() : null;
+                // Include if it's for the global party OR if the party no longer exists
+                return bidPartyId === partyId.toString() || !validPartyIds.has(bidPartyId);
+            });
+        } else {
+            // For regular parties, only find bids for this specific party
+            bidsToRefund = await Bid.find({
+                mediaId: actualMediaId,
+                partyId: partyId,
+                status: 'active'
+            }).populate('userId', 'balance uuid username');
+        }
         
         console.log(`🔄 Found ${bidsToRefund.length} bids to refund for vetoed media ${mediaId}`);
         
