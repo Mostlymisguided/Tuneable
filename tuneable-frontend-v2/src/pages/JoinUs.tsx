@@ -24,37 +24,36 @@ const JoinUs: React.FC = () => {
         '1 share in Tuneable',
         'Discord access',
         'Quarterly updates'
-      ],
-      popular: false
+      ]
     },
     {
       id: 'starter',
-      name: 'Starter',
+      name: 'Supporter',
       shares: 10,
       price: 100,
-      description: 'Perfect for early supporters',
+      description: 'For dedicated music enthusiasts',
       features: [
         '10 shares in Tuneable',
         'Discord access',
         'Quarterly updates',
-        'Early feature access'
-      ],
-      popular: false
+        'Early feature access',
+        'Priority support'
+      ]
     },
     {
       id: 'supporter',
-      name: 'Supporter',
+      name: 'Investor',
       shares: 50,
       price: 500,
-      description: 'For dedicated music enthusiasts',
+      description: 'For serious investors',
       features: [
         '50 shares in Tuneable',
         'Discord access',
         'Quarterly updates',
         'Early feature access',
-        'Priority support'
-      ],
-      popular: true
+        'Priority support',
+        'Advisory input'
+      ]
     }
   ];
 
@@ -67,15 +66,23 @@ const JoinUs: React.FC = () => {
     setSelectedPackage(packageId);
     setIsLoading(true);
     try {
-      // For now, using the existing wallet top-up endpoint
-      // You'll need to create a dedicated shares purchase endpoint
-      const response = await paymentAPI.createCheckoutSession(amount, 'gbp');
+      // Use the dedicated share purchase endpoint (live Stripe mode)
+      const pkg = sharePackages.find(p => p.id === packageId);
+      const shares = pkg ? pkg.shares : customShares;
+      
+      const response = await paymentAPI.createShareCheckoutSession(
+        amount, 
+        'gbp', 
+        packageId, 
+        shares
+      );
       
       if (response.url) {
         // Store package info in sessionStorage for after payment
         sessionStorage.setItem('pendingSharePurchase', JSON.stringify({
           packageId,
           amount,
+          shares,
           timestamp: Date.now()
         }));
         
@@ -106,7 +113,7 @@ const JoinUs: React.FC = () => {
   };
 
   const handleSharesChange = (delta: number) => {
-    const newShares = Math.max(1, customShares + delta);
+    const newShares = Math.max(1, Math.min(100, customShares + delta));
     setCustomShares(newShares);
   };
 
@@ -155,18 +162,8 @@ const JoinUs: React.FC = () => {
             {sharePackages.map((pkg) => (
               <div
                 key={pkg.id}
-                className={`bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border-2 transition-all ${
-                  pkg.popular
-                    ? 'border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.5)] scale-105'
-                    : 'border-gray-700 hover:border-purple-500/50'
-                }`}
+                className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-gray-700 transition-all hover:border-purple-500 hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] hover:scale-105"
               >
-                {pkg.popular && (
-                  <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold px-4 py-1 rounded-full inline-block mb-4">
-                    Most Popular
-                  </div>
-                )}
-                
                 <h3 className="text-3xl font-bold text-white mb-2">{pkg.name}</h3>
                 <p className="text-gray-400 mb-6">{pkg.description}</p>
                 
@@ -191,11 +188,7 @@ const JoinUs: React.FC = () => {
                 <button
                   onClick={() => handlePurchase(pkg.id, pkg.price)}
                   disabled={isLoading}
-                  className={`w-full py-4 rounded-lg font-semibold text-lg transition-all ${
-                    pkg.popular
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg'
-                      : 'bg-gray-800 text-white hover:bg-gray-700 border border-gray-600'
-                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className="w-full py-4 rounded-lg font-semibold text-lg transition-all bg-gray-800 text-white hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:shadow-lg border border-gray-600 hover:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading && selectedPackage === pkg.id ? 'Processing...' : 'Purchase Shares'}
                 </button>
@@ -230,11 +223,16 @@ const JoinUs: React.FC = () => {
                   <div className="text-2xl font-semibold text-purple-400 mt-2">
                     £{(customShares * sharePrice).toLocaleString()}
                   </div>
+                  {customShares >= 100 && (
+                    <div className="text-xs text-yellow-400 mt-1">
+                      Maximum reached
+                    </div>
+                  )}
                 </div>
                 
                 <button
                   onClick={() => handleSharesChange(1)}
-                  disabled={isLoading}
+                  disabled={customShares >= 100 || isLoading}
                   className="p-3 bg-gray-800 border border-gray-600 rounded-lg text-white hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Increase shares"
                 >

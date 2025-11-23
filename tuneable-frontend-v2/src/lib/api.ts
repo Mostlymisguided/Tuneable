@@ -210,6 +210,17 @@ export const paymentAPI = {
     return response.data;
   },
   
+  // Create checkout session for share purchases (uses live Stripe mode)
+  createShareCheckoutSession: async (amount: number, currency: string = 'gbp', packageId?: string, shares?: number) => {
+    const response = await api.post('/payments/create-share-checkout-session', {
+      amount,
+      currency,
+      packageId,
+      shares,
+    });
+    return response.data;
+  },
+  
   createPaymentIntent: async (amount: number, currency: string = 'gbp') => {
     const response = await api.post('/payments/create-payment-intent', {
       amount,

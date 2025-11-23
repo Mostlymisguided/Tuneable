@@ -7,7 +7,11 @@ const WalletTransaction = require('../models/WalletTransaction'); // Import wall
 const { sendPaymentNotification } = require('../utils/emailService');
 require('dotenv').config();
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Test mode Stripe (for wallet top-ups)
+const stripeTest = new Stripe(process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY);
+
+// Live mode Stripe (for share purchases/funding)
+const stripeLive = process.env.STRIPE_SECRET_KEY_LIVE ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE) : null;
 
 // Create Payment Intent
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
@@ -19,7 +23,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await stripeTest.paymentIntents.create({
       amount: amount * 100, // Convert to cents
       currency: currency || 'gbp',
       automatic_payment_methods: { enabled: true },
@@ -32,7 +36,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   }
 });
 
-// Create Stripe Checkout Session for Wallet Top-up
+// Create Stripe Checkout Session for Wallet Top-up (TEST MODE)
 router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   try {
     const { amount, currency = 'gbp' } = req.body;
@@ -42,7 +46,7 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await stripeTest.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
@@ -74,16 +78,88 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   }
 });
 
-// Webhook to handle successful payments
+// Create Stripe Checkout Session for Share Purchase (LIVE MODE)
+router.post('/create-share-checkout-session', authMiddleware, async (req, res) => {
+  try {
+    const { amount, currency = 'gbp', packageId, shares } = req.body;
+    const userId = req.user.uuid;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    if (!stripeLive) {
+      return res.status(500).json({ error: 'Live Stripe key not configured. Share purchases require live mode.' });
+    }
+
+    const session = await stripeLive.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: 'Tuneable Share Purchase',
+              description: shares 
+                ? `Purchase ${shares} share${shares > 1 ? 's' : ''} in Tuneable`
+                : `Purchase shares in Tuneable`,
+            },
+            unit_amount: Math.round(amount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join-us?success=true&amount=${amount}&packageId=${packageId || 'custom'}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join-us?canceled=true`,
+      metadata: {
+        userId: userId,
+        amount: amount.toString(),
+        type: 'share_purchase',
+        packageId: packageId || 'custom',
+        shares: shares ? shares.toString() : ''
+      },
+    });
+
+    res.json({ sessionId: session.id, url: session.url });
+  } catch (error) {
+    console.error('Stripe Share Purchase Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Webhook to handle successful payments (handles both test and live modes)
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
+  let isLiveMode = false;
 
+  // Try test mode webhook first
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.log(`Webhook signature verification failed.`, err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    event = stripeTest.webhooks.constructEvent(
+      req.body, 
+      sig, 
+      process.env.STRIPE_WEBHOOK_SECRET_TEST || process.env.STRIPE_WEBHOOK_SECRET
+    );
+    isLiveMode = false;
+  } catch (testErr) {
+    // If test webhook fails, try live webhook
+    if (stripeLive && process.env.STRIPE_WEBHOOK_SECRET_LIVE) {
+      try {
+        event = stripeLive.webhooks.constructEvent(
+          req.body, 
+          sig, 
+          process.env.STRIPE_WEBHOOK_SECRET_LIVE
+        );
+        isLiveMode = true;
+      } catch (liveErr) {
+        console.log(`Webhook signature verification failed for both test and live modes.`, liveErr.message);
+        return res.status(400).send(`Webhook Error: ${liveErr.message}`);
+      }
+    } else {
+      console.log(`Webhook signature verification failed.`, testErr.message);
+      return res.status(400).send(`Webhook Error: ${testErr.message}`);
+    }
   }
 
   // Handle the checkout.session.completed event
@@ -156,6 +232,38 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
       } catch (error) {
         console.error('Error updating user balance from webhook:', error.message);
+      }
+    } else if (session.metadata.type === 'share_purchase') {
+      // Handle share purchase (live mode)
+      try {
+        const userId = session.metadata.userId;
+        const amountPounds = parseFloat(session.metadata.amount);
+        const packageId = session.metadata.packageId;
+        const shares = parseInt(session.metadata.shares || '0');
+
+        console.log(`✅ Share purchase successful: User ${userId} purchased ${shares} shares (package: ${packageId}) for £${amountPounds}`);
+        
+        // TODO: Store share purchase in database
+        // You'll need to create a SharePurchase model or add shares field to User model
+        // For now, we'll just log it. You can implement share tracking later:
+        // 
+        // Example implementation:
+        // const user = await User.findOne({ uuid: userId });
+        // if (user) {
+        //   // Add shares to user or create separate SharePurchase record
+        //   await SharePurchase.create({
+        //     userId: user._id,
+        //     user_uuid: userId,
+        //     shares: shares,
+        //     amount: Math.round(amountPounds * 100), // in pence
+        //     packageId: packageId,
+        //     stripeSessionId: session.id,
+        //     status: 'completed'
+        //   });
+        // }
+        
+      } catch (error) {
+        console.error('Error processing share purchase:', error.message);
       }
     }
   }
