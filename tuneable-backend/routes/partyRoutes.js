@@ -2097,6 +2097,14 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         const refundsByUser = new Map();
         
         for (const bid of bidsToRefund) {
+            // Skip bids with null or invalid userId (e.g., deleted users)
+            if (!bid.userId || !bid.userId._id) {
+                console.warn(`⚠️ Skipping bid ${bid._id} - user not found (likely deleted)`);
+                // Still mark the bid as vetoed even if we can't refund
+                await Bid.findByIdAndUpdate(bid._id, { status: 'vetoed' });
+                continue;
+            }
+            
             const userId = bid.userId._id.toString();
             
             if (!refundsByUser.has(userId)) {
@@ -2123,7 +2131,8 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
                 })
             );
             
-            console.log(`💰 Refunding £${refund.totalAmount.toFixed(2)} to user ${refund.user.username}`);
+            const username = refund.user?.username || 'Unknown User';
+            console.log(`💰 Refunding £${refund.totalAmount.toFixed(2)} to user ${username}`);
             
             // Update all bids for this user to 'vetoed' status
             refundPromises.push(
