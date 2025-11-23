@@ -283,7 +283,14 @@ async function bulkImportLikedVideos(accessToken, userId, maxVideos = 100, maxDu
                     contentType: ['music'],
                     contentForm: ['tune'],
                     globalMediaAggregate: 0, // Updated to schema grammar
-                    bids: []
+                    bids: [],
+                    // Store original YouTube metadata for refresh tracking
+                    youtubeMetadata: {
+                        originalTitle: video.title,
+                        originalThumbnail: video.thumbnail,
+                        isAvailable: true,
+                        availabilityCheckedAt: new Date()
+                    }
                 });
 
                 await media.save();

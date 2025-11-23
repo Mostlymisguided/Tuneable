@@ -1041,7 +1041,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
             console.log(`✅ Using existing media: "${media.title}" (${media._id})`);
         } else {
             // Create new media item
-            media = new Media({
+            const mediaData = {
                 title,
                 artist: [{ name: artist, userId: null, verified: false }],
                 coverArt: extractedCoverArt,
@@ -1053,7 +1053,25 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
                 globalMediaAggregate: bidAmountPence, // Store in pence (schema grammar)
                 contentType: 'music',
                 contentForm: 'tune'
-            });
+            };
+
+            // Store original YouTube metadata if this is a YouTube video
+            if (platform === 'youtube' && url) {
+                const { extractYouTubeVideoId } = require('../utils/youtubeUtils');
+                const videoId = extractYouTubeVideoId(url);
+                if (videoId) {
+                    mediaData.externalIds = { youtube: videoId };
+                    // Store original YouTube data for refresh tracking
+                    mediaData.youtubeMetadata = {
+                        originalTitle: title, // Store original title from YouTube
+                        originalThumbnail: extractedCoverArt, // Store original thumbnail
+                        isAvailable: true,
+                        availabilityCheckedAt: new Date()
+                    };
+                }
+            }
+
+            media = new Media(mediaData);
             
             console.log(`✅ Created new media: "${media.title}" (${media._id})`);
         }

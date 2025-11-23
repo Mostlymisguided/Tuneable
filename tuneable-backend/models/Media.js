@@ -226,6 +226,16 @@ const mediaSchema = new mongoose.Schema({
     of: String,
     default: {}
   },
+
+  // YouTube-specific metadata tracking
+  youtubeMetadata: {
+    originalTitle: { type: String }, // Original title from YouTube (before manual edits)
+    originalThumbnail: { type: String }, // Original thumbnail URL from YouTube
+    lastRefreshedAt: { type: Date }, // Last time we checked video availability
+    isAvailable: { type: Boolean, default: true }, // Whether video is still available on YouTube
+    availabilityCheckedAt: { type: Date }, // Last availability check timestamp
+    unavailableReason: { type: String, enum: ['deleted', 'privated', 'unavailable', null], default: null } // Why video is unavailable
+  },
   
   // ========================================
   // BID METRICS (managed by BidMetricsEngine)
