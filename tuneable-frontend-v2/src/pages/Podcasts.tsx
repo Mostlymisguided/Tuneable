@@ -558,6 +558,79 @@ const Podcasts: React.FC = () => {
     }
   };
 
+  const handleSeriesClick = async (episode: PodcastEpisode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!user) {
+      toast.info('Please log in to view podcast series');
+      navigate('/login');
+      return;
+    }
+
+    // If series already exists in database, navigate directly
+    if (episode.podcastSeries?._id) {
+      navigate(`/podcast/${episode.podcastSeries._id}`);
+      return;
+    }
+
+    // Otherwise, create or find the series first
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Prepare series data based on episode source
+      let seriesData: any = null;
+      
+      if (episode.podcastTitle) {
+        seriesData = {
+          title: episode.podcastTitle,
+          description: '',
+          author: episode.podcastAuthor || '',
+          image: episode.podcastImage || episode.coverArt || null,
+          categories: episode.genres || [],
+          language: 'en'
+        };
+        
+        // Add external IDs based on source
+        if (episode.source === 'podcastindex' && episode.feedId) {
+          seriesData.podcastIndexId = episode.feedId.toString();
+        } else if (episode.source === 'taddy' && (episode as any).podcastSeriesUuid) {
+          seriesData.taddyUuid = (episode as any).podcastSeriesUuid;
+        } else if (episode.source === 'apple' && episode.collectionId) {
+          seriesData.iTunesId = episode.collectionId;
+        }
+      }
+
+      if (!seriesData) {
+        toast.error('Unable to determine podcast series information');
+        return;
+      }
+
+      // Create or find series via backend
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/create-or-find-series`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ seriesData })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create/find series');
+      }
+
+      const data = await response.json();
+      navigate(`/podcast/${data.series._id}`);
+    } catch (error: any) {
+      console.error('Error creating/finding series:', error);
+      toast.error(error.message || 'Failed to load podcast series');
+    }
+  };
+
   const clearFilters = () => {
     setFilters({
       category: '',
@@ -1017,7 +1090,10 @@ const Podcasts: React.FC = () => {
                           )}
                         </div>
                         {(episode.podcastSeries || episode.podcastTitle) && (
-                          <p className="text-purple-300 text-sm mb-2">
+                          <p 
+                            className="text-purple-300 text-sm mb-2 cursor-pointer hover:text-purple-200 hover:underline transition-colors"
+                            onClick={(e) => handleSeriesClick(episode, e)}
+                          >
                             {episode.podcastSeries?.title || episode.podcastTitle}
                           </p>
                         )}

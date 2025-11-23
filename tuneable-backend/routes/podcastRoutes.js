@@ -5,6 +5,7 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const { isValidObjectId } = require('../utils/validators');
 
 // Import services
 const podcastIndexService = require('../services/podcastIndexService');
@@ -1238,6 +1239,97 @@ router.post('/discovery/import-single-episode', authMiddleware, async (req, res)
   } catch (error) {
     console.error('Error importing single episode:', error);
     res.status(500).json({ error: 'Failed to import episode', details: error.message });
+  }
+});
+
+// Create or find podcast series
+router.post('/discovery/create-or-find-series', authMiddleware, async (req, res) => {
+  try {
+    const { seriesData } = req.body;
+    const userId = req.user._id;
+
+    if (!seriesData || !seriesData.title) {
+      return res.status(400).json({ error: 'Series data with title is required' });
+    }
+
+    const series = await podcastAdapter.createOrFindSeries(seriesData, userId);
+
+    res.json({
+      success: true,
+      series: {
+        _id: series._id,
+        title: series.title,
+        description: series.description,
+        coverArt: series.coverArt,
+        host: series.host,
+        genres: series.genres,
+        externalIds: series.externalIds
+      }
+    });
+  } catch (error) {
+    console.error('Error creating/finding series:', error);
+    res.status(500).json({ error: 'Failed to create/find series', details: error.message });
+  }
+});
+
+// Get podcast series with episodes
+router.get('/series/:seriesId', async (req, res) => {
+  try {
+    const { seriesId } = req.params;
+    
+    if (!isValidObjectId(seriesId)) {
+      return res.status(400).json({ error: 'Invalid series ID' });
+    }
+
+    // Get series
+    const series = await Media.findById(seriesId)
+      .populate('host.userId', 'username profilePic uuid')
+      .lean();
+
+    if (!series) {
+      return res.status(404).json({ error: 'Podcast series not found' });
+    }
+
+    // Verify it's a podcast series
+    if (!series.contentForm?.includes('podcastseries')) {
+      return res.status(400).json({ error: 'Media item is not a podcast series' });
+    }
+
+    // Get all episodes from this series
+    const episodes = await Media.find({
+      podcastSeries: seriesId,
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    })
+      .sort({ globalMediaAggregate: -1, releaseDate: -1 })
+      .populate('host.userId', 'username profilePic uuid')
+      .populate('addedBy', 'username')
+      .lean()
+      .limit(100); // Limit to top 100 episodes
+
+    // Calculate stats
+    const totalEpisodes = episodes.length;
+    const totalTips = episodes.reduce((sum, ep) => sum + (ep.globalMediaAggregate || 0), 0);
+    const avgTip = totalEpisodes > 0 ? totalTips / totalEpisodes : 0;
+    const topEpisode = episodes.length > 0 ? episodes[0] : null;
+
+    res.json({
+      series,
+      episodes,
+      stats: {
+        totalEpisodes,
+        totalTips,
+        avgTip,
+        topEpisode: topEpisode ? {
+          _id: topEpisode._id,
+          title: topEpisode.title,
+          globalMediaAggregate: topEpisode.globalMediaAggregate || 0
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('Error getting podcast series:', error);
+    res.status(500).json({ error: 'Failed to get podcast series', details: error.message });
   }
 });
 
