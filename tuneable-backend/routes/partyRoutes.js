@@ -2064,14 +2064,76 @@ router.delete('/:partyId/media/:mediaId', authMiddleware, async (req, res) => {
         }
 
         // Find the media in the party's queue
-        const mediaIndex = party.media.findIndex(entry => 
-            (entry.mediaId && entry.mediaId.toString() === mediaId) || 
-            (entry.media_uuid === mediaId)
-        );
+        // Handle both ObjectId and UUID formats, and both populated and unpopulated mediaId
+        let mediaIndex = party.media.findIndex(entry => {
+            if (!entry.mediaId) return false;
+            
+            // Handle populated mediaId (object with _id)
+            const entryMediaId = entry.mediaId._id ? entry.mediaId._id.toString() : entry.mediaId.toString();
+            const entryUuid = entry.mediaId.uuid || entry.media_uuid;
+            
+            // Check if mediaId matches (ObjectId format)
+            if (mongoose.isValidObjectId(mediaId) && entryMediaId === mediaId) {
+                return true;
+            }
+            
+            // Check if UUID matches
+            if (entryUuid && entryUuid === mediaId) {
+                return true;
+            }
+            
+            // Also check direct mediaId string comparison (for unpopulated references)
+            if (entry.mediaId.toString() === mediaId) {
+                return true;
+            }
+            
+            return false;
+        });
+        
+        // For global party, if media not found in party.media array, check if it has bids and add it
+        if (mediaIndex === -1 && party.type === 'global') {
+            let mediaDoc = null;
+            if (mongoose.isValidObjectId(mediaId)) {
+                mediaDoc = await Media.findById(mediaId);
+            } else {
+                mediaDoc = await Media.findOne({ uuid: mediaId });
+            }
+            
+            if (mediaDoc) {
+                // Check if there are any bids for this media in this party
+                const hasBids = await Bid.findOne({
+                    mediaId: mediaDoc._id,
+                    partyId: partyId,
+                    status: 'active'
+                });
+                
+                if (hasBids) {
+                    // Media exists and has bids, but wasn't in party.media array
+                    // Add it to the party.media array with status 'active'
+                    party.media.push({
+                        mediaId: mediaDoc._id,
+                        status: 'active',
+                        addedAt: new Date()
+                    });
+                    await party.save();
+                    // Refresh party to get the new entry
+                    await party.populate('media.mediaId');
+                    // Find it again
+                    mediaIndex = party.media.findIndex(entry => {
+                        if (!entry.mediaId) return false;
+                        const entryMediaId = entry.mediaId._id ? entry.mediaId._id.toString() : entry.mediaId.toString();
+                        return entryMediaId === mediaDoc._id.toString();
+                    });
+                }
+            }
+        }
+        
         if (mediaIndex === -1) {
             return res.status(404).json({ error: 'Media not found in party queue' });
         }
 
+        // Refresh party to ensure we have the latest data
+        await party.populate('media.mediaId');
         const mediaEntry = party.media[mediaIndex];
 
         // Resolve actual mediaId (handle both ObjectId and UUID)
