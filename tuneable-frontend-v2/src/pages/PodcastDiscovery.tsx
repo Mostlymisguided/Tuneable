@@ -76,7 +76,7 @@ const PodcastDiscovery: React.FC = () => {
     // Load top boosted podcasts
     const loadTopBoostedPodcasts = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/charts/boosted?limit=10`);
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/chart?limit=10&sortBy=globalMediaAggregate`);
         if (response.ok) {
           const data = await response.json();
           setTopBoostedPodcasts(data.episodes || []);

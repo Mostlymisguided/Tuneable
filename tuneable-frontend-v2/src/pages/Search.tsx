@@ -152,22 +152,22 @@ const SearchPage: React.FC = () => {
             limit: '20'
           });
           
-          const podcastResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search?${params}`);
+          const podcastResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`);
           if (podcastResponse.ok) {
             const podcastData = await podcastResponse.json();
             // Convert podcast episodes to search result format
             const podcastResults = podcastData.episodes.map((episode: any) => ({
-              id: episode.id,
+              id: episode._id || episode.id,
               title: episode.title,
-              artist: episode.podcastTitle,
-              coverArt: episode.podcastImage,
+              artist: episode.podcastSeries?.title || episode.host?.[0]?.name || 'Unknown',
+              coverArt: episode.coverArt || episode.podcastSeries?.coverArt,
               duration: episode.duration,
-              sources: { audio: episode.audioUrl },
-              globalMediaAggregate: episode.globalMediaAggregate,
+              sources: episode.sources ? (typeof episode.sources === 'object' && !Array.isArray(episode.sources) ? episode.sources : {}) : {},
+              globalMediaAggregate: episode.globalMediaAggregate || 0,
               addedBy: episode.addedBy?.username,
               isLocal: true,
               isPodcast: true,
-              podcastAuthor: episode.podcastAuthor,
+              podcastAuthor: episode.host?.[0]?.name || '',
               description: episode.description
             }));
             

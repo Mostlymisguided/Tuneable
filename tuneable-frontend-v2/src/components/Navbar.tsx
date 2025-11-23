@@ -72,7 +72,7 @@ const Navbar: React.FC = () => {
                     className="hidden sm:block px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
-                    Admin Panel
+                    Admin
                   </Link>
                 )}
                 {(user.role?.includes('creator') || user.role?.includes('admin')) && (
