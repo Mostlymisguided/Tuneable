@@ -1928,7 +1928,7 @@ const TuneProfile: React.FC = () => {
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
                         <p className="text-xl font-bold text-green-400">
-                          £{party.partyMediaAggregate?.toFixed(2) || '0.00'}
+                          {penceToPounds(party.partyMediaAggregate || 0)}
                         </p>
                         <p className="text-xs text-gray-400">
                           {party.bidCount || 0} {party.bidCount === 1 ? 'bid' : 'bids'}
