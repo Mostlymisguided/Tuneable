@@ -376,7 +376,7 @@ const Parties: React.FC = () => {
           ? 'hover:shadow-lg hover:scale-105 hover:bg-gray-800/50 cursor-pointer group'
           : 'hover:shadow-md'
       }`}
-      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(`/party/${party._id || party.id || party.uuid}`) : undefined}
+      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(party.type === 'global' ? '/party/global' : `/party/${party._id || party.id || party.uuid}`) : undefined}
     >
       {/* Purple overlay for clickable cards */}
       {(isUserInParty(party) || party.type === 'global') && (

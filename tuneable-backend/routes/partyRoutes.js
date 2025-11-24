@@ -15,7 +15,7 @@ const { isValidObjectId } = require('../utils/validators');
 const { broadcastToParty } = require('../utils/socketIO');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
-// const { resolvePartyId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
+const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
@@ -135,7 +135,7 @@ router.post('/', adminMiddleware, async (req, res) => {
   });
 
 
-router.post("/join/:partyId", authMiddleware, async (req, res) => {
+router.post("/join/:partyId", authMiddleware, resolvePartyId(), async (req, res) => {
     const { partyId } = req.params;
     const { inviteCode, location } = req.body;
     const userId = req.user._id;
@@ -409,7 +409,7 @@ router.get('/search-by-code/:code', authMiddleware, async (req, res) => {
 
 // FETCH PARTY DETAILS
 // Access: Public (optional auth - shows private parties if logged in and joined)
-router.get('/:id/details', optionalAuthMiddleware, async (req, res) => {
+router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user?._id; // Optional - may be null for unauthenticated users
@@ -829,7 +829,7 @@ router.post('/geocode-address', async (req, res) => {
  * Search within party queue media
  * Access: Protected
  */
-router.get('/:partyId/search', authMiddleware, async (req, res) => {
+router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const { q } = req.query;
@@ -932,7 +932,7 @@ router.get('/:partyId/search', authMiddleware, async (req, res) => {
 });
 
 // Route 1: Add new media to party with initial bid
-router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const { url, title, artist, bidAmount, platform, duration, tags, category } = req.body;
@@ -1321,7 +1321,7 @@ router.post('/:partyId/media/add', authMiddleware, async (req, res) => {
 });
 
 // Route 2: Place bid on existing media in party
-router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         const { bidAmount, tags } = req.body;
@@ -1712,7 +1712,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, async (req, res) => 
 
 // Mark media as playing (called by web player when media starts)
 // Note: Status is now managed per-user in webPlayerStore, this endpoint just broadcasts
-router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/:mediaId/play', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         const userId = req.user._id;
@@ -1766,7 +1766,7 @@ router.post('/:partyId/media/:mediaId/play', authMiddleware, async (req, res) =>
 });
 
 // Reset all media to queued status (for testing/development)
-router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/reset', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const userId = req.user._id;
@@ -1807,7 +1807,7 @@ router.post('/:partyId/media/reset', authMiddleware, async (req, res) => {
 });
 
 // Mark media as played (called by web player when media finishes)
-router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/:mediaId/complete', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         const userId = req.user._id;
@@ -1866,7 +1866,7 @@ router.post('/:partyId/media/:mediaId/complete', authMiddleware, async (req, res
 });
 
 // Get media by status
-router.get('/:partyId/media/status/:status', authMiddleware, async (req, res) => {
+router.get('/:partyId/media/status/:status', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, status } = req.params;
         const validStatuses = ['active', 'vetoed'];
@@ -1913,7 +1913,7 @@ router.post('/update-statuses', async (req, res) => {
 
 // Skip to next media (remote parties only)
 // Note: Accepts mediaId in request body to identify current media (playback is per-user)
-router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
+router.post('/:partyId/skip-next', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const { mediaId } = req.body; // Current media being skipped
@@ -1972,7 +1972,7 @@ router.post('/:partyId/skip-next', authMiddleware, async (req, res) => {
 
 // Skip to previous media (remote parties only)
 // Note: Accepts mediaId in request body to identify current media (playback is per-user)
-router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
+router.post('/:partyId/skip-previous', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const { mediaId } = req.body; // Current media being skipped
@@ -2027,7 +2027,7 @@ router.post('/:partyId/skip-previous', authMiddleware, async (req, res) => {
 });
 
 // End a party (host only)
-router.post('/:partyId/end', authMiddleware, async (req, res) => {
+router.post('/:partyId/end', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const userId = req.user._id;
@@ -2081,7 +2081,7 @@ router.post('/:partyId/end', authMiddleware, async (req, res) => {
 
 // Veto a media item from a party (party veto or delegates to global veto)
 // POST /api/parties/:partyId/media/veto
-router.post('/:partyId/media/veto', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
         const { mediaId, reason } = req.body;
@@ -2359,7 +2359,7 @@ router.post('/:partyId/media/veto', authMiddleware, async (req, res) => {
 });
 
 // Unveto a media item from a party (restore to active, notify users)
-router.post('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) => {
+router.post('/:partyId/media/:mediaId/unveto', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         const Bid = require('../models/Bid');
@@ -2505,7 +2505,7 @@ router.post('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) 
 });
 
 // Kick a user from a party (host or admin only)
-router.post('/:partyId/kick/:userId', authMiddleware, async (req, res) => {
+router.post('/:partyId/kick/:userId', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, userId } = req.params;
         const { reason } = req.body || {};
@@ -2621,7 +2621,7 @@ router.post('/:partyId/kick/:userId', authMiddleware, async (req, res) => {
 });
 
 // Unkick a user from a party (host or admin only)
-router.post('/:partyId/unkick/:userId', authMiddleware, async (req, res) => {
+router.post('/:partyId/unkick/:userId', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, userId } = req.params;
         const unkickerId = req.user._id;
@@ -2691,7 +2691,7 @@ router.post('/:partyId/unkick/:userId', authMiddleware, async (req, res) => {
 });
 
 // Get media sorted by bid values within specific time periods
-router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res) => {
+router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
@@ -2991,7 +2991,7 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, async (req, res
 // @route   PUT /api/parties/:partyId/media/:mediaId/unveto
 // @desc    Un-veto a media item (restore to queue) - host only
 // @access  Private (host only)
-router.put('/:partyId/media/:mediaId/unveto', authMiddleware, async (req, res) => {
+router.put('/:partyId/media/:mediaId/unveto', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
         

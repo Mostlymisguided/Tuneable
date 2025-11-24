@@ -1,45 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User as UserIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
-import { partyAPI } from '../lib/api';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [globalPartyId, setGlobalPartyId] = useState<string | null>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
-
-  // Fetch Global Party ID dynamically
-  useEffect(() => {
-    const fetchGlobalPartyId = async () => {
-      try {
-        const res = await partyAPI.getParties();
-        const globalParty = (res.parties || []).find((p: any) => p.type === 'global');
-        if (globalParty) {
-          // Handle both _id (MongoDB) and id (transformed) formats
-          const partyId = globalParty._id || globalParty.id;
-          if (partyId) {
-            setGlobalPartyId(partyId);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch Global Party ID:', error);
-        // Fallback to hardcoded ID if fetch fails
-        setGlobalPartyId('67c6a02895baad05d3a97cf4');
-      }
-    };
-
-    if (user) {
-      fetchGlobalPartyId();
-    }
-  }, [user]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/20 shadow-lg border-purple-400">
@@ -94,7 +67,7 @@ const Navbar: React.FC = () => {
                   Parties
                 </Link>
                 <Link
-                  to={globalPartyId ? `/party/${globalPartyId}` : '/parties'}
+                  to="/party/global"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}

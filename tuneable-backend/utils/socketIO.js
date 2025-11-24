@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const { resolvePartyIdValue } = require('./idResolver');
 
 let io = null;
 
@@ -110,7 +111,7 @@ const initializeSocketIO = (server) => {
     });
 
     // Handle party room joining
-    socket.on('join-party', (data) => {
+    socket.on('join-party', async (data) => {
       try {
         const { partyId } = data;
         if (!partyId) {
@@ -118,12 +119,19 @@ const initializeSocketIO = (server) => {
           return;
         }
 
-        // Join party room
-        socket.join(`party:${partyId}`);
-        console.log(`🎉 Socket ${socket.id} joined party room: party:${partyId}`);
+        // Resolve "global" slug or UUID to ObjectId (same as middleware)
+        const resolvedPartyId = await resolvePartyIdValue(partyId);
+        if (!resolvedPartyId) {
+          socket.emit('error', { message: 'Party not found' });
+          return;
+        }
+
+        // Join party room using resolved ObjectId
+        socket.join(`party:${resolvedPartyId}`);
+        console.log(`🎉 Socket ${socket.id} joined party room: party:${resolvedPartyId}`);
         
-        // Emit confirmation
-        socket.emit('party-joined', { partyId, success: true });
+        // Emit confirmation with resolved partyId for consistency
+        socket.emit('party-joined', { partyId: resolvedPartyId, success: true });
       } catch (error) {
         console.error('Error joining party room:', error);
         socket.emit('error', { message: 'Failed to join party room', details: error.message });
@@ -131,12 +139,16 @@ const initializeSocketIO = (server) => {
     });
 
     // Handle party room leaving
-    socket.on('leave-party', (data) => {
+    socket.on('leave-party', async (data) => {
       try {
         const { partyId } = data;
         if (partyId) {
-          socket.leave(`party:${partyId}`);
-          console.log(`👋 Socket ${socket.id} left party room: party:${partyId}`);
+          // Resolve "global" slug or UUID to ObjectId
+          const resolvedPartyId = await resolvePartyIdValue(partyId);
+          if (resolvedPartyId) {
+            socket.leave(`party:${resolvedPartyId}`);
+            console.log(`👋 Socket ${socket.id} left party room: party:${resolvedPartyId}`);
+          }
         }
       } catch (error) {
         console.error('Error leaving party room:', error);

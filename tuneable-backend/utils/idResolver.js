@@ -24,25 +24,52 @@ async function resolveId(id, Model, field = 'uuid') {
 }
 
 /**
+ * Resolves a party ID, handling special "global" slug
+ * @param {string} partyId - The party ID (can be "global", ObjectId, or UUID)
+ * @returns {Promise<string|null>} - The resolved MongoDB ObjectId or null if not found
+ */
+async function resolvePartyIdValue(partyId) {
+    try {
+        // Special case: "global" slug for the global party
+        if (partyId === 'global') {
+            const Party = require('../models/Party');
+            const globalParty = await Party.getGlobalParty();
+            return globalParty ? globalParty._id.toString() : null;
+        }
+        
+        // Otherwise, use standard resolution
+        const Party = require('../models/Party');
+        return await resolveId(partyId, Party, 'uuid');
+    } catch (error) {
+        console.error('Error resolving party ID:', error);
+        return null;
+    }
+}
+
+/**
  * Middleware to resolve party ID from UUID to ObjectId
+ * Also handles special "global" slug for the global party
  */
 function resolvePartyId() {
     return async (req, res, next) => {
         try {
             const { id, partyId } = req.params;
-            const Party = require('../models/Party');
             
             // Handle both 'id' and 'partyId' parameter names
             const paramName = id ? 'id' : 'partyId';
             const paramValue = id || partyId;
             
-            const resolvedId = await resolveId(paramValue, Party, 'uuid');
+            if (!paramValue) {
+                return next(); // No party ID to resolve
+            }
+            
+            const resolvedId = await resolvePartyIdValue(paramValue);
             
             if (!resolvedId) {
                 return res.status(404).json({ error: 'Party not found' });
             }
             
-            // Replace the UUID with the resolved ObjectId
+            // Replace the UUID/slug with the resolved ObjectId
             req.params[paramName] = resolvedId;
             next();
         } catch (error) {
@@ -79,5 +106,6 @@ function resolveUserId() {
 module.exports = {
     resolveId,
     resolvePartyId,
+    resolvePartyIdValue,
     resolveUserId
 };
