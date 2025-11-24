@@ -3232,5 +3232,327 @@ router.get('/share/:id', async (req, res) => {
   }
 });
 
+// ========================================
+// GLOBAL VETO ENDPOINTS (Admin only)
+// ========================================
+
+const adminMiddleware = require('../middleware/adminMiddleware');
+
+/**
+ * @route   POST /api/media/:mediaId/veto
+ * @desc    Globally veto a media item (admin only)
+ * @access  Private (admin)
+ * 
+ * This endpoint performs a complete global veto:
+ * - Updates Media.status to 'vetoed'
+ * - Refunds ALL active bids across ALL parties
+ * - Updates ALL bid statuses to 'vetoed'
+ * - Updates party.media[].status to 'vetoed' for ALL parties that have this media
+ * - Sends notifications to all affected users
+ */
+router.post('/:mediaId/veto', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { reason } = req.body;
+    const mongoose = require('mongoose');
+    const Bid = require('../models/Bid');
+    const User = require('../models/User');
+    const Party = require('../models/Party');
+    const notificationService = require('../services/notificationService');
+
+    // Handle both ObjectId and UUID formats
+    let actualMediaId = mediaId;
+    let media = null;
+    
+    if (mongoose.isValidObjectId(mediaId)) {
+      media = await Media.findById(mediaId);
+      actualMediaId = mediaId;
+    } else {
+      media = await Media.findOne({ uuid: mediaId });
+      if (media) {
+        actualMediaId = media._id.toString();
+      }
+    }
+
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (media.status === 'vetoed') {
+      return res.status(400).json({ error: 'Media is already globally vetoed' });
+    }
+
+    // Ensure actualMediaId is an ObjectId for queries
+    const mediaObjectIdForQuery = mongoose.isValidObjectId(actualMediaId) 
+      ? new mongoose.Types.ObjectId(actualMediaId)
+      : actualMediaId;
+
+    // Find ALL active bids for this media across ALL parties
+    const bidsToRefund = await Bid.find({
+      mediaId: mediaObjectIdForQuery,
+      status: 'active'
+    }).populate('userId', 'balance uuid username');
+    
+    console.log(`🌍 Global veto: Found ${bidsToRefund.length} total active bids for this media across all parties`);
+
+    // Group bids by userId for efficient refunds
+    const refundsByUser = new Map();
+    
+    for (const bid of bidsToRefund) {
+      // Skip bids with null or invalid userId (e.g., deleted users)
+      if (!bid.userId || !bid.userId._id) {
+        console.warn(`⚠️ Skipping bid ${bid._id} - user not found (likely deleted)`);
+        // Still mark the bid as vetoed even if we can't refund
+        await Bid.findByIdAndUpdate(bid._id, { status: 'vetoed' });
+        continue;
+      }
+      
+      const userId = bid.userId._id.toString();
+      
+      if (!refundsByUser.has(userId)) {
+        refundsByUser.set(userId, {
+          user: bid.userId,
+          totalAmount: 0,
+          bidIds: []
+        });
+      }
+      
+      const refund = refundsByUser.get(userId);
+      refund.totalAmount += bid.amount;
+      refund.bidIds.push(bid._id);
+    }
+
+    // Refund all users and update bid statuses
+    const refundPromises = [];
+    
+    for (const [userId, refund] of refundsByUser) {
+      // Refund user balance (add back the amount)
+      refundPromises.push(
+        User.findByIdAndUpdate(userId, {
+          $inc: { balance: refund.totalAmount }
+        })
+      );
+      
+      const username = refund.user?.username || 'Unknown User';
+      console.log(`💰 Refunding £${(refund.totalAmount / 100).toFixed(2)} to user ${username}`);
+      
+      // Update all bids for this user to 'vetoed' status
+      refundPromises.push(
+        Bid.updateMany(
+          { _id: { $in: refund.bidIds } },
+          { 
+            $set: { 
+              status: 'vetoed',
+              vetoedBy: req.user._id,
+              vetoedReason: reason || null,
+              vetoedAt: new Date()
+            } 
+          }
+        )
+      );
+    }
+    
+    await Promise.all(refundPromises);
+
+    // Update Media.status to 'vetoed'
+    media.status = 'vetoed';
+    media.vetoedAt = new Date();
+    media.vetoedBy = req.user._id;
+    media.vetoedReason = reason || null;
+    await media.save();
+
+    // Update party.media[].status to 'vetoed' for ALL parties that have this media
+    const partyUpdateResult = await Party.updateMany(
+      { 'media.mediaId': mediaObjectIdForQuery },
+      {
+        $set: {
+          'media.$.status': 'vetoed',
+          'media.$.vetoedAt': new Date(),
+          'media.$.vetoedBy': req.user._id
+        }
+      }
+    );
+    console.log(`📋 Updated party.media[] status for ${partyUpdateResult.modifiedCount} party entries`);
+
+    // Send notifications to all users who bid on this media
+    try {
+      for (const [userId, refund] of refundsByUser) {
+        // For global veto, we don't have a specific partyId, so we'll use null
+        // The notification service should handle this gracefully
+        notificationService.notifyMediaVetoed(
+          userId,
+          actualMediaId,
+          media.title,
+          null, // partyId - null for global veto
+          'Global', // partyName
+          refund.totalAmount,
+          reason || null
+        ).catch(err => console.error(`Error sending veto notification to user ${userId}:`, err));
+      }
+    } catch (notifError) {
+      console.error('Error setting up notifications:', notifError);
+      // Don't fail the veto if notifications fail
+    }
+
+    const totalRefunded = Array.from(refundsByUser.values()).reduce((sum, r) => sum + r.totalAmount, 0);
+
+    res.json({
+      message: 'Media globally vetoed successfully',
+      media: {
+        _id: media._id,
+        uuid: media.uuid,
+        title: media.title,
+        status: media.status,
+        vetoedAt: media.vetoedAt,
+        vetoedBy: media.vetoedBy,
+        vetoedReason: media.vetoedReason
+      },
+      refundedBidsCount: bidsToRefund.length,
+      refundedUsersCount: refundsByUser.size,
+      refundedAmount: totalRefunded,
+      partyEntriesUpdated: partyUpdateResult.modifiedCount,
+      notificationsSent: refundsByUser.size
+    });
+  } catch (error) {
+    console.error('Error vetoing media:', error);
+    res.status(500).json({ error: 'Error vetoing media', details: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/media/:mediaId/unveto
+ * @desc    Remove global veto from a media item (admin only)
+ * @access  Private (admin)
+ */
+router.post('/:mediaId/unveto', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+
+    if (!isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (media.status !== 'vetoed') {
+      return res.status(400).json({ error: 'Media is not globally vetoed' });
+    }
+
+    // Remove global veto
+    media.status = 'active';
+    media.vetoedAt = null;
+    media.vetoedBy = null;
+    media.vetoedReason = null;
+
+    await media.save();
+
+    // Send notifications to users who had bids on this media
+    try {
+      const notificationService = require('../services/notificationService');
+      const Bid = require('../models/Bid');
+      
+      // Find all users who have vetoed bids on this media
+      const bids = await Bid.find({ 
+        mediaId: media._id, 
+        status: 'vetoed' 
+      }).populate('userId', '_id');
+
+      const userIds = [...new Set(bids.map(bid => bid.userId._id.toString()))];
+
+      // Send notifications
+      for (const userId of userIds) {
+        notificationService.notifyMediaUnvetoed(
+          userId,
+          media._id,
+          media.title
+        ).catch(err => console.error(`Error sending unveto notification to user ${userId}:`, err));
+      }
+    } catch (notifError) {
+      console.error('Error sending unveto notifications:', notifError);
+      // Don't fail the unveto if notifications fail
+    }
+
+    res.json({
+      message: 'Global veto removed successfully',
+      media: {
+        _id: media._id,
+        uuid: media.uuid,
+        title: media.title,
+        status: media.status
+      },
+      note: 'Media can now be added to parties again. Existing party vetoes remain in effect.'
+    });
+  } catch (error) {
+    console.error('Error unvetoing media:', error);
+    res.status(500).json({ error: 'Error unvetoing media', details: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/media/vetoed
+ * @desc    Get all globally vetoed media (admin only)
+ * @access  Private (admin)
+ */
+router.get('/vetoed', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, sortBy = 'vetoedAt', sortOrder = 'desc' } = req.query;
+
+    const query = { status: 'vetoed' };
+    const sort = {};
+    
+    if (sortBy === 'vetoedAt') {
+      sort.vetoedAt = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'title') {
+      sort.title = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sort.vetoedAt = -1; // Default sort
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [vetoedMedia, total] = await Promise.all([
+      Media.find(query)
+        .populate('vetoedBy', 'username uuid')
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Media.countDocuments(query)
+    ]);
+
+    const formattedMedia = vetoedMedia.map(media => ({
+      _id: media._id,
+      uuid: media.uuid,
+      title: media.title,
+      artist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown',
+      coverArt: media.coverArt,
+      status: media.status,
+      vetoedAt: media.vetoedAt,
+      vetoedBy: media.vetoedBy ? {
+        _id: media.vetoedBy._id,
+        username: media.vetoedBy.username,
+        uuid: media.vetoedBy.uuid
+      } : null,
+      vetoedReason: media.vetoedReason
+    }));
+
+    res.json({
+      vetoedMedia: formattedMedia,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching vetoed media:', error);
+    res.status(500).json({ error: 'Failed to fetch vetoed media', details: error.message });
+  }
+});
+
 module.exports = router;
 

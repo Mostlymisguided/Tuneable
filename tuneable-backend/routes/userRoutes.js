@@ -2960,6 +2960,210 @@ router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
   }
 });
 
+// Admin: Get all vetoes (global media vetoes, party media vetoes, and bid vetoes)
+router.get('/admin/vetoes', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const Media = require('../models/Media');
+    const Party = require('../models/Party');
+    const Bid = require('../models/Bid');
+    const { 
+      page = 1, 
+      limit = 50, 
+      type = 'all', // 'all', 'global', 'party', 'bid'
+      sortBy = 'vetoedAt', 
+      sortOrder = 'desc' 
+    } = req.query;
+
+    const results = {
+      globalVetoes: [],
+      partyVetoes: [],
+      bidVetoes: [],
+      total: 0
+    };
+
+    // Fetch global vetoes (Media with status: 'vetoed')
+    if (type === 'all' || type === 'global') {
+      const globalMedia = await Media.find({ status: 'vetoed' })
+        .populate('vetoedBy', 'username uuid')
+        .populate('artist', 'name')
+        .sort({ vetoedAt: sortOrder === 'desc' ? -1 : 1 })
+        .lean();
+
+      results.globalVetoes = globalMedia.map(media => ({
+        _id: media._id,
+        uuid: media.uuid,
+        type: 'global',
+        media: {
+          _id: media._id,
+          uuid: media.uuid,
+          title: media.title,
+          artist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown',
+          coverArt: media.coverArt
+        },
+        vetoedAt: media.vetoedAt,
+        vetoedBy: media.vetoedBy ? {
+          _id: media.vetoedBy._id,
+          username: media.vetoedBy.username,
+          uuid: media.vetoedBy.uuid
+        } : null,
+        vetoedReason: media.vetoedReason,
+        party: null // Global vetoes don't have a party
+      }));
+    }
+
+    // Fetch party vetoes (Party.media[] entries with status: 'vetoed')
+    if (type === 'all' || type === 'party') {
+      const parties = await Party.find({ 'media.status': 'vetoed' })
+        .populate('media.mediaId', 'title artist coverArt uuid')
+        .populate('media.vetoedBy', 'username uuid')
+        .populate('host', 'username uuid')
+        .lean();
+
+      const partyVetoes = [];
+      parties.forEach(party => {
+        party.media.forEach(mediaEntry => {
+          if (mediaEntry.status === 'vetoed') {
+            partyVetoes.push({
+              _id: `${party._id}-${mediaEntry.mediaId?._id || mediaEntry.mediaId}`,
+              type: 'party',
+              media: {
+                _id: mediaEntry.mediaId?._id || mediaEntry.mediaId,
+                uuid: mediaEntry.mediaId?.uuid || mediaEntry.media_uuid,
+                title: mediaEntry.mediaId?.title || 'Unknown',
+                artist: Array.isArray(mediaEntry.mediaId?.artist) && mediaEntry.mediaId.artist.length > 0 
+                  ? mediaEntry.mediaId.artist[0].name 
+                  : 'Unknown',
+                coverArt: mediaEntry.mediaId?.coverArt
+              },
+              party: {
+                _id: party._id,
+                uuid: party.uuid,
+                name: party.name,
+                type: party.type
+              },
+              vetoedAt: mediaEntry.vetoedAt,
+              vetoedBy: mediaEntry.vetoedBy ? {
+                _id: mediaEntry.vetoedBy._id,
+                username: mediaEntry.vetoedBy.username,
+                uuid: mediaEntry.vetoedBy.uuid
+              } : null,
+              vetoedReason: null // Party vetoes don't store reason in media entry
+            });
+          }
+        });
+      });
+
+      // Sort party vetoes
+      partyVetoes.sort((a, b) => {
+        const aTime = a.vetoedAt ? new Date(a.vetoedAt).getTime() : 0;
+        const bTime = b.vetoedAt ? new Date(b.vetoedAt).getTime() : 0;
+        return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
+      });
+
+      results.partyVetoes = partyVetoes;
+    }
+
+    // Fetch bid vetoes (Bid with status: 'vetoed')
+    if (type === 'all' || type === 'bid') {
+      const bidQuery = { status: 'vetoed' };
+      const bidSort = {};
+      
+      if (sortBy === 'vetoedAt') {
+        bidSort.vetoedAt = sortOrder === 'desc' ? -1 : 1;
+      } else {
+        bidSort.vetoedAt = -1;
+      }
+
+      const vetoedBids = await Bid.find(bidQuery)
+        .populate('userId', 'username profilePic uuid')
+        .populate('mediaId', 'title artist coverArt _id uuid')
+        .populate('partyId', 'name type uuid')
+        .populate('vetoedBy', 'username uuid')
+        .sort(bidSort)
+        .limit(parseInt(limit))
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .lean();
+
+      results.bidVetoes = vetoedBids.map(bid => ({
+        _id: bid._id,
+        uuid: bid.uuid,
+        type: 'bid',
+        media: {
+          _id: bid.mediaId?._id || bid.mediaId,
+          uuid: bid.mediaId?.uuid || bid.media_uuid,
+          title: bid.mediaTitle || bid.mediaId?.title || 'Unknown',
+          artist: bid.mediaArtist || (Array.isArray(bid.mediaId?.artist) ? bid.mediaId.artist[0]?.name : bid.mediaId?.artist) || 'Unknown',
+          coverArt: bid.mediaCoverArt || bid.mediaId?.coverArt
+        },
+        party: {
+          _id: bid.partyId?._id || bid.partyId,
+          uuid: bid.partyId?.uuid || bid.party_uuid,
+          name: bid.partyName || bid.partyId?.name || 'Unknown',
+          type: bid.partyType || bid.partyId?.type || 'unknown'
+        },
+        user: {
+          _id: bid.userId?._id || bid.userId,
+          username: bid.username || bid.userId?.username || 'Unknown',
+          uuid: bid.userId?.uuid || bid.user_uuid
+        },
+        amount: bid.amount, // In pence
+        vetoedAt: bid.vetoedAt,
+        vetoedBy: bid.vetoedBy ? {
+          _id: bid.vetoedBy._id,
+          username: bid.vetoedBy.username,
+          uuid: bid.vetoedBy.uuid
+        } : null,
+        vetoedReason: bid.vetoedReason,
+        bidScope: bid.bidScope || 'party'
+      }));
+    }
+
+    // Combine all vetoes and sort
+    const allVetoes = [
+      ...results.globalVetoes,
+      ...results.partyVetoes,
+      ...results.bidVetoes
+    ].sort((a, b) => {
+      const aTime = a.vetoedAt ? new Date(a.vetoedAt).getTime() : 0;
+      const bTime = b.vetoedAt ? new Date(b.vetoedAt).getTime() : 0;
+      return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
+    });
+
+    // Apply pagination if type is 'all'
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedVetoes = type === 'all' 
+      ? allVetoes.slice(startIndex, endIndex)
+      : allVetoes;
+
+    results.total = allVetoes.length;
+
+    res.json({
+      vetoes: paginatedVetoes,
+      summary: {
+        global: results.globalVetoes.length,
+        party: results.partyVetoes.length,
+        bid: results.bidVetoes.length,
+        total: results.total
+      },
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: results.total,
+        totalPages: Math.ceil(results.total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching vetoes:', error);
+    res.status(500).json({ error: 'Failed to fetch vetoes', details: error.message });
+  }
+});
+
 // Admin: Get all bids with filtering, sorting, and pagination
 router.get('/admin/bids', authMiddleware, async (req, res) => {
   try {
@@ -3159,7 +3363,6 @@ router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
     // Update bid status to vetoed
     bid.status = 'vetoed';
     bid.vetoedBy = req.user._id;
-    bid.vetoedBy_uuid = req.user.uuid;
     bid.vetoedReason = reason || null;
     bid.vetoedAt = new Date();
     await bid.save();

@@ -101,8 +101,7 @@ const PartySchema = new mongoose.Schema({
       playedAt: { type: Date, default: null },
       completedAt: { type: Date, default: null },
       vetoedAt: { type: Date, default: null },
-      vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      vetoedBy_uuid: { type: String }
+      vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
     }
   ],
   

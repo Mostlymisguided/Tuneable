@@ -57,7 +57,6 @@ function transformDocument(doc, options = {}) {
         
         // Transform vetoedBy reference
         if (song.vetoedBy && song.vetoedBy.uuid) {
-          transformedSong.vetoedBy_uuid = song.vetoedBy.uuid;
           transformedSong.vetoedBy = song.vetoedBy.uuid;
         }
         

@@ -90,15 +90,62 @@ const payoutRequestSchema = new mongoose.Schema({
   // Denormalized fields for quick access
   username: { type: String },
   email: { type: String },
-  artistName: { type: String } // From creatorProfile.artistName
+  artistName: { type: String }, // From creatorProfile.artistName
+  
+  // ========================================
+  // SECURITY & VERIFICATION
+  // ========================================
+  transactionHash: { 
+    type: String, 
+    index: true 
+  }, // SHA-256 hash for tamper detection
 }, {
-  timestamps: true
+    timestamps: true
 });
 
 // Indexes for efficient queries
 payoutRequestSchema.index({ userId: 1, status: 1 });
 payoutRequestSchema.index({ status: 1, requestedAt: 1 });
 payoutRequestSchema.index({ processedBy: 1 });
+payoutRequestSchema.index({ transactionHash: 1 }); // Hash lookup for verification
+
+// ========================================
+// HASH GENERATION
+// ========================================
+
+/**
+ * Generate transaction hash for tamper detection
+ */
+payoutRequestSchema.methods.generateHash = function() {
+  const crypto = require('crypto');
+  const data = JSON.stringify({
+    uuid: this.uuid,
+    userId: this.userId?.toString(),
+    user_uuid: this.user_uuid,
+    requestedAmount: this.requestedAmount,
+    status: this.status,
+    payoutMethod: this.payoutMethod,
+    requestedAt: this.requestedAt?.toISOString() || this.requestedAt,
+    processedAt: this.processedAt?.toISOString() || this.processedAt
+  });
+  return crypto.createHash('sha256').update(data).digest('hex');
+};
+
+/**
+ * Verify transaction integrity by checking hash
+ */
+payoutRequestSchema.methods.verifyIntegrity = function() {
+  const expectedHash = this.generateHash();
+  return this.transactionHash === expectedHash;
+};
+
+// Auto-generate hash on save
+payoutRequestSchema.pre('save', function(next) {
+  if (this.isNew || this.isModified('requestedAmount') || this.isModified('status')) {
+    this.transactionHash = this.generateHash();
+  }
+  next();
+});
 
 // Pre-save hook to populate denormalized fields
 payoutRequestSchema.pre('save', async function(next) {

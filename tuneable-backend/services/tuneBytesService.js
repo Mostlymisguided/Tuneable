@@ -157,6 +157,15 @@ class TuneBytesService {
 
       await transaction.save();
 
+      // Store verification hash
+      try {
+        const verificationService = require('../services/transactionVerificationService');
+        await verificationService.storeVerificationHash(transaction, 'TuneBytesTransaction');
+      } catch (verifyError) {
+        console.error('Failed to store verification hash for TuneBytes transaction:', verifyError);
+        // Don't fail the transaction if verification storage fails
+      }
+
       // Update user's TuneBytes balance
       await User.findByIdAndUpdate(user._id, {
         $inc: { tuneBytes: calculation.tuneBytesEarned },

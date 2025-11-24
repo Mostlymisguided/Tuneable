@@ -161,6 +161,7 @@ app.use('/api/labels', labelRoutes); // Label routes
 app.use('/api/collectives', collectiveRoutes); // Collective routes
 app.use('/api/notifications', notificationRoutes); // Notification routes
 app.use('/api/artist-escrow', require('./routes/artistEscrowRoutes')); // Artist escrow routes
+app.use('/api/verification', require('./routes/verificationRoutes')); // Transaction verification routes
 app.use('/api/webhooks/instagram', instagramWebhooks); // Instagram webhooks
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('API routes registered.');

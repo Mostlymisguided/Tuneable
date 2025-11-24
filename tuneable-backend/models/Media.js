@@ -317,7 +317,20 @@ const mediaSchema = new mongoose.Schema({
       _id: false
     }],
     _id: false
-  }]
+  }],
+
+  // ========================================
+  // GLOBAL VETO (affects all parties)
+  // ========================================
+  status: {
+    type: String,
+    enum: ['active', 'vetoed'],
+    default: 'active',
+    index: true
+  },
+  vetoedAt: { type: Date },
+  vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  vetoedReason: { type: String }
 }, { 
   timestamps: true // Automatically manage createdAt and updatedAt
 });
@@ -398,6 +411,7 @@ mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by ow
 mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
 mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user
 mediaSchema.index({ "editHistory.editedAt": -1 }); // Index for recent edits
+mediaSchema.index({ status: 1 }); // Index for global veto status
 mediaSchema.index(
   { title: 'text', description: 'text' },
   { default_language: 'english', language_override: 'none' }

@@ -314,8 +314,9 @@ export const partyAPI = {
   },
   
   vetoMedia: async (partyId: string, mediaId: string, reason?: string) => {
-    const response = await api.delete(`/parties/${partyId}/media/${mediaId}`, {
-      data: { reason },
+    const response = await api.post(`/parties/${partyId}/media/veto`, {
+      mediaId,
+      reason,
     });
     return response.data;
   },
@@ -523,6 +524,27 @@ export const mediaAPI = {
     }
   ) => {
     const response = await api.put(`/media/${mediaId}/ownership`, payload);
+    return response.data;
+  },
+
+  // Global veto (admin only)
+  vetoMedia: async (mediaId: string, reason?: string) => {
+    const response = await api.post(`/media/${mediaId}/veto`, { reason });
+    return response.data;
+  },
+
+  unvetoMedia: async (mediaId: string) => {
+    const response = await api.post(`/media/${mediaId}/unveto`);
+    return response.data;
+  },
+
+  getVetoedMedia: async (params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'vetoedAt' | 'title';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/media/vetoed', { params });
     return response.data;
   },
 
@@ -802,6 +824,18 @@ export const userAPI = {
     sortOrder?: 'asc' | 'desc';
   }) => {
     const response = await api.get('/users/admin/bids/vetoed', { params });
+    return response.data;
+  },
+
+  // Admin: Get all vetoes (global, party, and bid vetoes)
+  getAllVetoes: async (params?: {
+    page?: number;
+    limit?: number;
+    type?: 'all' | 'global' | 'party' | 'bid';
+    sortBy?: 'vetoedAt';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/users/admin/vetoes', { params });
     return response.data;
   },
 

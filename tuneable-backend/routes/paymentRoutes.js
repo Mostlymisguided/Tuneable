@@ -197,7 +197,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           
           // Create wallet transaction record
           try {
-            await WalletTransaction.create({
+            const walletTransaction = await WalletTransaction.create({
               userId: updatedUser._id,
               user_uuid: updatedUser.uuid,
               amount: amountPence,
@@ -217,6 +217,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               }
             });
             console.log(`✅ Created wallet transaction record for top-up: ${session.id}`);
+            
+            // Store verification hash
+            try {
+              const verificationService = require('../services/transactionVerificationService');
+              await verificationService.storeVerificationHash(walletTransaction, 'WalletTransaction');
+            } catch (verifyError) {
+              console.error('Failed to store verification hash:', verifyError);
+              // Don't fail the webhook if verification storage fails
+            }
           } catch (txError) {
             console.error('❌ Failed to create wallet transaction record:', txError);
             // Don't fail the webhook if transaction record creation fails
@@ -303,7 +312,7 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
 
     // Create wallet transaction record
     try {
-      await WalletTransaction.create({
+      const walletTransaction = await WalletTransaction.create({
         userId: user._id,
         user_uuid: user.uuid,
         amount: amountPence,
@@ -315,6 +324,14 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
         description: description || 'Manual balance adjustment',
         username: user.username
       });
+      
+      // Store verification hash
+      try {
+        const verificationService = require('../services/transactionVerificationService');
+        await verificationService.storeVerificationHash(walletTransaction, 'WalletTransaction');
+      } catch (verifyError) {
+        console.error('Failed to store verification hash:', verifyError);
+      }
     } catch (txError) {
       console.error('Failed to create wallet transaction record:', txError);
       // Don't fail the request if transaction record creation fails
@@ -359,7 +376,7 @@ router.post('/confirm-payment', authMiddleware, async (req, res) => {
 
     // Create wallet transaction record
     try {
-      await WalletTransaction.create({
+      const walletTransaction = await WalletTransaction.create({
         userId: user._id,
         user_uuid: user.uuid,
         amount: amountPence,
@@ -371,6 +388,14 @@ router.post('/confirm-payment', authMiddleware, async (req, res) => {
         description: 'Payment confirmed and balance updated',
         username: user.username
       });
+      
+      // Store verification hash
+      try {
+        const verificationService = require('../services/transactionVerificationService');
+        await verificationService.storeVerificationHash(walletTransaction, 'WalletTransaction');
+      } catch (verifyError) {
+        console.error('Failed to store verification hash:', verifyError);
+      }
     } catch (txError) {
       console.error('Failed to create wallet transaction record:', txError);
       // Don't fail the request if transaction record creation fails

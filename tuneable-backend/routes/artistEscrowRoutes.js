@@ -179,6 +179,15 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
     
     await payoutRequest.save();
     
+    // Store verification hash
+    try {
+      const verificationService = require('../services/transactionVerificationService');
+      await verificationService.storeVerificationHash(payoutRequest, 'PayoutRequest');
+    } catch (verifyError) {
+      console.error('Failed to store verification hash for payout request:', verifyError);
+      // Don't fail the request if verification storage fails
+    }
+    
     // Send notification to admin
     try {
       const Notification = require('../models/Notification');

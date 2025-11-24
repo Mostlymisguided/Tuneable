@@ -31,7 +31,8 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
                         { album: { $regex: query, $options: 'i' } }
                     ]
                 },
-                { contentType: { $in: ['music'] } } // Filter to music content
+                { contentType: { $in: ['music'] } }, // Filter to music content
+                { status: { $ne: 'vetoed' } } // Exclude globally vetoed media
             ]
         };
 

@@ -102,9 +102,17 @@ const artistEscrowAllocationSchema = new mongoose.Schema({
   },
   notes: { 
     type: String 
-  } // Admin notes for manual matching if needed
+  }, // Admin notes for manual matching if needed
+  
+  // ========================================
+  // SECURITY & VERIFICATION
+  // ========================================
+  transactionHash: { 
+    type: String, 
+    index: true 
+  }, // SHA-256 hash for tamper detection
 }, {
-  timestamps: true
+    timestamps: true
 });
 
 // Indexes for efficient queries
@@ -112,6 +120,46 @@ artistEscrowAllocationSchema.index({ mediaId: 1, claimed: 1 });
 artistEscrowAllocationSchema.index({ artistName: 1, claimed: 1 });
 artistEscrowAllocationSchema.index({ 'matchingCriteria.youtubeChannelId': 1, claimed: 1 });
 artistEscrowAllocationSchema.index({ artistUserId: 1, claimed: 1 });
+artistEscrowAllocationSchema.index({ transactionHash: 1 }); // Hash lookup for verification
+
+// ========================================
+// HASH GENERATION
+// ========================================
+
+/**
+ * Generate transaction hash for tamper detection
+ */
+artistEscrowAllocationSchema.methods.generateHash = function() {
+  const crypto = require('crypto');
+  const data = JSON.stringify({
+    uuid: this.uuid,
+    mediaId: this.mediaId?.toString(),
+    bidId: this.bidId?.toString(),
+    artistUserId: this.artistUserId?.toString(),
+    artistName: this.artistName,
+    percentage: this.percentage,
+    allocatedAmount: this.allocatedAmount,
+    claimed: this.claimed,
+    allocatedAt: this.allocatedAt?.toISOString() || this.allocatedAt
+  });
+  return crypto.createHash('sha256').update(data).digest('hex');
+};
+
+/**
+ * Verify transaction integrity by checking hash
+ */
+artistEscrowAllocationSchema.methods.verifyIntegrity = function() {
+  const expectedHash = this.generateHash();
+  return this.transactionHash === expectedHash;
+};
+
+// Auto-generate hash on save
+artistEscrowAllocationSchema.pre('save', function(next) {
+  if (this.isNew || this.isModified('allocatedAmount') || this.isModified('percentage') || this.isModified('claimed')) {
+    this.transactionHash = this.generateHash();
+  }
+  next();
+});
 
 // Virtual: Total unclaimed amount for an artist name
 artistEscrowAllocationSchema.statics.getUnclaimedTotal = async function(artistName) {

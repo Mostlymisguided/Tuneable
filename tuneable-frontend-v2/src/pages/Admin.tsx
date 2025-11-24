@@ -78,12 +78,13 @@ const Admin: React.FC = () => {
   const [labelSortDirection, setLabelSortDirection] = useState<'asc' | 'desc'>('desc');
   const [labelFilterStatus, setLabelFilterStatus] = useState<string>('');
   const [labelSearchQuery, setLabelSearchQuery] = useState<string>('');
-  const [vetoedBids, setVetoedBids] = useState<any[]>([]);
   const [isLoadingVetoedBids, setIsLoadingVetoedBids] = useState(false);
-  const [vetoedBidsSortField, setVetoedBidsSortField] = useState<string>('vetoedAt');
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
   const [vetoedBidsTotal, setVetoedBidsTotal] = useState<number>(0);
+  const [vetoesFilter, setVetoesFilter] = useState<'all' | 'global' | 'party' | 'bid'>('all');
+  const [allVetoes, setAllVetoes] = useState<any[]>([]);
+  const [vetoesSummary, setVetoesSummary] = useState<{global: number; party: number; bid: number; total: number}>({global: 0, party: 0, bid: 0, total: 0});
   const [bids, setBids] = useState<any[]>([]);
   const [isLoadingBids, setIsLoadingBids] = useState(false);
   const [bidsSortField, setBidsSortField] = useState<string>('createdAt');
@@ -544,49 +545,33 @@ const Admin: React.FC = () => {
     }
   }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab]);
 
-  const loadVetoedBids = async () => {
+  const loadAllVetoes = async () => {
     try {
       setIsLoadingVetoedBids(true);
       const params: any = {
         page: vetoedBidsPage,
         limit: 50,
-        sortBy: vetoedBidsSortField,
+        type: vetoesFilter,
+        sortBy: 'vetoedAt',
         sortOrder: vetoedBidsSortDirection
       };
-      const data = await userAPI.getVetoedBids(params);
-      setVetoedBids(data.bids || []);
-      setVetoedBidsTotal(data.total || 0);
+      const data = await userAPI.getAllVetoes(params);
+      setAllVetoes(data.vetoes || []);
+      setVetoesSummary(data.summary || {global: 0, party: 0, bid: 0, total: 0});
+      setVetoedBidsTotal(data.pagination?.total || 0);
     } catch (error) {
-      console.error('Error loading vetoed bids:', error);
-      toast.error('Failed to load vetoed bids');
+      console.error('Error loading vetoes:', error);
+      toast.error('Failed to load vetoes');
     } finally {
       setIsLoadingVetoedBids(false);
     }
   };
 
-  const handleVetoedBidsSort = (field: string) => {
-    if (vetoedBidsSortField === field) {
-      setVetoedBidsSortDirection(vetoedBidsSortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setVetoedBidsSortField(field);
-      setVetoedBidsSortDirection('desc');
-    }
-  };
-
-  const getVetoedBidsSortIcon = (field: string) => {
-    if (vetoedBidsSortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
-    }
-    return vetoedBidsSortDirection === 'asc' 
-      ? <ArrowUp className="h-4 w-4 text-purple-400" />
-      : <ArrowDown className="h-4 w-4 text-purple-400" />;
-  };
-
   useEffect(() => {
     if (activeTab === 'vetoed-bids' && isAdmin) {
-      loadVetoedBids();
+      loadAllVetoes();
     }
-  }, [vetoedBidsSortField, vetoedBidsSortDirection, vetoedBidsPage, activeTab]);
+  }, [vetoedBidsSortDirection, vetoedBidsPage, activeTab, vetoesFilter]);
 
   const loadBids = async () => {
     try {
@@ -2305,20 +2290,57 @@ const Admin: React.FC = () => {
         {activeTab === 'vetoed-bids' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Vetoes</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Vetoes</h2>
+                <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+                  <span>🌍 Global: {vetoesSummary.global}</span>
+                  <span>🎉 Party: {vetoesSummary.party}</span>
+                  <span>💰 Bid: {vetoesSummary.bid}</span>
+                  <span className="text-gray-500">Total: {vetoesSummary.total}</span>
+                </div>
+              </div>
               <button
-                onClick={loadVetoedBids}
+                onClick={loadAllVetoes}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
               >
                 Refresh
               </button>
             </div>
 
+            {/* Filter */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium text-gray-300">Filter by Type:</label>
+                <select
+                  value={vetoesFilter}
+                  onChange={(e) => {
+                    setVetoesFilter(e.target.value as 'all' | 'global' | 'party' | 'bid');
+                    setVetoedBidsPage(1);
+                  }}
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                >
+                  <option value="all">All Vetoes</option>
+                  <option value="global">🌍 Global Vetoes</option>
+                  <option value="party">🎉 Party Vetoes</option>
+                  <option value="bid">💰 Bid Vetoes</option>
+                </select>
+                <button
+                  onClick={() => {
+                    setVetoedBidsSortDirection(vetoedBidsSortDirection === 'desc' ? 'asc' : 'desc');
+                  }}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                  {vetoedBidsSortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
+                </button>
+              </div>
+            </div>
+
             {isLoadingVetoedBids ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
               </div>
-            ) : vetoedBids.length === 0 ? (
+            ) : allVetoes.length === 0 ? (
               <div className="bg-gray-800 rounded-lg p-8 text-center">
                 <XCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
                 <p className="text-gray-400">No vetoes found</p>
@@ -2330,37 +2352,21 @@ const Admin: React.FC = () => {
                     <thead className="bg-gray-700">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                           Media
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          User
+                          {vetoesFilter === 'bid' ? 'User' : 'Party'}
                         </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleVetoedBidsSort('amount')}
-                        >
-                          <div className="flex items-center">
-                            Bid Amount
-                            {getVetoedBidsSortIcon('amount')}
-                          </div>
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleVetoedBidsSort('createdAt')}
-                        >
-                          <div className="flex items-center">
-                            Date Placed
-                            {getVetoedBidsSortIcon('createdAt')}
-                          </div>
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleVetoedBidsSort('vetoedAt')}
-                        >
-                          <div className="flex items-center">
-                            Date Vetoed
-                            {getVetoedBidsSortIcon('vetoedAt')}
-                          </div>
+                        {vetoesFilter === 'bid' && (
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                            Amount
+                          </th>
+                        )}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Vetoed At
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                           Vetoed By
@@ -2369,101 +2375,129 @@ const Admin: React.FC = () => {
                           Reason
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Party
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Scope
+                          Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-gray-800 divide-y divide-gray-700">
-                      {vetoedBids.map((bid) => (
-                        <tr key={bid._id} className="hover:bg-gray-700/50 transition-colors">
+                      {allVetoes.map((veto) => (
+                        <tr key={veto._id} className="hover:bg-gray-700/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {veto.type === 'global' ? (
+                              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium flex items-center gap-1">
+                                🌍 Global
+                              </span>
+                            ) : veto.type === 'party' ? (
+                              <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium flex items-center gap-1">
+                                🎉 Party
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-medium flex items-center gap-1">
+                                💰 Bid
+                              </span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              {bid.media?.coverArt && (
+                              {veto.media?.coverArt && (
                                 <img
-                                  src={bid.media.coverArt}
-                                  alt={bid.media.title}
+                                  src={veto.media.coverArt}
+                                  alt={veto.media.title}
                                   className="h-10 w-10 rounded object-cover mr-3"
                                 />
                               )}
                               <div>
                                 <button
-                                  onClick={() => navigate(`/tune/${bid.media._id}`)}
+                                  onClick={() => navigate(`/tune/${veto.media._id || veto.media.uuid}`)}
                                   className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
                                 >
-                                  {bid.media?.title || 'Unknown'}
+                                  {veto.media?.title || 'Unknown'}
                                 </button>
                                 <div className="text-xs text-gray-400">
-                                  {bid.media ? <ClickableArtistDisplay media={bid.media} /> : 'Unknown Artist'}
+                                  {veto.media?.artist || 'Unknown Artist'}
                                 </div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={() => bid.user?.uuid && navigate(`/user/${bid.user.uuid}`)}
-                              className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
-                            >
-                              {bid.user?.username || 'Unknown'}
-                            </button>
+                            {veto.type === 'bid' ? (
+                              <button
+                                onClick={() => veto.user?.uuid && navigate(`/user/${veto.user.uuid}`)}
+                                className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                              >
+                                {veto.user?.username || 'Unknown'}
+                              </button>
+                            ) : (
+                              <div>
+                                <div className="text-sm text-gray-300">
+                                  {veto.party?.name || 'N/A'}
+                                </div>
+                                {veto.party?.type && (
+                                  <div className="text-xs text-gray-500">
+                                    {veto.party.type}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </td>
+                          {veto.type === 'bid' && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-green-400">
+                                {penceToPounds(veto.amount || 0)}
+                              </div>
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-green-400">
-                              {penceToPounds(bid.amount)}
+                            <div className="text-sm text-gray-300">
+                              {veto.vetoedAt ? new Date(veto.vetoedAt).toLocaleString() : 'N/A'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              {bid.createdAt ? new Date(bid.createdAt).toLocaleString() : 'N/A'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {bid.vetoedAt ? new Date(bid.vetoedAt).toLocaleString() : 'N/A'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {bid.vetoedBy?.username || 'Unknown'}
+                              {veto.vetoedBy?.username || 'Unknown'}
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-300 max-w-xs truncate" title={bid.vetoedReason || ''}>
-                              {bid.vetoedReason || 'No reason provided'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {bid.party?.name || 'Unknown'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {bid.party?.type || 'unknown'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-xs text-gray-400 uppercase">
-                              {bid.bidScope || 'party'}
+                            <div className="text-sm text-gray-300 max-w-xs truncate" title={veto.vetoedReason || ''}>
+                              {veto.vetoedReason || 'No reason provided'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
-                              {bid.party?._id && bid.media?._id && (
+                              {veto.type === 'global' && veto.media?._id && (
                                 <button
                                   onClick={async () => {
-                                    if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
+                                    if (window.confirm(`Remove global veto from "${veto.media?.title || 'this media'}"? Media can be added to parties again.`)) {
                                       try {
-                                        await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
-                                        toast.success(`Media unvetoed successfully. Users have been notified.`);
-                                        loadVetoedBids();
+                                        await mediaAPI.unvetoMedia(veto.media._id);
+                                        toast.success('Global veto removed successfully');
+                                        loadAllVetoes();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to remove global veto');
+                                      }
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                  title="Remove global veto"
+                                >
+                                  Unveto
+                                </button>
+                              )}
+                              {veto.type === 'party' && veto.party?._id && veto.media?._id && (
+                                <button
+                                  onClick={async () => {
+                                    if (window.confirm(`Unveto "${veto.media?.title || 'this media'}" from "${veto.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
+                                      try {
+                                        await partyAPI.unvetoMedia(veto.party._id, veto.media._id);
+                                        toast.success('Media unvetoed from party successfully');
+                                        loadAllVetoes();
                                       } catch (error: any) {
                                         toast.error(error.response?.data?.error || 'Failed to unveto media');
                                       }
                                     }
                                   }}
                                   className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                  title="Unveto media in party"
+                                  title="Unveto from party"
                                 >
                                   Unveto
                                 </button>

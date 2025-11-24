@@ -70,6 +70,14 @@ const walletTransactionSchema = new mongoose.Schema({
   // ========================================
   username: { type: String }, // For quick lookups without populating
   
+  // ========================================
+  // SECURITY & VERIFICATION
+  // ========================================
+  transactionHash: { 
+    type: String, 
+    index: true 
+  }, // SHA-256 hash for tamper detection
+  
 }, { 
   timestamps: true 
 });
@@ -82,6 +90,50 @@ walletTransactionSchema.index({ stripeSessionId: 1 }); // Lookup by Stripe sessi
 walletTransactionSchema.index({ stripePaymentIntentId: 1 }); // Lookup by Stripe payment intent
 walletTransactionSchema.index({ type: 1, status: 1 }); // Filter by type and status
 walletTransactionSchema.index({ userId: 1, type: 1, createdAt: -1 }); // User's transactions by type
+walletTransactionSchema.index({ transactionHash: 1 }); // Hash lookup for verification
+
+// ========================================
+// HASH GENERATION
+// ========================================
+
+/**
+ * Generate transaction hash for tamper detection
+ * Hash includes all critical financial fields
+ */
+walletTransactionSchema.methods.generateHash = function() {
+  const crypto = require('crypto');
+  const data = JSON.stringify({
+    uuid: this.uuid,
+    userId: this.userId?.toString(),
+    user_uuid: this.user_uuid,
+    amount: this.amount,
+    type: this.type,
+    status: this.status,
+    balanceBefore: this.balanceBefore,
+    balanceAfter: this.balanceAfter,
+    paymentMethod: this.paymentMethod,
+    stripeSessionId: this.stripeSessionId,
+    stripePaymentIntentId: this.stripePaymentIntentId,
+    createdAt: this.createdAt?.toISOString() || this.createdAt
+  });
+  return crypto.createHash('sha256').update(data).digest('hex');
+};
+
+/**
+ * Verify transaction integrity by checking hash
+ */
+walletTransactionSchema.methods.verifyIntegrity = function() {
+  const expectedHash = this.generateHash();
+  return this.transactionHash === expectedHash;
+};
+
+// Auto-generate hash on save
+walletTransactionSchema.pre('save', function(next) {
+  if (this.isNew || this.isModified('amount') || this.isModified('status') || this.isModified('balanceBefore') || this.isModified('balanceAfter')) {
+    this.transactionHash = this.generateHash();
+  }
+  next();
+});
 
 // ========================================
 // STATIC METHODS

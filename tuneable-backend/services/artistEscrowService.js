@@ -237,6 +237,15 @@ class ArtistEscrowService {
     
     await allocation.save();
     
+    // Store verification hash
+    try {
+      const verificationService = require('../services/transactionVerificationService');
+      await verificationService.storeVerificationHash(allocation, 'ArtistEscrowAllocation');
+    } catch (verifyError) {
+      console.error('Failed to store verification hash for escrow allocation:', verifyError);
+      // Don't fail the allocation if verification storage fails
+    }
+    
     console.log(`   ✅ Allocated £${(validatedAmount / 100).toFixed(2)} to unknown artist "${primaryArtistName}" (${percentage}%)`);
   }
   

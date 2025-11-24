@@ -364,12 +364,22 @@ const notifyMediaVetoed = async (userId, mediaId, mediaTitle, partyId, partyName
     const Media = require('../models/Media');
     const Party = require('../models/Party');
     const media = await Media.findById(mediaId).select('uuid');
-    const party = await Party.findById(partyId).select('uuid');
     
     const mediaLinkId = media?.uuid || mediaId;
-    const partyLinkId = party?.uuid || partyId;
     
-    let message = `"${mediaTitle}" was vetoed from "${partyName}". Your tip of £${(refundAmount / 100).toFixed(2)} has been refunded.`;
+    // Handle global veto (partyId is null)
+    let partyLinkId = null;
+    let link = `/tune/${mediaLinkId}`;
+    let linkText = 'View Media';
+    
+    if (partyId) {
+      const party = await Party.findById(partyId).select('uuid');
+      partyLinkId = party?.uuid || partyId;
+      link = `/party/${partyLinkId}`;
+      linkText = 'View Party';
+    }
+    
+    let message = `"${mediaTitle}" was vetoed${partyId ? ` from "${partyName}"` : ' globally'}. Your tip of £${(refundAmount / 100).toFixed(2)} has been refunded.`;
     if (reason) {
       message += ` Reason: ${reason}`;
     }
@@ -379,11 +389,11 @@ const notifyMediaVetoed = async (userId, mediaId, mediaTitle, partyId, partyName
       type: 'media_vetoed',
       title: 'Media Vetoed',
       message,
-      link: `/party/${partyLinkId}`,
-      linkText: 'View Party',
+      link,
+      linkText,
       relatedMediaId: mediaId,
       relatedPartyId: partyId,
-      groupKey: `media_vetoed_${mediaId}_${partyId}_${userId}`
+      groupKey: `media_vetoed_${mediaId}_${partyId || 'global'}_${userId}`
     });
   } catch (error) {
     console.error('Error creating media vetoed notification:', error);

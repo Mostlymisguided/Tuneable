@@ -123,7 +123,6 @@ const bidSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }, // User who vetoed the bid (admin)
-    vetoedBy_uuid: { type: String }, // UUID reference for vetoedBy
     vetoedReason: { type: String }, // Reason for vetoing the bid
     vetoedAt: { type: Date }, // Timestamp when bid was vetoed
     
@@ -134,6 +133,14 @@ const bidSchema = new mongoose.Schema({
     // BidMetricsEngine rather than stored as static fields.
     // This allows for flexible metric computation based on the
     // bid metrics schema defined in utils/bidMetricsSchema.js
+    
+    // ========================================
+    // SECURITY & VERIFICATION
+    // ========================================
+    transactionHash: { 
+        type: String, 
+        index: true 
+    }, // SHA-256 hash for tamper detection
 }, {
     timestamps: true
 });
@@ -226,7 +233,49 @@ bidSchema.index({ partyId: 1, status: 1 }); // Party bids by status
 bidSchema.index({ userId: 1, createdAt: -1 }); // User's recent bids
 bidSchema.index({ mediaId: 1, createdAt: -1 }); // Media's recent bids
 bidSchema.index({ partyId: 1, createdAt: -1 }); // Party's recent bids
+bidSchema.index({ transactionHash: 1 }); // Hash lookup for verification
 
+// ========================================
+// HASH GENERATION
+// ========================================
+
+/**
+ * Generate transaction hash for tamper detection
+ * Hash includes all critical financial fields
+ */
+bidSchema.methods.generateHash = function() {
+    const crypto = require('crypto');
+    const data = JSON.stringify({
+        uuid: this.uuid,
+        userId: this.userId?.toString(),
+        user_uuid: this.user_uuid,
+        partyId: this.partyId?.toString(),
+        party_uuid: this.party_uuid,
+        mediaId: this.mediaId?.toString(),
+        media_uuid: this.media_uuid,
+        amount: this.amount,
+        status: this.status,
+        bidScope: this.bidScope,
+        createdAt: this.createdAt?.toISOString() || this.createdAt
+    });
+    return crypto.createHash('sha256').update(data).digest('hex');
+};
+
+/**
+ * Verify transaction integrity by checking hash
+ */
+bidSchema.methods.verifyIntegrity = function() {
+    const expectedHash = this.generateHash();
+    return this.transactionHash === expectedHash;
+};
+
+// Auto-generate hash on save
+bidSchema.pre('save', function(next) {
+    if (this.isNew || this.isModified('amount') || this.isModified('status')) {
+        this.transactionHash = this.generateHash();
+    }
+    next();
+});
 
 // ========================================
 // NOTES ON USAGE

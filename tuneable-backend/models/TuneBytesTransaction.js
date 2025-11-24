@@ -68,6 +68,14 @@ const tuneBytesTransactionSchema = new mongoose.Schema({
   },
   
   // ========================================
+  // SECURITY & VERIFICATION
+  // ========================================
+  transactionHash: { 
+    type: String, 
+    index: true 
+  }, // SHA-256 hash for tamper detection
+  
+  // ========================================
   // REDEMPTION DATA (for future use)
   // ========================================
   redemptionData: {
@@ -90,6 +98,47 @@ tuneBytesTransactionSchema.index({ userId: 1, createdAt: -1 }); // User's TuneBy
 tuneBytesTransactionSchema.index({ mediaId: 1, createdAt: -1 }); // Media's TuneBytes transactions
 tuneBytesTransactionSchema.index({ bidId: 1 }); // Unique per bid
 tuneBytesTransactionSchema.index({ status: 1 }); // Filter by status
+tuneBytesTransactionSchema.index({ transactionHash: 1 }); // Hash lookup for verification
+
+// ========================================
+// HASH GENERATION
+// ========================================
+
+/**
+ * Generate transaction hash for tamper detection
+ */
+tuneBytesTransactionSchema.methods.generateHash = function() {
+  const crypto = require('crypto');
+  const data = JSON.stringify({
+    uuid: this.uuid,
+    userId: this.userId?.toString(),
+    user_uuid: this.user_uuid,
+    mediaId: this.mediaId?.toString(),
+    media_uuid: this.media_uuid,
+    bidId: this.bidId?.toString(),
+    bid_uuid: this.bid_uuid,
+    tuneBytesEarned: this.tuneBytesEarned,
+    status: this.status,
+    createdAt: this.createdAt?.toISOString() || this.createdAt
+  });
+  return crypto.createHash('sha256').update(data).digest('hex');
+};
+
+/**
+ * Verify transaction integrity by checking hash
+ */
+tuneBytesTransactionSchema.methods.verifyIntegrity = function() {
+  const expectedHash = this.generateHash();
+  return this.transactionHash === expectedHash;
+};
+
+// Auto-generate hash on save
+tuneBytesTransactionSchema.pre('save', function(next) {
+  if (this.isNew || this.isModified('tuneBytesEarned') || this.isModified('status')) {
+    this.transactionHash = this.generateHash();
+  }
+  next();
+});
 tuneBytesTransactionSchema.index({ 'calculationSnapshot.discoveryRank': 1 }); // Discovery analytics
 
 // Compound indexes
