@@ -24,19 +24,29 @@ const Wallet: React.FC = () => {
     const amount = urlParams.get('amount');
 
     if (success === 'true' && amount) {
-      // Manually update balance since webhook might not work in development
-      const updateUserBalance = async () => {
+      // Wait a moment for webhook to process, then use fallback if needed
+      // The backend will check if webhook already processed it and avoid duplicates
+      const checkAndUpdateBalance = async () => {
         try {
+          // Wait a bit for webhook to process (2 seconds)
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Call update-balance endpoint - it will check for existing webhook transaction
           const response = await paymentAPI.updateBalance(parseFloat(amount));
-          toast.success(`Successfully added £${amount} to your wallet!`);
+          
+          if (response.message === 'Payment already processed by webhook') {
+            // Webhook already handled it
+            toast.success(`Successfully added £${amount} to your wallet!`);
+          } else {
+            // Fallback was used (or webhook hadn't processed yet)
+            toast.success(`Successfully added £${amount} to your wallet!`);
+          }
+          
           // Update balance in context
           if (response.balance !== undefined) {
             updateBalance(response.balance);
-          } else {
-            // Fallback: refresh user data
-            if (refreshUser) {
-              refreshUser();
-            }
+          } else if (refreshUser) {
+            refreshUser();
           }
         } catch (error) {
           console.error('Failed to update balance:', error);
@@ -44,7 +54,7 @@ const Wallet: React.FC = () => {
         }
       };
       
-      updateUserBalance();
+      checkAndUpdateBalance();
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (canceled === 'true') {

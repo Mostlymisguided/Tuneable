@@ -281,13 +281,60 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 });
 
 // Development endpoint to manually update balance (for testing)
+// NOTE: This is a fallback for when webhooks don't work. In production, webhooks should handle Stripe payments.
 router.post('/update-balance', authMiddleware, async (req, res) => {
   try {
-    const { amount, description } = req.body;
+    const { amount, description, stripeSessionId } = req.body;
     const userId = req.user._id;  // Use _id here since it's internal only, not passed to Stripe
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Convert amount to pence for comparison
+    const amountPence = Math.round(amount * 100);
+    
+    // Check if webhook already processed this payment
+    // Look for recent Stripe transactions with same amount (within last 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    // First check by sessionId if provided
+    if (stripeSessionId) {
+      const existingBySession = await WalletTransaction.findOne({
+        stripeSessionId: stripeSessionId,
+        userId: userId
+      });
+      
+      if (existingBySession) {
+        console.log(`✅ Payment already processed by webhook for session ${stripeSessionId}`);
+        const user = await User.findById(userId);
+        return res.json({
+          message: 'Payment already processed by webhook',
+          balance: user?.balance || 0,
+          transaction: existingBySession
+        });
+      }
+    }
+    
+    // Also check for recent Stripe transactions with same amount (to catch webhook-processed payments)
+    const existingTransaction = await WalletTransaction.findOne({
+      userId: userId,
+      amount: amountPence,
+      paymentMethod: 'stripe',
+      type: 'topup',
+      status: 'completed',
+      createdAt: { $gte: fiveMinutesAgo }
+    });
+    
+    if (existingTransaction) {
+      // Webhook already processed this payment, just return the current balance
+      console.log(`✅ Payment already processed by webhook (found existing transaction: ${existingTransaction._id})`);
+      const user = await User.findById(userId);
+      return res.json({
+        message: 'Payment already processed by webhook',
+        balance: user?.balance || 0,
+        transaction: existingTransaction
+      });
     }
 
     // Get current balance before update
@@ -297,7 +344,6 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
     }
     
     const balanceBefore = userBefore.balance || 0;
-    const amountPence = Math.round(amount * 100); // Convert to pence if provided in pounds
 
     // Update user balance
     const user = await User.findByIdAndUpdate(
@@ -311,17 +357,20 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
     }
 
     // Create wallet transaction record
+    // If this is a Stripe payment fallback, mark it appropriately
+    const isStripeFallback = !!stripeSessionId;
     try {
       const walletTransaction = await WalletTransaction.create({
         userId: user._id,
         user_uuid: user.uuid,
         amount: amountPence,
-        type: 'adjustment',
+        type: isStripeFallback ? 'topup' : 'adjustment',
         status: 'completed',
-        paymentMethod: 'manual',
+        paymentMethod: isStripeFallback ? 'stripe' : 'manual',
+        stripeSessionId: stripeSessionId || undefined,
         balanceBefore: balanceBefore,
         balanceAfter: user.balance,
-        description: description || 'Manual balance adjustment',
+        description: description || (isStripeFallback ? 'Wallet top-up via Stripe (fallback)' : 'Manual balance adjustment'),
         username: user.username
       });
       
