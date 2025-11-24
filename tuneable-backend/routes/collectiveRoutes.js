@@ -8,6 +8,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
+const { processLocation, mergeLocation } = require('../utils/locationUtils');
 
 // Configure upload for collective profile pictures (reuse label upload config)
 const profilePictureUpload = createLabelProfilePictureUpload();
@@ -513,7 +514,7 @@ router.get('/:slug/media', async (req, res) => {
 // Create collective (with optional profile picture upload)
 router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
-    const { name, description, email, website, genres, foundedYear, type } = req.body;
+    const { name, description, email, website, genres, foundedYear, type, location } = req.body;
 
     // Validate required fields
     if (!name || !email) {
@@ -545,6 +546,9 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       console.log(`📸 Saving collective profile picture: ${profilePictureUrl} for collective ${name}`);
     }
 
+    // Process location data
+    const processedLocation = processLocation(location);
+
     const collective = new Collective({
       name,
       slug, // Explicitly set slug
@@ -555,6 +559,7 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       foundedYear,
       type: type || 'collective',
       profilePicture: profilePictureUrl,
+      location: processedLocation,
       members: [{
         userId: req.user.id,
         role: 'founder',
@@ -587,8 +592,22 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to update this collective' });
     }
 
-    const updates = req.body;
+    const updates = { ...req.body };
+    
+    // Handle location separately to safely merge
+    let locationUpdate = null;
+    if (updates.location !== undefined) {
+      locationUpdate = mergeLocation(updates.location, collective.location);
+      delete updates.location; // Remove from updates to handle separately
+    }
+    
+    // Apply all other updates
     Object.assign(collective, updates);
+    
+    // Apply location update separately if provided
+    if (locationUpdate !== null) {
+      collective.location = locationUpdate;
+    }
     
     await collective.save();
 

@@ -9,6 +9,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
+const { processLocation, mergeLocation } = require('../utils/locationUtils');
 
 // Configure upload for label profile pictures
 const profilePictureUpload = createLabelProfilePictureUpload();
@@ -766,7 +767,7 @@ router.get('/:slug/media', async (req, res) => {
 // Create label (with optional profile picture upload)
 router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
-    const { name, description, email, website, genres, foundedYear, userType } = req.body;
+    const { name, description, email, website, genres, foundedYear, userType, location } = req.body;
     
     // Handle social media links (can come as nested object or individual fields from FormData)
     let socialMedia = {};
@@ -844,6 +845,9 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
     // Affiliated artists start as 'unverified' (less priority)
     const verificationStatus = adminRole === 'owner' ? 'pending' : 'unverified';
 
+    // Process location data
+    const processedLocation = processLocation(location);
+
     const label = new Label({
       name,
       slug, // Explicitly set slug
@@ -854,6 +858,7 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       foundedYear,
       profilePicture: profilePictureUrl,
       socialMedia: Object.keys(socialMedia).length > 0 ? socialMedia : undefined,
+      location: processedLocation,
       admins: [{
         userId: req.user.id,
         role: adminRole,
@@ -949,8 +954,22 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to update this label' });
     }
 
-    const updates = req.body;
+    const updates = { ...req.body };
+    
+    // Handle location separately to safely merge
+    let locationUpdate = null;
+    if (updates.location !== undefined) {
+      locationUpdate = mergeLocation(updates.location, label.location);
+      delete updates.location; // Remove from updates to handle separately
+    }
+    
+    // Apply all other updates
     Object.assign(label, updates);
+    
+    // Apply location update separately if provided
+    if (locationUpdate !== null) {
+      label.location = locationUpdate;
+    }
     
     await label.save();
 
