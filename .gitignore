@@ -45,6 +45,7 @@ generateToken.js
 
 # Scripts with hardcoded credentials
 tuneable-backend/scripts/copy-production-to-dev.js
+tuneable-backend/scripts/find-orphaned-bids.js
 
 # Editor / backup files
 *.backup
