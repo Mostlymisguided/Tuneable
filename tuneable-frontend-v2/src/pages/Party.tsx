@@ -2633,35 +2633,22 @@ const Party: React.FC = () => {
                         </button>
                       ))}
                     </div>
-                    
-                    {/* Refresh Button */}
-                    <div className="flex justify-center items-center gap-2 mt-4">
-                      <button
-                        onClick={handleRefresh}
-                        disabled={isRefreshing}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                        title="Refresh party data to see new tips"
-                      >
-                        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                      </button>
-                    </div>
                   </div>
                 )}
 
-                {/* Refresh Button and Show Vetoed Toggle - Always visible for Host/Admin */}
-                {(isHost || user?.role?.includes('admin')) && (
-                  <div className="flex justify-center items-center gap-2 mb-6">
-                    <button
-                      onClick={handleRefresh}
-                      disabled={isRefreshing}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                      title="Refresh party data to see new tips"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                      <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                    </button>
-                    {/* Show Vetoed Media Toggle */}
+                {/* Refresh Button - Always visible for everyone */}
+                <div className="flex justify-center items-center gap-2 mb-6">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                    title="Refresh party data to see new tips"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                  </button>
+                  {/* Show Vetoed Media Toggle - Only visible for Host/Admin */}
+                  {(isHost || user?.role?.includes('admin')) && (
                     <button
                       onClick={() => setShowVetoed(!showVetoed)}
                       className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -2678,8 +2665,8 @@ const Party: React.FC = () => {
                         </span>
                       )}
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Media Queue - Show when NOT viewing vetoed */}
                 {!showVetoed && getDisplayMedia().length > 0 && (
