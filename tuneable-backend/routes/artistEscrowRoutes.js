@@ -20,6 +20,15 @@ router.get('/info', authMiddleware, async (req, res) => {
       escrow: {
         balance: escrowInfo.balance, // In pence
         balancePounds: escrowInfo.balancePounds,
+        totalEscrowEarned: escrowInfo.totalEscrowEarned, // In pence
+        totalEscrowEarnedPounds: escrowInfo.totalEscrowEarnedPounds,
+        lastPayoutTotalEarned: escrowInfo.lastPayoutTotalEarned, // In pence
+        lastPayoutTotalEarnedPounds: escrowInfo.lastPayoutTotalEarnedPounds,
+        isFirstPayout: escrowInfo.isFirstPayout,
+        payoutEligible: escrowInfo.payoutEligible,
+        payoutEligibilityReason: escrowInfo.payoutEligibilityReason,
+        remainingToEligible: escrowInfo.remainingToEligible, // In pence
+        remainingToEligiblePounds: escrowInfo.remainingToEligiblePounds,
         history: escrowInfo.history,
         unclaimedAllocations: escrowInfo.unclaimedAllocations
       }
@@ -116,7 +125,7 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
     const userId = req.user._id;
     const { amount, payoutMethod, payoutDetails } = req.body;
     
-    const user = await User.findById(userId).select('artistEscrowBalance username email creatorProfile');
+    const user = await User.findById(userId).select('artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned username email creatorProfile');
     
     if (!user) {
       return res.status(404).json({
@@ -148,6 +157,54 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
         success: false,
         error: 'Minimum payout amount is £1.00'
       });
+    }
+    
+    // Payout eligibility thresholds (in pence)
+    const FIRST_PAYOUT_THRESHOLD = 3300; // £33.00 - must earn this much before first payout
+    const SUBSEQUENT_PAYOUT_INTERVAL = 1000; // £10.00 - must earn this much more for subsequent payouts
+    
+    const totalEscrowEarned = user.totalEscrowEarned || 0;
+    const lastPayoutTotalEarned = user.lastPayoutTotalEarned || 0;
+    const isFirstPayout = lastPayoutTotalEarned === 0;
+    
+    // Check payout eligibility
+    if (isFirstPayout) {
+      // First payout: must have earned at least £33 total
+      if (totalEscrowEarned < FIRST_PAYOUT_THRESHOLD) {
+        const remaining = FIRST_PAYOUT_THRESHOLD - totalEscrowEarned;
+        return res.status(400).json({
+          success: false,
+          error: `First payout requires earning at least £33.00 in total tips. You have earned £${(totalEscrowEarned / 100).toFixed(2)} so far. You need to earn £${(remaining / 100).toFixed(2)} more before your first payout.`,
+          totalEscrowEarned: totalEscrowEarned,
+          totalEscrowEarnedPounds: totalEscrowEarned / 100,
+          requiredThreshold: FIRST_PAYOUT_THRESHOLD,
+          requiredThresholdPounds: FIRST_PAYOUT_THRESHOLD / 100,
+          remaining: remaining,
+          remainingPounds: remaining / 100,
+          isFirstPayout: true
+        });
+      }
+    } else {
+      // Subsequent payout: must have earned at least £10 more since last payout
+      const earnedSinceLastPayout = totalEscrowEarned - lastPayoutTotalEarned;
+      if (earnedSinceLastPayout < SUBSEQUENT_PAYOUT_INTERVAL) {
+        const remaining = SUBSEQUENT_PAYOUT_INTERVAL - earnedSinceLastPayout;
+        return res.status(400).json({
+          success: false,
+          error: `Subsequent payouts require earning at least £10.00 more since your last payout. You have earned £${(earnedSinceLastPayout / 100).toFixed(2)} since your last payout. You need to earn £${(remaining / 100).toFixed(2)} more.`,
+          totalEscrowEarned: totalEscrowEarned,
+          totalEscrowEarnedPounds: totalEscrowEarned / 100,
+          lastPayoutTotalEarned: lastPayoutTotalEarned,
+          lastPayoutTotalEarnedPounds: lastPayoutTotalEarned / 100,
+          earnedSinceLastPayout: earnedSinceLastPayout,
+          earnedSinceLastPayoutPounds: earnedSinceLastPayout / 100,
+          requiredInterval: SUBSEQUENT_PAYOUT_INTERVAL,
+          requiredIntervalPounds: SUBSEQUENT_PAYOUT_INTERVAL / 100,
+          remaining: remaining,
+          remainingPounds: remaining / 100,
+          isFirstPayout: false
+        });
+      }
     }
     
     // Check for existing pending request
@@ -456,7 +513,7 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
     }
     
     // Fetch fresh user data to ensure we have latest balance
-    const user = await User.findById(payoutRequest.userId).select('username email artistEscrowBalance artistEscrowHistory creatorProfile');
+    const user = await User.findById(payoutRequest.userId).select('username email artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory creatorProfile');
     
     if (!user) {
       return res.status(404).json({
@@ -471,6 +528,7 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
       // Use atomic update to prevent race conditions - deduct balance atomically
       // This ensures balance is sufficient and update happens in one operation
       const balanceBefore = user.artistEscrowBalance || 0;
+      const totalEscrowEarned = user.totalEscrowEarned || 0;
       
       const updatedUser = await User.findOneAndUpdate(
         { 
@@ -478,9 +536,10 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
           artistEscrowBalance: { $gte: requestedAmount } // Only update if balance is sufficient
         },
         { 
-          $inc: { artistEscrowBalance: -requestedAmount } // Atomic decrement
+          $inc: { artistEscrowBalance: -requestedAmount }, // Atomic decrement
+          $set: { lastPayoutTotalEarned: totalEscrowEarned } // Update last payout total earned to current total
         },
-        { new: true, select: 'artistEscrowBalance artistEscrowHistory username email creatorProfile' }
+        { new: true, select: 'artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory username email creatorProfile' }
       );
       
       if (!updatedUser) {

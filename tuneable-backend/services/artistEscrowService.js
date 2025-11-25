@@ -160,7 +160,10 @@ class ArtistEscrowService {
       : 'Unknown Artist';
     
     await User.findByIdAndUpdate(userId, {
-      $inc: { artistEscrowBalance: validatedAmount },
+      $inc: { 
+        artistEscrowBalance: validatedAmount,
+        totalEscrowEarned: validatedAmount // Track cumulative earnings for payout eligibility
+      },
       $push: {
         artistEscrowHistory: {
           mediaId: mediaId,
@@ -327,7 +330,7 @@ class ArtistEscrowService {
   async getEscrowInfo(userId) {
     try {
       const user = await User.findById(userId)
-        .select('artistEscrowBalance artistEscrowHistory')
+        .select('artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory')
         .populate('artistEscrowHistory.mediaId', 'title artist coverArt')
         .populate('artistEscrowHistory.bidId', 'amount createdAt');
       
@@ -344,9 +347,51 @@ class ArtistEscrowService {
         .populate('bidId', 'amount createdAt')
         .sort({ allocatedAt: -1 });
       
+      // Calculate payout eligibility
+      const FIRST_PAYOUT_THRESHOLD = 3300; // £33.00 in pence
+      const SUBSEQUENT_PAYOUT_INTERVAL = 1000; // £10.00 in pence
+      
+      const totalEscrowEarned = user.totalEscrowEarned || 0;
+      const lastPayoutTotalEarned = user.lastPayoutTotalEarned || 0;
+      const isFirstPayout = lastPayoutTotalEarned === 0;
+      
+      let payoutEligible = false;
+      let payoutEligibilityReason = '';
+      let remainingToEligible = 0;
+      
+      if (isFirstPayout) {
+        // First payout: must have earned at least £33 total
+        if (totalEscrowEarned >= FIRST_PAYOUT_THRESHOLD) {
+          payoutEligible = true;
+          payoutEligibilityReason = 'You are eligible for your first payout.';
+        } else {
+          remainingToEligible = FIRST_PAYOUT_THRESHOLD - totalEscrowEarned;
+          payoutEligibilityReason = `First payout requires earning at least £${(FIRST_PAYOUT_THRESHOLD / 100).toFixed(2)} in total tips. You need to earn £${(remainingToEligible / 100).toFixed(2)} more.`;
+        }
+      } else {
+        // Subsequent payout: must have earned at least £10 more since last payout
+        const earnedSinceLastPayout = totalEscrowEarned - lastPayoutTotalEarned;
+        if (earnedSinceLastPayout >= SUBSEQUENT_PAYOUT_INTERVAL) {
+          payoutEligible = true;
+          payoutEligibilityReason = 'You are eligible for another payout.';
+        } else {
+          remainingToEligible = SUBSEQUENT_PAYOUT_INTERVAL - earnedSinceLastPayout;
+          payoutEligibilityReason = `Subsequent payouts require earning at least £${(SUBSEQUENT_PAYOUT_INTERVAL / 100).toFixed(2)} more since your last payout. You need to earn £${(remainingToEligible / 100).toFixed(2)} more.`;
+        }
+      }
+      
       return {
         balance: user.artistEscrowBalance || 0, // In pence
         balancePounds: (user.artistEscrowBalance || 0) / 100,
+        totalEscrowEarned: totalEscrowEarned, // In pence
+        totalEscrowEarnedPounds: totalEscrowEarned / 100,
+        lastPayoutTotalEarned: lastPayoutTotalEarned, // In pence
+        lastPayoutTotalEarnedPounds: lastPayoutTotalEarned / 100,
+        isFirstPayout: isFirstPayout,
+        payoutEligible: payoutEligible,
+        payoutEligibilityReason: payoutEligibilityReason,
+        remainingToEligible: remainingToEligible, // In pence
+        remainingToEligiblePounds: remainingToEligible / 100,
         history: user.artistEscrowHistory || [],
         unclaimedAllocations: unclaimedAllocations.map(a => ({
           _id: a._id,

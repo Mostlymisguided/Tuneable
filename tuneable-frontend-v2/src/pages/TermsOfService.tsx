@@ -361,7 +361,9 @@ const TermsOfService: React.FC = () => {
                 <h3 className="text-xl font-medium text-gray-900">8.5 Payment Schedule</h3>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Payouts to artists are processed manually upon request</li>
-                  <li>Minimum payout threshold: £1.00 GBP</li>
+                  <li>Minimum payout amount: £1.00 GBP per request</li>
+                  <li>First payout eligibility: Requires earning at least £33.00 in total tips (see section 8.7.6)</li>
+                  <li>Subsequent payout eligibility: Requires earning at least £10.00 more since last payout (see section 8.7.6)</li>
                   <li>You will receive detailed statements showing your revenue breakdown</li>
                   <li>Payment methods will be determined at the time of first payout</li>
                 </ul>
@@ -448,7 +450,21 @@ const TermsOfService: React.FC = () => {
                   according to our escrow terms.
                 </p>
 
-                <h3 className="text-xl font-medium text-gray-900">8.7.6 Unclaimed Funds</h3>
+                <h3 className="text-xl font-medium text-gray-900">8.7.6 Payout Eligibility Thresholds</h3>
+                <p className="mb-2">
+                  To help buffer beta user credits and ensure sustainable payout processing, Tuneable has implemented payout eligibility thresholds:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li><strong>First Payout:</strong> Artists must earn at least £33.00 in total tips before requesting their first payout. This threshold helps ensure that payouts reflect genuine engagement and support from the community.</li>
+                  <li><strong>Subsequent Payouts:</strong> After the first payout, artists can request additional payouts once they have earned at least £10.00 more in tips since their last payout. This interval helps balance artist cash flow needs with administrative efficiency.</li>
+                  <li><strong>Minimum Payout Amount:</strong> Each payout request must be for at least £1.00 GBP (as outlined in section 8.5).</li>
+                  <li><strong>Eligibility Tracking:</strong> Your total escrow earnings are tracked cumulatively. You can view your current earnings, eligibility status, and remaining amount needed for payout eligibility in your artist escrow dashboard.</li>
+                </ul>
+                <p className="mb-2">
+                  These thresholds apply to all payout requests and help ensure that the platform can sustainably process payouts while preventing abuse of beta user credits. Thresholds may be adjusted with 30 days notice to accommodate platform scaling.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">8.7.7 Unclaimed Funds</h3>
                 <p className="mb-2">
                   After the 3-year escrow period, if funds remain unclaimed:
                 </p>

@@ -24,6 +24,15 @@ import { penceToPounds } from '../utils/currency';
 interface EscrowInfo {
   balance: number;
   balancePounds: number;
+  totalEscrowEarned?: number;
+  totalEscrowEarnedPounds?: number;
+  lastPayoutTotalEarned?: number;
+  lastPayoutTotalEarnedPounds?: number;
+  isFirstPayout?: boolean;
+  payoutEligible?: boolean;
+  payoutEligibilityReason?: string;
+  remainingToEligible?: number;
+  remainingToEligiblePounds?: number;
   history: Array<{
     mediaId: string | { _id: string; title: string; coverArt?: string };
     bidId: string | { _id: string; amount: number; createdAt: string };
@@ -351,7 +360,7 @@ const ArtistEscrowDashboard: React.FC = () => {
         {/* Balance Card */}
         <div className="bg-purple-800/50 rounded-lg p-6 mb-6 backdrop-blur-sm">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <div className="flex items-center space-x-2 mb-2">
                 <Coins className="h-6 w-6 text-yellow-400" />
                 <h2 className="text-xl font-semibold">Escrow Balance</h2>
@@ -362,32 +371,100 @@ const ArtistEscrowDashboard: React.FC = () => {
               <p className="text-sm text-gray-300 mt-2">
                 {escrowInfo.history.length} allocation{escrowInfo.history.length !== 1 ? 's' : ''} in history
               </p>
+              {escrowInfo.totalEscrowEarned !== undefined && (
+                <p className="text-sm text-gray-400 mt-1">
+                  Total earned: {penceToPounds(escrowInfo.totalEscrowEarned)}
+                </p>
+              )}
             </div>
             {hasBalance && (
-              <button
-                onClick={() => setShowPayoutModal(true)}
-                disabled={isRequestingPayout}
-                className="px-6 py-3 bg-yellow-500 text-gray-900 font-semibold rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {isRequestingPayout ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Coins className="h-5 w-5" />
-                    <span>Request Payout</span>
-                  </>
+              <div className="flex flex-col items-end space-y-2">
+                <button
+                  onClick={() => setShowPayoutModal(true)}
+                  disabled={isRequestingPayout || !escrowInfo.payoutEligible}
+                  className="px-6 py-3 bg-yellow-500 text-gray-900 font-semibold rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isRequestingPayout ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="h-5 w-5" />
+                      <span>Request Payout</span>
+                    </>
+                  )}
+                </button>
+                {!escrowInfo.payoutEligible && escrowInfo.payoutEligibilityReason && (
+                  <p className="text-xs text-yellow-300 max-w-xs text-right">
+                    {escrowInfo.payoutEligibilityReason}
+                  </p>
                 )}
-              </button>
+              </div>
             )}
           </div>
         </div>
 
+        {/* Payout Eligibility Banner */}
+        {escrowInfo.payoutEligible !== undefined && (
+          <div className={`rounded-lg p-4 mb-6 backdrop-blur-sm ${
+            escrowInfo.payoutEligible 
+              ? 'bg-green-900/50 border border-green-500' 
+              : 'bg-yellow-900/50 border border-yellow-500'
+          }`}>
+            <div className="flex items-start space-x-3">
+              {escrowInfo.payoutEligible ? (
+                <CheckCircle className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <h3 className={`font-semibold mb-1 ${
+                  escrowInfo.payoutEligible ? 'text-green-300' : 'text-yellow-300'
+                }`}>
+                  {escrowInfo.payoutEligible ? 'Payout Eligible' : 'Payout Not Yet Eligible'}
+                </h3>
+                <p className="text-sm text-gray-300 mb-2">
+                  {escrowInfo.payoutEligibilityReason}
+                </p>
+                {!escrowInfo.payoutEligible && escrowInfo.remainingToEligible !== undefined && escrowInfo.remainingToEligible > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-400">Progress to eligibility:</span>
+                      <span className="text-yellow-400 font-semibold">
+                        {penceToPounds(escrowInfo.remainingToEligible)} remaining
+                      </span>
+                    </div>
+                    {escrowInfo.isFirstPayout ? (
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-yellow-500 h-2 rounded-full transition-all"
+                          style={{ 
+                            width: `${Math.min(100, ((escrowInfo.totalEscrowEarned || 0) / 3300) * 100)}%` 
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-yellow-500 h-2 rounded-full transition-all"
+                          style={{ 
+                            width: `${Math.min(100, (((escrowInfo.totalEscrowEarned || 0) - (escrowInfo.lastPayoutTotalEarned || 0)) / 1000) * 100)}%` 
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Payout Request Modal */}
         {showPayoutModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
             <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
               <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-white">Request Payout</h2>

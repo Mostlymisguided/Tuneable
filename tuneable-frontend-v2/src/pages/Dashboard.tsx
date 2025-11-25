@@ -810,7 +810,7 @@ Join here: ${inviteLink}`.trim();
       
       <div className="mb-8">
         <h1 className="text-3xl text-center font-bold text-gray-300">
-          Welcome back, {user?.username}!
+          Welcome {user?.username}!
         </h1>
         <p className="text-center text-gray-400 mt-2">
           Ready to create some amazing music experiences?

@@ -93,9 +93,7 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
           <h3 className="text-lg font-bold text-yellow-200 mb-2">
             🚧 Tuneable is in Beta Testing 🚧
           </h3>
-          <p className="text-xs text-yellow-100/90 leading-relaxed"> 
-              Please report any features not working as expected.
-            </p>
+            <div className="flex items-center space-x-4 mt-3">
               <Link 
                 to="/about" 
                 className="text-yellow-300 hover:text-yellow-100 underline inline-flex items-center"
@@ -103,7 +101,6 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
                 Learn More
               </Link>
             </div>
-          </div>
         </div>
         {dismissible && (
           <button

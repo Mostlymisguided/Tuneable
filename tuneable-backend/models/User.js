@@ -57,6 +57,16 @@ const userSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending', 'claimed'], default: 'pending' },
     _id: false
   }],
+  totalEscrowEarned: { 
+    type: Number, 
+    default: 0 
+  }, // Cumulative total escrow earned in PENCE (integer) - tracks all-time earnings for payout eligibility
+  // Example: 3300 represents £33.00 total earned
+  lastPayoutTotalEarned: { 
+    type: Number, 
+    default: 0 
+  }, // Total escrow earned at the time of last payout in PENCE (integer) - used to calculate subsequent payout eligibility
+  // Example: 3300 means last payout was when total earned was £33.00
   stripeConnectAccountId: { 
     type: String 
   }, // For future Stripe Connect migration (Phase 2)
