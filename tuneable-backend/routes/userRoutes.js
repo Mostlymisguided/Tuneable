@@ -3848,4 +3848,366 @@ router.delete('/admin/users/:userId/warnings/:warningIndex', authMiddleware, adm
   }
 });
 
+// ========================================
+// ADMIN: REFUND REQUEST MANAGEMENT
+// ========================================
+
+/**
+ * @route   GET /api/users/admin/refunds
+ * @desc    Get all refund requests (admin only)
+ * @access  Private (admin only)
+ */
+router.get('/admin/refunds', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status, page = 1, limit = 50 } = req.query;
+    const RefundRequest = require('../models/RefundRequest');
+    const User = require('../models/User');
+    
+    const query = {};
+    if (status) {
+      query.status = status;
+    }
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const refundRequests = await RefundRequest.find(query)
+      .populate('userId', 'username email profilePic uuid')
+      .populate('bidId', 'amount createdAt status')
+      .populate('partyId', 'name type')
+      .populate('mediaId', 'title artist coverArt')
+      .sort({ requestedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await RefundRequest.countDocuments(query);
+    
+    const formattedRequests = refundRequests.map(request => ({
+      _id: request._id,
+      uuid: request.uuid,
+      bidId: request.bidId?._id,
+      userId: request.userId?._id,
+      user: request.userId ? {
+        _id: request.userId._id,
+        username: request.userId.username,
+        email: request.userId.email,
+        profilePic: request.userId.profilePic,
+        uuid: request.userId.uuid
+      } : null,
+      partyId: request.partyId?._id,
+      party: request.partyId ? {
+        _id: request.partyId._id,
+        name: request.partyId.name,
+        type: request.partyId.type
+      } : null,
+      mediaId: request.mediaId?._id,
+      media: request.mediaId ? {
+        _id: request.mediaId._id,
+        title: request.mediaId.title,
+        artist: request.mediaId.artist,
+        coverArt: request.mediaId.coverArt
+      } : null,
+      amount: request.amount,
+      amountPounds: request.amount / 100,
+      reason: request.reason,
+      status: request.status,
+      requestedAt: request.requestedAt,
+      processedBy: request.processedBy,
+      processedAt: request.processedAt,
+      rejectionReason: request.rejectionReason,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt
+    }));
+    
+    res.json({
+      success: true,
+      refunds: formattedRequests,
+      total: total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('Error fetching refund requests:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch refund requests',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/users/admin/refunds/:requestId/process
+ * @desc    Process a refund request (approve or reject)
+ * @access  Private (admin only)
+ */
+router.post('/admin/refunds/:requestId/process', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { status, rejectionReason } = req.body;
+    const adminId = req.user._id;
+    
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required and must be "approved" or "rejected"'
+      });
+    }
+    
+    const RefundRequest = require('../models/RefundRequest');
+    const Bid = require('../models/Bid');
+    const User = require('../models/User');
+    const Media = require('../models/Media');
+    const Party = require('../models/Party');
+    const bidMetricsEngine = require('../services/bidMetricsEngine');
+    const artistEscrowService = require('../services/artistEscrowService');
+    const notificationService = require('../services/notificationService');
+    
+    // Find the refund request
+    const refundRequest = await RefundRequest.findById(requestId)
+      .populate('userId', 'username email balance')
+      .populate('bidId')
+      .populate('partyId')
+      .populate('mediaId');
+    
+    if (!refundRequest) {
+      return res.status(404).json({
+        success: false,
+        error: 'Refund request not found'
+      });
+    }
+    
+    if (refundRequest.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: `Refund request is already ${refundRequest.status}`
+      });
+    }
+    
+    const bid = refundRequest.bidId;
+    const user = refundRequest.userId;
+    const media = refundRequest.mediaId;
+    const party = refundRequest.partyId;
+    
+    if (status === 'approved') {
+      // Check if bid is still active
+      if (bid.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          error: `Bid is already ${bid.status}`
+        });
+      }
+      
+      // Refund the bid amount to user balance
+      const refundAmount = refundRequest.amount; // Already in pence
+      user.balance = (user.balance || 0) + refundAmount;
+      await user.save();
+      
+      // Update bid status
+      bid.status = 'refunded';
+      bid.refundedAt = new Date();
+      bid.refundedBy = adminId; // Admin processed the refund
+      bid.refundReason = `Admin approved refund request: ${refundRequest.reason}`;
+      await bid.save();
+      
+      // Reverse escrow allocation if possible
+      try {
+        const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
+        const escrowAllocation = await ArtistEscrowAllocation.findOne({ bidId: bid._id });
+        
+        if (escrowAllocation) {
+          if (!escrowAllocation.claimed) {
+            // Reverse unclaimed allocation
+            await escrowAllocation.remove();
+            console.log(`✅ Reversed unclaimed escrow allocation for bid ${bid._id}`);
+          } else if (escrowAllocation.claimed && escrowAllocation.artistUserId) {
+            // Escrow was claimed by a registered artist - try to reverse from their balance
+            const artistUser = await User.findById(escrowAllocation.artistUserId);
+            if (artistUser && artistUser.artistEscrowBalance > 0) {
+              const userShare = escrowAllocation.allocatedAmount; // Use the actual allocated amount
+              if (artistUser.artistEscrowBalance >= userShare) {
+                artistUser.artistEscrowBalance -= userShare;
+                artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - userShare);
+                
+                // Update artistEscrowHistory - mark the entry for this bid as claimed/processed
+                if (artistUser.artistEscrowHistory && artistUser.artistEscrowHistory.length > 0) {
+                  const historyEntry = artistUser.artistEscrowHistory.find(
+                    entry => entry.bidId && entry.bidId.toString() === bid._id.toString()
+                  );
+                  if (historyEntry && historyEntry.status === 'pending') {
+                    historyEntry.status = 'claimed';
+                    historyEntry.claimedAt = new Date();
+                  }
+                }
+                
+                await artistUser.save();
+                console.log(`✅ Reversed escrow from artist balance for bid ${bid._id}`);
+              } else {
+                console.log(`⚠️  Insufficient escrow balance to reverse - requires admin review`);
+              }
+            }
+          } else {
+            // Escrow was claimed but no artistUserId - flag for admin review
+            console.log(`⚠️  Escrow already claimed for bid ${bid._id} - requires admin review`);
+          }
+        } else {
+          // No escrow allocation found - escrow may have been allocated directly to registered artist
+          // Check media owners to find registered artists who received escrow
+          const mediaWithOwners = await Media.findById(bid.mediaId).select('mediaOwners');
+          if (mediaWithOwners && mediaWithOwners.mediaOwners) {
+            const userShare = Math.round(refundAmount * 0.70); // 70% artist share
+            for (const owner of mediaWithOwners.mediaOwners) {
+              if (owner.userId) {
+                const artistUser = await User.findById(owner.userId);
+                if (artistUser && artistUser.artistEscrowBalance > 0) {
+                  const ownerShare = Math.round(userShare * (owner.percentage / 100));
+                  if (artistUser.artistEscrowBalance >= ownerShare) {
+                    artistUser.artistEscrowBalance -= ownerShare;
+                    artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - ownerShare);
+                    
+                    // Update artistEscrowHistory - mark the entry for this bid as claimed/processed
+                    if (artistUser.artistEscrowHistory && artistUser.artistEscrowHistory.length > 0) {
+                      const historyEntry = artistUser.artistEscrowHistory.find(
+                        entry => entry.bidId && entry.bidId.toString() === bid._id.toString()
+                      );
+                      if (historyEntry && historyEntry.status === 'pending') {
+                        historyEntry.status = 'claimed';
+                        historyEntry.claimedAt = new Date();
+                      }
+                    }
+                    
+                    await artistUser.save();
+                    console.log(`✅ Reversed escrow from artist ${artistUser.username} balance for bid ${bid._id}`);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (escrowError) {
+        console.error('Error reversing escrow allocation:', escrowError);
+        // Don't fail the refund if escrow reversal fails - flag for admin review
+      }
+      
+      // Update metrics
+      try {
+        await bidMetricsEngine.updateMetricsForBidChange({
+          _id: bid._id,
+          userId: bid.userId,
+          mediaId: bid.mediaId,
+          partyId: bid.partyId,
+          amount: bid.amount
+        }, 'delete');
+      } catch (metricsError) {
+        console.error('Error updating metrics after refund:', metricsError);
+      }
+      
+      // Remove bid from party media entry
+      if (party) {
+        const mediaIndex = party.media.findIndex(entry => {
+          const entryMediaId = entry.mediaId?._id ? entry.mediaId._id.toString() : entry.mediaId?.toString();
+          return entryMediaId === bid.mediaId.toString();
+        });
+        
+        if (mediaIndex !== -1) {
+          const mediaEntry = party.media[mediaIndex];
+          mediaEntry.partyBids = mediaEntry.partyBids.filter(
+            bidRef => bidRef.toString() !== bid._id.toString()
+          );
+          await party.save();
+        }
+      }
+      
+      // Update refund request
+      refundRequest.status = 'approved';
+      refundRequest.processedBy = adminId;
+      refundRequest.processedAt = new Date();
+      await refundRequest.save();
+      
+      // Notify user
+      try {
+        await notificationService.createNotification({
+          userId: user._id,
+          type: 'refund_approved',
+          title: 'Refund Approved',
+          message: `Your refund request of £${(refundAmount / 100).toFixed(2)} for "${bid.mediaTitle}" has been approved.`,
+          link: '/wallet',
+          linkText: 'View Wallet',
+          relatedBidId: bid._id,
+          relatedMediaId: bid.mediaId
+        });
+      } catch (notifError) {
+        console.error('Failed to send refund approval notification:', notifError);
+      }
+      
+      console.log(`✅ Admin ${req.user.username} approved refund request ${requestId}: £${(refundAmount / 100).toFixed(2)}`);
+      
+      res.json({
+        success: true,
+        message: 'Refund approved and processed',
+        refundRequest: {
+          _id: refundRequest._id,
+          status: refundRequest.status,
+          processedAt: refundRequest.processedAt
+        },
+        refundAmount: refundAmount,
+        refundAmountPounds: refundAmount / 100
+      });
+      
+    } else {
+      // Rejected
+      if (rejectionReason && !rejectionReason.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Rejection reason is required when rejecting a refund request'
+        });
+      }
+      
+      // Update refund request
+      refundRequest.status = 'rejected';
+      refundRequest.processedBy = adminId;
+      refundRequest.processedAt = new Date();
+      refundRequest.rejectionReason = rejectionReason?.trim() || 'Refund request rejected';
+      await refundRequest.save();
+      
+      // Notify user
+      try {
+        await notificationService.createNotification({
+          userId: user._id,
+          type: 'refund_rejected',
+          title: 'Refund Request Rejected',
+          message: `Your refund request of £${(refundRequest.amount / 100).toFixed(2)} for "${bid.mediaTitle}" has been rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+          link: '/wallet',
+          linkText: 'View Wallet',
+          relatedBidId: bid._id,
+          relatedMediaId: bid.mediaId
+        });
+      } catch (notifError) {
+        console.error('Failed to send refund rejection notification:', notifError);
+      }
+      
+      console.log(`❌ Admin ${req.user.username} rejected refund request ${requestId}`);
+      
+      res.json({
+        success: true,
+        message: 'Refund request rejected',
+        refundRequest: {
+          _id: refundRequest._id,
+          status: refundRequest.status,
+          processedAt: refundRequest.processedAt,
+          rejectionReason: refundRequest.rejectionReason
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error processing refund request:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process refund request',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

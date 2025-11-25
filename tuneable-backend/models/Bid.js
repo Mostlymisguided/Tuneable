@@ -127,6 +127,18 @@ const bidSchema = new mongoose.Schema({
     vetoedAt: { type: Date }, // Timestamp when bid was vetoed
     
     // ========================================
+    // REFUND TRACKING
+    // ========================================
+    refundedAt: { type: Date }, // Timestamp when bid was refunded
+    refundedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }, // User who processed the refund (user themselves for instant, admin for processed)
+    refundReason: { type: String }, // Reason for refund (user-provided or admin note)
+    refundRequestedAt: { type: Date }, // Timestamp when refund was requested (if after time window)
+    refundRequestReason: { type: String }, // User's reason for requesting refund
+    
+    // ========================================
     // DYNAMIC METRICS (computed via BidMetricsEngine)
     // ========================================
     // Note: Aggregate values are now computed dynamically using the

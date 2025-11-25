@@ -847,7 +847,7 @@ const SearchPage: React.FC = () => {
                         className="w-full btn-primary flex items-center justify-center space-x-1 text-sm"
                       >
                         <Plus className="h-4 w-4" />
-                        <span>Bid & Add</span>
+                        <span>Tip & Add</span>
                       </button>
                     </div>
                   </div>

@@ -17,7 +17,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
@@ -1386,40 +1386,141 @@ const Party: React.FC = () => {
     setShowBidConfirmationModal(true);
   };
 
-  const handleVetoClick = async (media: any) => {
+  // Action modal state (for X button - veto/remove tip/request refund/report)
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [selectedMediaForAction, setSelectedMediaForAction] = useState<any>(null);
+  const [selectedBidForAction, setSelectedBidForAction] = useState<any>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  const handleActionButtonClick = (media: any) => {
     const mediaData = media.mediaId || media;
-    const mediaId = mediaData._id || mediaData.id || mediaData.uuid;
-    const isAdmin = user?.role?.includes('admin');
+    const userBid = getUserBid(media);
+    setSelectedMediaForAction(media);
+    setSelectedBidForAction(userBid);
+    setShowActionModal(true);
+  };
+
+  const handleRemoveTip = async () => {
+    if (!partyId || !selectedBidForAction?._id) return;
     
-    if (!isHost && !isAdmin) {
-      toast.error('Only the host or admin can veto media');
+    try {
+      setIsProcessingAction(true);
+      await partyAPI.removeTip(partyId, selectedBidForAction._id);
+      toast.success(`Tip of £${(selectedBidForAction.amount / 100).toFixed(2)} removed and refunded`);
+      
+      // Refresh party data and user balance
+      await fetchPartyDetails();
+      if (updateBalance) {
+        await updateBalance();
+      }
+      
+      setShowActionModal(false);
+      setSelectedMediaForAction(null);
+      setSelectedBidForAction(null);
+    } catch (error: any) {
+      console.error('Error removing tip:', error);
+      
+      if (error.response?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+        return;
+      }
+      
+      // If instant removal window expired, show error and keep modal open
+      if (error.response?.data?.useRefundRequest) {
+        toast.error('Instant removal window has expired. Please use the refund request option below.');
+        return;
+      }
+      
+      toast.error(error.response?.data?.error || 'Failed to remove tip');
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleRequestRefund = async () => {
+    if (!refundReason.trim()) {
+      toast.error('Please provide a reason for the refund request');
       return;
     }
 
-    try {
-      const confirmationMessage = `Are you sure you want to veto "${mediaData.title || 'this media'}"? All tips will be refunded to users.`;
-      if (!window.confirm(confirmationMessage)) return;
+    if (!partyId || !selectedBidForAction?._id) return;
 
+    try {
+      setIsProcessingAction(true);
+      await partyAPI.requestRefund(partyId, selectedBidForAction._id, refundReason.trim());
+      toast.success('Refund request submitted. You will be notified when it is processed.');
+      
+      setShowActionModal(false);
+      setSelectedMediaForAction(null);
+      setSelectedBidForAction(null);
+      setRefundReason('');
+      
+      // Refresh party data
+      await fetchPartyDetails();
+    } catch (error: any) {
+      console.error('Error requesting refund:', error);
+      
+      if (error.response?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+        return;
+      }
+      
+      toast.error(error.response?.data?.error || 'Failed to request refund');
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleVetoFromModal = async () => {
+    if (!selectedMediaForAction) return;
+    
+    const mediaData = selectedMediaForAction.mediaId || selectedMediaForAction;
+    const mediaId = mediaData._id || mediaData.id || mediaData.uuid;
+    
+    try {
+      setIsProcessingAction(true);
       const vetoReason = window.prompt('Optional: provide a reason for the veto (leave blank to skip).')?.trim();
 
-      // Veto the media (sets status to 'vetoed' and refunds bids/tips)
       await partyAPI.vetoMedia(partyId!, mediaId, vetoReason || undefined);
       toast.success('Media vetoed and tips refunded');
+      
+      setShowActionModal(false);
+      setSelectedMediaForAction(null);
+      setSelectedBidForAction(null);
       
       // Refresh party data
       await fetchPartyDetails();
     } catch (error: any) {
       console.error('Error vetoing media:', error);
       
-      // Handle 401 Unauthorized errors with a more helpful message
       if (error.response?.status === 401) {
         toast.error('Your session has expired. Please log in again.');
-        // The API interceptor will handle the redirect to login
         return;
       }
       
       toast.error(error.response?.data?.error || 'Failed to veto media');
+    } finally {
+      setIsProcessingAction(false);
     }
+  };
+
+  // Helper function to get user's bid on a media item
+  const getUserBid = (media: any) => {
+    if (!user?._id) return null;
+    const bids = media.bids || media.mediaId?.bids || [];
+    return bids.find((bid: any) => {
+      const bidUserId = bid.userId?._id || bid.userId;
+      return bidUserId === user._id && bid.status === 'active';
+    });
+  };
+
+  // Helper function to check if bid is within 10-minute window
+  const isWithinRemovalWindow = (bid: any) => {
+    if (!bid?.createdAt) return false;
+    const timeSinceBid = Date.now() - new Date(bid.createdAt).getTime();
+    const INSTANT_REMOVAL_WINDOW = 10 * 60 * 1000; // 10 minutes
+    return timeSinceBid <= INSTANT_REMOVAL_WINDOW;
   };
   
   const handleUnvetoClick = async (media: any) => {
@@ -2121,15 +2222,15 @@ const Party: React.FC = () => {
                                     key={`queue-search-${mediaData.id || mediaData._id}-${index}`}
                                     className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 pt-8 md:pt-4"
                                   >
-                                    {/* Admin Veto Button - Top Right */}
-                                    {isAdmin && (
+                                    {/* Action Button - Top Right (opens modal with available actions) */}
+                                    {(isHost || isAdmin || getUserBid(item)) && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleVetoClick(item);
+                                          handleActionButtonClick(item);
                                         }}
-                                        className="absolute top-2 right-2 z-20 p-1 md:p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
-                                        title="Veto this tune (Admin Only)"
+                                        className="absolute top-2 right-2 z-20 p-1 md:p-1.5 bg-gray-700/80 hover:bg-gray-600 text-white rounded-md transition-colors shadow-lg"
+                                        title="Actions"
                                       >
                                         <X className="h-3 w-3 md:h-4 md:w-4" />
                                       </button>
@@ -2698,15 +2799,15 @@ const Party: React.FC = () => {
                             key={`queued-${mediaData.id}-${index}`}
                             className="card flex flex-col md:flex-row md:items-center hover:shadow-2xl relative p-1.5 md:p-4 pt-8"
                           >
-                            {/* Admin Veto Button - Top Right */}
-                            {isAdmin && (
+                            {/* Action Button - Top Right (opens modal with available actions) */}
+                            {(isHost || isAdmin || getUserBid(item)) && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleVetoClick(item);
+                                  handleActionButtonClick(item);
                                 }}
-                                className="absolute top-2 right-2 z-20 p-1 md:p-1.5 border hover:bg-red-600 text-white rounded-md transition-colors shadow-lg"
-                                title="Veto this tune (Admin Only)"
+                                className="absolute top-2 right-2 z-20 p-1 md:p-1.5 border hover:bg-gray-600 text-white rounded-md transition-colors shadow-lg"
+                                title="Actions"
                               >
                                 <X className="h-2 w-2 md:h-4 md:w-4" />
                               </button>
@@ -3368,6 +3469,195 @@ const Party: React.FC = () => {
         category={validationCategory}
         duration={validationDuration}
       />
+
+      {/* Action Modal (Veto/Remove Tip/Request Refund/Report) */}
+      {showActionModal && selectedMediaForAction && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full border border-gray-700">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white">Media Actions</h2>
+                <button
+                  onClick={() => {
+                    setShowActionModal(false);
+                    setSelectedMediaForAction(null);
+                    setSelectedBidForAction(null);
+                    setRefundReason('');
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  disabled={isProcessingAction}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {(() => {
+                const mediaData = selectedMediaForAction.mediaId || selectedMediaForAction;
+                const isAdmin = user?.role?.includes('admin');
+                const userBid = selectedBidForAction;
+                const canRemoveInstantly = userBid && isWithinRemovalWindow(userBid);
+                const canRequestRefund = userBid && !canRemoveInstantly;
+
+                return (
+                  <div className="space-y-4">
+                    {/* Media Info */}
+                    <div className="mb-4">
+                      <p className="text-gray-300 font-medium">{mediaData.title || 'Unknown Media'}</p>
+                      <p className="text-sm text-gray-400">
+                        {Array.isArray(mediaData.artist) 
+                          ? mediaData.artist[0]?.name || 'Unknown Artist'
+                          : mediaData.artist || 'Unknown Artist'}
+                      </p>
+                    </div>
+
+                    {/* Host/Admin: Veto Option */}
+                    {(isHost || isAdmin) && (
+                      <div className="border-t border-gray-700 pt-4">
+                        <h3 className="text-sm font-semibold text-gray-400 mb-2 uppercase">Host/Admin Actions</h3>
+                        <button
+                          onClick={handleVetoFromModal}
+                          disabled={isProcessingAction}
+                          className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                        >
+                          {isProcessingAction ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span>Processing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <X className="h-5 w-5" />
+                              <span>Veto Media</span>
+                            </>
+                          )}
+                        </button>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Veto this media and refund all tips to users
+                        </p>
+                      </div>
+                    )}
+
+                    {/* User: Remove Tip Option (within 10 minutes) */}
+                    {canRemoveInstantly && (
+                      <div className="border-t border-gray-700 pt-4">
+                        <h3 className="text-sm font-semibold text-gray-400 mb-2 uppercase">Your Tip</h3>
+                        <div className="mb-3">
+                          <p className="text-gray-300 mb-1">
+                            Your tip: <span className="font-semibold text-yellow-400">£{(userBid.amount / 100).toFixed(2)}</span>
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            You can remove your tip instantly within 10 minutes
+                          </p>
+                        </div>
+                        <button
+                          onClick={handleRemoveTip}
+                          disabled={isProcessingAction}
+                          className="w-full px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                        >
+                          {isProcessingAction ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span>Removing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <X className="h-5 w-5" />
+                              <span>Remove Tip</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* User: Request Refund Option (after 10 minutes) */}
+                    {canRequestRefund && (
+                      <div className="border-t border-gray-700 pt-4">
+                        <h3 className="text-sm font-semibold text-gray-400 mb-2 uppercase">Your Tip</h3>
+                        <div className="mb-3">
+                          <p className="text-gray-300 mb-1">
+                            Your tip: <span className="font-semibold text-yellow-400">£{(userBid.amount / 100).toFixed(2)}</span>
+                          </p>
+                          <p className="text-xs text-gray-400 mb-3">
+                            The 10-minute instant removal window has passed. You can request a refund which will be reviewed by administrators.
+                          </p>
+                        </div>
+                        <div className="mb-3">
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Reason for refund request *
+                          </label>
+                          <textarea
+                            value={refundReason}
+                            onChange={(e) => setRefundReason(e.target.value)}
+                            placeholder="Please explain why you're requesting a refund..."
+                            rows={3}
+                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                            disabled={isProcessingAction}
+                          />
+                        </div>
+                        <button
+                          onClick={handleRequestRefund}
+                          disabled={isProcessingAction || !refundReason.trim()}
+                          className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                        >
+                          {isProcessingAction ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span>Submitting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Coins className="h-5 w-5" />
+                              <span>Request Refund</span>
+                            </>
+                          )}
+                        </button>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Refund requests are typically processed within 3-5 business days
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Report Media Option (for all users) */}
+                    <div className="border-t border-gray-700 pt-4">
+                      <h3 className="text-sm font-semibold text-gray-400 mb-2 uppercase">Report</h3>
+                      <button
+                        onClick={() => {
+                          // TODO: Implement report media functionality
+                          toast.info('Report functionality coming soon');
+                        }}
+                        disabled={isProcessingAction}
+                        className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                      >
+                        <Flag className="h-5 w-5" />
+                        <span>Report Media</span>
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Report inappropriate content or copyright issues
+                      </p>
+                    </div>
+
+                    {/* Cancel Button */}
+                    <div className="border-t border-gray-700 pt-4">
+                      <button
+                        onClick={() => {
+                          setShowActionModal(false);
+                          setSelectedMediaForAction(null);
+                          setSelectedBidForAction(null);
+                          setRefundReason('');
+                        }}
+                        disabled={isProcessingAction}
+                        className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

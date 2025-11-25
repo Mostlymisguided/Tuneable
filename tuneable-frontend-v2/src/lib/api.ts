@@ -326,6 +326,18 @@ export const partyAPI = {
     return response.data;
   },
   
+  removeTip: async (partyId: string, bidId: string) => {
+    const response = await api.post(`/parties/${partyId}/bids/${bidId}/remove`);
+    return response.data;
+  },
+  
+  requestRefund: async (partyId: string, bidId: string, reason: string) => {
+    const response = await api.post(`/parties/${partyId}/bids/${bidId}/request-refund`, {
+      reason
+    });
+    return response.data;
+  },
+  
   kickUser: async (partyId: string, userId: string, reason?: string) => {
     const response = await api.post(`/parties/${partyId}/kick/${userId}`, { reason });
     return response.data;

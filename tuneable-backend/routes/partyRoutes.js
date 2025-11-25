@@ -3059,4 +3059,353 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
     }
 });
 
+// ========================================
+// USER TIP REMOVAL & REFUND ROUTES
+// ========================================
+
+/**
+ * @route   POST /api/parties/:partyId/bids/:bidId/remove
+ * @desc    Remove user's own tip (instant refund within 10 minutes)
+ * @access  Private (user must own the bid)
+ */
+router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId, bidId } = req.params;
+        const userId = req.user._id;
+        const Bid = require('../models/Bid');
+        const User = require('../models/User');
+        const Media = require('../models/Media');
+        const mongoose = require('mongoose');
+        const bidMetricsEngine = require('../services/bidMetricsEngine');
+        const artistEscrowService = require('../services/artistEscrowService');
+
+        // Validate inputs
+        if (!mongoose.isValidObjectId(bidId)) {
+            return res.status(400).json({ error: 'Invalid bidId format' });
+        }
+
+        // Find the bid
+        const bid = await Bid.findById(bidId);
+        if (!bid) {
+            return res.status(404).json({ error: 'Bid not found' });
+        }
+
+        // Check if user owns this bid
+        if (bid.userId.toString() !== userId.toString()) {
+            return res.status(403).json({ error: 'You can only remove your own tips' });
+        }
+
+        // Check if bid is already refunded or vetoed
+        if (bid.status !== 'active') {
+            return res.status(400).json({ 
+                error: `Bid is already ${bid.status}`,
+                currentStatus: bid.status
+            });
+        }
+
+        // Check time window (10 minutes = 600,000 milliseconds)
+        const timeSinceBid = Date.now() - new Date(bid.createdAt).getTime();
+        const INSTANT_REMOVAL_WINDOW = 10 * 60 * 1000; // 10 minutes
+
+        if (timeSinceBid > INSTANT_REMOVAL_WINDOW) {
+            return res.status(400).json({ 
+                error: 'Instant removal window has expired. Please use the refund request feature.',
+                timeSinceBid: timeSinceBid,
+                windowMs: INSTANT_REMOVAL_WINDOW,
+                useRefundRequest: true
+            });
+        }
+
+        // Get user and media
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const media = await Media.findById(bid.mediaId);
+        if (!media) {
+            return res.status(404).json({ error: 'Media not found' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Refund the bid amount to user balance
+        const refundAmount = bid.amount; // Already in pence
+        user.balance = (user.balance || 0) + refundAmount;
+        await user.save();
+
+        // Update bid status
+        bid.status = 'refunded';
+        bid.refundedAt = new Date();
+        bid.refundedBy = userId; // User removed their own tip
+        bid.refundReason = 'User removed tip within 10-minute window';
+        await bid.save();
+
+        // Reverse escrow allocation if possible
+        // Note: If artist already claimed, this will need admin review
+        try {
+            const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
+            const escrowAllocation = await ArtistEscrowAllocation.findOne({ bidId: bid._id });
+            
+            if (escrowAllocation) {
+                if (!escrowAllocation.claimed) {
+                    // Reverse unclaimed allocation
+                    await escrowAllocation.remove();
+                    console.log(`✅ Reversed unclaimed escrow allocation for bid ${bidId}`);
+                } else if (escrowAllocation.claimed && escrowAllocation.artistUserId) {
+                    // Escrow was claimed by a registered artist - try to reverse from their balance
+                    const artistUser = await User.findById(escrowAllocation.artistUserId);
+                    if (artistUser && artistUser.artistEscrowBalance > 0) {
+                        const userShare = escrowAllocation.allocatedAmount; // Use the actual allocated amount
+                        if (artistUser.artistEscrowBalance >= userShare) {
+                            artistUser.artistEscrowBalance -= userShare;
+                            artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - userShare);
+                            await artistUser.save();
+                            console.log(`✅ Reversed escrow from artist balance for bid ${bidId}`);
+                        } else {
+                            console.log(`⚠️  Insufficient escrow balance to reverse - requires admin review`);
+                        }
+                    }
+                } else {
+                    // Escrow was claimed but no artistUserId - flag for admin review
+                    console.log(`⚠️  Escrow already claimed for bid ${bidId} - requires admin review`);
+                }
+            } else {
+                // No escrow allocation found - escrow may have been allocated directly to registered artist
+                // Check media owners to find registered artists who received escrow
+                const mediaWithOwners = await Media.findById(bid.mediaId).select('mediaOwners');
+                if (mediaWithOwners && mediaWithOwners.mediaOwners) {
+                    const userShare = Math.round(refundAmount * 0.70); // 70% artist share
+                    for (const owner of mediaWithOwners.mediaOwners) {
+                if (owner.userId) {
+                  const artistUser = await User.findById(owner.userId);
+                  if (artistUser && artistUser.artistEscrowBalance > 0) {
+                    const ownerShare = Math.round(userShare * (owner.percentage / 100));
+                    if (artistUser.artistEscrowBalance >= ownerShare) {
+                      artistUser.artistEscrowBalance -= ownerShare;
+                      artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - ownerShare);
+                      
+                      // Update artistEscrowHistory - mark the entry for this bid as refunded
+                      if (artistUser.artistEscrowHistory && artistUser.artistEscrowHistory.length > 0) {
+                        const historyEntry = artistUser.artistEscrowHistory.find(
+                          entry => entry.bidId && entry.bidId.toString() === bid._id.toString()
+                        );
+                        if (historyEntry && historyEntry.status === 'pending') {
+                          historyEntry.status = 'claimed'; // Mark as claimed/processed (we can't add 'refunded' without schema change)
+                          historyEntry.claimedAt = new Date();
+                        }
+                      }
+                      
+                      await artistUser.save();
+                      console.log(`✅ Reversed escrow from artist ${artistUser.username} balance for bid ${bidId}`);
+                    }
+                  }
+                }
+                    }
+                }
+            }
+        } catch (escrowError) {
+            console.error('Error reversing escrow allocation:', escrowError);
+            // Don't fail the refund if escrow reversal fails - flag for admin review
+        }
+
+        // Update metrics (this will recalculate aggregates)
+        try {
+            await bidMetricsEngine.updateMetricsForBidChange({
+                _id: bid._id,
+                userId: bid.userId,
+                mediaId: bid.mediaId,
+                partyId: bid.partyId,
+                amount: bid.amount
+            }, 'delete');
+        } catch (metricsError) {
+            console.error('Error updating metrics after bid removal:', metricsError);
+            // Don't fail the refund if metrics update fails
+        }
+
+        // Remove bid from party media entry if it's the only bid
+        const mediaIndex = party.media.findIndex(entry => {
+            const entryMediaId = entry.mediaId?._id ? entry.mediaId._id.toString() : entry.mediaId?.toString();
+            return entryMediaId === bid.mediaId.toString();
+        });
+
+        if (mediaIndex !== -1) {
+            const mediaEntry = party.media[mediaIndex];
+            // Remove bid ID from partyBids array
+            mediaEntry.partyBids = mediaEntry.partyBids.filter(
+                bidRef => bidRef.toString() !== bidId
+            );
+            
+            // If no more active bids, we could remove the media entry, but let's keep it for history
+            // The metrics engine will handle recalculating aggregates
+            await party.save();
+        }
+
+        console.log(`✅ User ${user.username} removed their tip of £${(refundAmount / 100).toFixed(2)} for bid ${bidId}`);
+
+        res.json({
+            success: true,
+            message: 'Tip removed successfully',
+            refundAmount: refundAmount,
+            refundAmountPounds: refundAmount / 100,
+            newBalance: user.balance,
+            newBalancePounds: user.balance / 100,
+            bidId: bid._id
+        });
+
+    } catch (error) {
+        console.error('Error removing tip:', error);
+        res.status(500).json({ 
+            error: 'Failed to remove tip', 
+            details: error.message 
+        });
+    }
+});
+
+/**
+ * @route   POST /api/parties/:partyId/bids/:bidId/request-refund
+ * @desc    Request refund for user's own tip (after 10-minute window)
+ * @access  Private (user must own the bid)
+ */
+router.post('/:partyId/bids/:bidId/request-refund', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId, bidId } = req.params;
+        const { reason } = req.body;
+        const userId = req.user._id;
+        const Bid = require('../models/Bid');
+        const RefundRequest = require('../models/RefundRequest');
+        const User = require('../models/User');
+        const Media = require('../models/Media');
+        const notificationService = require('../services/notificationService');
+        const mongoose = require('mongoose');
+
+        // Validate inputs
+        if (!mongoose.isValidObjectId(bidId)) {
+            return res.status(400).json({ error: 'Invalid bidId format' });
+        }
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json({ error: 'Refund reason is required' });
+        }
+
+        // Find the bid
+        const bid = await Bid.findById(bidId);
+        if (!bid) {
+            return res.status(404).json({ error: 'Bid not found' });
+        }
+
+        // Check if user owns this bid
+        if (bid.userId.toString() !== userId.toString()) {
+            return res.status(403).json({ error: 'You can only request refunds for your own tips' });
+        }
+
+        // Check if bid is already refunded or vetoed
+        if (bid.status !== 'active') {
+            return res.status(400).json({ 
+                error: `Bid is already ${bid.status}`,
+                currentStatus: bid.status
+            });
+        }
+
+        // Check if refund already requested
+        if (bid.refundRequestedAt) {
+            const existingRequest = await RefundRequest.findOne({ bidId: bid._id, status: 'pending' });
+            if (existingRequest) {
+                return res.status(400).json({ 
+                    error: 'Refund request already pending',
+                    requestId: existingRequest._id
+                });
+            }
+        }
+
+        // Check time window (must be after 10 minutes)
+        const timeSinceBid = Date.now() - new Date(bid.createdAt).getTime();
+        const INSTANT_REMOVAL_WINDOW = 10 * 60 * 1000; // 10 minutes
+
+        if (timeSinceBid <= INSTANT_REMOVAL_WINDOW) {
+            return res.status(400).json({ 
+                error: 'You can remove this tip instantly. Use the remove endpoint instead.',
+                timeSinceBid: timeSinceBid,
+                windowMs: INSTANT_REMOVAL_WINDOW,
+                useInstantRemove: true
+            });
+        }
+
+        // Get media and party for denormalized fields
+        const media = await Media.findById(bid.mediaId);
+        if (!media) {
+            return res.status(404).json({ error: 'Media not found' });
+        }
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        // Create refund request
+        const refundRequest = new RefundRequest({
+            bidId: bid._id,
+            userId: userId,
+            partyId: partyId,
+            mediaId: bid.mediaId,
+            amount: bid.amount, // Already in pence
+            reason: reason.trim(),
+            status: 'pending',
+            username: bid.username,
+            partyName: bid.partyName,
+            mediaTitle: bid.mediaTitle,
+            mediaArtist: bid.mediaArtist
+        });
+
+        await refundRequest.save();
+
+        // Update bid to mark refund as requested
+        bid.refundRequestedAt = new Date();
+        bid.refundRequestReason = reason.trim();
+        await bid.save();
+
+        // Notify admins
+        try {
+            const adminUsers = await User.find({ role: 'admin' }).select('_id');
+            for (const admin of adminUsers) {
+                await notificationService.createNotification({
+                    userId: admin._id,
+                    type: 'refund_requested',
+                    title: 'New Refund Request',
+                    message: `${bid.username} requested a refund of £${(bid.amount / 100).toFixed(2)} for "${bid.mediaTitle}"`,
+                    link: `/admin?tab=refunds`,
+                    linkText: 'Review Refund Request',
+                    relatedBidId: bid._id,
+                    relatedMediaId: bid.mediaId
+                });
+            }
+        } catch (notifError) {
+            console.error('Failed to send refund request notification:', notifError);
+            // Don't fail the request if notification fails
+        }
+
+        console.log(`📝 User ${bid.username} requested refund for bid ${bidId}: £${(bid.amount / 100).toFixed(2)}`);
+
+        res.json({
+            success: true,
+            message: 'Refund request submitted. You will be notified when it is processed.',
+            requestId: refundRequest._id,
+            bidId: bid._id,
+            amount: bid.amount,
+            amountPounds: bid.amount / 100,
+            reason: reason.trim()
+        });
+
+    } catch (error) {
+        console.error('Error requesting refund:', error);
+        res.status(500).json({ 
+            error: 'Failed to request refund', 
+            details: error.message 
+        });
+    }
+});
+
 module.exports = router;
