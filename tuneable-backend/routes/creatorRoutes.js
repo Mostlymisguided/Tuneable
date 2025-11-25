@@ -145,7 +145,7 @@ router.patch('/profile', authMiddleware, async (req, res) => {
     }
 
     if (!user.creatorProfile) {
-      return res.status(400).json({ error: 'No creator profile found. Please apply first.' });
+      return res.status(400).json({ error: 'No creator profile found. Please create one first.' });
     }
 
     // Update allowed fields

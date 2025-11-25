@@ -2615,7 +2615,7 @@ Join here: ${inviteLink}`.trim();
                   ? 'View Application' 
                   : user.creatorProfile?.verificationStatus === 'rejected'
                   ? 'Re-apply'
-                  : 'Apply Now'}
+                  : 'Join Now'}
               </span>
             </button>
           </div>
