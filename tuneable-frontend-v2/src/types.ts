@@ -151,6 +151,7 @@ export interface Media {
   album?: string;
   EP?: string;
   releaseDate?: string;
+  releaseYear?: number;
   
   // Episode/Series
   episodeNumber?: number;

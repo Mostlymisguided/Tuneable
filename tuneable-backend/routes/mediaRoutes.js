@@ -31,6 +31,29 @@ const capitalizeTag = (tag) => {
     .join(' ');
 };
 
+/**
+ * Extract release year from releaseDate or use provided releaseYear
+ * @param {Date|string|null} releaseDate - The release date
+ * @param {number|null} releaseYear - The release year (if provided directly)
+ * @returns {number|null} - The release year or null
+ */
+const extractReleaseYear = (releaseDate, releaseYear) => {
+  // If releaseYear is provided directly, use it
+  if (releaseYear && typeof releaseYear === 'number' && releaseYear >= 1900 && releaseYear <= 2100) {
+    return releaseYear;
+  }
+  
+  // Otherwise, extract from releaseDate
+  if (releaseDate) {
+    const date = releaseDate instanceof Date ? releaseDate : new Date(releaseDate);
+    if (!isNaN(date.getTime())) {
+      return date.getFullYear();
+    }
+  }
+  
+  return null;
+};
+
 const toPlainUserReference = (user) => {
   if (!user) return null;
 
@@ -423,6 +446,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       album,
       genre,
       releaseDate,
+      releaseYear,
       duration,
       explicit,
       tags,
@@ -524,12 +548,17 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     // Generate creatorDisplay from parsed arrays
     const creatorDisplay = formatCreatorDisplay(artistArray, featuringArray);
     
+    // Process release date and year
+    const finalReleaseDate = releaseDate ? new Date(releaseDate) : (mappedMetadata.releaseDate || null);
+    const finalReleaseYear = extractReleaseYear(finalReleaseDate, releaseYear ? parseInt(releaseYear) : null);
+    
     // Create Media entry with extracted and manual metadata
     const media = new Media({
       // Basic information (user input takes priority)
       title: finalTitle,
       album: finalAlbum,
-      releaseDate: releaseDate || mappedMetadata.releaseDate || undefined,
+      releaseDate: finalReleaseDate,
+      releaseYear: finalReleaseYear,
       
       // Creators (parsed from artist string or use extracted metadata)
       artist: artistArray.length > 0 ? artistArray : (mappedMetadata.artist || toCreatorSubdocs([{
@@ -1345,7 +1374,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Note: 'sources' is handled separately below due to Map type
     const allowedUpdates = [
       'title', 'producer', 'album', 'genre',
-      'releaseDate', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
+      'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
       'lyrics', 'description', 'language'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
@@ -1356,11 +1385,34 @@ router.put('/:id', authMiddleware, async (req, res) => {
         let value = req.body[field];
         
         // Convert numeric fields from string to number if needed
-        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate'];
+        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear'];
         if (numericFields.includes(field) && typeof value === 'string' && value.trim() !== '') {
-          const numValue = parseFloat(value);
+          const numValue = field === 'releaseYear' ? parseInt(value) : parseFloat(value);
           if (!isNaN(numValue)) {
             value = numValue;
+          }
+        }
+        
+        // Handle releaseDate and releaseYear together
+        if (field === 'releaseDate') {
+          const dateValue = value ? new Date(value) : null;
+          const yearValue = extractReleaseYear(dateValue, req.body.releaseYear ? parseInt(req.body.releaseYear) : null);
+          if (media.releaseYear !== yearValue) {
+            changes.push({
+              field: 'releaseYear',
+              oldValue: media.releaseYear,
+              newValue: yearValue
+            });
+            media.releaseYear = yearValue;
+          }
+          value = dateValue;
+        } else if (field === 'releaseYear') {
+          // If releaseYear is set but releaseDate is not, extract from releaseDate if it exists
+          if (!value && media.releaseDate) {
+            const yearValue = extractReleaseYear(media.releaseDate, null);
+            if (yearValue) {
+              value = yearValue;
+            }
           }
         }
         

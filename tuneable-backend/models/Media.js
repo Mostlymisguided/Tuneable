@@ -197,6 +197,7 @@ const mediaSchema = new mongoose.Schema({
   album: { type: String },
   EP: { type: String },
   releaseDate: { type: Date, default: null },
+  releaseYear: { type: Number, min: 1900, max: 2100, default: null }, // Year-only option when full date is unknown
   
   // Label/Publisher (hybrid subdocument)
   label: [{
@@ -364,6 +365,17 @@ mediaSchema.pre('save', function (next) {
   
   this.creatorNames = Array.from(names);
   
+  // Auto-populate releaseYear from releaseDate if not set
+  if (!this.releaseYear && this.releaseDate) {
+    const date = this.releaseDate instanceof Date ? this.releaseDate : new Date(this.releaseDate);
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear();
+      if (year >= 1900 && year <= 2100) {
+        this.releaseYear = year;
+      }
+    }
+  }
+  
   // Auto-generate creatorDisplay if not set and we have artist/featuring data
   if (!this.creatorDisplay && (this.artist || this.featuring)) {
     const { formatCreatorDisplay } = require('../utils/artistParser');
@@ -399,6 +411,7 @@ mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
 mediaSchema.index({ tags: 1, globalMediaAggregate: -1 }); // Compound index for tag rankings
 mediaSchema.index({ releaseDate: -1 }); // Index for release date sorting
+mediaSchema.index({ releaseYear: -1 }); // Index for release year sorting/filtering
 mediaSchema.index({ episodeNumber: 1, seasonNumber: 1 }); // Index for episode/season queries
 mediaSchema.index({ podcastSeries: 1 }); // Index for podcast series lookups
 mediaSchema.index({ "externalIds.podcastIndex": 1 }); // Index for Podcast Index lookups

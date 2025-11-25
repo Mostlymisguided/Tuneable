@@ -56,6 +56,8 @@ const CreatorUpload: React.FC = () => {
     album: '',
     genre: '',
     releaseDate: '',
+    releaseYear: null as number | null,
+    releaseYearOnly: false,
     duration: '',
     explicit: false,
     tags: '',
@@ -380,7 +382,12 @@ const CreatorUpload: React.FC = () => {
       }
       if (formData.album) uploadData.append('album', formData.album.trim());
       if (formData.genre) uploadData.append('genre', formData.genre);
-      if (formData.releaseDate) uploadData.append('releaseDate', formData.releaseDate);
+      // Handle releaseDate and releaseYear
+      if (formData.releaseYearOnly && formData.releaseYear) {
+        uploadData.append('releaseYear', formData.releaseYear.toString());
+      } else if (formData.releaseDate) {
+        uploadData.append('releaseDate', formData.releaseDate);
+      }
       if (formData.duration) {
         const durationSeconds = mmssToSeconds(formData.duration);
         if (durationSeconds > 0) {
@@ -722,17 +729,49 @@ const CreatorUpload: React.FC = () => {
             {/* Release Date & Duration */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-white font-medium mb-2 flex items-center">
-                  <Calendar className="h-4 w-4 mr-2 text-purple-400" />
-                  Release Date
-                </label>
-                <input
-                  type="date"
-                  name="releaseDate"
-                  value={formData.releaseDate}
-                  onChange={handleChange}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500"
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-white font-medium flex items-center">
+                    <Calendar className="h-4 w-4 mr-2 text-purple-400" />
+                    Release Date
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.releaseYearOnly}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          releaseYearOnly: e.target.checked,
+                          releaseDate: e.target.checked ? '' : formData.releaseDate
+                        });
+                      }}
+                      className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm text-gray-400">Year only</span>
+                  </label>
+                </div>
+                {formData.releaseYearOnly ? (
+                  <input
+                    type="number"
+                    min="1900"
+                    max="2100"
+                    value={formData.releaseYear || ''}
+                    onChange={(e) => {
+                      const year = e.target.value ? parseInt(e.target.value) : null;
+                      setFormData({ ...formData, releaseYear: year });
+                    }}
+                    placeholder="e.g., 2024"
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500"
+                  />
+                ) : (
+                  <input
+                    type="date"
+                    name="releaseDate"
+                    value={formData.releaseDate}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500"
+                  />
+                )}
               </div>
               
               <div>

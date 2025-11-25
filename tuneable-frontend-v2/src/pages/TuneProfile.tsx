@@ -216,6 +216,8 @@ const TuneProfile: React.FC = () => {
     genres: [] as string[],
     genre: '', // Keep for backward compatibility
     releaseDate: '',
+    releaseYear: null as number | null,
+    releaseYearOnly: false, // Toggle for year-only mode
     duration: '0:00', // Store as MM:SS string
     explicit: false,
     isrc: '',
@@ -509,6 +511,10 @@ const TuneProfile: React.FC = () => {
         ? new Date(media.releaseDate).toISOString().split('T')[0] 
         : '';
       
+      // Check if we have releaseYear but no releaseDate (year-only mode)
+      const releaseYear = (media as any).releaseYear || null;
+      const releaseYearOnly = !media.releaseDate && releaseYear !== null;
+      
       setEditForm({
         title: media.title || '',
         artist: artistName,
@@ -519,6 +525,8 @@ const TuneProfile: React.FC = () => {
         genres: genresArray,
         genre: genreValue,
         releaseDate: releaseDateFormatted,
+        releaseYear: releaseYear,
+        releaseYearOnly: releaseYearOnly,
         duration: media.duration ? secondsToMMSS(media.duration) : '0:00',
         explicit: media.explicit || false,
         isrc: media.isrc || '',
@@ -691,6 +699,18 @@ const TuneProfile: React.FC = () => {
       // Convert duration from MM:SS to seconds
       const durationInSeconds = mmssToSeconds(editForm.duration);
       
+      // Handle releaseDate and releaseYear
+      let releaseDateValue = editForm.releaseDate || null;
+      let releaseYearValue = editForm.releaseYear || null;
+      
+      // If year-only mode, clear releaseDate and use releaseYear
+      if (editForm.releaseYearOnly && releaseYearValue) {
+        releaseDateValue = null;
+      } else if (releaseDateValue) {
+        // If full date is provided, releaseYear will be extracted on backend
+        releaseYearValue = null; // Let backend extract from date
+      }
+      
       const updateData: any = {
         ...editForm,
         duration: durationInSeconds,
@@ -698,7 +718,9 @@ const TuneProfile: React.FC = () => {
         genres,
         elements,
         featuring,
-        labelId: selectedLabel?._id || null // Send labelId if selected
+        labelId: selectedLabel?._id || null, // Send labelId if selected
+        releaseDate: releaseDateValue,
+        releaseYear: releaseYearValue
       };
       
       // Add collectiveId for artist if collective is selected
@@ -1463,7 +1485,15 @@ const TuneProfile: React.FC = () => {
     { label: 'Tags', value: media.tags, icon: Tag },
     { label: 'Pitch', value: media.pitch, fieldName: 'pitch', icon: Music },
     { label: 'Album', value: media.album, icon: Disc },
-    { label: 'Release Date', value: media.releaseDate, icon: Calendar },
+    { 
+      label: 'Release Date', 
+      value: media.releaseDate 
+        ? new Date(media.releaseDate).toLocaleDateString()
+        : (media as any).releaseYear 
+          ? `${(media as any).releaseYear}`
+          : null,
+      icon: Calendar 
+    },
     { label: 'Explicit', value: media.explicit ? 'Yes' : 'No', icon: Globe },
     { label: 'ISRC', value: media.isrc, icon: Music },
     { label: 'UPC', value: media.upc, icon: Disc },
@@ -1827,10 +1857,10 @@ const TuneProfile: React.FC = () => {
                     setGlobalBidInput(newAmount.toFixed(2));
                     setHasInitializedBidInput(true);
                   }}
-                  disabled={isPlacingGlobalBid || (user && (() => {
+                  disabled={isPlacingGlobalBid || (user ? (() => {
                     const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
                     return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                  })())}
+                  })() : false)}
                   className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl transition-colors flex items-center justify-center"
                 >
                   <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
@@ -2368,10 +2398,10 @@ const TuneProfile: React.FC = () => {
                             setGlobalBidInput(newAmount.toFixed(2));
                             setHasInitializedBidInput(true);
                           }}
-                          disabled={isPlacingGlobalBid || (user && (() => {
+                          disabled={isPlacingGlobalBid || (user ? (() => {
                             const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
                             return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                          })())}
+                          })() : false)}
                           className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
                         >
                           <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
@@ -2390,34 +2420,33 @@ const TuneProfile: React.FC = () => {
                           )}
                         </button>
                       </div>
-                        
-                        {/* Quick amounts */}
-                        <div className="flex flex-wrap justify-center gap-2 mb-4">
-                          {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-                            <button
-                              key={amount}
-                              onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                              className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
-                            >
-                              £{amount.toFixed(2)}
-                            </button>
-                          ))}
-                        </div>
-                        
-                        <p className="text-xs md:text-sm text-gray-400">
-                          Minimum bid: £{minimumBid.toFixed(2)}
-                        </p>
-                        {user && (
-                          <p className="text-xs md:text-sm text-gray-400 mt-2">
-                            Your balance: {penceToPounds((user as any)?.balance)}
-                          </p>
-                        )}
-                        {!user && (
-                          <p className="text-xs md:text-sm text-gray-400 mt-2">
-                            Sign in to tip and support this tune
-                          </p>
-                        )}
+                      
+                      {/* Quick amounts */}
+                      <div className="flex flex-wrap justify-center gap-2 mb-4">
+                        {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
+                          <button
+                            key={amount}
+                            onClick={() => setGlobalBidInput(amount.toFixed(2))}
+                            className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
+                          >
+                            £{amount.toFixed(2)}
+                          </button>
+                        ))}
                       </div>
+                      
+                      <p className="text-xs md:text-sm text-gray-400">
+                        Minimum bid: £{minimumBid.toFixed(2)}
+                      </p>
+                      {user && (
+                        <p className="text-xs md:text-sm text-gray-400 mt-2">
+                          Your balance: {penceToPounds((user as any)?.balance)}
+                        </p>
+                      )}
+                      {!user && (
+                        <p className="text-xs md:text-sm text-gray-400 mt-2">
+                          Sign in to tip and support this tune
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2738,13 +2767,45 @@ const TuneProfile: React.FC = () => {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-white font-medium mb-2">Release Date</label>
-                  <input
-                    type="date"
-                    value={editForm.releaseDate}
-                    onChange={(e) => setEditForm({ ...editForm, releaseDate: e.target.value })}
-                    className="input"
-                  />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-white font-medium">Release Date</label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editForm.releaseYearOnly}
+                        onChange={(e) => {
+                          setEditForm({ 
+                            ...editForm, 
+                            releaseYearOnly: e.target.checked,
+                            releaseDate: e.target.checked ? '' : editForm.releaseDate
+                          });
+                        }}
+                        className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-gray-400">Year only</span>
+                    </label>
+                  </div>
+                  {editForm.releaseYearOnly ? (
+                    <input
+                      type="number"
+                      min="1900"
+                      max="2100"
+                      value={editForm.releaseYear || ''}
+                      onChange={(e) => {
+                        const year = e.target.value ? parseInt(e.target.value) : null;
+                        setEditForm({ ...editForm, releaseYear: year });
+                      }}
+                      placeholder="e.g., 2024"
+                      className="input"
+                    />
+                  ) : (
+                    <input
+                      type="date"
+                      value={editForm.releaseDate}
+                      onChange={(e) => setEditForm({ ...editForm, releaseDate: e.target.value })}
+                      className="input"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -3102,13 +3163,13 @@ const TuneProfile: React.FC = () => {
                 <div>
                   <label className="block text-white font-medium mb-2">Cover Art URL</label>
                   <div className="flex space-x-2">
-                  <input
-                    type="url"
-                    value={editForm.coverArt}
-                    onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
+                    <input
+                      type="url"
+                      value={editForm.coverArt}
+                      onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
                       className="input flex-1"
-                    placeholder="https://example.com/cover.jpg"
-                  />
+                      placeholder="https://example.com/cover.jpg"
+                    />
                     <button
                       type="button"
                       onClick={handleCoverArtUploadClick}
