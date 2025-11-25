@@ -966,17 +966,6 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Check if media is globally vetoed (before processing bid)
-        if (media.status === 'vetoed') {
-            return res.status(403).json({ 
-                error: `"${media.title}" has been globally vetoed and cannot be added to any party.`,
-                mediaId: media._id,
-                mediaTitle: media.title,
-                vetoedAt: media.vetoedAt,
-                vetoedBy: media.vetoedBy
-            });
-        }
-
         // Convert bid amount from pounds to pence (user input is in pounds)
         const bidAmountPence = Math.round(bidAmount * 100);
         
@@ -1086,6 +1075,17 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             media = new Media(mediaData);
             
             console.log(`✅ Created new media: "${media.title}" (${media._id})`);
+        }
+
+        // Check if media is globally vetoed (after finding/creating media)
+        if (media.status === 'vetoed') {
+            return res.status(403).json({ 
+                error: `"${media.title}" has been globally vetoed and cannot be added to any party.`,
+                mediaId: media._id,
+                mediaTitle: media.title,
+                vetoedAt: media.vetoedAt,
+                vetoedBy: media.vetoedBy
+            });
         }
 
         // Calculate queue context
