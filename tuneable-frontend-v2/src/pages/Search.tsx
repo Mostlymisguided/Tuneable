@@ -371,7 +371,7 @@ const SearchPage: React.FC = () => {
 
           if (response.ok) {
             await response.json();
-            toast.success(`Podcast episode added to party with £${songBidAmount.toFixed(2)} bid!`);
+            toast.success(`Podcast episode added to party with £${songBidAmount.toFixed(2)} tip!`);
             navigate(`/party/${partyId}`);
           } else {
             const error = await response.json();
@@ -424,7 +424,7 @@ const SearchPage: React.FC = () => {
             });
 
             if (bidResponse.ok) {
-              toast.success(`Podcast episode added to party with £${songBidAmount.toFixed(2)} bid!`);
+              toast.success(`Podcast episode added to party with £${songBidAmount.toFixed(2)} tip!`);
               navigate(`/party/${partyId}`);
             } else {
               const error = await bidResponse.json();
@@ -520,9 +520,9 @@ const SearchPage: React.FC = () => {
       });
       
       if (response.isDuplicate) {
-        toast.success(`Bid of £${songBidAmount.toFixed(2)} added to existing song in queue!`);
+        toast.success(`Tip of £${songBidAmount.toFixed(2)} added to existing song in queue!`);
       } else {
-        toast.success(`Song added to party with £${songBidAmount.toFixed(2)} bid!`);
+        toast.success(`Song added to party with £${songBidAmount.toFixed(2)} tip!`);
       }
       navigate(`/party/${partyId}`);
     } catch (error: any) {

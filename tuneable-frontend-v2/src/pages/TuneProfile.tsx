@@ -1192,7 +1192,8 @@ const TuneProfile: React.FC = () => {
   const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      navigate('/login');
+      const returnUrl = `/tune/${mediaId || media?._id}`;
+      navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
@@ -1779,76 +1780,75 @@ const TuneProfile: React.FC = () => {
           /* NORMAL VIEW - All existing content */
           <>
         {/* Global Tip Section - Support This Tune */}
-        {user && (
-          <div className="mb-6 px-2 md:px-0">
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
-                <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
-                  <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                  Support This Tune
-                </h3>
-                <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                  Boost this tune's global ranking and support the artist
-                </p>
-                
-                <div className="flex flex-row items-center justify-center mb-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const current = parseFloat(globalBidInput) || minimumBid;
-                      const newAmount = Math.max(minimumBid, current - 0.01);
-                      setGlobalBidInput(newAmount.toFixed(2));
+        <div className="mb-6 px-2 md:px-0">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
+                <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
+                Support This Tune
+              </h3>
+              <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
+                Boost this tune's global ranking and support the artist
+              </p>
+              
+              <div className="flex flex-row items-center justify-center mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = parseFloat(globalBidInput) || minimumBid;
+                    const newAmount = Math.max(minimumBid, current - 0.01);
+                    setGlobalBidInput(newAmount.toFixed(2));
+                    setHasInitializedBidInput(true);
+                  }}
+                  disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
+                  className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl transition-colors flex items-center justify-center"
+                >
+                  <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                </button>
+                <div className="flex items-center bg-gray-800 overflow-hidden">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={minimumBid}
+                    value={globalBidInput}
+                    onChange={(e) => {
                       setHasInitializedBidInput(true);
+                      setGlobalBidInput(e.target.value);
                     }}
-                    disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-                    className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl transition-colors flex items-center justify-center"
-                  >
-                    <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                  </button>
-                  <div className="flex items-center bg-gray-800 overflow-hidden">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min={minimumBid}
-                      value={globalBidInput}
-                      onChange={(e) => {
-                        setHasInitializedBidInput(true);
-                        setGlobalBidInput(e.target.value);
-                      }}
-                      className="w-24 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const current = parseFloat(globalBidInput) || minimumBid;
-                      const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                      const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
-                      setGlobalBidInput(newAmount.toFixed(2));
-                      setHasInitializedBidInput(true);
-                    }}
-                    disabled={isPlacingGlobalBid || (() => {
-                      const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                      return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                    })()}
-                    className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl transition-colors flex items-center justify-center"
-                  >
-                    <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                  </button>
-                  <button
-                    onClick={handleGlobalBid}
-                    disabled={isPlacingGlobalBid || !isGlobalBidValid}
-                    className="w-auto px-6 md:px-8 ml-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
-                  >
-                    {isPlacingGlobalBid ? (
-                      <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
-                    ) : (
-                      <span>
-                        {isGlobalBidValid ? `Tip £${globalBidInput}` : 'Enter Tip'}
-                      </span>
-                    )}
-                  </button>
+                    className="w-24 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = parseFloat(globalBidInput) || minimumBid;
+                    const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
+                    const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
+                    setGlobalBidInput(newAmount.toFixed(2));
+                    setHasInitializedBidInput(true);
+                  }}
+                  disabled={isPlacingGlobalBid || (user && (() => {
+                    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                    return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
+                  })())}
+                  className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl transition-colors flex items-center justify-center"
+                >
+                  <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                </button>
+                <button
+                  onClick={handleGlobalBid}
+                  disabled={isPlacingGlobalBid || !isGlobalBidValid}
+                  className="w-auto px-6 md:px-8 ml-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
+                >
+                  {isPlacingGlobalBid ? (
+                    <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
+                  ) : (
+                    <span>
+                      {!user ? 'Sign in to Tip' : (isGlobalBidValid ? `Tip £${globalBidInput}` : 'Enter Tip')}
+                    </span>
+                  )}
+                </button>
+              </div>
                 
                 {/* Quick amounts */}
                 <div className="flex flex-wrap justify-center gap-2 mb-4">
@@ -1863,13 +1863,19 @@ const TuneProfile: React.FC = () => {
                   ))}
                 </div>
                 
-                <p className="text-xs md:text-sm text-gray-400">
-                  Your balance: {penceToPounds((user as any)?.balance)}
-                </p>
+                {user && (
+                  <p className="text-xs md:text-sm text-gray-400">
+                    Your balance: {penceToPounds((user as any)?.balance)}
+                  </p>
+                )}
+                {!user && (
+                  <p className="text-xs md:text-sm text-gray-400">
+                    Sign in to tip and support this tune
+                  </p>
+                )}
               </div>
             </div>
           </div>
-        )}
 
         {/* Top Supporters */}
         {media.bids && media.bids.length > 0 && (
@@ -2314,77 +2320,76 @@ const TuneProfile: React.FC = () => {
               /* Tune Info Tab - Show normal content when viewing info tab in edit mode */
               <div className="space-y-8">
                 {/* Global Bid Section - Support This Tune */}
-                {user && (
-                  <div className="mb-6 px-2 md:px-0">
-                    <div className="max-w-2xl mx-auto">
-                      <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
-                        <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
-                          <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                          Support This Tune
-                        </h3>
-                        <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                          Boost this tune's global ranking and support the artist
-                        </p>
-                        
-                        <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseFloat(globalBidInput) || minimumBid;
-                              const newAmount = Math.max(minimumBid, current - 0.01);
-                              setGlobalBidInput(newAmount.toFixed(2));
+                <div className="mb-6 px-2 md:px-0">
+                  <div className="max-w-2xl mx-auto">
+                    <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
+                        <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
+                        Support This Tune
+                      </h3>
+                      <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
+                        Boost this tune's global ranking and support the artist
+                      </p>
+                      
+                      <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = parseFloat(globalBidInput) || minimumBid;
+                            const newAmount = Math.max(minimumBid, current - 0.01);
+                            setGlobalBidInput(newAmount.toFixed(2));
+                            setHasInitializedBidInput(true);
+                          }}
+                          disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
+                          className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                        >
+                          <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                        </button>
+                        <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                          <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={minimumBid}
+                            value={globalBidInput}
+                            onChange={(e) => {
                               setHasInitializedBidInput(true);
+                              setGlobalBidInput(e.target.value);
                             }}
-                            disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-                            className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
-                          >
-                            <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                          </button>
-                          <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                            <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min={minimumBid}
-                              value={globalBidInput}
-                              onChange={(e) => {
-                                setHasInitializedBidInput(true);
-                                setGlobalBidInput(e.target.value);
-                              }}
-                              className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseFloat(globalBidInput) || minimumBid;
-                              const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                              const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
-                              setGlobalBidInput(newAmount.toFixed(2));
-                              setHasInitializedBidInput(true);
-                            }}
-                            disabled={isPlacingGlobalBid || (() => {
-                              const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                              return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                            })()}
-                            className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
-                          >
-                            <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                          </button>
-                          <button
-                            onClick={handleGlobalBid}
-                            disabled={isPlacingGlobalBid || !isGlobalBidValid}
-                            className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                          >
-                            {isPlacingGlobalBid ? (
-                              <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
-                            ) : (
-                              <span>
-                                {isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid'}
-                              </span>
-                            )}
-                          </button>
+                            className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = parseFloat(globalBidInput) || minimumBid;
+                            const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
+                            const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
+                            setGlobalBidInput(newAmount.toFixed(2));
+                            setHasInitializedBidInput(true);
+                          }}
+                          disabled={isPlacingGlobalBid || (user && (() => {
+                            const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                            return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
+                          })())}
+                          className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
+                        >
+                          <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                        </button>
+                        <button
+                          onClick={handleGlobalBid}
+                          disabled={isPlacingGlobalBid || !isGlobalBidValid}
+                          className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        >
+                          {isPlacingGlobalBid ? (
+                            <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
+                          ) : (
+                            <span>
+                              {!user ? 'Sign in to Tip' : (isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid')}
+                            </span>
+                          )}
+                        </button>
+                      </div>
                         
                         {/* Quick amounts */}
                         <div className="flex flex-wrap justify-center gap-2 mb-4">
@@ -2402,10 +2407,20 @@ const TuneProfile: React.FC = () => {
                         <p className="text-xs md:text-sm text-gray-400">
                           Minimum bid: £{minimumBid.toFixed(2)}
                         </p>
+                        {user && (
+                          <p className="text-xs md:text-sm text-gray-400 mt-2">
+                            Your balance: {penceToPounds((user as any)?.balance)}
+                          </p>
+                        )}
+                        {!user && (
+                          <p className="text-xs md:text-sm text-gray-400 mt-2">
+                            Sign in to tip and support this tune
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {/* All other normal content sections would go here - comments, top bidders, etc. */}
                 {/* For now, showing a message that user can switch to edit tab */}
