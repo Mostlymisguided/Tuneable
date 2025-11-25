@@ -65,7 +65,7 @@ const giveBetaSignupCredit = async (user) => {
         userId: user._id,
         type: 'admin_announcement',
         title: 'Beta Wallet Credit Added',
-        message: 'You have been gifted £1.11 credit as a beta user. You can top up through the wallet and it will not cost you anything in beta mode. Ideally, when the platform goes live, you will choose to transfer your beta top ups with real money. If not, only your first £1.11 of bids will be transferred. You can top up for free but please bear this in mind and spend as you would in real life.',
+        message: 'You have been gifted £1.11 credit as a beta user',
         link: '/wallet',
         linkText: 'View Wallet',
         groupKey: `beta_signup_credit_${user._id}`

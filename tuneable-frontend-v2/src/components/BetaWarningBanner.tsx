@@ -67,9 +67,8 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
             <p className="text-sm font-semibold text-yellow-200 mb-1">
               🚧 Tuneable is in Beta Testing 🚧
             </p>
-            <p className="text-xs text-yellow-100/90 leading-relaxed">
-              We're currently in beta testing mode. 
-              Please report any bugs / features not working as expected.
+            <p className="text-xs text-yellow-100/90 leading-relaxed"> 
+              Please report any features not working as expected.
             </p>
           </div>
           {dismissible && (
@@ -94,14 +93,9 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
           <h3 className="text-lg font-bold text-yellow-200 mb-2">
             🚧 Tuneable is in Beta Testing 🚧
           </h3>
-          <div className="space-y-2 text-sm text-yellow-100/90">
-            <p className="font-semibold">We're currently in beta testing mode - this means:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>All transactions use test mode (not real money)</li>
-              <li>You can top up for free but please spend as you would in real life</li>
-              <li>When we launch, you will be able to transfer your username and activity</li>
-            </ul>
-            <div className="flex items-center space-x-4 mt-3">
+          <p className="text-xs text-yellow-100/90 leading-relaxed"> 
+              Please report any features not working as expected.
+            </p>
               <Link 
                 to="/about" 
                 className="text-yellow-300 hover:text-yellow-100 underline inline-flex items-center"
