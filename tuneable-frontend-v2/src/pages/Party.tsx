@@ -1394,7 +1394,6 @@ const Party: React.FC = () => {
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   const handleActionButtonClick = (media: any) => {
-    const mediaData = media.mediaId || media;
     const userBid = getUserBid(media);
     setSelectedMediaForAction(media);
     setSelectedBidForAction(userBid);
@@ -1406,14 +1405,16 @@ const Party: React.FC = () => {
     
     try {
       setIsProcessingAction(true);
-      await partyAPI.removeTip(partyId, selectedBidForAction._id);
+      const response = await partyAPI.removeTip(partyId, selectedBidForAction._id);
       toast.success(`Tip of £${(selectedBidForAction.amount / 100).toFixed(2)} removed and refunded`);
       
-      // Refresh party data and user balance
-      await fetchPartyDetails();
-      if (updateBalance) {
-        await updateBalance();
+      // Update user balance from API response
+      if (updateBalance && response.newBalance !== undefined) {
+        updateBalance(response.newBalance);
       }
+      
+      // Refresh party data
+      await fetchPartyDetails();
       
       setShowActionModal(false);
       setSelectedMediaForAction(null);
