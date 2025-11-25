@@ -17,6 +17,20 @@ const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils'
 const MetadataExtractor = require('../utils/metadataExtractor');
 const { canUploadMedia, canEditMedia } = require('../utils/permissionHelpers');
 
+/**
+ * Capitalize the first letter of each word in a tag (title case)
+ * @param {string} tag - The tag to capitalize
+ * @returns {string} - The capitalized tag
+ */
+const capitalizeTag = (tag) => {
+  if (!tag || typeof tag !== 'string') return tag;
+  return tag
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 const toPlainUserReference = (user) => {
   if (!user) return null;
 
@@ -453,8 +467,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       return res.status(500).json({ error: 'Failed to upload audio file' });
     }
     
-    // Parse tags (comma-separated string to array)
-    const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+    // Parse tags (comma-separated string to array) and capitalize them
+    const parsedTags = tags ? tags.split(',').map(t => capitalizeTag(t.trim())).filter(t => t) : [];
     
     // Determine final values (user input takes priority over extracted metadata)
     const finalTitle = title || extractedMetadata?.title || 'Untitled';
@@ -2127,7 +2141,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         coverArt: coverArt || DEFAULT_COVER_ART,
         duration: duration || 0,
         sources: sourcesMap,
-        tags: Array.isArray(tags) ? tags : [],
+        tags: Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [],
         category: category || 'Unknown',
         addedBy: userId,
         globalMediaAggregate: 0,

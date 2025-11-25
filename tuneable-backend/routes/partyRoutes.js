@@ -37,26 +37,39 @@ const deriveCodeFromPartyId = (objectId) => {
   };
 
 /**
- * Helper function to merge tags into existing media tags array
- * - Deduplicates tags (case-insensitive)
- * - Trims whitespace
- * - Preserves existing tags
- * @param {Array} existingTags - Current tags array from media
- * @param {Array} newTags - New tags to merge in
- * @returns {Array} Merged tags array
+ * Capitalize the first letter of each word in a tag (title case)
+ * @param {string} tag - The tag to capitalize
+ * @returns {string} - The capitalized tag
+ */
+const capitalizeTag = (tag) => {
+  if (!tag || typeof tag !== 'string') return tag;
+  return tag
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+/**
+ * Merge tags and ensure they're capitalized (title case)
+ * @param {Array} existingTags - Existing tags array
+ * @param {Array} newTags - New tags to merge
+ * @returns {Array} - Merged and capitalized tags array
  */
 const mergeTags = (existingTags, newTags) => {
   if (!newTags || !Array.isArray(newTags) || newTags.length === 0) {
-    return existingTags || [];
+    // Capitalize existing tags if they're not already capitalized
+    return (existingTags || []).map(tag => capitalizeTag(tag));
   }
   
   const existing = (existingTags || []).map(t => t.toLowerCase().trim());
-  const merged = [...(existingTags || [])];
+  const merged = [...(existingTags || []).map(tag => capitalizeTag(tag))];
   
   newTags.forEach(tag => {
-    const lowerTag = tag.toLowerCase().trim();
+    const capitalizedTag = capitalizeTag(tag);
+    const lowerTag = capitalizedTag.toLowerCase().trim();
     if (lowerTag && !existing.includes(lowerTag)) {
-      merged.push(tag.trim());
+      merged.push(capitalizedTag);
       existing.push(lowerTag);
     }
   });
@@ -1006,7 +1019,8 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         }
 
         // Use only user-provided tags (no extraction from YouTube)
-        let videoTags = Array.isArray(tags) ? tags : [];
+        // Capitalize tags for consistent display
+        let videoTags = Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [];
         let videoCategory = category || 'Unknown';
         
         // Check if media already exists to prevent duplicates
@@ -1617,10 +1631,12 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // Update media global bid value
         const media = await Media.findById(actualMediaId);
         if (media) {
-            // Merge tags if provided
+            // Merge tags if provided (tags are already capitalized in mergeTags)
             if (tags && Array.isArray(tags) && tags.length > 0) {
                 const tagsBefore = media.tags || [];
-                media.tags = mergeTags(media.tags, tags);
+                // Capitalize incoming tags before merging
+                const capitalizedTags = tags.map(tag => capitalizeTag(tag));
+                media.tags = mergeTags(media.tags, capitalizedTags);
                 console.log(`✅ Merged tags into media: "${media.title}" (${media._id})`);
                 console.log(`   Tags before: [${tagsBefore.join(', ')}]`);
                 console.log(`   New tags: [${tags.join(', ')}]`);
