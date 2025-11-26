@@ -1176,13 +1176,39 @@ const TuneProfile: React.FC = () => {
 
     setIsAddingToParty(true);
     try {
-      const mediaIdToUse = media._id || mediaId;
-      if (!mediaIdToUse) {
-        toast.error('Unable to identify media');
+      // Get media URL - prefer YouTube, fallback to first available source
+      const mediaSource = selectedPartyForAdd.mediaSource || 'youtube';
+      let url = '';
+      
+      if (mediaSource === 'youtube' && media.sources?.youtube) {
+        url = media.sources.youtube;
+      } else if (media.sources) {
+        // Fallback to first available source
+        url = Object.values(media.sources)[0] as string;
+      }
+
+      if (!url) {
+        toast.error('Media source URL not found. Cannot add to party.');
+        setIsAddingToParty(false);
         return;
       }
 
-      await partyAPI.placeBid(selectedPartyForAdd._id, mediaIdToUse, tipAmount);
+      // Get artist name (handle both string and array formats)
+      const artistName = Array.isArray(media.artist) 
+        ? media.artist.map((a: any) => a.name || a).join(', ')
+        : media.artist || 'Unknown Artist';
+
+      // Use addMediaToParty which handles adding media and placing bid in one operation
+      await partyAPI.addMediaToParty(selectedPartyForAdd._id, {
+        url,
+        title: media.title,
+        artist: artistName,
+        bidAmount: tipAmount,
+        platform: mediaSource,
+        duration: media.duration || 180,
+        category: media.category || 'Music'
+      });
+
       toast.success(`Added to ${selectedPartyForAdd.name} with £${tipAmount.toFixed(2)} tip!`);
       
       // Refresh top parties to show the newly added party
