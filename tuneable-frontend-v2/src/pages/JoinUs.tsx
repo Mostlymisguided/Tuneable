@@ -198,7 +198,7 @@ const JoinUs: React.FC = () => {
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-gray-700 max-w-2xl mx-auto">
             <h3 className="text-2xl font-bold text-white mb-4 text-center">Custom Investment</h3>
             <p className="text-gray-400 text-center mb-6">
-              Choose the number of shares you'd like to purchase (£10 per share)
+              Choose the number of shares you'd like to purchase (maximum 100 shares)
             </p>
             <div className="space-y-6">
               <div className="flex items-center justify-center gap-4">
