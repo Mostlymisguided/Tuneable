@@ -257,6 +257,15 @@ const TuneProfile: React.FC = () => {
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
 
+  // Add to Other Party modal state
+  const [showAddToPartyModal, setShowAddToPartyModal] = useState(false);
+  const [availableParties, setAvailableParties] = useState<any[]>([]);
+  const [isLoadingParties, setIsLoadingParties] = useState(false);
+  const [partySearchQuery, setPartySearchQuery] = useState('');
+  const [selectedPartyForAdd, setSelectedPartyForAdd] = useState<any | null>(null);
+  const [addToPartyTipAmount, setAddToPartyTipAmount] = useState<string>('');
+  const [isAddingToParty, setIsAddingToParty] = useState(false);
+
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -1107,6 +1116,88 @@ const TuneProfile: React.FC = () => {
     } catch (err: any) {
       console.error('Error submitting claim:', err);
       toast.error(err.response?.data?.error || 'Failed to submit claim');
+    }
+  };
+
+  // Load available parties for adding media
+  const loadAvailableParties = async () => {
+    if (!user) {
+      toast.info('Please log in to add tunes to parties');
+      navigate('/login');
+      return;
+    }
+
+    setIsLoadingParties(true);
+    try {
+      const response = await partyAPI.getParties();
+      // Filter out parties where this media is already added (check topParties list)
+      const topPartyIds = new Set(topParties.map((p: any) => p._id));
+      const filteredParties = (response.parties || []).filter((party: any) => {
+        // Exclude parties already in the top parties list (media already added there)
+        return !topPartyIds.has(party._id);
+      });
+      setAvailableParties(filteredParties);
+    } catch (err: any) {
+      console.error('Error loading available parties:', err);
+      toast.error('Failed to load parties');
+    } finally {
+      setIsLoadingParties(false);
+    }
+  };
+
+  // Handle opening Add to Party modal
+  const handleOpenAddToPartyModal = () => {
+    if (!user) {
+      toast.info('Please log in to add tunes to parties');
+      navigate('/login');
+      return;
+    }
+    setShowAddToPartyModal(true);
+    loadAvailableParties();
+    // Initialize tip amount with minimum bid or average bid
+    const avgBid = media?.globalMediaAggregate ? (media.globalMediaAggregate / (media.bids?.length || 1)) / 100 : 0;
+    const minBid = minimumBid;
+    const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+    setAddToPartyTipAmount(defaultBid.toFixed(2));
+  };
+
+  // Handle adding media to party with tip
+  const handleAddToParty = async () => {
+    if (!selectedPartyForAdd || !media) {
+      toast.error('Please select a party');
+      return;
+    }
+
+    const tipAmount = parseFloat(addToPartyTipAmount);
+    if (!Number.isFinite(tipAmount) || tipAmount < minimumBid) {
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+
+    setIsAddingToParty(true);
+    try {
+      const mediaIdToUse = media._id || mediaId;
+      if (!mediaIdToUse) {
+        toast.error('Unable to identify media');
+        return;
+      }
+
+      await partyAPI.placeBid(selectedPartyForAdd._id, mediaIdToUse, tipAmount);
+      toast.success(`Added to ${selectedPartyForAdd.name} with £${tipAmount.toFixed(2)} tip!`);
+      
+      // Refresh top parties to show the newly added party
+      await loadTopParties();
+      
+      // Close modal and reset state
+      setShowAddToPartyModal(false);
+      setSelectedPartyForAdd(null);
+      setAddToPartyTipAmount('');
+    } catch (err: any) {
+      console.error('Error adding media to party:', err);
+      const errorMessage = err.response?.data?.error || 'Failed to add tune to party';
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingToParty(false);
     }
   };
 
@@ -1985,6 +2076,19 @@ const TuneProfile: React.FC = () => {
                 <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
                 <p>This tune hasn't been added to any parties yet</p>
                 <p className="text-sm text-gray-500 mt-2">Be the first to add it to a party!</p>
+              </div>
+            )}
+            
+            {/* Add to Other Party Button */}
+            {user && (
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <button
+                  onClick={handleOpenAddToPartyModal}
+                  className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add to Other Party</span>
+                </button>
               </div>
             )}
           </div>
@@ -3432,6 +3536,194 @@ const TuneProfile: React.FC = () => {
                 className="btn-secondary"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Other Party Modal */}
+      {showAddToPartyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ zIndex: 10000 }}>
+          <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-700">
+              <div className="flex items-center space-x-2">
+                <Plus className="h-5 w-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">Add to Party</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddToPartyModal(false);
+                  setSelectedPartyForAdd(null);
+                  setPartySearchQuery('');
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Media Info */}
+              {media && (
+                <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    {media.coverArt && (
+                      <img 
+                        src={media.coverArt} 
+                        alt={media.title}
+                        className="w-12 h-12 rounded object-cover"
+                      />
+                    )}
+                    <div>
+                      <p className="text-white font-medium">{media.title}</p>
+                      <p className="text-gray-400 text-sm">{media.artist}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Party Search */}
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Search Parties
+                </label>
+                <input
+                  type="text"
+                  value={partySearchQuery}
+                  onChange={(e) => setPartySearchQuery(e.target.value)}
+                  placeholder="Search by party name or location..."
+                  className="input w-full"
+                />
+              </div>
+
+              {/* Party List */}
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Select Party
+                </label>
+                {isLoadingParties ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Loader2 className="h-8 w-8 mx-auto animate-spin mb-2" />
+                    <p>Loading parties...</p>
+                  </div>
+                ) : availableParties.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
+                    <p>No available parties found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {availableParties
+                      .filter((party: any) => {
+                        if (!partySearchQuery) return true;
+                        const query = partySearchQuery.toLowerCase();
+                        return (
+                          party.name?.toLowerCase().includes(query) ||
+                          party.location?.toLowerCase().includes(query)
+                        );
+                      })
+                      .map((party: any) => (
+                        <div
+                          key={party._id}
+                          onClick={() => setSelectedPartyForAdd(party)}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedPartyForAdd?._id === party._id
+                              ? 'bg-purple-600 border-purple-500'
+                              : 'bg-gray-800 border-gray-700 hover:border-purple-500/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-white font-medium">{party.name}</h4>
+                              <p className="text-gray-400 text-sm">{party.location}</p>
+                            </div>
+                            {selectedPartyForAdd?._id === party._id && (
+                              <CheckCircle className="h-5 w-5 text-white" />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tip Amount Input */}
+              {selectedPartyForAdd && (
+                <div className="mb-4">
+                  <label className="block text-white font-medium mb-2">
+                    Tip Amount (£)
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        const current = parseFloat(addToPartyTipAmount) || minimumBid;
+                        const newAmount = Math.max(minimumBid, current - 0.01);
+                        setAddToPartyTipAmount(newAmount.toFixed(2));
+                      }}
+                      disabled={parseFloat(addToPartyTipAmount) <= minimumBid}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-l-lg transition-colors"
+                    >
+                      <Minus className="h-4 w-4 text-white" />
+                    </button>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={minimumBid}
+                      value={addToPartyTipAmount}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '' || parseFloat(value) >= minimumBid) {
+                          setAddToPartyTipAmount(value);
+                        }
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-none text-white focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      onClick={() => {
+                        const current = parseFloat(addToPartyTipAmount) || minimumBid;
+                        const newAmount = current + 0.01;
+                        setAddToPartyTipAmount(newAmount.toFixed(2));
+                      }}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-r-lg transition-colors"
+                    >
+                      <Plus className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Minimum tip: £{minimumBid.toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-700">
+              <button
+                onClick={() => {
+                  setShowAddToPartyModal(false);
+                  setSelectedPartyForAdd(null);
+                  setPartySearchQuery('');
+                }}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddToParty}
+                disabled={!selectedPartyForAdd || isAddingToParty || parseFloat(addToPartyTipAmount) < minimumBid}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+              >
+                {isAddingToParty ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Adding...</span>
+                  </>
+                ) : (
+                  <span>Add to Party</span>
+                )}
               </button>
             </div>
           </div>
