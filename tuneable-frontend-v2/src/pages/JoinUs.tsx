@@ -23,7 +23,8 @@ const JoinUs: React.FC = () => {
       features: [
         '1 share in Tuneable',
         'Discord access',
-        'Quarterly updates'
+        'Quarterly updates',
+        'Early feature access',
       ]
     },
     {
@@ -37,7 +38,6 @@ const JoinUs: React.FC = () => {
         'Discord access',
         'Quarterly updates',
         'Early feature access',
-        'Priority support'
       ]
     },
     {
@@ -51,8 +51,6 @@ const JoinUs: React.FC = () => {
         'Discord access',
         'Quarterly updates',
         'Early feature access',
-        'Priority support',
-        'Advisory input'
       ]
     }
   ];
