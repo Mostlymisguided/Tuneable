@@ -987,6 +987,7 @@ const Party: React.FC = () => {
           console.error('Error adding media:', error);
           toast.error(error.response?.data?.error || 'Failed to add media to party');
         } finally {
+          setIsBidding(false); // Reset bidding state
           setPendingMedia(null);
           pendingMediaRef.current = null;
           // Close modal after operation completes
