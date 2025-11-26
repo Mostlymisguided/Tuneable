@@ -2550,9 +2550,9 @@ const Party: React.FC = () => {
                                         const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
                                         const parsed = parseFloat(raw);
                                         if (!Number.isFinite(parsed)) {
-                                          return 'Add';
+                                          return 'Tip';
                                         }
-                                        return `Add £${parsed.toFixed(2)}`;
+                                        return `Tip £${parsed.toFixed(2)}`;
                                       })()}
                                     </button>
                                   </div>
@@ -2665,9 +2665,9 @@ const Party: React.FC = () => {
                                         const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
                                         const parsed = parseFloat(raw);
                                         if (!Number.isFinite(parsed)) {
-                                          return 'Add';
+                                          return 'Tip';
                                         }
-                                        return `Add £${parsed.toFixed(2)}`;
+                                        return `Tip £${parsed.toFixed(2)}`;
                                       })()}
                                     </button>
                                   </div>
