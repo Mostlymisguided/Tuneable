@@ -3682,42 +3682,16 @@ const TuneProfile: React.FC = () => {
                   <label className="block text-white font-medium mb-2">
                     Tip Amount (£)
                   </label>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {
-                        const current = parseFloat(addToPartyTipAmount) || minimumBid;
-                        const newAmount = Math.max(minimumBid, current - 0.01);
-                        setAddToPartyTipAmount(newAmount.toFixed(2));
-                      }}
-                      disabled={parseFloat(addToPartyTipAmount) <= minimumBid}
-                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-l-lg transition-colors"
-                    >
-                      <Minus className="h-4 w-4 text-white" />
-                    </button>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min={minimumBid}
-                      value={addToPartyTipAmount}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || parseFloat(value) >= minimumBid) {
-                          setAddToPartyTipAmount(value);
-                        }
-                      }}
-                      className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-none text-white focus:outline-none focus:border-purple-500"
-                    />
-                    <button
-                      onClick={() => {
-                        const current = parseFloat(addToPartyTipAmount) || minimumBid;
-                        const newAmount = current + 0.01;
-                        setAddToPartyTipAmount(newAmount.toFixed(2));
-                      }}
-                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-r-lg transition-colors"
-                    >
-                      <Plus className="h-4 w-4 text-white" />
-                    </button>
-                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={addToPartyTipAmount}
+                    onChange={(e) => {
+                      setAddToPartyTipAmount(e.target.value);
+                    }}
+                    placeholder={`Minimum: £${minimumBid.toFixed(2)}`}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <p className="text-xs text-gray-400 mt-1">
                     Minimum tip: £{minimumBid.toFixed(2)}
                   </p>
