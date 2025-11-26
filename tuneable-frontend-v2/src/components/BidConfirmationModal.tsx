@@ -25,10 +25,40 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
+  // Capitalize tag: first letter of each word (title case)
+  const capitalizeTag = (tag: string): string => {
+    if (!tag || typeof tag !== 'string') return tag;
+    return tag
+      .trim()
+      .split(/\s+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const handleAddTag = () => {
-    const trimmedTag = tagInput.trim().toLowerCase();
-    if (trimmedTag && !tags.includes(trimmedTag) && tags.length < 5) {
-      setTags([...tags, trimmedTag]);
+    const input = tagInput.trim();
+    if (!input) return;
+
+    // Split by comma and process each tag
+    const newTags = input
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0)
+      .map(tag => capitalizeTag(tag))
+      .filter(tag => {
+        // Check if tag already exists (case-insensitive comparison)
+        const tagLower = tag.toLowerCase();
+        return !tags.some(existingTag => existingTag.toLowerCase() === tagLower);
+      });
+
+    // Add new tags (respecting the 5 tag limit)
+    const remainingSlots = 5 - tags.length;
+    if (remainingSlots > 0 && newTags.length > 0) {
+      const tagsToAdd = newTags.slice(0, remainingSlots);
+      setTags([...tags, ...tagsToAdd]);
+      setTagInput('');
+    } else if (remainingSlots === 0) {
+      // Already at max tags
       setTagInput('');
     }
   };
