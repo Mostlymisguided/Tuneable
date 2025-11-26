@@ -1131,10 +1131,12 @@ const TuneProfile: React.FC = () => {
     try {
       const response = await partyAPI.getParties();
       // Filter out parties where this media is already added (check topParties list)
-      const topPartyIds = new Set(topParties.map((p: any) => p._id));
+      // Use uuid or _id for comparison
+      const topPartyIds = new Set(topParties.map((p: any) => p.uuid || p._id));
       const filteredParties = (response.parties || []).filter((party: any) => {
         // Exclude parties already in the top parties list (media already added there)
-        return !topPartyIds.has(party._id);
+        const partyId = party.uuid || party._id;
+        return !topPartyIds.has(partyId);
       });
       setAvailableParties(filteredParties);
     } catch (err: any) {
@@ -1199,7 +1201,15 @@ const TuneProfile: React.FC = () => {
         : media.artist || 'Unknown Artist';
 
       // Use addMediaToParty which handles adding media and placing bid in one operation
-      await partyAPI.addMediaToParty(selectedPartyForAdd._id, {
+      // Use uuid if available, otherwise fallback to _id (resolvePartyId middleware handles both)
+      const partyIdToUse = selectedPartyForAdd.uuid || selectedPartyForAdd._id;
+      if (!partyIdToUse) {
+        toast.error('Invalid party ID');
+        setIsAddingToParty(false);
+        return;
+      }
+      
+      await partyAPI.addMediaToParty(partyIdToUse, {
         url,
         title: media.title,
         artist: artistName,
@@ -3651,12 +3661,15 @@ const TuneProfile: React.FC = () => {
                           party.location?.toLowerCase().includes(query)
                         );
                       })
-                      .map((party: any) => (
+                      .map((party: any) => {
+                        const partyId = party.uuid || party._id;
+                        const selectedPartyId = selectedPartyForAdd?.uuid || selectedPartyForAdd?._id;
+                        return (
                         <div
-                          key={party._id}
+                          key={partyId}
                           onClick={() => setSelectedPartyForAdd(party)}
                           className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                            selectedPartyForAdd?._id === party._id
+                            selectedPartyId === partyId
                               ? 'bg-purple-600 border-purple-500'
                               : 'bg-gray-800 border-gray-700 hover:border-purple-500/50'
                           }`}
@@ -3666,12 +3679,13 @@ const TuneProfile: React.FC = () => {
                               <h4 className="text-white font-medium">{party.name}</h4>
                               <p className="text-gray-400 text-sm">{party.location}</p>
                             </div>
-                            {selectedPartyForAdd?._id === party._id && (
+                            {selectedPartyId === partyId && (
                               <CheckCircle className="h-5 w-5 text-white" />
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 )}
               </div>
