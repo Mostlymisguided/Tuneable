@@ -331,6 +331,7 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
             },
             {
                 $project: {
+                    _id: 1, // Explicitly include _id for consistency
                     uuid: 1,
                     name: 1,
                     location: 1,

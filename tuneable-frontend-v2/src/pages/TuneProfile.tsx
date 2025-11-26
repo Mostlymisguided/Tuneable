@@ -1131,11 +1131,11 @@ const TuneProfile: React.FC = () => {
     try {
       const response = await partyAPI.getParties();
       // Filter out parties where this media is already added (check topParties list)
-      // Use uuid or _id for comparison
-      const topPartyIds = new Set(topParties.map((p: any) => p.uuid || p._id));
+      // Prefer _id over uuid for comparison
+      const topPartyIds = new Set(topParties.map((p: any) => p._id || p.uuid));
       const filteredParties = (response.parties || []).filter((party: any) => {
         // Exclude parties already in the top parties list (media already added there)
-        const partyId = party.uuid || party._id;
+        const partyId = party._id || party.uuid;
         return !topPartyIds.has(partyId);
       });
       setAvailableParties(filteredParties);
@@ -1201,8 +1201,8 @@ const TuneProfile: React.FC = () => {
         : media.artist || 'Unknown Artist';
 
       // Use addMediaToParty which handles adding media and placing bid in one operation
-      // Use uuid if available, otherwise fallback to _id (resolvePartyId middleware handles both)
-      const partyIdToUse = selectedPartyForAdd.uuid || selectedPartyForAdd._id;
+      // Prefer _id (ObjectId) over uuid - resolvePartyId middleware handles both
+      const partyIdToUse = selectedPartyForAdd._id || selectedPartyForAdd.uuid;
       if (!partyIdToUse) {
         toast.error('Invalid party ID');
         setIsAddingToParty(false);
@@ -3662,8 +3662,9 @@ const TuneProfile: React.FC = () => {
                         );
                       })
                       .map((party: any) => {
-                        const partyId = party.uuid || party._id;
-                        const selectedPartyId = selectedPartyForAdd?.uuid || selectedPartyForAdd?._id;
+                        // Prefer _id over uuid
+                        const partyId = party._id || party.uuid;
+                        const selectedPartyId = selectedPartyForAdd?._id || selectedPartyForAdd?.uuid;
                         return (
                         <div
                           key={partyId}
