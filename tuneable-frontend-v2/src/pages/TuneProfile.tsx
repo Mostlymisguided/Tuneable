@@ -1202,36 +1202,76 @@ const TuneProfile: React.FC = () => {
 
       // Use addMediaToParty which handles adding media and placing bid in one operation
       // Prefer _id (ObjectId) over uuid - resolvePartyId middleware handles both
-      const partyIdToUse = selectedPartyForAdd._id || selectedPartyForAdd.uuid;
-      if (!partyIdToUse) {
+      // Convert _id to string if it's an ObjectId object
+      const rawPartyId = selectedPartyForAdd._id || selectedPartyForAdd.uuid;
+      if (!rawPartyId) {
         toast.error('Invalid party ID');
         setIsAddingToParty(false);
         return;
       }
       
-      await partyAPI.addMediaToParty(partyIdToUse, {
-        url,
-        title: media.title,
-        artist: artistName,
-        bidAmount: tipAmount,
-        platform: mediaSource,
-        duration: media.duration || 180,
-        category: media.category || 'Music'
+      // Ensure partyId is a string (ObjectId objects need to be converted)
+      const partyIdToUse = typeof rawPartyId === 'string' ? rawPartyId : rawPartyId.toString();
+      
+      console.log('Adding media to party:', {
+        partyId: partyIdToUse,
+        partyName: selectedPartyForAdd.name,
+        mediaTitle: media.title
       });
+      
+      try {
+        const response = await partyAPI.addMediaToParty(partyIdToUse, {
+          url,
+          title: media.title,
+          artist: artistName,
+          bidAmount: tipAmount,
+          platform: mediaSource,
+          duration: media.duration || 180,
+          category: media.category || 'Music'
+        });
 
-      toast.success(`Added to ${selectedPartyForAdd.name} with £${tipAmount.toFixed(2)} tip!`);
+        console.log('Successfully added media to party:', response);
+        toast.success(`Added to ${selectedPartyForAdd.name} with £${tipAmount.toFixed(2)} tip!`);
+        
+        // Refresh top parties to show the newly added party
+        await loadTopParties();
+        
+        // Close modal and reset state
+        setShowAddToPartyModal(false);
+        setSelectedPartyForAdd(null);
+        setAddToPartyTipAmount('');
+      } catch (apiErr: any) {
+        console.error('Error adding media to party:', apiErr);
+        console.error('Error details:', {
+          status: apiErr.response?.status,
+          statusText: apiErr.response?.statusText,
+          error: apiErr.response?.data?.error,
+          message: apiErr.response?.data?.message,
+          partyId: partyIdToUse,
+          url: apiErr.config?.url,
+          method: apiErr.config?.method
+        });
       
-      // Refresh top parties to show the newly added party
-      await loadTopParties();
-      
-      // Close modal and reset state
-      setShowAddToPartyModal(false);
-      setSelectedPartyForAdd(null);
-      setAddToPartyTipAmount('');
+        // Provide more helpful error messages
+        let errorMessage = 'Failed to add tune to party';
+        if (apiErr.response?.status === 404) {
+          if (apiErr.response?.data?.error?.includes('Party not found')) {
+            errorMessage = 'Party not found. Please try selecting a different party.';
+          } else if (apiErr.response?.data?.error?.includes('Media not found in party queue')) {
+            errorMessage = 'Unable to add media to party. The media may already be in this party.';
+          } else {
+            errorMessage = 'Party or media not found. Please try again.';
+          }
+        } else if (apiErr.response?.data?.error) {
+          errorMessage = apiErr.response.data.error;
+        }
+        
+        toast.error(errorMessage);
+      }
     } catch (err: any) {
-      console.error('Error adding media to party:', err);
-      const errorMessage = err.response?.data?.error || 'Failed to add tune to party';
-      toast.error(errorMessage);
+      // Outer catch for any other errors (like invalid party ID)
+      console.error('Error in handleAddToParty:', err);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsAddingToParty(false);
     }
