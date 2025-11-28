@@ -445,8 +445,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             party = isGlobalParty;
             
             // Find ALL media that has ANY bids (party or global)
-            const Media = require('../models/Media');
-            const Bid = require('../models/Bid');
+            // Bid and Media are already required at top of file
             
             // Query all media with bids, but only populate ACTIVE bids
             // This ensures we only count active bids in the aggregate calculation
@@ -1312,7 +1311,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         const mediaAggregatePre = media.globalMediaAggregate || 0;
         
         // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
-        const Bid = require('../models/Bid');
+        // Bid is already required at top of file
         const userBidsPre = await Bid.find({
           userId: userId,
           status: 'active'
@@ -1741,7 +1740,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         const mediaAggregatePre = media.globalMediaAggregate || 0;
         
         // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
-        const Bid = require('../models/Bid');
+        // Bid is already required at top of file
         const userBidsPre = await Bid.find({
           userId: userId,
           status: 'active'
@@ -2174,9 +2173,7 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
     try {
         const { partyId } = req.params;
         const { mediaId, reason } = req.body;
-        const Bid = require('../models/Bid');
-        const User = require('../models/User');
-        const Media = require('../models/Media');
+        // Bid, User, and Media are already required at top of file
         const mongoose = require('mongoose');
         const axios = require('axios');
 
@@ -2350,7 +2347,7 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
             const mediaAggregatePre = media.globalMediaAggregate || 0;
             
             // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
-            const Bid = require('../models/Bid');
+            // Bid is already required at top of file
             const userBidsPre = await Bid.find({
               userId: userId,
               status: 'active'
@@ -2510,9 +2507,7 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
 router.post('/:partyId/media/:mediaId/unveto', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
-        const Bid = require('../models/Bid');
-        const User = require('../models/User');
-        const Media = require('../models/Media');
+        // Bid, User, and Media are already required at top of file
         const notificationService = require('../services/notificationService');
         const mongoose = require('mongoose');
 
@@ -3220,9 +3215,7 @@ router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), as
     try {
         const { partyId, bidId } = req.params;
         const userId = req.user._id;
-        const Bid = require('../models/Bid');
-        const User = require('../models/User');
-        const Media = require('../models/Media');
+        // Bid, User, and Media are already required at top of file
         const mongoose = require('mongoose');
         const bidMetricsEngine = require('../services/bidMetricsEngine');
         const artistEscrowService = require('../services/artistEscrowService');
@@ -3285,7 +3278,7 @@ router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), as
         const mediaAggregatePre = media.globalMediaAggregate || 0;
         
         // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
-        const Bid = require('../models/Bid');
+        // Bid is already required at top of file
         const userBidsPre = await Bid.find({
           userId: userId,
           status: 'active'
@@ -3458,9 +3451,8 @@ router.post('/:partyId/bids/:bidId/request-refund', authMiddleware, resolveParty
         const { partyId, bidId } = req.params;
         const { reason } = req.body;
         const userId = req.user._id;
-        const Bid = require('../models/Bid');
+        // Bid and User are already required at top of file
         const RefundRequest = require('../models/RefundRequest');
-        const User = require('../models/User');
         const Media = require('../models/Media');
         const notificationService = require('../services/notificationService');
         const mongoose = require('mongoose');
