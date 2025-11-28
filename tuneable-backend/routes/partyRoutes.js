@@ -1307,7 +1307,44 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         // Note: For first tip on new media, the tipper is typically the owner, so no tip_received notification needed
 
-        // Update user balance (already in pence, no conversion needed)
+        // Capture PRE balances BEFORE updating
+        const userBalancePre = user.balance;
+        const mediaAggregatePre = media.globalMediaAggregate || 0;
+        
+        // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
+        const Bid = require('../models/Bid');
+        const userBidsPre = await Bid.find({
+          userId: userId,
+          status: 'active'
+        }).lean();
+        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        
+        // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
+        try {
+          const tuneableLedgerService = require('../services/tuneableLedgerService');
+          await tuneableLedgerService.createTipEntry({
+            userId,
+            mediaId: media._id,
+            partyId,
+            bidId: bid._id,
+            amount: bidAmountPence,
+            userBalancePre,
+            userAggregatePre,
+            mediaAggregatePre,
+            referenceTransactionId: bid._id,
+            metadata: {
+              isNewMedia: isNewMediaEntry,
+              queuePosition,
+              queueSize,
+              platform: detectedPlatform
+            }
+          });
+        } catch (error) {
+          console.error('Failed to create ledger entry for bid:', bid._id, error);
+          // Don't fail the bid if ledger entry fails - log and continue
+        }
+        
+        // THEN update user balance (already in pence, no conversion needed)
         user.balance = user.balance - bidAmountPence;
         await user.save();
 
@@ -1699,8 +1736,43 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // Note: Bid tracking is now handled automatically by BidMetricsEngine
         // via the Bid model's post('save') hook - no need to call manually
 
-        // Update user balance
-        // Update balance (already in pence, no conversion needed)
+        // Capture PRE balances BEFORE updating
+        const userBalancePre = user.balance;
+        const mediaAggregatePre = media.globalMediaAggregate || 0;
+        
+        // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
+        const Bid = require('../models/Bid');
+        const userBidsPre = await Bid.find({
+          userId: userId,
+          status: 'active'
+        }).lean();
+        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        
+        // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
+        try {
+          const tuneableLedgerService = require('../services/tuneableLedgerService');
+          await tuneableLedgerService.createTipEntry({
+            userId,
+            mediaId: actualMediaId,
+            partyId,
+            bidId: bid._id,
+            amount: bidAmountPence,
+            userBalancePre,
+            userAggregatePre,
+            mediaAggregatePre,
+            referenceTransactionId: bid._id,
+            metadata: {
+              queuePosition,
+              queueSize,
+              platform: detectedPlatform
+            }
+          });
+        } catch (error) {
+          console.error('Failed to create ledger entry for bid:', bid._id, error);
+          // Don't fail the bid if ledger entry fails - log and continue
+        }
+        
+        // THEN update user balance (already in pence, no conversion needed)
         user.balance = user.balance - bidAmountPence;
         await user.save();
 
@@ -2264,7 +2336,66 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
         const refundPromises = [];
         
         for (const [userId, refund] of refundsByUser) {
-            // Refund user balance (add back the amount)
+            // Get user and media for PRE balances
+            const user = await User.findById(userId);
+            const media = await Media.findById(mediaId);
+            
+            if (!user || !media) {
+                console.warn(`⚠️ Skipping refund - user or media not found`);
+                continue;
+            }
+            
+            // Capture PRE balances BEFORE updating
+            const userBalancePre = user.balance || 0;
+            const mediaAggregatePre = media.globalMediaAggregate || 0;
+            
+            // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
+            const Bid = require('../models/Bid');
+            const userBidsPre = await Bid.find({
+              userId: userId,
+              status: 'active'
+            }).lean();
+            const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+            
+            // Create ledger entries for each bid being refunded BEFORE balance update
+            // Process bids in order to maintain accurate balance and aggregate tracking
+            let runningUserBalance = userBalancePre;
+            let runningUserAggregate = userAggregatePre;
+            let runningMediaAggregate = mediaAggregatePre;
+            
+            for (const bidId of refund.bidIds) {
+                try {
+                    const bid = await Bid.findById(bidId);
+                    if (bid) {
+                        const tuneableLedgerService = require('../services/tuneableLedgerService');
+                        await tuneableLedgerService.createRefundEntry({
+                            userId: user._id,
+                            mediaId: media._id,
+                            partyId: partyId,
+                            bidId: bid._id,
+                            amount: bid.amount,
+                            userBalancePre: runningUserBalance, // Cumulative balance
+                            userAggregatePre: runningUserAggregate, // Adjust per bid
+                            mediaAggregatePre: runningMediaAggregate, // Adjust per bid
+                            referenceTransactionId: null,
+                            metadata: {
+                                reason: 'Media vetoed in party',
+                                vetoedBy: req.user._id.toString()
+                            }
+                        });
+                        
+                        // Update running balances/aggregates for next bid
+                        runningUserBalance = runningUserBalance + bid.amount;
+                        runningUserAggregate = Math.max(0, runningUserAggregate - bid.amount);
+                        runningMediaAggregate = Math.max(0, runningMediaAggregate - bid.amount);
+                    }
+                } catch (ledgerError) {
+                    console.error(`Failed to create ledger entry for refund bid ${bidId}:`, ledgerError);
+                    // Don't fail the refund if ledger entry fails
+                }
+            }
+            
+            // Refund user balance (add back the amount) AFTER ledger entries are created
             refundPromises.push(
                 User.findByIdAndUpdate(userId, {
                     $inc: { balance: refund.totalAmount }
@@ -3149,6 +3280,41 @@ router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), as
             return res.status(404).json({ error: 'Party not found' });
         }
 
+        // Capture PRE balances BEFORE updating
+        const userBalancePre = user.balance || 0;
+        const mediaAggregatePre = media.globalMediaAggregate || 0;
+        
+        // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
+        const Bid = require('../models/Bid');
+        const userBidsPre = await Bid.find({
+          userId: userId,
+          status: 'active'
+        }).lean();
+        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        
+        // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
+        try {
+          const tuneableLedgerService = require('../services/tuneableLedgerService');
+          await tuneableLedgerService.createRefundEntry({
+            userId: user._id,
+            mediaId: media._id,
+            partyId: partyId,
+            bidId: bid._id,
+            amount: bid.amount,
+            userBalancePre,
+            userAggregatePre,
+            mediaAggregatePre,
+            referenceTransactionId: null,
+            metadata: {
+              reason: 'User removed tip within 10-minute window',
+              removedBy: userId.toString()
+            }
+          });
+        } catch (ledgerError) {
+          console.error('Failed to create ledger entry for instant removal refund:', ledgerError);
+          // Don't fail the refund if ledger entry fails - log and continue
+        }
+        
         // Refund the bid amount to user balance
         const refundAmount = bid.amount; // Already in pence
         user.balance = (user.balance || 0) + refundAmount;

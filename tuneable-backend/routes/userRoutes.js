@@ -3998,6 +3998,41 @@ router.post('/admin/refunds/:requestId/process', authMiddleware, adminMiddleware
         });
       }
       
+      // Capture PRE balances BEFORE updating
+      const userBalancePre = user.balance || 0;
+      const mediaAggregatePre = media.globalMediaAggregate || 0;
+      
+      // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
+      const Bid = require('../models/Bid');
+      const userBidsPre = await Bid.find({
+        userId: user._id,
+        status: 'active'
+      }).lean();
+      const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+      
+      // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
+      try {
+        const tuneableLedgerService = require('../services/tuneableLedgerService');
+        await tuneableLedgerService.createRefundEntry({
+          userId: user._id,
+          mediaId: media._id,
+          partyId: party?._id || null,
+          bidId: bid._id,
+          amount: refundRequest.amount,
+          userBalancePre,
+          userAggregatePre,
+          mediaAggregatePre,
+          referenceTransactionId: refundRequest._id,
+          metadata: {
+            reason: refundRequest.reason,
+            processedBy: adminId.toString()
+          }
+        });
+      } catch (ledgerError) {
+        console.error('Failed to create ledger entry for refund:', ledgerError);
+        // Don't fail the refund if ledger entry fails - log and continue
+      }
+      
       // Refund the bid amount to user balance
       const refundAmount = refundRequest.amount; // Already in pence
       user.balance = (user.balance || 0) + refundAmount;

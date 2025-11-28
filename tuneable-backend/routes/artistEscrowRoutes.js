@@ -525,11 +525,20 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
     const requestedAmount = payoutRequest.requestedAmount;
     
     if (status === 'completed') {
-      // Use atomic update to prevent race conditions - deduct balance atomically
-      // This ensures balance is sufficient and update happens in one operation
-      const balanceBefore = user.artistEscrowBalance || 0;
+      // Capture PRE balances BEFORE atomic update
+      const escrowBalancePre = user.artistEscrowBalance || 0;
       const totalEscrowEarned = user.totalEscrowEarned || 0;
       
+      // Calculate user aggregate PRE (total tips placed by user)
+      const Bid = require('../models/Bid');
+      const userBidsPre = await Bid.find({
+        userId: user._id,
+        status: 'active'
+      }).lean();
+      const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+      
+      // Use atomic update to prevent race conditions - deduct balance atomically
+      // This ensures balance is sufficient and update happens in one operation
       const updatedUser = await User.findOneAndUpdate(
         { 
           _id: user._id, 
@@ -546,8 +555,29 @@ router.post('/admin/process-payout', authMiddleware, adminMiddleware, async (req
         // Balance check failed - user balance was insufficient or changed
         return res.status(400).json({
           success: false,
-          error: `User's current balance (£${(balanceBefore / 100).toFixed(2)}) is less than requested amount (£${(requestedAmount / 100).toFixed(2)}) or balance was modified`
+          error: `User's current balance (£${(escrowBalancePre / 100).toFixed(2)}) is less than requested amount (£${(requestedAmount / 100).toFixed(2)}) or balance was modified`
         });
+      }
+      
+      // Create ledger entry AFTER successful balance update
+      try {
+        const tuneableLedgerService = require('../services/tuneableLedgerService');
+        await tuneableLedgerService.createPayoutEntry({
+          userId: user._id,
+          amount: requestedAmount,
+          escrowBalancePre,
+          userAggregatePre,
+          referenceTransactionId: payoutRequest._id,
+          metadata: {
+            payoutMethod: payoutMethod || payoutRequest.payoutMethod,
+            payoutDetails: payoutDetails || payoutRequest.payoutDetails,
+            notes: notes,
+            processedBy: req.user._id.toString()
+          }
+        });
+      } catch (ledgerError) {
+        console.error('Failed to create ledger entry for payout:', ledgerError);
+        // Don't fail the payout if ledger entry fails - log and continue
       }
       
       // Reload user to ensure we have the full history array (might be needed for proper subdocument handling)

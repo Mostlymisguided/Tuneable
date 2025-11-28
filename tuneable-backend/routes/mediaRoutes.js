@@ -3392,7 +3392,65 @@ router.post('/:mediaId/veto', authMiddleware, adminMiddleware, async (req, res) 
     const refundPromises = [];
     
     for (const [userId, refund] of refundsByUser) {
-      // Refund user balance (add back the amount)
+      // Get user and media for PRE balances
+      const user = await User.findById(userId);
+      
+      if (!user || !media) {
+        console.warn(`⚠️ Skipping refund - user or media not found`);
+        continue;
+      }
+      
+      // Capture PRE balances BEFORE updating
+      const userBalancePre = user.balance || 0;
+      const mediaAggregatePre = media.globalMediaAggregate || 0;
+      
+      // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
+      const Bid = require('../models/Bid');
+      const userBidsPre = await Bid.find({
+        userId: userId,
+        status: 'active'
+      }).lean();
+      const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+      
+      // Create ledger entries for each bid being refunded BEFORE balance update
+      // Process bids in order to maintain accurate balance and aggregate tracking
+      let runningUserBalance = userBalancePre;
+      let runningUserAggregate = userAggregatePre;
+      let runningMediaAggregate = mediaAggregatePre;
+      
+      for (const bidId of refund.bidIds) {
+        try {
+          const bid = await Bid.findById(bidId);
+          if (bid) {
+            const tuneableLedgerService = require('../services/tuneableLedgerService');
+            await tuneableLedgerService.createRefundEntry({
+              userId: user._id,
+              mediaId: media._id,
+              partyId: bid.partyId || null,
+              bidId: bid._id,
+              amount: bid.amount,
+              userBalancePre: runningUserBalance, // Cumulative balance
+              userAggregatePre: runningUserAggregate, // Adjust per bid
+              mediaAggregatePre: runningMediaAggregate, // Adjust per bid
+              referenceTransactionId: null,
+              metadata: {
+                reason: 'Media globally vetoed',
+                vetoedBy: req.user._id.toString()
+              }
+            });
+            
+            // Update running balances/aggregates for next bid
+            runningUserBalance = runningUserBalance + bid.amount;
+            runningUserAggregate = Math.max(0, runningUserAggregate - bid.amount);
+            runningMediaAggregate = Math.max(0, runningMediaAggregate - bid.amount);
+          }
+        } catch (ledgerError) {
+          console.error(`Failed to create ledger entry for refund bid ${bidId}:`, ledgerError);
+          // Don't fail the refund if ledger entry fails
+        }
+      }
+      
+      // Refund user balance (add back the amount) AFTER ledger entries are created
       refundPromises.push(
         User.findByIdAndUpdate(userId, {
           $inc: { balance: refund.totalAmount }

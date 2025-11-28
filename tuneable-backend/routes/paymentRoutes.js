@@ -184,6 +184,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         
         const balanceBefore = user.balance || 0;
         
+        // Calculate user aggregate PRE (total tips placed)
+        const Bid = require('../models/Bid');
+        const userBidsPre = await Bid.find({
+          userId: user._id,
+          status: 'active'
+        }).lean();
+        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        
         // Update user balance - find by UUID instead of _id
         // Balance is stored in pence
         const updatedUser = await User.findOneAndUpdate(
@@ -195,9 +203,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         if (updatedUser) {
           console.log(`Wallet top-up successful: User ${userId} added £${amountPounds}, new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
           
-          // Create wallet transaction record
+          // Create wallet transaction record FIRST
+          let walletTransaction;
           try {
-            const walletTransaction = await WalletTransaction.create({
+            walletTransaction = await WalletTransaction.create({
               userId: updatedUser._id,
               user_uuid: updatedUser.uuid,
               amount: amountPence,
@@ -217,6 +226,28 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               }
             });
             console.log(`✅ Created wallet transaction record for top-up: ${session.id}`);
+            
+            // Create ledger entry AFTER WalletTransaction is created (so we can reference it)
+            try {
+              const tuneableLedgerService = require('../services/tuneableLedgerService');
+              await tuneableLedgerService.createTopUpEntry({
+                userId: updatedUser._id,
+                amount: amountPence,
+                userBalancePre: balanceBefore,
+                userAggregatePre,
+                referenceTransactionId: walletTransaction._id,
+                metadata: {
+                  stripeSessionId: session.id,
+                  stripePaymentIntentId: session.payment_intent,
+                  currency: session.currency || 'gbp',
+                  customerEmail: session.customer_email,
+                  customerDetails: session.customer_details
+                }
+              });
+            } catch (ledgerError) {
+              console.error('Failed to create ledger entry for top-up:', ledgerError);
+              // Don't fail the webhook if ledger entry fails - log and continue
+            }
             
             // Store verification hash
             try {
