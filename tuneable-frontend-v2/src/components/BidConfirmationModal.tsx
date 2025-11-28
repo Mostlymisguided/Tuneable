@@ -40,10 +40,12 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     if (!input) return;
 
     // Split by comma and process each tag
+    // Handles: "tag1, tag2, tag3" or "tag1,tag2,tag3" or "tag1,,tag2," (multiple/trailing commas)
+    // Filters out empty strings from multiple commas or trailing commas
     const newTags = input
       .split(',')
       .map(tag => tag.trim())
-      .filter(tag => tag.length > 0)
+      .filter(tag => tag.length > 0) // Filter empty strings from multiple/trailing commas
       .map(tag => capitalizeTag(tag))
       .filter(tag => {
         // Check if tag already exists (case-insensitive comparison)

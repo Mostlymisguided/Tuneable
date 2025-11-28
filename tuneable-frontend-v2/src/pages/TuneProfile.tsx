@@ -700,10 +700,24 @@ const TuneProfile: React.FC = () => {
     
     try {
       // Convert input strings to arrays before saving
-      const tags = tagInput.split(',').map(t => t.trim()).filter(t => t);
-      const genres = genresInput.split(',').map(g => g.trim()).filter(g => g.length > 0);
-      const elements = elementsInput.split(',').map(el => el.trim()).filter(el => el.length > 0);
-      const featuring = featuringInput.split(',').map(f => f.trim()).filter(f => f.length > 0);
+      // Handle comma-separated input consistently across all fields
+      // Filters out empty strings from multiple commas or trailing commas
+      const tags = tagInput
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0); // Explicitly filter empty strings
+      const genres = genresInput
+        .split(',')
+        .map(g => g.trim())
+        .filter(g => g.length > 0);
+      const elements = elementsInput
+        .split(',')
+        .map(el => el.trim())
+        .filter(el => el.length > 0);
+      const featuring = featuringInput
+        .split(',')
+        .map(f => f.trim())
+        .filter(f => f.length > 0);
       
       // Convert duration from MM:SS to seconds
       const durationInSeconds = mmssToSeconds(editForm.duration);
@@ -785,8 +799,13 @@ const TuneProfile: React.FC = () => {
   };
 
   // Process tags from input string
+  // Handles comma-separated input: "tag1, tag2, tag3" or "tag1,tag2,tag3"
+  // Filters out empty strings from multiple commas or trailing commas
   const handleTagInputBlur = () => {
-    const tags = tagInput.split(',').map(t => t.trim()).filter(t => t);
+    const tags = tagInput
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0); // Explicitly filter empty strings
     setEditForm({ ...editForm, tags });
   };
 
