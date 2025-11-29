@@ -108,6 +108,7 @@ const Admin: React.FC = () => {
   const [editingField, setEditingField] = useState<'title' | 'artist' | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
+  const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels'>('users');
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
     user: 0,
@@ -540,10 +541,10 @@ const Admin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'labels' && isAdmin) {
+    if (activeTab === 'users-labels' && usersLabelsSubTab === 'labels' && isAdmin) {
       loadLabels();
     }
-  }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab]);
+  }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab, usersLabelsSubTab]);
 
   const loadAllVetoes = async () => {
     try {
@@ -843,8 +844,7 @@ const Admin: React.FC = () => {
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: BarChart3 },
-    { id: 'users', name: 'Users', icon: Users },
-    { id: 'labels', name: 'Labels', icon: Building },
+    { id: 'users-labels', name: 'Users & Labels', icon: Users },
     { id: 'bids', name: 'Bids', icon: DollarSign },
     { id: 'media-management', name: 'Media', icon: Music },
     { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
@@ -1094,9 +1094,42 @@ const Admin: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'users' && (
+        {activeTab === 'users-labels' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">User Management</h2>
+            {/* Sub-tabs for Users & Labels */}
+            <div className="bg-gray-800 border-b border-gray-700">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-8">
+                  <button
+                    onClick={() => setUsersLabelsSubTab('users')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      usersLabelsSubTab === 'users'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Users
+                  </button>
+                  <button
+                    onClick={() => setUsersLabelsSubTab('labels')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      usersLabelsSubTab === 'labels'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    Labels
+                  </button>
+                </nav>
+              </div>
+            </div>
+            
+            {/* Users Content */}
+            {usersLabelsSubTab === 'users' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white">User Management</h2>
             
             <div className="bg-gray-800 rounded-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-700">
@@ -1354,13 +1387,14 @@ const Admin: React.FC = () => {
                 </table>
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'labels' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Label Management</h2>
+              </div>
+            )}
+            
+            {/* Labels Content */}
+            {usersLabelsSubTab === 'labels' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">Label Management</h2>
               <button
                 onClick={loadLabels}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
@@ -1585,6 +1619,8 @@ const Admin: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
               </div>
             )}
           </div>
