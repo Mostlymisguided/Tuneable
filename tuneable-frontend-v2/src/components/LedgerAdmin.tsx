@@ -6,18 +6,13 @@ import {
   Search, 
   Shield, 
   TrendingUp, 
-  TrendingDown, 
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Filter,
   Download,
   CheckCircle,
   XCircle,
   Eye,
-  User,
-  Music,
-  Calendar,
   DollarSign,
   RefreshCw,
   Clock
@@ -808,11 +803,11 @@ const LedgerAdmin: React.FC = () => {
                     View User Profile
                   </button>
                 )}
-                {selectedEntry.mediaId && (
+                {selectedEntry.mediaId && selectedEntry.mediaId._id && (
                   <button
                     onClick={() => {
                       setShowDetailsModal(false);
-                      navigate(`/tune/${selectedEntry.mediaId._id}`);
+                      navigate(`/tune/${selectedEntry.mediaId!._id}`);
                     }}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                   >

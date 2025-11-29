@@ -1468,6 +1468,25 @@ export const artistEscrowAPI = {
     const response = await api.get('/artist-escrow/stats');
     return response.data;
   },
+
+  // Admin: Get all payout requests (with optional status filter)
+  getPayouts: async (status?: 'pending' | 'processing' | 'completed' | 'rejected' | 'all') => {
+    const params = status ? { status } : {};
+    const response = await api.get('/artist-escrow/admin/payouts', { params });
+    return response.data;
+  },
+
+  // Admin: Process a payout (complete or reject)
+  processPayout: async (requestId: string, status: 'completed' | 'rejected', payoutMethod?: string, payoutDetails?: Record<string, any>, notes?: string) => {
+    const response = await api.post('/artist-escrow/admin/process-payout', {
+      requestId,
+      status,
+      payoutMethod,
+      payoutDetails,
+      notes
+    });
+    return response.data;
+  },
 };
 
 export const ledgerAPI = {
