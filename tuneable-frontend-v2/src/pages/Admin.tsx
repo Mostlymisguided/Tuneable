@@ -116,6 +116,7 @@ const Admin: React.FC = () => {
   const [editingValue, setEditingValue] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
   const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels' | 'collectives'>('users');
+  const [bidsMediaVetoesSubTab, setBidsMediaVetoesSubTab] = useState<'bids' | 'media' | 'vetoes'>('bids');
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
     user: 0,
@@ -636,10 +637,10 @@ const Admin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'vetoed-bids' && isAdmin) {
+    if (activeTab === 'bids-media-vetoes' && bidsMediaVetoesSubTab === 'vetoes' && isAdmin) {
       loadAllVetoes();
     }
-  }, [vetoedBidsSortDirection, vetoedBidsPage, activeTab, vetoesFilter]);
+  }, [vetoedBidsSortDirection, vetoedBidsPage, activeTab, bidsMediaVetoesSubTab, vetoesFilter]);
 
   const loadBids = async () => {
     try {
@@ -689,10 +690,10 @@ const Admin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'bids' && isAdmin) {
+    if (activeTab === 'bids-media-vetoes' && bidsMediaVetoesSubTab === 'bids' && isAdmin) {
       loadBids();
     }
-  }, [bidsSortField, bidsSortDirection, bidsPage, bidsStatusFilter, bidsSearchQuery, bidsScopeFilter, activeTab]);
+  }, [bidsSortField, bidsSortDirection, bidsPage, bidsStatusFilter, bidsSearchQuery, bidsScopeFilter, activeTab, bidsMediaVetoesSubTab]);
 
   const loadMedia = async () => {
     try {
@@ -807,7 +808,7 @@ const Admin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'media-management' && isAdmin) {
+    if (activeTab === 'bids-media-vetoes' && bidsMediaVetoesSubTab === 'media' && isAdmin) {
       // Debounce search query to avoid race conditions
       const timeoutId = setTimeout(() => {
         // Only search if query is empty or at least 2 characters
@@ -935,11 +936,9 @@ const Admin: React.FC = () => {
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: BarChart3 },
-    { id: 'users-labels', name: 'Users & Labels', icon: Users },
-    { id: 'bids', name: 'Bids', icon: DollarSign },
-    { id: 'media-management', name: 'Media', icon: Music },
-    { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
-    { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
+    { id: 'users-labels', name: 'Users Labels Collectives', icon: Users },
+    { id: 'bids-media-vetoes', name: 'Bids Media Vetoes', icon: DollarSign },
+    { id: 'reports', name: 'Reports Apps Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
     { id: 'ledger', name: 'Ledger', icon: Database },
     { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -1985,17 +1984,61 @@ const Admin: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'bids' && (
+        {activeTab === 'bids-media-vetoes' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Tip Management</h2>
-              <button
-                onClick={loadBids}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-              >
-                Refresh
-              </button>
+            {/* Sub-tabs for Bids, Media & Vetoes */}
+            <div className="bg-gray-800 border-b border-gray-700">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-8">
+                  <button
+                    onClick={() => setBidsMediaVetoesSubTab('bids')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      bidsMediaVetoesSubTab === 'bids'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Bids
+                  </button>
+                  <button
+                    onClick={() => setBidsMediaVetoesSubTab('media')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      bidsMediaVetoesSubTab === 'media'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Music className="h-4 w-4 mr-2" />
+                    Media
+                  </button>
+                  <button
+                    onClick={() => setBidsMediaVetoesSubTab('vetoes')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      bidsMediaVetoesSubTab === 'vetoes'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Vetoes
+                  </button>
+                </nav>
+              </div>
             </div>
+
+            {/* Bids Content */}
+            {bidsMediaVetoesSubTab === 'bids' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">Tip Management</h2>
+                  <button
+                    onClick={loadBids}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
 
             {/* Filters */}
             <div className="bg-gray-800 rounded-lg p-4">
@@ -2272,23 +2315,22 @@ const Admin: React.FC = () => {
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {activeTab === 'media-management' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Media Management</h2>
-              <button
-                onClick={loadMedia}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
+            {/* Media Content */}
+            {bidsMediaVetoesSubTab === 'media' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">Media Management</h2>
+                  <button
+                    onClick={loadMedia}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
 
-            {/* Filters */}
-            <div className="bg-gray-800 rounded-lg p-4">
+                {/* Filters */}
+                <div className="bg-gray-800 rounded-lg p-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -2687,21 +2729,20 @@ const Admin: React.FC = () => {
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {activeTab === 'vetoed-bids' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Vetoes</h2>
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
-                  <span>🌍 Global: {vetoesSummary.global}</span>
-                  <span>🎉 Party: {vetoesSummary.party}</span>
-                  <span>💰 Bid: {vetoesSummary.bid}</span>
-                  <span className="text-gray-500">Total: {vetoesSummary.total}</span>
-                </div>
-              </div>
+            {/* Vetoes Content */}
+            {bidsMediaVetoesSubTab === 'vetoes' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Vetoes</h2>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+                      <span>🌍 Global: {vetoesSummary.global}</span>
+                      <span>🎉 Party: {vetoesSummary.party}</span>
+                      <span>💰 Bid: {vetoesSummary.bid}</span>
+                      <span className="text-gray-500">Total: {vetoesSummary.total}</span>
+                    </div>
+                  </div>
               <button
                 onClick={loadAllVetoes}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
