@@ -157,6 +157,25 @@ const mediaSchema = new mongoose.Schema({
   // AUTO-GENERATED: All creator names for search/discovery
   creatorNames: { type: [String], default: [] },
   
+  // AI Usage Tracking (MVP)
+  aiUsage: {
+    used: { type: Boolean, default: false },
+    disclosure: {
+      type: String,
+      enum: ['none', 'partial', 'full'],
+      default: 'none'
+    },
+    tools: [{
+      category: {
+        type: String,
+        enum: ['generation', 'enhancement', 'mixing', 'mastering', 'composition', 'lyrics', 'other']
+      },
+      name: { type: String }, // e.g., "ChatGPT", "Stable Diffusion", "LANDR"
+      provider: { type: String }, // e.g., "OpenAI", "Stability AI", "LANDR"
+      _id: false
+    }]
+  },
+  
   // Technical metadata (music-specific)
   // mediaOwners: Array of users with ownership percentages for revenue distribution
   mediaOwners: [{
@@ -420,6 +439,8 @@ mediaSchema.index({ "author.verified": 1 }); // Index for verified author querie
 mediaSchema.index({ "label.name": 1 }); // Index for label searches
 mediaSchema.index({ "label.labelId": 1 }); // Index for Label model references
 mediaSchema.index({ "artist.collectiveId": 1 }); // Index for Collective references in artist
+mediaSchema.index({ "aiUsage.used": 1 }); // Index for AI usage filtering
+mediaSchema.index({ "aiUsage.disclosure": 1 }); // Index for disclosure level filtering
 mediaSchema.index({ "producer.collectiveId": 1 }); // Index for Collective references in producer
 mediaSchema.index({ "featuring.collectiveId": 1 }); // Index for Collective references in featuring
 // Note: Other creator roles (songwriter, composer, host, guest, etc.) also support collectiveId but indexes are optional for now
