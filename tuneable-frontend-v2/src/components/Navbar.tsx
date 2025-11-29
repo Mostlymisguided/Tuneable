@@ -25,7 +25,12 @@ const Navbar: React.FC = () => {
                 alt="Tuneable Logo" 
                 className="h-6 w-6 sm:h-8 sm:w-8"
               />
-              <span className="hidden sm:block text-lg sm:text-xl font-bold text-white">Tuneable</span>
+              <div className="hidden sm:flex flex-col items-start">
+                <span className="text-lg sm:text-xl font-bold text-white">Tuneable</span>
+                <span className="text-[10px] font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white px-1.5 py-0.5 rounded mt-0.5">
+                  BETA
+                </span>
+              </div>
             </Link>
           </div>
 
