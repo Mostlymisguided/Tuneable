@@ -790,6 +790,22 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleVetoMedia = async (mediaId: string, mediaTitle: string) => {
+    const reason = prompt(`Veto "${mediaTitle}"?\n\nEnter reason (optional):`);
+    if (reason === null) {
+      return; // User cancelled
+    }
+
+    try {
+      const result = await mediaAPI.vetoMedia(mediaId, reason || undefined);
+      toast.success(`Media vetoed successfully. ${result.refundedBidsCount || 0} bids refunded.`);
+      loadMedia(); // Reload to get updated status
+    } catch (error: any) {
+      console.error('Error vetoing media:', error);
+      toast.error(error.response?.data?.error || 'Failed to veto media');
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'media-management' && isAdmin) {
       loadMedia();
@@ -2602,7 +2618,9 @@ const Admin: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col gap-1">
-                              {item.rightsCleared ? (
+                              {item.status === 'vetoed' ? (
+                                <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
+                              ) : item.rightsCleared ? (
                                 <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Rights Cleared</span>
                               ) : (
                                 <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>
@@ -2623,6 +2641,15 @@ const Admin: React.FC = () => {
                               >
                                 View
                               </button>
+                              {item.status !== 'vetoed' && (
+                                <button
+                                  onClick={() => handleVetoMedia(item._id, item.title)}
+                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                  title="Veto media globally"
+                                >
+                                  Veto
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
