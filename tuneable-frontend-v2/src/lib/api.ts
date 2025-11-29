@@ -1194,6 +1194,27 @@ export const collectiveAPI = {
     const response = await api.put(`/collectives/${collectiveId}/profile-picture`, formData);
     return response.data;
   },
+
+  // Get all collectives (admin only)
+  getAllCollectives: async (params?: {
+    verificationStatus?: string;
+    genre?: string;
+    type?: 'band' | 'collective' | 'production_company' | 'other';
+    search?: string;
+    sortBy?: 'name' | 'verificationStatus' | 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
+    sortOrder?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/collectives/admin/all', { params });
+    return response.data;
+  },
+
+  // Verify collective (admin only)
+  verifyCollective: async (collectiveId: string) => {
+    const response = await api.post(`/collectives/${collectiveId}/verify`);
+    return response.data;
+  },
 };
 
 export const claimAPI = {

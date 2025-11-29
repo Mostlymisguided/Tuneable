@@ -770,6 +770,103 @@ router.patch('/:slug/members/:userId/role', authMiddleware, async (req, res) => 
 // ADMIN ROUTES
 // ========================================
 
+// Get all collectives (admin only)
+router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { 
+      verificationStatus, 
+      genre,
+      type,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1, 
+      limit = 20 
+    } = req.query;
+    
+    const query = {};
+    if (verificationStatus) {
+      query.verificationStatus = verificationStatus;
+    }
+    if (genre) {
+      query.genres = genre;
+    }
+    if (type) {
+      query.type = type;
+    }
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    // Build sort object
+    const sort = {};
+    if (sortBy === 'name') {
+      sort.name = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'verificationStatus') {
+      sort.verificationStatus = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'totalBidAmount' || sortBy === 'globalCollectiveAggregate') {
+      sort['stats.globalCollectiveAggregate'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'memberCount') {
+      sort['stats.memberCount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'releaseCount') {
+      sort['stats.releaseCount'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'lastBidAt') {
+      sort['stats.lastBidAt'] = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sort.createdAt = sortOrder === 'desc' ? -1 : 1;
+    }
+
+    const collectives = await Collective.find(query)
+      .select('name slug email profilePicture verificationStatus verificationMethod verifiedAt verifiedBy stats.globalCollectiveAggregate stats.memberCount stats.releaseCount stats.lastBidAt genres type createdAt updatedAt')
+      .populate('members.userId', 'username email uuid profilePic')
+      .populate('verifiedBy', 'username')
+      .sort(sort)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    // Format collectives to include founder/admin info
+    const formattedCollectives = collectives.map(collective => {
+      const founders = (collective.members || [])
+        .filter(member => member.role === 'founder' && !member.leftAt)
+        .map(member => ({
+          username: member.userId?.username || 'Unknown',
+          email: member.userId?.email || '',
+          uuid: member.userId?.uuid || '',
+          profilePic: member.userId?.profilePic || null
+        }));
+
+      const admins = (collective.members || [])
+        .filter(member => member.role === 'admin' && !member.leftAt)
+        .map(member => ({
+          username: member.userId?.username || 'Unknown',
+          email: member.userId?.email || '',
+          uuid: member.userId?.uuid || '',
+          profilePic: member.userId?.profilePic || null
+        }));
+
+      return {
+        ...collective,
+        founders,
+        admins,
+        ownerCount: founders.length
+      };
+    });
+
+    const total = await Collective.countDocuments(query);
+
+    res.json({
+      collectives: formattedCollectives,
+      totalPages: Math.ceil(total / limit),
+      currentPage: parseInt(page),
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching admin collectives:', error);
+    res.status(500).json({ error: 'Failed to fetch collectives', details: error.message });
+  }
+});
+
 // Verify collective (admin only)
 router.post('/:id/verify', authMiddleware, adminMiddleware, async (req, res) => {
   try {

@@ -27,7 +27,7 @@ import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
-import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, reportAPI, artistEscrowAPI } from '../lib/api';
+import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
@@ -79,6 +79,12 @@ const Admin: React.FC = () => {
   const [labelSortDirection, setLabelSortDirection] = useState<'asc' | 'desc'>('desc');
   const [labelFilterStatus, setLabelFilterStatus] = useState<string>('');
   const [labelSearchQuery, setLabelSearchQuery] = useState<string>('');
+  const [collectives, setCollectives] = useState<any[]>([]);
+  const [isLoadingCollectives, setIsLoadingCollectives] = useState(false);
+  const [collectiveSortField, setCollectiveSortField] = useState<string>('createdAt');
+  const [collectiveSortDirection, setCollectiveSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [collectiveFilterStatus, setCollectiveFilterStatus] = useState<string>('');
+  const [collectiveSearchQuery, setCollectiveSearchQuery] = useState<string>('');
   const [isLoadingVetoedBids, setIsLoadingVetoedBids] = useState(false);
   const [vetoedBidsSortDirection, setVetoedBidsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [vetoedBidsPage, setVetoedBidsPage] = useState<number>(1);
@@ -109,7 +115,7 @@ const Admin: React.FC = () => {
   const [editingField, setEditingField] = useState<'title' | 'artist' | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
-  const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels'>('users');
+  const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels' | 'collectives'>('users');
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
     user: 0,
@@ -546,6 +552,66 @@ const Admin: React.FC = () => {
       loadLabels();
     }
   }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab, usersLabelsSubTab]);
+
+  const loadCollectives = async () => {
+    try {
+      setIsLoadingCollectives(true);
+      const params: any = {
+        sortBy: collectiveSortField,
+        sortOrder: collectiveSortDirection,
+        page: 1,
+        limit: 100
+      };
+      if (collectiveFilterStatus) {
+        params.verificationStatus = collectiveFilterStatus;
+      }
+      if (collectiveSearchQuery) {
+        params.search = collectiveSearchQuery;
+      }
+      const data = await collectiveAPI.getAllCollectives(params);
+      setCollectives(data.collectives || []);
+    } catch (error) {
+      console.error('Error loading collectives:', error);
+      toast.error('Failed to load collectives');
+    } finally {
+      setIsLoadingCollectives(false);
+    }
+  };
+
+  const handleCollectiveSort = (field: string) => {
+    if (collectiveSortField === field) {
+      setCollectiveSortDirection(collectiveSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setCollectiveSortField(field);
+      setCollectiveSortDirection('desc');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'users-labels' && usersLabelsSubTab === 'collectives' && isAdmin) {
+      loadCollectives();
+    }
+  }, [collectiveSortField, collectiveSortDirection, collectiveFilterStatus, collectiveSearchQuery, activeTab, usersLabelsSubTab]);
+
+  const getCollectiveSortIcon = (field: string) => {
+    if (collectiveSortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
+    }
+    return collectiveSortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
+  };
+
+  const handleVerifyCollective = async (collectiveId: string) => {
+    try {
+      await collectiveAPI.verifyCollective(collectiveId);
+      toast.success('Collective verified successfully');
+      loadCollectives();
+    } catch (error: any) {
+      console.error('Error verifying collective:', error);
+      toast.error(error.response?.data?.error || 'Failed to verify collective');
+    }
+  };
 
   const loadAllVetoes = async () => {
     try {
@@ -1124,6 +1190,17 @@ const Admin: React.FC = () => {
                     <Building className="h-4 w-4 mr-2" />
                     Labels
                   </button>
+                  <button
+                    onClick={() => setUsersLabelsSubTab('collectives')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      usersLabelsSubTab === 'collectives'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Collectives
+                  </button>
                 </nav>
               </div>
             </div>
@@ -1623,6 +1700,243 @@ const Admin: React.FC = () => {
                 </div>
               </div>
             )}
+              </div>
+            )}
+
+            {/* Collectives Content */}
+            {usersLabelsSubTab === 'collectives' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">Collective Management</h2>
+                  <button
+                    onClick={loadCollectives}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Search by Name
+                      </label>
+                      <input
+                        type="text"
+                        value={collectiveSearchQuery}
+                        onChange={(e) => {
+                          setCollectiveSearchQuery(e.target.value);
+                          if (e.target.value.length === 0 || e.target.value.length >= 2) {
+                            loadCollectives();
+                          }
+                        }}
+                        placeholder="Search collectives..."
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Verification Status
+                      </label>
+                      <select
+                        value={collectiveFilterStatus}
+                        onChange={(e) => {
+                          setCollectiveFilterStatus(e.target.value);
+                          loadCollectives();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="unverified">Unverified</option>
+                        <option value="pending">Pending</option>
+                        <option value="verified">Verified</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {isLoadingCollectives ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : collectives.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <Users className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No collectives found</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-700">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Collective
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleCollectiveSort('verificationStatus')}
+                            >
+                              <div className="flex items-center">
+                                Status
+                                {getCollectiveSortIcon('verificationStatus')}
+                              </div>
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Founders
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleCollectiveSort('globalCollectiveAggregate')}
+                            >
+                              <div className="flex items-center">
+                                Total Bids
+                                {getCollectiveSortIcon('globalCollectiveAggregate')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleCollectiveSort('memberCount')}
+                            >
+                              <div className="flex items-center">
+                                Members
+                                {getCollectiveSortIcon('memberCount')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleCollectiveSort('releaseCount')}
+                            >
+                              <div className="flex items-center">
+                                Releases
+                                {getCollectiveSortIcon('releaseCount')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleCollectiveSort('createdAt')}
+                            >
+                              <div className="flex items-center">
+                                Created
+                                {getCollectiveSortIcon('createdAt')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleCollectiveSort('lastBidAt')}
+                            >
+                              <div className="flex items-center">
+                                Last Activity
+                                {getCollectiveSortIcon('lastBidAt')}
+                              </div>
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-gray-800 divide-y divide-gray-700">
+                          {collectives.map((collective) => (
+                            <tr key={collective._id} className="hover:bg-gray-700/50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <img
+                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                                    alt={collective.name}
+                                    className="h-10 w-10 rounded-full object-cover mr-3"
+                                    onError={(e) => {
+                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                                    }}
+                                  />
+                                  <div>
+                                    <div className="text-sm font-medium text-white">{collective.name}</div>
+                                    <div className="text-xs text-gray-400">{collective.email}</div>
+                                    {collective.type && (
+                                      <div className="text-xs text-gray-500 capitalize">{collective.type}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {getVerificationStatusBadge(collective.verificationStatus)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {collective.founders && collective.founders.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {collective.founders.map((founder: any, idx: number) => (
+                                        <div key={idx} className="flex items-center space-x-2">
+                                          {founder.profilePic && (
+                                            <img
+                                              src={founder.profilePic}
+                                              alt={founder.username}
+                                              className="h-6 w-6 rounded-full object-cover"
+                                            />
+                                          )}
+                                          <span>{founder.username}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-500">No founders</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {penceToPounds(collective.stats?.globalCollectiveAggregate || 0)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {collective.stats?.memberCount || 0}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {collective.stats?.releaseCount || 0}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {formatDate(collective.createdAt)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {collective.stats?.lastBidAt ? formatDate(collective.stats.lastBidAt) : 'N/A'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-2">
+                                  {collective.verificationStatus !== 'verified' && (
+                                    <button
+                                      onClick={() => handleVerifyCollective(collective._id)}
+                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                      title="Verify collective"
+                                    >
+                                      Verify
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                    title="View collective"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
