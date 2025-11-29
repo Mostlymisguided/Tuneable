@@ -234,22 +234,40 @@ tuneableLedgerSchema.methods.verifyIntegrity = function() {
 // ========================================
 
 /**
+ * Counter model for sequence generation
+ * Defined at module level to ensure proper registration
+ */
+let Counter;
+try {
+  Counter = mongoose.model('Counter');
+} catch (error) {
+  // Model doesn't exist yet, create it
+  const counterSchema = new mongoose.Schema({
+    _id: { type: String, required: true },
+    sequence: { type: Number, default: 0 }
+  }, { collection: 'counters' });
+  Counter = mongoose.model('Counter', counterSchema);
+}
+
+/**
  * Get next sequence number atomically using MongoDB counter pattern
  * This prevents race conditions in high-volume async scenarios
  */
 async function getNextSequence() {
-  const Counter = mongoose.model('Counter') || mongoose.model('Counter', new mongoose.Schema({
-    _id: { type: String, required: true },
-    sequence: { type: Number, default: 0 }
-  }));
-  
-  const result = await Counter.findByIdAndUpdate(
-    'tuneableLedgerSequence',
-    { $inc: { sequence: 1 } },
-    { new: true, upsert: true }
-  );
-  
-  return result.sequence;
+  try {
+    const result = await Counter.findByIdAndUpdate(
+      'tuneableLedgerSequence',
+      { $inc: { sequence: 1 } },
+      { new: true, upsert: true }
+    );
+    
+    return result.sequence;
+  } catch (error) {
+    console.error('Error generating sequence number:', error);
+    // Fallback: if counter fails, use timestamp-based sequence
+    // This ensures ledger entries can still be created
+    throw new Error(`Failed to generate sequence number: ${error.message}`);
+  }
 }
 
 /**

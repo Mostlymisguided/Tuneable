@@ -1339,7 +1339,9 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             }
           });
         } catch (error) {
-          console.error('Failed to create ledger entry for bid:', bid._id, error);
+          console.error('Failed to create ledger entry for bid:', bid._id);
+          console.error('Ledger error details:', error.message);
+          console.error('Ledger error stack:', error.stack);
           // Don't fail the bid if ledger entry fails - log and continue
         }
         
@@ -1767,7 +1769,9 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             }
           });
         } catch (error) {
-          console.error('Failed to create ledger entry for bid:', bid._id, error);
+          console.error('Failed to create ledger entry for bid:', bid._id);
+          console.error('Ledger error details:', error.message);
+          console.error('Ledger error stack:', error.stack);
           // Don't fail the bid if ledger entry fails - log and continue
         }
         
