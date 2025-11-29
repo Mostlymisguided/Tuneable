@@ -808,7 +808,15 @@ const Admin: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'media-management' && isAdmin) {
-      loadMedia();
+      // Debounce search query to avoid race conditions
+      const timeoutId = setTimeout(() => {
+        // Only search if query is empty or at least 2 characters
+        if (mediaSearchQuery.length === 0 || mediaSearchQuery.length >= 2) {
+          loadMedia();
+        }
+      }, mediaSearchQuery.length > 0 ? 500 : 0); // 500ms debounce for non-empty queries, immediate for clearing
+
+      return () => clearTimeout(timeoutId);
     }
   }, [mediaSortField, mediaSortDirection, mediaPage, mediaContentTypeFilter, mediaContentFormFilter, mediaSearchQuery, mediaRightsFilter, activeTab]);
 
@@ -2292,9 +2300,6 @@ const Admin: React.FC = () => {
                     onChange={(e) => {
                       setMediaSearchQuery(e.target.value);
                       setMediaPage(1);
-                      if (e.target.value.length === 0 || e.target.value.length >= 2) {
-                        loadMedia();
-                      }
                     }}
                     placeholder="Title, artist, tags..."
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
