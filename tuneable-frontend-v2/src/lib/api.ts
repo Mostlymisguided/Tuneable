@@ -1447,6 +1447,75 @@ export const artistEscrowAPI = {
     const response = await api.get('/artist-escrow/stats');
     return response.data;
   },
+};
+
+export const ledgerAPI = {
+  // Get ledger statistics for dashboard
+  getStats: async () => {
+    const response = await api.get('/ledger/stats');
+    return response.data;
+  },
+
+  // Get ledger entries with filtering and pagination
+  getEntries: async (params?: {
+    transactionType?: 'TIP' | 'REFUND' | 'TOP_UP' | 'PAY_OUT';
+    userId?: string;
+    mediaId?: string;
+    startDate?: string;
+    endDate?: string;
+    minAmount?: number;
+    maxAmount?: number;
+    sortBy?: string;
+    sortDirection?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => {
+    const response = await api.get('/ledger/entries', { params });
+    return response.data;
+  },
+
+  // Get single ledger entry details
+  getEntry: async (entryId: string) => {
+    const response = await api.get(`/ledger/entry/${entryId}`);
+    return response.data;
+  },
+
+  // Get user's ledger history
+  getUserLedger: async (userId: string, limit = 100) => {
+    const response = await api.get(`/ledger/user/${userId}`, {
+      params: { limit }
+    });
+    return response.data;
+  },
+
+  // Get media's ledger history
+  getMediaLedger: async (mediaId: string, limit = 100) => {
+    const response = await api.get(`/ledger/media/${mediaId}`, {
+      params: { limit }
+    });
+    return response.data;
+  },
+
+  // Verify ledger integrity
+  verifyIntegrity: async (limit = 1000) => {
+    const response = await api.post('/ledger/verify', { limit });
+    return response.data;
+  },
+
+  // Search ledger entries
+  search: async (query: string, type: 'all' | 'uuid' | 'sequence' | 'hash' | 'user' | 'media' = 'all') => {
+    const response = await api.get('/ledger/search', {
+      params: { q: query, type }
+    });
+    return response.data;
+  },
+
+  // Reconcile user balance or media aggregate with ledger
+  reconcile: async (params: { userId?: string; mediaId?: string }) => {
+    const response = await api.get('/ledger/reconciliation', { params });
+    return response.data;
+  },
 
   // Admin: Get all payout requests (with optional status filter)
   getPayouts: async (status?: 'pending' | 'processing' | 'completed' | 'rejected' | 'all') => {

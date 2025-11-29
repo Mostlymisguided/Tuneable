@@ -25,6 +25,7 @@ import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
+import LedgerAdmin from '../components/LedgerAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from 'react-toastify';
@@ -850,6 +851,7 @@ const Admin: React.FC = () => {
     { id: 'vetoed-bids', name: 'Vetoes', icon: XCircle },
     { id: 'reports', name: 'Reports + Apps + Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
+    { id: 'ledger', name: 'Ledger', icon: Database },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'media', name: 'Media Import', icon: Youtube },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -3216,6 +3218,12 @@ const Admin: React.FC = () => {
         {activeTab === 'notifications' && (
           <div>
             <NotificationsManager />
+          </div>
+        )}
+
+        {activeTab === 'ledger' && (
+          <div>
+            <LedgerAdmin />
           </div>
         )}
 
