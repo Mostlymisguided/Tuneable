@@ -5,7 +5,6 @@ import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { ArrowLeft, Wallet as WalletIcon, Loader, AlertTriangle, Copy, Check } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
-import BetaWarningBanner from '../components/BetaWarningBanner';
 
 const Wallet: React.FC = () => {
   const navigate = useNavigate();
