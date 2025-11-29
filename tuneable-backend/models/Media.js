@@ -79,6 +79,22 @@ const mediaSchema = new mongoose.Schema({
     _id: false
   }],
   
+  mixedBy: [{
+    name: { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
+    verified: { type: Boolean, default: false },
+    _id: false
+  }],
+  
+  masteredBy: [{
+    name: { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', default: null }, // Reference to Collective model
+    verified: { type: Boolean, default: false },
+    _id: false
+  }],
+  
   // ROLE-SPECIFIC CREATORS (spoken content)
   host: [{
     name: { type: String, required: true },
@@ -342,7 +358,7 @@ mediaSchema.pre('save', function (next) {
   const names = new Set();
   
   const roleFields = [
-    'artist', 'producer', 'featuring', 'songwriter', 'composer',
+    'artist', 'producer', 'featuring', 'songwriter', 'composer', 'mixedBy', 'masteredBy',
     'host', 'guest', 'narrator',
     'director', 'cinematographer', 'editor',
     'author', 'label'
