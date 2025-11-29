@@ -115,8 +115,8 @@ const Wallet: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Beta Warning Banner */}
-      <BetaWarningBanner variant="full" className="mb-6" />
+      {/* Beta Warning Banner - Commented out for live mode */}
+      {/* <BetaWarningBanner variant="full" className="mb-6" /> */}
 
       {/* Test Card Instructions - Beta Mode Only */}
       {isBetaMode && (
