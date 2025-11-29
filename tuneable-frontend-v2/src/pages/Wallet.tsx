@@ -16,6 +16,19 @@ const Wallet: React.FC = () => {
 
   const quickTopUpAmounts = [5, 10, 20, 50];
 
+  // Calculate estimated Stripe fees: 1.4% + 20p for UK cards
+  const calculateStripeFee = (amount: number): number => {
+    // Stripe fee: 1.4% + 20p (fixed fee)
+    const percentageFee = amount * 0.014;
+    const fixedFee = 0.20;
+    return percentageFee + fixedFee;
+  };
+
+  // Calculate total charge (amount + fees)
+  const calculateTotalCharge = (amount: number): number => {
+    return amount + calculateStripeFee(amount);
+  };
+
   // Check for payment success/cancel in URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -271,21 +284,33 @@ const Wallet: React.FC = () => {
         </div>
         
         <div className="grid grid-cols-2 gap-4">
-          {quickTopUpAmounts.map((amount) => (
-            <button
-              key={amount}
-              onClick={() => handleQuickTopUp(amount)}
-              disabled={isLoading}
-              className="bg-gradient-button text-white font-semibold text-xl py-8 px-12 rounded-lg hover:opacity-90 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center"
-              style={{ padding: '2rem 3rem' }}
-            >
-              {isLoading ? (
-                <Loader className="h-5 w-5 animate-spin" />
-              ) : (
-                `£${amount}`
-              )}
-            </button>
-          ))}
+          {quickTopUpAmounts.map((amount) => {
+            const fee = calculateStripeFee(amount);
+            const totalCharge = calculateTotalCharge(amount);
+            return (
+              <button
+                key={amount}
+                onClick={() => handleQuickTopUp(amount)}
+                disabled={isLoading}
+                className="bg-gradient-button text-white font-semibold text-xl py-8 px-12 rounded-lg hover:opacity-90 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex flex-col items-center justify-center"
+                style={{ padding: '2rem 3rem' }}
+              >
+                {isLoading ? (
+                  <Loader className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    <span>£{amount}</span>
+                    <span className="text-sm font-normal opacity-90 mt-1">
+                      You'll be charged £{totalCharge.toFixed(2)}
+                    </span>
+                    <span className="text-xs font-normal opacity-75 mt-0.5">
+                      (includes £{fee.toFixed(2)} Stripe fees)
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -295,9 +320,24 @@ const Wallet: React.FC = () => {
         
         {/* Value Display */}
         <div className="text-center mb-4">
-          <div className="text-3xl font-bold text-white">
+          <div className="text-3xl font-bold text-white mb-2">
             £{parseFloat(customAmount).toFixed(2)}
           </div>
+          {(() => {
+            const amount = parseFloat(customAmount);
+            const fee = calculateStripeFee(amount);
+            const totalCharge = calculateTotalCharge(amount);
+            return (
+              <div className="text-sm text-gray-400">
+                <div className="mb-1">
+                  You'll be charged <span className="text-white font-semibold">£{totalCharge.toFixed(2)}</span>
+                </div>
+                <div className="text-xs">
+                  (includes £{fee.toFixed(2)} Stripe processing fees)
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Slider */}

@@ -168,12 +168,31 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     
     if (session.metadata.type === 'wallet_topup') {
       try {
-        const userId = session.metadata.userId;  // This is now a UUID string
-        const amountPounds = parseFloat(session.metadata.amount);
+        const userId = session.metadata.userId;
         
-        // Convert pounds to pence for storage
-        const amountPence = Math.round(amountPounds * 100);
-
+        // Get the actual Stripe instance (test or live)
+        const stripe = isLiveMode ? stripeLive : stripeTest;
+        
+        // Retrieve PaymentIntent to get actual amount received (net after fees)
+        let paymentIntent;
+        if (session.payment_intent) {
+          paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+        }
+        
+        // Use actual amount received from Stripe (net after fees)
+        // This is what Tuneable actually receives in the bank account
+        const amountReceivedPence = paymentIntent
+          ? paymentIntent.amount_received || paymentIntent.amount  // amount_received is net after fees
+          : session.amount_total; // Fallback to session total if PaymentIntent not available
+        
+        // Calculate fees for transparency
+        const amountRequestedPence = Math.round(parseFloat(session.metadata.amount) * 100);
+        const stripeFeesPence = amountRequestedPence - amountReceivedPence;
+        
+        // Convert to pounds for display
+        const amountReceivedPounds = amountReceivedPence / 100;
+        const stripeFeesPounds = stripeFeesPence / 100;
+        
         // Find user first to get current balance
         const user = await User.findOne({ uuid: userId });
         
@@ -192,24 +211,23 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }).lean();
         const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
         
-        // Update user balance - find by UUID instead of _id
-        // Balance is stored in pence
+        // Update user balance with ACTUAL amount received (net after fees)
         const updatedUser = await User.findOneAndUpdate(
-          { uuid: userId },  // Find by UUID instead of _id
-          { $inc: { balance: amountPence } },  // Store in pence
+          { uuid: userId },
+          { $inc: { balance: amountReceivedPence } }, // Use NET amount, not requested amount
           { new: true }
         );
-
+        
         if (updatedUser) {
-          console.log(`Wallet top-up successful: User ${userId} added £${amountPounds}, new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
+          console.log(`Wallet top-up successful: User ${userId} requested £${(amountRequestedPence / 100).toFixed(2)}, received £${amountReceivedPounds.toFixed(2)} (fees: £${stripeFeesPounds.toFixed(2)}), new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
           
-          // Create wallet transaction record FIRST
+          // Create wallet transaction record with fee information
           let walletTransaction;
           try {
             walletTransaction = await WalletTransaction.create({
               userId: updatedUser._id,
               user_uuid: updatedUser.uuid,
-              amount: amountPence,
+              amount: amountReceivedPence, // NET amount received
               type: 'topup',
               status: 'completed',
               paymentMethod: 'stripe',
@@ -217,22 +235,27 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               stripePaymentIntentId: session.payment_intent,
               balanceBefore: balanceBefore,
               balanceAfter: updatedUser.balance,
-              description: `Wallet top-up via Stripe`,
+              description: `Wallet top-up via Stripe (net: £${amountReceivedPounds.toFixed(2)})`,
               username: updatedUser.username,
               metadata: {
                 currency: session.currency || 'gbp',
                 customerEmail: session.customer_email,
-                customerDetails: session.customer_details
+                customerDetails: session.customer_details,
+                // Fee tracking
+                amountRequested: amountRequestedPence, // What user paid
+                amountReceived: amountReceivedPence, // What Tuneable received
+                stripeFees: stripeFeesPence, // Fees absorbed by user
+                stripeFeesPounds: stripeFeesPounds.toFixed(2),
+                isLiveMode: isLiveMode
               }
             });
-            console.log(`✅ Created wallet transaction record for top-up: ${session.id}`);
             
-            // Create ledger entry AFTER WalletTransaction is created (so we can reference it)
+            // Create ledger entry with NET amount
             try {
               const tuneableLedgerService = require('../services/tuneableLedgerService');
               await tuneableLedgerService.createTopUpEntry({
                 userId: updatedUser._id,
-                amount: amountPence,
+                amount: amountReceivedPence, // NET amount for ledger
                 userBalancePre: balanceBefore,
                 userAggregatePre,
                 referenceTransactionId: walletTransaction._id,
@@ -241,12 +264,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                   stripePaymentIntentId: session.payment_intent,
                   currency: session.currency || 'gbp',
                   customerEmail: session.customer_email,
-                  customerDetails: session.customer_details
+                  customerDetails: session.customer_details,
+                  // Fee tracking in ledger
+                  amountRequested: amountRequestedPence,
+                  amountReceived: amountReceivedPence,
+                  stripeFees: stripeFeesPence,
+                  isLiveMode: isLiveMode
                 }
               });
             } catch (ledgerError) {
               console.error('Failed to create ledger entry for top-up:', ledgerError);
-              // Don't fail the webhook if ledger entry fails - log and continue
             }
             
             // Store verification hash
@@ -255,19 +282,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               await verificationService.storeVerificationHash(walletTransaction, 'WalletTransaction');
             } catch (verifyError) {
               console.error('Failed to store verification hash:', verifyError);
-              // Don't fail the webhook if verification storage fails
             }
           } catch (txError) {
             console.error('❌ Failed to create wallet transaction record:', txError);
-            // Don't fail the webhook if transaction record creation fails
           }
           
-          // Send email notification to admin
+          // Send email notification
           try {
-            await sendPaymentNotification(updatedUser, amountPounds);
+            await sendPaymentNotification(updatedUser, amountReceivedPounds);
           } catch (emailError) {
             console.error('Failed to send payment notification email:', emailError);
-            // Don't fail the request if email fails
           }
         }
       } catch (error) {
