@@ -202,9 +202,10 @@ export const authAPI = {
 
 // Payment API
 export const paymentAPI = {
-  createCheckoutSession: async (amount: number, currency: string = 'gbp') => {
+  createCheckoutSession: async (amount: number, currency: string = 'gbp', totalCharge?: number) => {
     const response = await api.post('/payments/create-checkout-session', {
-      amount,
+      amount, // Amount to add to wallet
+      totalCharge, // Total amount to charge (including fees) - if not provided, uses amount
       currency,
     });
     return response.data;

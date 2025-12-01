@@ -5,6 +5,7 @@ import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { ArrowLeft, Wallet as WalletIcon, Loader, AlertTriangle, Copy, Check } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
+import TopUpConfirmationModal from '../components/TopUpConfirmationModal';
 
 const Wallet: React.FC = () => {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ const Wallet: React.FC = () => {
   const [customAmount, setCustomAmount] = useState('0.30');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedCard, setCopiedCard] = useState<string | null>(null);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [pendingTopUpAmount, setPendingTopUpAmount] = useState<number | null>(null);
 
   const quickTopUpAmounts = [5, 10, 20, 50];
 
@@ -76,12 +79,24 @@ const Wallet: React.FC = () => {
     }
   }, [refreshUser, updateBalance]);
 
-  const handleTopUp = async (amount: number) => {
-    if (isLoading) return;
+  const handleTopUpClick = (amount: number) => {
+    // Show confirmation modal instead of directly proceeding
+    setPendingTopUpAmount(amount);
+    setShowConfirmationModal(true);
+  };
+
+  const handleConfirmTopUp = async () => {
+    if (!pendingTopUpAmount || isLoading) return;
+    
+    const topUpAmount = pendingTopUpAmount;
+    const totalCharge = calculateTotalCharge(topUpAmount);
     
     setIsLoading(true);
+    setShowConfirmationModal(false);
+    
     try {
-      const response = await paymentAPI.createCheckoutSession(amount, 'gbp');
+      // Send both amount (wallet credit) and totalCharge (Stripe charge) to backend
+      const response = await paymentAPI.createCheckoutSession(topUpAmount, 'gbp', totalCharge);
       
       if (response.url) {
         // Redirect to Stripe Checkout
@@ -92,13 +107,18 @@ const Wallet: React.FC = () => {
     } catch (error: any) {
       console.error('Payment error:', error);
       toast.error(error.response?.data?.error || 'Failed to create payment session');
-    } finally {
       setIsLoading(false);
     }
+    // Note: Don't set isLoading to false here - it will be reset after redirect
+  };
+
+  const handleChangeAmount = () => {
+    setShowConfirmationModal(false);
+    setPendingTopUpAmount(null);
   };
 
   const handleQuickTopUp = (amount: number) => {
-    handleTopUp(amount);
+    handleTopUpClick(amount);
   };
 
   const handleCustomTopUp = () => {
@@ -107,7 +127,7 @@ const Wallet: React.FC = () => {
       toast.error('Please enter a valid amount (minimum £0.30)');
       return;
     }
-    handleTopUp(amount);
+    handleTopUpClick(amount);
   };
 
   const copyToClipboard = async (text: string, cardType: string) => {
@@ -283,33 +303,21 @@ const Wallet: React.FC = () => {
         </div>
         
         <div className="grid grid-cols-2 gap-4">
-          {quickTopUpAmounts.map((amount) => {
-            const fee = calculateStripeFee(amount);
-            const totalCharge = calculateTotalCharge(amount);
-            return (
-              <button
-                key={amount}
-                onClick={() => handleQuickTopUp(amount)}
-                disabled={isLoading}
-                className="bg-gradient-button text-white font-semibold text-xl py-8 px-12 rounded-lg hover:opacity-90 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex flex-col items-center justify-center"
-                style={{ padding: '2rem 3rem' }}
-              >
-                {isLoading ? (
-                  <Loader className="h-5 w-5 animate-spin" />
-                ) : (
-                  <>
-                    <span>£{amount}</span>
-                    <span className="text-sm font-normal opacity-90 mt-1">
-                      You'll be charged £{totalCharge.toFixed(2)}
-                    </span>
-                    <span className="text-xs font-normal opacity-75 mt-0.5">
-                      (includes £{fee.toFixed(2)} Stripe fees)
-                    </span>
-                  </>
-                )}
-              </button>
-            );
-          })}
+          {quickTopUpAmounts.map((amount) => (
+            <button
+              key={amount}
+              onClick={() => handleQuickTopUp(amount)}
+              disabled={isLoading}
+              className="bg-gradient-button text-white font-semibold text-xl py-8 px-12 rounded-lg hover:opacity-90 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex flex-col items-center justify-center"
+              style={{ padding: '2rem 3rem' }}
+            >
+              {isLoading ? (
+                <Loader className="h-5 w-5 animate-spin" />
+              ) : (
+                <span>£{amount}</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -322,21 +330,6 @@ const Wallet: React.FC = () => {
           <div className="text-3xl font-bold text-white mb-2">
             £{parseFloat(customAmount).toFixed(2)}
           </div>
-          {(() => {
-            const amount = parseFloat(customAmount);
-            const fee = calculateStripeFee(amount);
-            const totalCharge = calculateTotalCharge(amount);
-            return (
-              <div className="text-sm text-gray-400">
-                <div className="mb-1">
-                  You'll be charged <span className="text-white font-semibold">£{totalCharge.toFixed(2)}</span>
-                </div>
-                <div className="text-xs">
-                  (includes £{fee.toFixed(2)} Stripe processing fees)
-                </div>
-              </div>
-            );
-          })()}
         </div>
 
         {/* Slider */}
@@ -428,6 +421,23 @@ const Wallet: React.FC = () => {
         </div>
       </div>
       */}
+
+      {/* Top-Up Confirmation Modal */}
+      {pendingTopUpAmount !== null && (
+        <TopUpConfirmationModal
+          isOpen={showConfirmationModal}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            setPendingTopUpAmount(null);
+          }}
+          onConfirm={handleConfirmTopUp}
+          onChangeAmount={handleChangeAmount}
+          topUpAmount={pendingTopUpAmount}
+          stripeFee={calculateStripeFee(pendingTopUpAmount)}
+          totalCharge={calculateTotalCharge(pendingTopUpAmount)}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   );
 };

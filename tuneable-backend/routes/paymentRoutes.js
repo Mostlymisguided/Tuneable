@@ -59,13 +59,17 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 // Create Stripe Checkout Session for Wallet Top-up (uses AdminSettings to determine test/live mode)
 router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   try {
-    const { amount, currency = 'gbp' } = req.body;
+    const { amount, totalCharge, currency = 'gbp' } = req.body;
     const userId = req.user.uuid;  // Use UUID string instead of _id ObjectId
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
+    // Use totalCharge if provided (includes fees), otherwise use amount (backward compatibility)
+    const chargeAmount = totalCharge && totalCharge > amount ? totalCharge : amount;
+    
+    // amount is the wallet credit amount, chargeAmount is what Stripe will charge
     const stripe = await getWalletTopUpStripe();
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -77,7 +81,7 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
               name: 'Tuneable Wallet Top-up',
               description: `Add £${amount} to your Tuneable wallet`,
             },
-            unit_amount: Math.round(amount * 100), // Convert to pence
+            unit_amount: Math.round(chargeAmount * 100), // Convert to pence - use totalCharge if provided
           },
           quantity: 1,
         },
@@ -87,7 +91,8 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?canceled=true`,
       metadata: {
         userId: userId,  // Now a UUID string, not ObjectId
-        amount: amount.toString(),
+        amount: amount.toString(), // Wallet credit amount (what user wants to add)
+        totalCharge: chargeAmount.toString(), // Total Stripe charge (including fees)
         type: 'wallet_topup'
       },
     });
