@@ -267,19 +267,32 @@ class TuneableLedgerService {
         metadata
       });
       
+      console.log(`💾 Saving ledger entry to database: userId=${userId}, amount=${amount}, type=TOP_UP`);
       await ledgerEntry.save();
+      console.log(`✅ Ledger entry saved successfully: ${ledgerEntry._id}`);
       
       // Store verification hash
       try {
         const verificationService = require('./transactionVerificationService');
         await verificationService.storeVerificationHash(ledgerEntry, 'TuneableLedger');
+        console.log(`✅ Verification hash stored for ledger entry: ${ledgerEntry._id}`);
       } catch (verifyError) {
-        console.error('Failed to store verification hash for ledger entry:', verifyError);
+        console.error('⚠️ Failed to store verification hash for ledger entry:', verifyError);
+        // Don't throw - hash storage failure shouldn't prevent ledger entry creation
       }
       
       return ledgerEntry;
     } catch (error) {
-      console.error('Error creating TOP_UP ledger entry:', error);
+      console.error('❌ Error creating TOP_UP ledger entry:', error);
+      console.error('Error details:', {
+        userId,
+        amount,
+        userBalancePre,
+        userAggregatePre,
+        errorMessage: error.message,
+        errorName: error.name,
+        errorStack: error.stack
+      });
       throw error;
     }
   }

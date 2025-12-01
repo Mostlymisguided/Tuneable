@@ -193,8 +193,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     const session = event.data.object;
     
     if (session.metadata.type === 'wallet_topup') {
+      console.log(`🔔 Webhook received for wallet top-up: Session ${session.id}, User ${session.metadata.userId}`);
       try {
         const userId = session.metadata.userId;
+        
+        if (!userId) {
+          console.error('❌ Wallet top-up webhook: userId missing from session metadata');
+          return;
+        }
         
         // Get the actual Stripe instance (test or live)
         const stripe = isLiveMode ? stripeLive : stripeTest;
@@ -299,9 +305,27 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           
           // Create ledger entry with NET amount - ALWAYS try to create, even if walletTransaction failed
           // This ensures all top-ups are recorded in the ledger for financial integrity
+          console.log(`📝 Attempting to create ledger entry for top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}`);
           try {
             const tuneableLedgerService = require('../services/tuneableLedgerService');
-            await tuneableLedgerService.createTopUpEntry({
+            
+            // Validate required parameters before calling
+            if (!updatedUser._id) {
+              throw new Error('updatedUser._id is missing');
+            }
+            if (typeof amountReceivedPence !== 'number' || isNaN(amountReceivedPence)) {
+              throw new Error(`Invalid amountReceivedPence: ${amountReceivedPence}`);
+            }
+            if (typeof balanceBefore !== 'number' || isNaN(balanceBefore)) {
+              throw new Error(`Invalid balanceBefore: ${balanceBefore}`);
+            }
+            if (typeof userAggregatePre !== 'number' || isNaN(userAggregatePre)) {
+              throw new Error(`Invalid userAggregatePre: ${userAggregatePre}`);
+            }
+            
+            console.log(`📝 Ledger entry parameters validated: userId=${updatedUser._id}, amount=${amountReceivedPence}, balancePre=${balanceBefore}, aggregatePre=${userAggregatePre}`);
+            
+            const ledgerEntry = await tuneableLedgerService.createTopUpEntry({
               userId: updatedUser._id,
               amount: amountReceivedPence, // NET amount for ledger
               userBalancePre: balanceBefore,
@@ -321,16 +345,22 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 walletTransactionCreated: !!walletTransaction?._id // Track if wallet transaction exists
               }
             });
-            console.log(`✅ Ledger entry created for top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}, Transaction: ${walletTransaction?._id || 'N/A'}`);
+            
+            console.log(`✅ Ledger entry created successfully: Entry ID ${ledgerEntry._id}, User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}, Transaction: ${walletTransaction?._id || 'N/A'}`);
           } catch (ledgerError) {
-            console.error('❌ Failed to create ledger entry for top-up:', ledgerError);
+            console.error('❌ CRITICAL: Failed to create ledger entry for top-up');
             console.error('Ledger error details:', {
               userId: updatedUser._id,
+              user_uuid: updatedUser.uuid,
               amount: amountReceivedPence,
+              amountType: typeof amountReceivedPence,
               walletTransactionId: walletTransaction?._id || null,
               userBalancePre: balanceBefore,
+              userBalancePreType: typeof balanceBefore,
               userAggregatePre: userAggregatePre,
+              userAggregatePreType: typeof userAggregatePre,
               error: ledgerError.message,
+              errorName: ledgerError.name,
               stack: ledgerError.stack
             });
             // Don't throw - balance was already updated, just log the error
