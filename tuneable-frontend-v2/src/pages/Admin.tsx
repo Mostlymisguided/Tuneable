@@ -1516,68 +1516,68 @@ const Admin: React.FC = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-white">Label Management</h2>
-              <button
-                onClick={loadLabels}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-gray-800 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Search by Name
-                  </label>
-                  <input
-                    type="text"
-                    value={labelSearchQuery}
-                    onChange={(e) => {
-                      setLabelSearchQuery(e.target.value);
-                      if (e.target.value.length === 0 || e.target.value.length >= 2) {
-                        loadLabels();
-                      }
-                    }}
-                    placeholder="Search labels..."
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Verification Status
-                  </label>
-                  <select
-                    value={labelFilterStatus}
-                    onChange={(e) => {
-                      setLabelFilterStatus(e.target.value);
-                      loadLabels();
-                    }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  <button
+                    onClick={loadLabels}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                   >
-                    <option value="">All Statuses</option>
-                    <option value="unverified">Unverified</option>
-                    <option value="pending">Pending</option>
-                    <option value="verified">Verified</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                    Refresh
+                  </button>
                 </div>
-              </div>
-            </div>
 
-            {isLoadingLabels ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              </div>
-            ) : labels.length === 0 ? (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <Building className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No labels found</p>
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* Filters */}
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Search by Name
+                      </label>
+                      <input
+                        type="text"
+                        value={labelSearchQuery}
+                        onChange={(e) => {
+                          setLabelSearchQuery(e.target.value);
+                          if (e.target.value.length === 0 || e.target.value.length >= 2) {
+                            loadLabels();
+                          }
+                        }}
+                        placeholder="Search labels..."
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Verification Status
+                      </label>
+                      <select
+                        value={labelFilterStatus}
+                        onChange={(e) => {
+                          setLabelFilterStatus(e.target.value);
+                          loadLabels();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="unverified">Unverified</option>
+                        <option value="pending">Pending</option>
+                        <option value="verified">Verified</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {isLoadingLabels ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : labels.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <Building className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No labels found</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-700">
                     <thead className="bg-gray-700">
                       <tr>
@@ -1742,7 +1742,7 @@ const Admin: React.FC = () => {
                 </div>
               </div>
             )}
-              </div>
+            </div>
             )}
 
             {/* Collectives Content */}
@@ -2040,277 +2040,279 @@ const Admin: React.FC = () => {
                   </button>
                 </div>
 
-            {/* Filters */}
-            <div className="bg-gray-800 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Search
-                  </label>
-                  <input
-                    type="text"
-                    value={bidsSearchQuery}
-                    onChange={(e) => {
-                      setBidsSearchQuery(e.target.value);
-                      setBidsPage(1);
-                      if (e.target.value.length === 0 || e.target.value.length >= 2) {
-                        loadBids();
-                      }
-                    }}
-                    placeholder="User, media, or party..."
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                  />
+                {/* Filters */}
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Search
+                      </label>
+                      <input
+                        type="text"
+                        value={bidsSearchQuery}
+                        onChange={(e) => {
+                          setBidsSearchQuery(e.target.value);
+                          setBidsPage(1);
+                          if (e.target.value.length === 0 || e.target.value.length >= 2) {
+                            loadBids();
+                          }
+                        }}
+                        placeholder="User, media, or party..."
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Status
+                      </label>
+                      <select
+                        value={bidsStatusFilter}
+                        onChange={(e) => {
+                          setBidsStatusFilter(e.target.value);
+                          setBidsPage(1);
+                          loadBids();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="vetoed">Vetoed</option>
+                        <option value="refunded">Refunded</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Scope
+                      </label>
+                      <select
+                        value={bidsScopeFilter}
+                        onChange={(e) => {
+                          setBidsScopeFilter(e.target.value);
+                          setBidsPage(1);
+                          loadBids();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All Scopes</option>
+                        <option value="party">Party</option>
+                        <option value="global">Global</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={bidsStatusFilter}
-                    onChange={(e) => {
-                      setBidsStatusFilter(e.target.value);
-                      setBidsPage(1);
-                      loadBids();
-                    }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="vetoed">Vetoed</option>
-                    <option value="refunded">Refunded</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Scope
-                  </label>
-                  <select
-                    value={bidsScopeFilter}
-                    onChange={(e) => {
-                      setBidsScopeFilter(e.target.value);
-                      setBidsPage(1);
-                      loadBids();
-                    }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="">All Scopes</option>
-                    <option value="party">Party</option>
-                    <option value="global">Global</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            {isLoadingBids ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              </div>
-            ) : bids.length === 0 ? (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <DollarSign className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No tips found</p>
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Media
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          User
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleBidsSort('amount')}
-                        >
-                          <div className="flex items-center">
-                            Amount
-                            {getBidsSortIcon('amount')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleBidsSort('createdAt')}
-                        >
-                          <div className="flex items-center">
-                            Date Placed
-                            {getBidsSortIcon('createdAt')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Party
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Scope
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Platform
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-gray-800 divide-y divide-gray-700">
-                      {bids.map((bid) => (
-                        <tr key={bid._id} className="hover:bg-gray-700/50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {bid.media?.coverArt && (
-                                <img
-                                  src={bid.media.coverArt}
-                                  alt={bid.media.title}
-                                  className="h-10 w-10 rounded object-cover mr-3"
-                                />
-                              )}
-                              <div>
-                                <button
-                                  onClick={() => navigate(`/tune/${bid.media._id}`)}
-                                  className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
-                                >
-                                  {bid.media?.title || 'Unknown'}
-                                </button>
-                                <div className="text-xs text-gray-400">
-                                  {bid.media ? <ClickableArtistDisplay media={bid.media} /> : 'Unknown Artist'}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={() => bid.user?.uuid && navigate(`/user/${bid.user.uuid}`)}
-                              className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                {isLoadingBids ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : bids.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <DollarSign className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No tips found</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-700">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Media
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              User
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleBidsSort('amount')}
                             >
-                              {bid.user?.username || 'Unknown'}
-                            </button>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-green-400">
-                              {penceToPounds(bid.amount)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {bid.status === 'active' ? (
-                              <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Active</span>
-                            ) : bid.status === 'vetoed' ? (
-                              <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
-                            ) : (
-                              <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs font-medium">Refunded</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {bid.createdAt ? new Date(bid.createdAt).toLocaleString() : 'N/A'}
-                            </div>
-                            {bid.isInitialBid && (
-                              <div className="text-xs text-purple-400">Initial bid</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {bid.party?.name || 'Unknown'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {bid.party?.type || 'unknown'}
-                            </div>
-                            {bid.queuePosition && (
-                              <div className="text-xs text-gray-500">
-                                Queue: {bid.queuePosition}/{bid.queueSize || '?'}
+                              <div className="flex items-center">
+                                Amount
+                                {getBidsSortIcon('amount')}
                               </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-xs text-gray-400 uppercase">
-                              {bid.bidScope || 'party'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-xs text-gray-400 capitalize">
-                              {bid.platform || 'unknown'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              {bid.status === 'active' && (
-                                <button
-                                  onClick={async () => {
-                                    const reason = prompt('Enter reason for veto (optional):');
-                                    if (reason !== null) { // Allow empty string but not cancel
-                                      try {
-                                        await userAPI.vetoBid(bid._id, reason || undefined);
-                                        toast.success(`Tip vetoed successfully. User refunded ${penceToPounds(bid.amount)}.`);
-                                        loadBids();
-                                      } catch (error: any) {
-                                        toast.error(error.response?.data?.error || 'Failed to veto tip');
-                                      }
-                                    }
-                                  }}
-                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
-                                  title="Veto tip"
-                                >
-                                  Veto
-                                </button>
-                              )}
-                              {bid.vetoedAt && (
-                                <>
-                                  <div className="text-xs text-gray-500">
-                                    Vetoed: {new Date(bid.vetoedAt).toLocaleDateString()}
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleBidsSort('createdAt')}
+                            >
+                              <div className="flex items-center">
+                                Date Placed
+                                {getBidsSortIcon('createdAt')}
+                              </div>
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Party
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Scope
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Platform
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-gray-800 divide-y divide-gray-700">
+                          {bids.map((bid) => (
+                            <tr key={bid._id} className="hover:bg-gray-700/50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  {bid.media?.coverArt && (
+                                    <img
+                                      src={bid.media.coverArt}
+                                      alt={bid.media.title}
+                                      className="h-10 w-10 rounded object-cover mr-3"
+                                    />
+                                  )}
+                                  <div>
+                                    <button
+                                      onClick={() => navigate(`/tune/${bid.media._id}`)}
+                                      className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                                    >
+                                      {bid.media?.title || 'Unknown'}
+                                    </button>
+                                    <div className="text-xs text-gray-400">
+                                      {bid.media ? <ClickableArtistDisplay media={bid.media} /> : 'Unknown Artist'}
+                                    </div>
                                   </div>
-                                  {bid.party?._id && bid.media?._id && (
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={() => bid.user?.uuid && navigate(`/user/${bid.user.uuid}`)}
+                                  className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                                >
+                                  {bid.user?.username || 'Unknown'}
+                                </button>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-green-400">
+                                  {penceToPounds(bid.amount)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {bid.status === 'active' ? (
+                                  <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Active</span>
+                                ) : bid.status === 'vetoed' ? (
+                                  <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs font-medium">Refunded</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {bid.createdAt ? new Date(bid.createdAt).toLocaleString() : 'N/A'}
+                                </div>
+                                {bid.isInitialBid && (
+                                  <div className="text-xs text-purple-400">Initial bid</div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {bid.party?.name || 'Unknown'}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {bid.party?.type || 'unknown'}
+                                </div>
+                                {bid.queuePosition && (
+                                  <div className="text-xs text-gray-500">
+                                    Queue: {bid.queuePosition}/{bid.queueSize || '?'}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-xs text-gray-400 uppercase">
+                                  {bid.bidScope || 'party'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-xs text-gray-400 capitalize">
+                                  {bid.platform || 'unknown'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-2">
+                                  {bid.status === 'active' && (
                                     <button
                                       onClick={async () => {
-                                        if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
+                                        const reason = prompt('Enter reason for veto (optional):');
+                                        if (reason !== null) { // Allow empty string but not cancel
                                           try {
-                                            await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
-                                            toast.success(`Media unvetoed successfully. Users have been notified.`);
+                                            await userAPI.vetoBid(bid._id, reason || undefined);
+                                            toast.success(`Tip vetoed successfully. User refunded ${penceToPounds(bid.amount)}.`);
                                             loadBids();
                                           } catch (error: any) {
-                                            toast.error(error.response?.data?.error || 'Failed to unveto media');
+                                            toast.error(error.response?.data?.error || 'Failed to veto tip');
                                           }
                                         }
                                       }}
-                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors mt-1"
-                                      title="Unveto media in party"
+                                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                      title="Veto tip"
                                     >
-                                      Unveto
+                                      Veto
                                     </button>
                                   )}
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {bidsTotal > 50 && (
-                  <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
-                    <div className="text-sm text-gray-300">
-                      Showing {((bidsPage - 1) * 50) + 1} - {Math.min(bidsPage * 50, bidsTotal)} of {bidsTotal}
+                                  {bid.vetoedAt && (
+                                    <>
+                                      <div className="text-xs text-gray-500">
+                                        Vetoed: {new Date(bid.vetoedAt).toLocaleDateString()}
+                                      </div>
+                                      {bid.party?._id && bid.media?._id && (
+                                        <button
+                                          onClick={async () => {
+                                            if (window.confirm(`Unveto "${bid.media?.title || 'this media'}" in "${bid.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
+                                              try {
+                                                await partyAPI.unvetoMedia(bid.party._id, bid.media._id);
+                                                toast.success(`Media unvetoed successfully. Users have been notified.`);
+                                                loadBids();
+                                              } catch (error: any) {
+                                                toast.error(error.response?.data?.error || 'Failed to unveto media');
+                                              }
+                                            }
+                                          }}
+                                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors mt-1"
+                                          title="Unveto media in party"
+                                        >
+                                          Unveto
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setBidsPage(p => Math.max(1, p - 1))}
-                        disabled={bidsPage === 1}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => setBidsPage(p => p + 1)}
-                        disabled={bidsPage * 50 >= bidsTotal}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next
-                      </button>
-                    </div>
+                    {bidsTotal > 50 && (
+                      <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
+                        <div className="text-sm text-gray-300">
+                          Showing {((bidsPage - 1) * 50) + 1} - {Math.min(bidsPage * 50, bidsTotal)} of {bidsTotal}
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setBidsPage(p => Math.max(1, p - 1))}
+                            disabled={bidsPage === 1}
+                            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setBidsPage(p => p + 1)}
+                            disabled={bidsPage * 50 >= bidsTotal}
+                            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2331,184 +2333,239 @@ const Admin: React.FC = () => {
 
                 {/* Filters */}
                 <div className="bg-gray-800 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Search
-                  </label>
-                  <input
-                    type="text"
-                    value={mediaSearchQuery}
-                    onChange={(e) => {
-                      setMediaSearchQuery(e.target.value);
-                      setMediaPage(1);
-                    }}
-                    placeholder="Title, artist, tags..."
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Search
+                      </label>
+                      <input
+                        type="text"
+                        value={mediaSearchQuery}
+                        onChange={(e) => {
+                          setMediaSearchQuery(e.target.value);
+                          setMediaPage(1);
+                        }}
+                        placeholder="Title, artist, tags..."
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Content Type
+                      </label>
+                      <select
+                        value={mediaContentTypeFilter}
+                        onChange={(e) => {
+                          setMediaContentTypeFilter(e.target.value);
+                          setMediaPage(1);
+                          loadMedia();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All Types</option>
+                        <option value="music">Music</option>
+                        <option value="spoken">Spoken</option>
+                        <option value="video">Video</option>
+                        <option value="image">Image</option>
+                        <option value="written">Written</option>
+                        <option value="interactive">Interactive</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Content Form
+                      </label>
+                      <select
+                        value={mediaContentFormFilter}
+                        onChange={(e) => {
+                          setMediaContentFormFilter(e.target.value);
+                          setMediaPage(1);
+                          loadMedia();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All Forms</option>
+                        <option value="tune">Tune</option>
+                        <option value="album">Album</option>
+                        <option value="podcast">Podcast</option>
+                        <option value="episode">Episode</option>
+                        <option value="audiobook">Audiobook</option>
+                        <option value="video">Video</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Rights Cleared
+                      </label>
+                      <select
+                        value={mediaRightsFilter}
+                        onChange={(e) => {
+                          setMediaRightsFilter(e.target.value);
+                          setMediaPage(1);
+                          loadMedia();
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">All</option>
+                        <option value="true">Cleared</option>
+                        <option value="false">Not Cleared</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Content Type
-                  </label>
-                  <select
-                    value={mediaContentTypeFilter}
-                    onChange={(e) => {
-                      setMediaContentTypeFilter(e.target.value);
-                      setMediaPage(1);
-                      loadMedia();
-                    }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="">All Types</option>
-                    <option value="music">Music</option>
-                    <option value="spoken">Spoken</option>
-                    <option value="video">Video</option>
-                    <option value="image">Image</option>
-                    <option value="written">Written</option>
-                    <option value="interactive">Interactive</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Content Form
-                  </label>
-                  <select
-                    value={mediaContentFormFilter}
-                    onChange={(e) => {
-                      setMediaContentFormFilter(e.target.value);
-                      setMediaPage(1);
-                      loadMedia();
-                    }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="">All Forms</option>
-                    <option value="tune">Tune</option>
-                    <option value="album">Album</option>
-                    <option value="podcast">Podcast</option>
-                    <option value="episode">Episode</option>
-                    <option value="audiobook">Audiobook</option>
-                    <option value="video">Video</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Rights Cleared
-                  </label>
-                  <select
-                    value={mediaRightsFilter}
-                    onChange={(e) => {
-                      setMediaRightsFilter(e.target.value);
-                      setMediaPage(1);
-                      loadMedia();
-                    }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="">All</option>
-                    <option value="true">Cleared</option>
-                    <option value="false">Not Cleared</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            {isLoadingMedia ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              </div>
-            ) : mediaList.length === 0 ? (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <Music className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No media found</p>
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-700">
-                      <tr>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleMediaSort('title')}
-                        >
-                          <div className="flex items-center">
-                            Media
-                            {getMediaSortIcon('title')}
-                          </div>
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleMediaSort('artist')}
-                        >
-                          <div className="flex items-center">
-                            Artist
-                            {getMediaSortIcon('artist')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Type
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleMediaSort('globalMediaAggregate')}
-                        >
-                          <div className="flex items-center">
-                            Total Bids
-                            {getMediaSortIcon('globalMediaAggregate')}
-                          </div>
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleMediaSort('playCount')}
-                        >
-                          <div className="flex items-center">
-                            Plays
-                            {getMediaSortIcon('playCount')}
-                          </div>
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleMediaSort('duration')}
-                        >
-                          <div className="flex items-center">
-                            Duration
-                            {getMediaSortIcon('duration')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Owners
-                        </th>
-                        <th 
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
-                          onClick={() => handleMediaSort('uploadedAt')}
-                        >
-                          <div className="flex items-center">
-                            Uploaded
-                            {getMediaSortIcon('uploadedAt')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-gray-800 divide-y divide-gray-700">
-                      {mediaList.map((item) => (
-                        <tr key={item._id} className="hover:bg-gray-700/50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {item.coverArt && (
-                                <img
-                                  src={item.coverArt}
-                                  alt={item.title}
-                                  className="h-10 w-10 rounded object-cover mr-3"
-                                />
-                              )}
-                              <div className="flex-1">
-                                {editingMediaId === item._id && editingField === 'title' ? (
+                {isLoadingMedia ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : mediaList.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <Music className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No media found</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-700">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleMediaSort('title')}
+                            >
+                              <div className="flex items-center">
+                                Media
+                                {getMediaSortIcon('title')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleMediaSort('artist')}
+                            >
+                              <div className="flex items-center">
+                                Artist
+                                {getMediaSortIcon('artist')}
+                              </div>
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Type
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleMediaSort('globalMediaAggregate')}
+                            >
+                              <div className="flex items-center">
+                                Total Bids
+                                {getMediaSortIcon('globalMediaAggregate')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleMediaSort('playCount')}
+                            >
+                              <div className="flex items-center">
+                                Plays
+                                {getMediaSortIcon('playCount')}
+                              </div>
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleMediaSort('duration')}
+                            >
+                              <div className="flex items-center">
+                                Duration
+                                {getMediaSortIcon('duration')}
+                              </div>
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Owners
+                            </th>
+                            <th 
+                              className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
+                              onClick={() => handleMediaSort('uploadedAt')}
+                            >
+                              <div className="flex items-center">
+                                Uploaded
+                                {getMediaSortIcon('uploadedAt')}
+                              </div>
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-gray-800 divide-y divide-gray-700">
+                          {mediaList.map((item) => (
+                            <tr key={item._id} className="hover:bg-gray-700/50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  {item.coverArt && (
+                                    <img
+                                      src={item.coverArt}
+                                      alt={item.title}
+                                      className="h-10 w-10 rounded object-cover mr-3"
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    {editingMediaId === item._id && editingField === 'title' ? (
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="text"
+                                          value={editingValue}
+                                          onChange={(e) => setEditingValue(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleSaveEdit(item._id, 'title');
+                                            } else if (e.key === 'Escape') {
+                                              handleCancelEdit();
+                                            }
+                                          }}
+                                          className="flex-1 px-2 py-1 bg-gray-700 border border-purple-500 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => handleSaveEdit(item._id, 'title')}
+                                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                          title="Save"
+                                        >
+                                          ✓
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEdit}
+                                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                          title="Cancel"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2 group">
+                                        <button
+                                          onClick={() => navigate(`/tune/${item._id}`)}
+                                          className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                                        >
+                                          {item.title || 'Unknown'}
+                                        </button>
+                                        <button
+                                          onClick={() => handleStartEdit(item._id, 'title', item.title || '')}
+                                          className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
+                                          title="Edit title"
+                                        >
+                                          ✏️
+                                        </button>
+                                        {item.explicit && (
+                                          <span className="ml-2 text-xs text-red-400">E</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {editingMediaId === item._id && editingField === 'artist' ? (
                                   <div className="flex items-center gap-2">
                                     <input
                                       type="text"
@@ -2516,16 +2573,17 @@ const Admin: React.FC = () => {
                                       onChange={(e) => setEditingValue(e.target.value)}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
-                                          handleSaveEdit(item._id, 'title');
+                                          handleSaveEdit(item._id, 'artist');
                                         } else if (e.key === 'Escape') {
                                           handleCancelEdit();
                                         }
                                       }}
                                       className="flex-1 px-2 py-1 bg-gray-700 border border-purple-500 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                      placeholder="Artist names (comma-separated)"
                                       autoFocus
                                     />
                                     <button
-                                      onClick={() => handleSaveEdit(item._id, 'title')}
+                                      onClick={() => handleSaveEdit(item._id, 'artist')}
                                       className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
                                       title="Save"
                                     >
@@ -2541,190 +2599,136 @@ const Admin: React.FC = () => {
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-2 group">
+                                    <div className="text-sm text-gray-300">
+                                      <ClickableArtistDisplay media={item} />
+                                    </div>
                                     <button
-                                      onClick={() => navigate(`/tune/${item._id}`)}
-                                      className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
-                                    >
-                                      {item.title || 'Unknown'}
-                                    </button>
-                                    <button
-                                      onClick={() => handleStartEdit(item._id, 'title', item.title || '')}
+                                      onClick={() => handleStartEdit(item._id, 'artist', item.artist || '')}
                                       className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
-                                      title="Edit title"
+                                      title="Edit artist"
                                     >
                                       ✏️
                                     </button>
-                                    {item.explicit && (
-                                      <span className="ml-2 text-xs text-red-400">E</span>
-                                    )}
+                                </div>
+                              )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-xs text-gray-400">
+                                  {item.contentType?.join(', ') || 'N/A'}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {item.contentForm?.join(', ') || 'N/A'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-green-400">
+                                  {penceToPounds(item.globalMediaAggregate || 0)}
+                                </div>
+                                {item.globalMediaBidTop > 0 && (
+                                  <div className="text-xs text-gray-500">
+                                    Top: {penceToPounds(item.globalMediaBidTop)}
                                   </div>
                                 )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {editingMediaId === item._id && editingField === 'artist' ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={editingValue}
-                                  onChange={(e) => setEditingValue(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSaveEdit(item._id, 'artist');
-                                    } else if (e.key === 'Escape') {
-                                      handleCancelEdit();
-                                    }
-                                  }}
-                                  className="flex-1 px-2 py-1 bg-gray-700 border border-purple-500 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                  placeholder="Artist names (comma-separated)"
-                                  autoFocus
-                                />
-                                <button
-                                  onClick={() => handleSaveEdit(item._id, 'artist')}
-                                  className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                  title="Save"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={handleCancelEdit}
-                                  className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
-                                  title="Cancel"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group">
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-300">
-                                  <ClickableArtistDisplay media={item} />
+                                  {item.playCount || 0}
                                 </div>
-                                <button
-                                  onClick={() => handleStartEdit(item._id, 'artist', item.artist || '')}
-                                  className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
-                                  title="Edit artist"
-                                >
-                                  ✏️
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-xs text-gray-400">
-                              {item.contentType?.join(', ') || 'N/A'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {item.contentForm?.join(', ') || 'N/A'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-green-400">
-                              {penceToPounds(item.globalMediaAggregate || 0)}
-                            </div>
-                            {item.globalMediaBidTop > 0 && (
-                              <div className="text-xs text-gray-500">
-                                Top: {penceToPounds(item.globalMediaBidTop)}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {item.playCount || 0}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {formatDuration(item.duration)}
-                            </div>
-                            {item.fileSize && (
-                              <div className="text-xs text-gray-500">
-                                {formatFileSize(item.fileSize)}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {item.ownerCount || 0} owner{item.ownerCount !== 1 ? 's' : ''}
-                            </div>
-                            {item.totalOwnership !== 100 && item.totalOwnership > 0 && (
-                              <div className="text-xs text-yellow-400">
-                                {item.totalOwnership}% total
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {item.uploadedAt ? new Date(item.uploadedAt).toLocaleDateString() : 'N/A'}
-                            </div>
-                            {item.addedBy && (
-                              <div className="text-xs text-gray-500">
-                                by {item.addedBy.username}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col gap-1">
-                              {item.status === 'vetoed' ? (
-                                <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
-                              ) : item.rightsCleared ? (
-                                <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Rights Cleared</span>
-                              ) : (
-                                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>
-                              )}
-                              {item.label && item.label.length > 0 && (
-                                <div className="text-xs text-gray-400">
-                                  {item.label.length} label{item.label.length !== 1 ? 's' : ''}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {formatDuration(item.duration)}
                                 </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => navigate(`/tune/${item._id}`)}
-                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                                title="View media"
-                              >
-                                View
-                              </button>
-                              {item.status !== 'vetoed' && (
-                                <button
-                                  onClick={() => handleVetoMedia(item._id, item.title)}
-                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
-                                  title="Veto media globally"
-                                >
-                                  Veto
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {mediaTotal > 50 && (
-                  <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
-                    <div className="text-sm text-gray-300">
-                      Showing {((mediaPage - 1) * 50) + 1} - {Math.min(mediaPage * 50, mediaTotal)} of {mediaTotal}
+                                {item.fileSize && (
+                                  <div className="text-xs text-gray-500">
+                                    {formatFileSize(item.fileSize)}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {item.ownerCount || 0} owner{item.ownerCount !== 1 ? 's' : ''}
+                                </div>
+                                {item.totalOwnership !== 100 && item.totalOwnership > 0 && (
+                                  <div className="text-xs text-yellow-400">
+                                    {item.totalOwnership}% total
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {item.uploadedAt ? new Date(item.uploadedAt).toLocaleDateString() : 'N/A'}
+                                </div>
+                                {item.addedBy && (
+                                  <div className="text-xs text-gray-500">
+                                    by {item.addedBy.username}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex flex-col gap-1">
+                                  {item.status === 'vetoed' ? (
+                                    <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
+                                  ) : item.rightsCleared ? (
+                                    <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Rights Cleared</span>
+                                  ) : (
+                                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>
+                                  )}
+                                  {item.label && item.label.length > 0 && (
+                                    <div className="text-xs text-gray-400">
+                                      {item.label.length} label{item.label.length !== 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => navigate(`/tune/${item._id}`)}
+                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                    title="View media"
+                                  >
+                                    View
+                                  </button>
+                                  {item.status !== 'vetoed' && (
+                                    <button
+                                      onClick={() => handleVetoMedia(item._id, item.title)}
+                                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                      title="Veto media globally"
+                                    >
+                                      Veto
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setMediaPage(p => Math.max(1, p - 1))}
-                        disabled={mediaPage === 1}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => setMediaPage(p => p + 1)}
-                        disabled={mediaPage * 50 >= mediaTotal}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next
-                      </button>
-                    </div>
+                    {mediaTotal > 50 && (
+                      <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
+                        <div className="text-sm text-gray-300">
+                          Showing {((mediaPage - 1) * 50) + 1} - {Math.min(mediaPage * 50, mediaTotal)} of {mediaTotal}
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setMediaPage(p => Math.max(1, p - 1))}
+                            disabled={mediaPage === 1}
+                            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setMediaPage(p => p + 1)}
+                            disabled={mediaPage * 50 >= mediaTotal}
+                            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2743,105 +2747,105 @@ const Admin: React.FC = () => {
                       <span className="text-gray-500">Total: {vetoesSummary.total}</span>
                     </div>
                   </div>
-              <button
-                onClick={loadAllVetoes}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
+                  <button
+                    onClick={loadAllVetoes}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
 
-            {/* Filter */}
-            <div className="bg-gray-800 rounded-lg p-4">
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-gray-300">Filter by Type:</label>
-                <select
-                  value={vetoesFilter}
-                  onChange={(e) => {
-                    setVetoesFilter(e.target.value as 'all' | 'global' | 'party' | 'bid');
-                    setVetoedBidsPage(1);
-                  }}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                >
-                  <option value="all">All Vetoes</option>
-                  <option value="global">🌍 Global Vetoes</option>
-                  <option value="party">🎉 Party Vetoes</option>
-                  <option value="bid">💰 Bid Vetoes</option>
-                </select>
-                <button
-                  onClick={() => {
-                    setVetoedBidsSortDirection(vetoedBidsSortDirection === 'desc' ? 'asc' : 'desc');
-                  }}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                  {vetoedBidsSortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
-                </button>
-              </div>
-            </div>
+                {/* Filter */}
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium text-gray-300">Filter by Type:</label>
+                    <select
+                      value={vetoesFilter}
+                      onChange={(e) => {
+                        setVetoesFilter(e.target.value as 'all' | 'global' | 'party' | 'bid');
+                        setVetoedBidsPage(1);
+                      }}
+                      className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="all">All Vetoes</option>
+                      <option value="global">🌍 Global Vetoes</option>
+                      <option value="party">🎉 Party Vetoes</option>
+                      <option value="bid">💰 Bid Vetoes</option>
+                    </select>
+                    <button
+                      onClick={() => {
+                        setVetoedBidsSortDirection(vetoedBidsSortDirection === 'desc' ? 'asc' : 'desc');
+                      }}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <ArrowUpDown className="h-4 w-4" />
+                      {vetoedBidsSortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
+                    </button>
+                  </div>
+                </div>
 
-            {isLoadingVetoedBids ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              </div>
-            ) : allVetoes.length === 0 ? (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <XCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No vetoes found</p>
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Type
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Media
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          {vetoesFilter === 'bid' ? 'User' : 'Party'}
-                        </th>
-                        {vetoesFilter === 'bid' && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Amount
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Vetoed At
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Vetoed By
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Reason
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-gray-800 divide-y divide-gray-700">
-                      {allVetoes.map((veto) => (
-                        <tr key={veto._id} className="hover:bg-gray-700/50 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {veto.type === 'global' ? (
-                              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium flex items-center gap-1">
-                                🌍 Global
-                              </span>
-                            ) : veto.type === 'party' ? (
-                              <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium flex items-center gap-1">
-                                🎉 Party
-                              </span>
-                            ) : (
-                              <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-medium flex items-center gap-1">
-                                💰 Bid
-                              </span>
+                    {isLoadingVetoedBids ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                  </div>
+                ) : allVetoes.length === 0 ? (
+                  <div className="bg-gray-800 rounded-lg p-8 text-center">
+                    <XCircle className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">No vetoes found</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-700">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Type
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Media
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              {vetoesFilter === 'bid' ? 'User' : 'Party'}
+                            </th>
+                            {vetoesFilter === 'bid' && (
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Amount
+                              </th>
                             )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Vetoed At
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Vetoed By
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Reason
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-gray-800 divide-y divide-gray-700">
+                          {allVetoes.map((veto) => (
+                            <tr key={veto._id} className="hover:bg-gray-700/50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {veto.type === 'global' ? (
+                                  <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium flex items-center gap-1">
+                                    🌍 Global
+                                  </span>
+                                ) : veto.type === 'party' ? (
+                                  <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium flex items-center gap-1">
+                                    🎉 Party
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-medium flex items-center gap-1">
+                                    💰 Bid
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               {veto.media?.coverArt && (
                                 <img
@@ -2862,118 +2866,120 @@ const Admin: React.FC = () => {
                                 </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {veto.type === 'bid' ? (
-                              <button
-                                onClick={() => veto.user?.uuid && navigate(`/user/${veto.user.uuid}`)}
-                                className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
-                              >
-                                {veto.user?.username || 'Unknown'}
-                              </button>
-                            ) : (
-                              <div>
-                                <div className="text-sm text-gray-300">
-                                  {veto.party?.name || 'N/A'}
-                                </div>
-                                {veto.party?.type && (
-                                  <div className="text-xs text-gray-500">
-                                    {veto.party.type}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {veto.type === 'bid' ? (
+                                  <button
+                                    onClick={() => veto.user?.uuid && navigate(`/user/${veto.user.uuid}`)}
+                                    className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                                  >
+                                    {veto.user?.username || 'Unknown'}
+                                  </button>
+                                ) : (
+                                  <div>
+                                    <div className="text-sm text-gray-300">
+                                      {veto.party?.name || 'N/A'}
+                                    </div>
+                                    {veto.party?.type && (
+                                      <div className="text-xs text-gray-500">
+                                        {veto.party.type}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
-                              </div>
-                            )}
-                          </td>
-                          {veto.type === 'bid' && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-green-400">
-                                {penceToPounds(veto.amount || 0)}
-                              </div>
-                            </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {veto.vetoedAt ? new Date(veto.vetoedAt).toLocaleString() : 'N/A'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {veto.vetoedBy?.username || 'Unknown'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-300 max-w-xs truncate" title={veto.vetoedReason || ''}>
-                              {veto.vetoedReason || 'No reason provided'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              {veto.type === 'global' && veto.media?._id && (
-                                <button
-                                  onClick={async () => {
-                                    if (window.confirm(`Remove global veto from "${veto.media?.title || 'this media'}"? Media can be added to parties again.`)) {
-                                      try {
-                                        await mediaAPI.unvetoMedia(veto.media._id);
-                                        toast.success('Global veto removed successfully');
-                                        loadAllVetoes();
-                                      } catch (error: any) {
-                                        toast.error(error.response?.data?.error || 'Failed to remove global veto');
-                                      }
-                                    }
-                                  }}
-                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                  title="Remove global veto"
-                                >
-                                  Unveto
-                                </button>
+                              </td>
+                              {veto.type === 'bid' && (
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-green-400">
+                                    {penceToPounds(veto.amount || 0)}
+                                  </div>
+                                </td>
                               )}
-                              {veto.type === 'party' && veto.party?._id && veto.media?._id && (
-                                <button
-                                  onClick={async () => {
-                                    if (window.confirm(`Unveto "${veto.media?.title || 'this media'}" from "${veto.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
-                                      try {
-                                        await partyAPI.unvetoMedia(veto.party._id, veto.media._id);
-                                        toast.success('Media unvetoed from party successfully');
-                                        loadAllVetoes();
-                                      } catch (error: any) {
-                                        toast.error(error.response?.data?.error || 'Failed to unveto media');
-                                      }
-                                    }
-                                  }}
-                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                  title="Unveto from party"
-                                >
-                                  Unveto
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {vetoedBidsTotal > 50 && (
-                  <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
-                    <div className="text-sm text-gray-300">
-                      Showing {((vetoedBidsPage - 1) * 50) + 1} - {Math.min(vetoedBidsPage * 50, vetoedBidsTotal)} of {vetoedBidsTotal}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {veto.vetoedAt ? new Date(veto.vetoedAt).toLocaleString() : 'N/A'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-300">
+                                  {veto.vetoedBy?.username || 'Unknown'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-300 max-w-xs truncate" title={veto.vetoedReason || ''}>
+                                  {veto.vetoedReason || 'No reason provided'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  {veto.type === 'global' && veto.media?._id && (
+                                    <button
+                                      onClick={async () => {
+                                        if (window.confirm(`Remove global veto from "${veto.media?.title || 'this media'}"? Media can be added to parties again.`)) {
+                                          try {
+                                            await mediaAPI.unvetoMedia(veto.media._id);
+                                            toast.success('Global veto removed successfully');
+                                            loadAllVetoes();
+                                          } catch (error: any) {
+                                            toast.error(error.response?.data?.error || 'Failed to remove global veto');
+                                          }
+                                        }
+                                      }}
+                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                      title="Remove global veto"
+                                    >
+                                      Unveto
+                                    </button>
+                                  )}
+                                  {veto.type === 'party' && veto.party?._id && veto.media?._id && (
+                                    <button
+                                      onClick={async () => {
+                                        if (window.confirm(`Unveto "${veto.media?.title || 'this media'}" from "${veto.party?.name || 'this party'}"? Users will be notified and can tip again.`)) {
+                                          try {
+                                            await partyAPI.unvetoMedia(veto.party._id, veto.media._id);
+                                            toast.success('Media unvetoed from party successfully');
+                                            loadAllVetoes();
+                                          } catch (error: any) {
+                                            toast.error(error.response?.data?.error || 'Failed to unveto media');
+                                          }
+                                        }
+                                      }}
+                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                      title="Unveto from party"
+                                    >
+                                      Unveto
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setVetoedBidsPage(p => Math.max(1, p - 1))}
-                        disabled={vetoedBidsPage === 1}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => setVetoedBidsPage(p => p + 1)}
-                        disabled={vetoedBidsPage * 50 >= vetoedBidsTotal}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next
-                      </button>
+                    {vetoedBidsTotal > 50 && (
+                    <div className="px-6 py-4 bg-gray-700 border-t border-gray-600 flex items-center justify-between">
+                      <div className="text-sm text-gray-300">
+                        Showing {((vetoedBidsPage - 1) * 50) + 1} - {Math.min(vetoedBidsPage * 50, vetoedBidsTotal)} of {vetoedBidsTotal}
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setVetoedBidsPage(p => Math.max(1, p - 1))}
+                          disabled={vetoedBidsPage === 1}
+                          className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setVetoedBidsPage(p => p + 1)}
+                          disabled={vetoedBidsPage * 50 >= vetoedBidsTotal}
+                          className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
                     </div>
+                  )}
                   </div>
                 )}
               </div>
@@ -3633,6 +3639,17 @@ const Admin: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-white">System Settings</h2>
+            
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Configuration</h3>
+              <p className="text-gray-400">System settings and configuration options will be available here.</p>
+            </div>
+          </div>
+        )}
+
         {/* Warning Modal */}
         {warningModalOpen && selectedUserForWarning && (
           <IssueWarningModal
@@ -3648,17 +3665,6 @@ const Admin: React.FC = () => {
               loadUsers();
             }}
           />
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">System Settings</h2>
-            
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Configuration</h3>
-              <p className="text-gray-400">System settings and configuration options will be available here.</p>
-            </div>
-          </div>
         )}
       </div>
     </div>
