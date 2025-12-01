@@ -61,21 +61,102 @@ After updating `.env`, restart your backend server to load the new webhook secre
 
 For production, configure webhooks in the Stripe Dashboard:
 
+### Step 1: Verify Webhook Endpoint is Accessible
+
+First, test that your webhook endpoint is reachable:
+
+```bash
+curl https://yourdomain.com/api/payments/webhook/test
+```
+
+You should get a JSON response like:
+```json
+{
+  "status": "ok",
+  "message": "Webhook endpoint is accessible",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "url": "/api/payments/webhook"
+}
+```
+
+If this fails, check:
+- Your server is running
+- The route is correctly registered
+- No firewall is blocking the endpoint
+
+### Step 2: Configure Webhook in Stripe Dashboard
+
 1. Go to: https://dashboard.stripe.com/webhooks
 2. Click "Add endpoint"
 3. Set endpoint URL to: `https://yourdomain.com/api/payments/webhook`
+   - **IMPORTANT**: Use HTTPS, not HTTP
+   - **IMPORTANT**: Include the full path `/api/payments/webhook`
 4. Select events to listen for:
-   - `checkout.session.completed`
-5. Copy the "Signing secret" (starts with `whsec_`)
-6. Add to production environment variables:
+   - `checkout.session.completed` (required for wallet top-ups)
+5. Click "Add endpoint"
+6. Copy the "Signing secret" (starts with `whsec_`)
+7. Add to production environment variables:
    ```bash
    STRIPE_WEBHOOK_SECRET_TEST=whsec_...  # For test mode
    STRIPE_WEBHOOK_SECRET_LIVE=whsec_...   # For live mode
    ```
+8. **Restart your backend server** after adding the secret
+
+### Step 3: Test the Webhook
+
+1. Perform a test wallet top-up
+2. Go to Stripe Dashboard → Webhooks → Your endpoint → "Recent events"
+3. Check if the `checkout.session.completed` event appears
+4. Click on the event to see:
+   - **Status**: Should be "Succeeded" (green)
+   - **Response**: Should show `{"received": true}`
+   - **Response time**: Should be under 5 seconds
+
+### Step 4: Check Backend Logs
+
+After a top-up, check your backend logs for:
+- `🔔 Stripe webhook received - checking signature...`
+- `✅ Webhook signature verified`
+- `📦 Checkout session completed`
+- `🔔 Webhook received for wallet top-up`
+- `✅ Ledger entry created successfully`
+
+If you don't see these logs, the webhook isn't being called.
 
 ## Troubleshooting
 
-### No webhook logs appearing
+### No webhook logs appearing (Production)
+
+**Most common issue**: Webhook not configured in Stripe Dashboard
+
+1. **Check webhook is configured**:
+   - Go to https://dashboard.stripe.com/webhooks
+   - Verify an endpoint exists for your production URL
+   - Check the endpoint URL matches exactly: `https://yourdomain.com/api/payments/webhook`
+
+2. **Check webhook secret**:
+   - In Stripe Dashboard → Webhooks → Your endpoint → "Signing secret"
+   - Copy the secret and verify it matches `STRIPE_WEBHOOK_SECRET_TEST` or `STRIPE_WEBHOOK_SECRET_LIVE` in your `.env`
+   - **Restart your backend** after updating the secret
+
+3. **Check webhook events**:
+   - Go to Stripe Dashboard → Webhooks → Your endpoint → "Recent events"
+   - After a top-up, check if `checkout.session.completed` event appears
+   - If event shows "Failed" (red), click it to see the error
+
+4. **Check endpoint accessibility**:
+   ```bash
+   curl https://yourdomain.com/api/payments/webhook/test
+   ```
+   Should return JSON with `"status": "ok"`
+
+5. **Check Stripe mode**:
+   - Verify you're using the correct Stripe mode (test vs live)
+   - Check AdminSettings → Stripe mode matches your webhook configuration
+   - Test mode webhooks need `STRIPE_WEBHOOK_SECRET_TEST`
+   - Live mode webhooks need `STRIPE_WEBHOOK_SECRET_LIVE`
+
+### No webhook logs appearing (Local Development)
 
 - **Check Stripe CLI is running**: Make sure `stripe listen` is running in a separate terminal
 - **Check webhook secret**: Ensure `STRIPE_WEBHOOK_SECRET_TEST` matches the secret from `stripe listen`

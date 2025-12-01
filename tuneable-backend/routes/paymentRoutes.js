@@ -389,10 +389,17 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             console.error('Failed to send payment notification email:', emailError);
           }
         }
-      } catch (error) {
-        console.error('Error updating user balance from webhook:', error.message);
-      }
-    } else if (session.metadata.type === 'share_purchase') {
+        } catch (error) {
+          console.error('❌ Error processing wallet top-up webhook:', error);
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            sessionId: session.id,
+            userId: session.metadata?.userId
+          });
+          // Still respond to Stripe even if processing failed
+        }
+    } else if (session.metadata && session.metadata.type === 'share_purchase') {
       // Handle share purchase (live mode)
       try {
         const userId = session.metadata.userId;
@@ -424,9 +431,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       } catch (error) {
         console.error('Error processing share purchase:', error.message);
       }
+    } else {
+      console.log(`⚠️ Unhandled checkout session type: ${session.metadata?.type || 'no metadata'}`);
     }
+  } else {
+    console.log(`⚠️ Unhandled webhook event type: ${event.type}`);
   }
 
+  // Always respond to Stripe to acknowledge receipt
   res.json({ received: true });
 });
 
