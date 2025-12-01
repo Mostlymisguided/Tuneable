@@ -104,6 +104,13 @@ const tuneableLedgerSchema = new mongoose.Schema({
     // Null for non-media transactions (TOP_UP, PAY_OUT)
   },
   
+  globalAggregatePre: {
+    type: Number,
+    default: null
+    // Platform-wide total of all active bids before transaction (in pence)
+    // This is the sum of all active bids across the entire platform
+  },
+  
   // ========================================
   // BALANCE SNAPSHOTS (POST)
   // ========================================
@@ -125,6 +132,13 @@ const tuneableLedgerSchema = new mongoose.Schema({
     default: null
     // Media's total aggregate after transaction (in pence)
     // Null for non-media transactions (TOP_UP, PAY_OUT)
+  },
+  
+  globalAggregatePost: {
+    type: Number,
+    default: null
+    // Platform-wide total of all active bids after transaction (in pence)
+    // This is the sum of all active bids across the entire platform
   },
   
   // ========================================
@@ -214,6 +228,8 @@ tuneableLedgerSchema.methods.generateHash = function() {
     userAggregatePost: this.userAggregatePost,
     mediaAggregatePre: this.mediaAggregatePre,
     mediaAggregatePost: this.mediaAggregatePost,
+    globalAggregatePre: this.globalAggregatePre,
+    globalAggregatePost: this.globalAggregatePost,
     status: this.status,
     referenceTransactionId: this.referenceTransactionId?.toString(),
     referenceTransactionType: this.referenceTransactionType
@@ -290,6 +306,8 @@ tuneableLedgerSchema.pre('save', async function(next) {
         this.isModified('userAggregatePost') ||
         this.isModified('mediaAggregatePre') ||
         this.isModified('mediaAggregatePost') ||
+        this.isModified('globalAggregatePre') ||
+        this.isModified('globalAggregatePost') ||
         this.isModified('sequence')) {
       // Hash will be set after sequence is determined
       if (this.sequence) {

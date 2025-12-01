@@ -1,6 +1,7 @@
 const TuneableLedger = require('../models/TuneableLedger');
 const User = require('../models/User');
 const Media = require('../models/Media');
+const Bid = require('../models/Bid');
 
 /**
  * TuneableLedgerService
@@ -53,6 +54,11 @@ class TuneableLedgerService {
       const userAggregatePost = userAggregatePre + amount;
       const mediaAggregatePost = mediaAggregatePre + amount;
       
+      // Calculate global aggregate PRE and POST
+      const globalAggregatePre = await this._calculateGlobalAggregate();
+      // For TIP: global aggregate increases by amount (new active bid)
+      const globalAggregatePost = globalAggregatePre + amount;
+      
       // Get denormalized fields
       const username = user.username;
       const mediaTitle = media.title;
@@ -73,6 +79,8 @@ class TuneableLedgerService {
         userAggregatePost,
         mediaAggregatePre,
         mediaAggregatePost,
+        globalAggregatePre,
+        globalAggregatePost,
         referenceTransactionId: referenceTransactionId || bidId,
         referenceTransactionType: 'Bid',
         username,
@@ -144,6 +152,11 @@ class TuneableLedgerService {
       const userAggregatePost = Math.max(0, userAggregatePre - amount); // Refund reduces aggregate
       const mediaAggregatePost = Math.max(0, mediaAggregatePre - amount); // Refund reduces aggregate
       
+      // Calculate global aggregate PRE and POST
+      const globalAggregatePre = await this._calculateGlobalAggregate();
+      // For REFUND: global aggregate decreases by amount (bid becomes inactive)
+      const globalAggregatePost = Math.max(0, globalAggregatePre - amount);
+      
       // Get denormalized fields
       const username = user.username;
       const mediaTitle = media.title;
@@ -164,6 +177,8 @@ class TuneableLedgerService {
         userAggregatePost,
         mediaAggregatePre,
         mediaAggregatePost,
+        globalAggregatePre,
+        globalAggregatePost,
         referenceTransactionId,
         referenceTransactionType: referenceTransactionId ? 'RefundRequest' : 'Bid',
         username,
@@ -221,6 +236,11 @@ class TuneableLedgerService {
       const userBalancePost = userBalancePre + amount; // Top-up adds
       const userAggregatePost = userAggregatePre; // Top-up doesn't change aggregate
       
+      // Calculate global aggregate PRE and POST
+      const globalAggregatePre = await this._calculateGlobalAggregate();
+      // For TOP_UP: global aggregate doesn't change (no bid activity)
+      const globalAggregatePost = globalAggregatePre;
+      
       // Get denormalized fields
       const username = user.username;
       
@@ -238,6 +258,8 @@ class TuneableLedgerService {
         userAggregatePost,
         mediaAggregatePre: null,
         mediaAggregatePost: null,
+        globalAggregatePre,
+        globalAggregatePost,
         referenceTransactionId,
         referenceTransactionType: 'WalletTransaction',
         username,
@@ -298,6 +320,11 @@ class TuneableLedgerService {
       
       const artistEscrowBalancePost = userBalancePost;
       
+      // Calculate global aggregate PRE and POST
+      const globalAggregatePre = await this._calculateGlobalAggregate();
+      // For PAY_OUT: global aggregate doesn't change (no bid activity)
+      const globalAggregatePost = globalAggregatePre;
+      
       // Get denormalized fields
       const username = user.username;
       
@@ -315,6 +342,8 @@ class TuneableLedgerService {
         userAggregatePost,
         mediaAggregatePre: null,
         mediaAggregatePost: null,
+        globalAggregatePre,
+        globalAggregatePost,
         referenceTransactionId,
         referenceTransactionType: 'PayoutRequest',
         username,
@@ -340,6 +369,35 @@ class TuneableLedgerService {
     } catch (error) {
       console.error('Error creating PAY_OUT ledger entry:', error);
       throw error;
+    }
+  }
+  
+  /**
+   * Calculate global aggregate (sum of all active bids across platform)
+   * @private
+   * @returns {Promise<number>} Total amount in pence
+   */
+  async _calculateGlobalAggregate() {
+    try {
+      const result = await Bid.aggregate([
+        {
+          $match: {
+            status: 'active' // Only count active bids
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' }
+          }
+        }
+      ]);
+      
+      return result.length > 0 ? result[0].total : 0;
+    } catch (error) {
+      console.error('Error calculating global aggregate:', error);
+      // Return 0 on error to avoid blocking ledger entry creation
+      return 0;
     }
   }
   
