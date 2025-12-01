@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle } from 'lucide-react';
+import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail } from 'lucide-react';
+import { SUPPORT_EMAIL } from '../constants';
 
 const Help: React.FC = () => {
   const sections = [
@@ -13,9 +14,8 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">What is Tuneable?</h3>
             <p className="text-gray-300">
-              Tuneable is a music discovery and tipping platform where you can tip on songs, join parties, 
-              and discover new music. Your tips help determine what gets played, and you earn TuneByte Tokens when 
-              others tip on tunes you've tipped on.
+              Tuneable is a music discovery and tipping platform where you can tip on tunes, join parties, 
+              and discover new music. Your tips help create charts and you earn TuneByte Tokens by adding and tipping on music that later becomes popular on the platform.
             </p>
           </div>
           <div>
@@ -38,21 +38,21 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">How Tipping Works</h3>
             <p className="text-gray-300">
-              When you tip on a song, you're voting for it to be moved up the charts. Higher tips give songs more weight 
+              When you tip on a tune, you're voting for it to be moved up the charts. Higher tips give tunes more weight 
               in the charts. The minimum tip is usually £0.01, but party hosts can set their own minimum.
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Earning Credits</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Earning TuneBytes</h3>
             <p className="text-gray-300">
               You earn TuneByte Tokens when other users tip on tunes you've tipped on. The more your tunes get tipped on, 
-              the more you earn. TuneByte Tokens will be able to be exchanged for perks and Artist rewards in the future.
+              the more you earn. TuneBytes can't be spent yet but they will be tradeable for all sorts of artist swag in the future.
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Adding Credits</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Adding Credit</h3>
             <p className="text-gray-300">
-              You can add credits to your account through the Wallet page. We accept secure payments via 
+              You can add credit to your account through the Wallet page. We accept secure payments via 
               Stripe. Your balance is always displayed in your profile and wallet.
             </p>
           </div>
@@ -69,16 +69,16 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Joining a Party</h3>
             <p className="text-gray-300">
               Browse available parties from the Parties page. Click on any party to view the queue and 
-              start tipping on songs. You can tip on songs already in the queue or search for new tracks 
+              start tipping on tunes. You can tip tunes already in the queue or search for new tracks 
               to add.
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Adding Songs</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Adding Tunes</h3>
             <p className="text-gray-300">
-              Use the search feature in any party to find songs from our library or YouTube. When adding 
-              a new track, you'll be prompted to add tags to help others discover it. Set your bid amount 
-              and add the song to the queue.
+              Use the search feature in any party to find tunes from our library or YouTube. When adding 
+              a new track, you'll be prompted to add tags to help others discover it. Set your tip amount 
+              and add the tune to the queue.
             </p>
           </div>
           <div>
@@ -102,7 +102,7 @@ const Help: React.FC = () => {
             <p className="text-gray-300">
               Creators can upload their own music through the Creator Dashboard. You'll need to provide 
               the track file, artwork, and metadata. Once uploaded, your tracks can be discovered and 
-              bid on by other users.
+              tipped on by other users.
             </p>
           </div>
           <div>
@@ -139,13 +139,13 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Privacy Settings</h3>
             <p className="text-gray-300">
               Control your privacy through your profile settings. You can manage who can see your 
-              activity, bids, and profile information.
+              activity, tips, and profile information.
             </p>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Notifications</h3>
             <p className="text-gray-300">
-              Stay updated with notifications about bids, party updates, and platform activity. 
+              Stay updated with notifications about tips, party updates, and platform activity. 
               Manage your notification preferences in your account settings.
             </p>
           </div>
@@ -161,15 +161,15 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Playback Issues</h3>
             <p className="text-gray-300">
-              If songs aren't playing, check your internet connection and browser settings. Make sure 
+              If tunes aren't playing, check your internet connection and browser settings. Make sure 
               pop-ups aren't blocked, as some media players may require this. Try refreshing the page 
               or clearing your browser cache.
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Bid Not Going Through</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Tip Not Going Through</h3>
             <p className="text-gray-300">
-              Ensure you have sufficient credits in your account. Check that your bid meets the minimum 
+              Ensure you have sufficient credit in your account. Check that your tip meets the minimum 
               requirement for the party. If issues persist, try refreshing the page or logging out and 
               back in.
             </p>
@@ -192,10 +192,22 @@ const Help: React.FC = () => {
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Contact Us</h3>
-            <p className="text-gray-300">
+            <p className="text-gray-300 mb-3">
               If you need additional help, you can report issues through the platform's reporting system 
               or contact administrators through the admin panel if you have access.
             </p>
+            <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Mail className="h-5 w-5 text-purple-400" />
+                <span className="text-sm font-medium text-purple-300">Email Support</span>
+              </div>
+              <a 
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="text-purple-300 hover:text-purple-200 transition-colors text-lg font-semibold break-all"
+              >
+                {SUPPORT_EMAIL}
+              </a>
+            </div>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Reporting Problems</h3>
@@ -258,9 +270,21 @@ const Help: React.FC = () => {
             <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-6">
               <h3 className="text-xl font-semibold text-white mb-3">Still Need Help?</h3>
               <p className="text-gray-300 mb-4">
-                Can't find what you're looking for? Check out our other resources:
+                Can't find what you're looking for? Contact us directly or check out our other resources:
               </p>
-              <div className="flex flex-wrap gap-4">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail className="h-5 w-5 text-purple-400" />
+                  <span className="text-sm font-medium text-purple-300">Email Support</span>
+                </div>
+                <a 
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="text-purple-300 hover:text-purple-200 transition-colors text-lg font-semibold break-all"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-4 border-t border-purple-500/20">
                 <Link 
                   to="/privacy-policy" 
                   className="text-purple-300 hover:text-purple-200 transition-colors"
