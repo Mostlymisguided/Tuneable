@@ -102,6 +102,15 @@ const Wallet: React.FC = () => {
     setShowConfirmationModal(false);
     
     try {
+      // Verify token exists before making request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in to top up your wallet');
+        navigate('/login');
+        setIsLoading(false);
+        return;
+      }
+      
       // Send both amount (wallet credit) and totalCharge (Stripe charge) to backend
       const response = await paymentAPI.createCheckoutSession(topUpAmount, 'gbp', totalCharge);
       
@@ -113,7 +122,15 @@ const Wallet: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Payment error:', error);
-      toast.error(error.response?.data?.error || 'Failed to create payment session');
+      if (error.response?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to create payment session');
+      }
       setIsLoading(false);
     }
     // Note: Don't set isLoading to false here - it will be reset after redirect
