@@ -68,7 +68,6 @@ const Admin: React.FC = () => {
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<any>(null);
   const [isLoadingQuota, setIsLoadingQuota] = useState(false);
-  const [adminSettings, setAdminSettings] = useState<any>(null);
   const [threshold, setThreshold] = useState(95);
   const [thresholdEnabled, setThresholdEnabled] = useState(true);
   const [stripeMode, setStripeMode] = useState<'test' | 'live'>('live');
@@ -353,7 +352,6 @@ const Admin: React.FC = () => {
       
       if (response.ok) {
         const settings = await response.json();
-        setAdminSettings(settings);
         setThreshold(settings.youtubeQuota?.disableSearchThreshold || 95);
         setThresholdEnabled(settings.youtubeQuota?.enabled !== false);
         setStripeMode(settings.stripe?.walletTopUpMode || 'live');
@@ -387,9 +385,8 @@ const Admin: React.FC = () => {
       });
       
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         toast.success('Settings saved successfully');
-        setAdminSettings(result.settings);
         // Reload quota status to reflect new threshold
         loadQuotaStatus();
       } else {
