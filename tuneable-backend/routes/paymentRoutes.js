@@ -297,50 +297,44 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             // Continue even if wallet transaction creation fails - balance was already updated
           }
           
-          // Create ledger entry with NET amount (only if walletTransaction was created successfully)
-          if (walletTransaction && walletTransaction._id) {
-            try {
-              const tuneableLedgerService = require('../services/tuneableLedgerService');
-              await tuneableLedgerService.createTopUpEntry({
-                userId: updatedUser._id,
-                amount: amountReceivedPence, // NET amount for ledger
-                userBalancePre: balanceBefore,
-                userAggregatePre,
-                referenceTransactionId: walletTransaction._id,
-                metadata: {
-                  stripeSessionId: session.id,
-                  stripePaymentIntentId: session.payment_intent,
-                  currency: session.currency || 'gbp',
-                  customerEmail: session.customer_email,
-                  customerDetails: session.customer_details,
-                  // Fee tracking in ledger
-                  amountRequested: amountRequestedPence,
-                  amountReceived: amountReceivedPence,
-                  stripeFees: stripeFeesPence,
-                  isLiveMode: isLiveMode
-                }
-              });
-              console.log(`✅ Ledger entry created for top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}, Transaction: ${walletTransaction._id}`);
-            } catch (ledgerError) {
-              console.error('❌ Failed to create ledger entry for top-up:', ledgerError);
-              console.error('Ledger error details:', {
-                userId: updatedUser._id,
-                amount: amountReceivedPence,
-                walletTransactionId: walletTransaction._id,
-                userBalancePre: balanceBefore,
-                userAggregatePre: userAggregatePre,
-                error: ledgerError.message,
-                stack: ledgerError.stack
-              });
-              // Don't throw - balance was already updated, just log the error
-            }
-          } else {
-            console.error('❌ Cannot create ledger entry: walletTransaction not created or missing _id');
-            console.error('Wallet transaction state:', {
-              walletTransaction: walletTransaction ? 'exists' : 'null/undefined',
-              hasId: walletTransaction?._id ? 'yes' : 'no',
-              userId: updatedUser._id
+          // Create ledger entry with NET amount - ALWAYS try to create, even if walletTransaction failed
+          // This ensures all top-ups are recorded in the ledger for financial integrity
+          try {
+            const tuneableLedgerService = require('../services/tuneableLedgerService');
+            await tuneableLedgerService.createTopUpEntry({
+              userId: updatedUser._id,
+              amount: amountReceivedPence, // NET amount for ledger
+              userBalancePre: balanceBefore,
+              userAggregatePre,
+              referenceTransactionId: walletTransaction?._id || null, // Use walletTransaction ID if available
+              metadata: {
+                stripeSessionId: session.id,
+                stripePaymentIntentId: session.payment_intent,
+                currency: session.currency || 'gbp',
+                customerEmail: session.customer_email,
+                customerDetails: session.customer_details,
+                // Fee tracking in ledger
+                amountRequested: amountRequestedPence,
+                amountReceived: amountReceivedPence,
+                stripeFees: stripeFeesPence,
+                isLiveMode: isLiveMode,
+                walletTransactionCreated: !!walletTransaction?._id // Track if wallet transaction exists
+              }
             });
+            console.log(`✅ Ledger entry created for top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}, Transaction: ${walletTransaction?._id || 'N/A'}`);
+          } catch (ledgerError) {
+            console.error('❌ Failed to create ledger entry for top-up:', ledgerError);
+            console.error('Ledger error details:', {
+              userId: updatedUser._id,
+              amount: amountReceivedPence,
+              walletTransactionId: walletTransaction?._id || null,
+              userBalancePre: balanceBefore,
+              userAggregatePre: userAggregatePre,
+              error: ledgerError.message,
+              stack: ledgerError.stack
+            });
+            // Don't throw - balance was already updated, just log the error
+            // This is a critical error but we don't want to fail the webhook
           }
           
           // Send email notification
