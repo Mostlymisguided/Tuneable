@@ -94,9 +94,15 @@ app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 
 console.log('CORS enabled for allowed origins:', allowedOrigins);
 
-// Middleware to parse JSON bodies
-app.use(express.json());
-console.log('JSON body parsing middleware added.');
+// Middleware to parse JSON bodies (exclude webhook route which needs raw body)
+app.use((req, res, next) => {
+  // Skip JSON parsing for Stripe webhook (needs raw body for signature verification)
+  if (req.path === '/api/payments/webhook') {
+    return next();
+  }
+  express.json()(req, res, next);
+});
+console.log('JSON body parsing middleware added (webhook excluded).');
 
 // Trust proxy - required for Render/Heroku (they use reverse proxies)
 // This ensures req.protocol is correctly set to 'https' for secure cookies
