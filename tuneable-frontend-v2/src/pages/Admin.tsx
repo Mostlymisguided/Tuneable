@@ -68,9 +68,10 @@ const Admin: React.FC = () => {
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<any>(null);
   const [isLoadingQuota, setIsLoadingQuota] = useState(false);
-  const [, setAdminSettings] = useState<any>(null);
+  const [adminSettings, setAdminSettings] = useState<any>(null);
   const [threshold, setThreshold] = useState(95);
   const [thresholdEnabled, setThresholdEnabled] = useState(true);
+  const [stripeMode, setStripeMode] = useState<'test' | 'live'>('live');
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [labels, setLabels] = useState<any[]>([]);
@@ -355,6 +356,7 @@ const Admin: React.FC = () => {
         setAdminSettings(settings);
         setThreshold(settings.youtubeQuota?.disableSearchThreshold || 95);
         setThresholdEnabled(settings.youtubeQuota?.enabled !== false);
+        setStripeMode(settings.stripe?.walletTopUpMode || 'live');
       }
     } catch (error) {
       console.error('Error loading admin settings:', error);
@@ -377,6 +379,9 @@ const Admin: React.FC = () => {
           youtubeQuota: {
             disableSearchThreshold: threshold,
             enabled: thresholdEnabled
+          },
+          stripe: {
+            walletTopUpMode: stripeMode
           }
         })
       });
@@ -1173,6 +1178,76 @@ const Admin: React.FC = () => {
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <DollarSign className="h-5 w-5 mr-2" />
+                Stripe Payment Settings
+              </h3>
+              
+              {isLoadingSettings ? (
+                <p className="text-gray-400">Loading settings...</p>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Wallet Top-up Mode
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-start p-4 rounded-lg border-2 cursor-pointer transition-all border-gray-700 bg-gray-800/30 hover:border-gray-600">
+                        <input
+                          type="radio"
+                          name="stripeMode"
+                          value="live"
+                          checked={stripeMode === 'live'}
+                          onChange={(e) => setStripeMode(e.target.value as 'test' | 'live')}
+                          className="mt-1 mr-3"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-white font-medium">Live Mode</span>
+                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">PRODUCTION</span>
+                          </div>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Wallet top-ups will use live Stripe keys. Real payments will be processed.
+                          </p>
+                        </div>
+                      </label>
+                      <label className="flex items-start p-4 rounded-lg border-2 cursor-pointer transition-all border-gray-700 bg-gray-800/30 hover:border-gray-600">
+                        <input
+                          type="radio"
+                          name="stripeMode"
+                          value="test"
+                          checked={stripeMode === 'test'}
+                          onChange={(e) => setStripeMode(e.target.value as 'test' | 'live')}
+                          className="mt-1 mr-3"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-white font-medium">Test Mode</span>
+                            <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded">TESTING</span>
+                          </div>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Wallet top-ups will use test Stripe keys. No real payments will be processed.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-3">
+                      <strong>Note:</strong> Share purchases always use live mode regardless of this setting.
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={saveAdminSettings}
+                    disabled={isSavingSettings}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded transition-colors"
+                  >
+                    {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                  </button>
                 </div>
               )}
             </div>

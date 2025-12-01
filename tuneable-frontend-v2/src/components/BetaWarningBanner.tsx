@@ -68,9 +68,12 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
               🚧 Tuneable is in Beta Testing 🚧
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed"> 
+              Add your favourite tunes and tip to vote for a solstice/festive/xmas number one.
+            </p>
+            <p className="text-xs text-yellow-100/90 leading-relaxed"> 
               Please report any features not working as expected.
             </p>
-          </div>
+          </div>  
           {dismissible && (
             <button
               onClick={handleDismiss}

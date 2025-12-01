@@ -18,6 +18,15 @@ const adminSettingsSchema = new mongoose.Schema({
     } // Master switch to enable/disable threshold checking
   },
   
+  // Stripe payment settings
+  stripe: {
+    walletTopUpMode: {
+      type: String,
+      enum: ['test', 'live'],
+      default: 'live' // Default to live mode for production
+    } // Controls whether wallet top-ups use test or live Stripe keys
+  },
+  
   updatedAt: { type: Date, default: Date.now },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, {

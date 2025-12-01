@@ -436,6 +436,28 @@ router.get('/admin/settings', authMiddleware, async (req, res) => {
     }
 });
 
+// Get Stripe publishable key based on current mode (public endpoint for frontend)
+router.get('/stripe/publishable-key', async (req, res) => {
+    try {
+        const AdminSettings = require('../models/AdminSettings');
+        const settings = await AdminSettings.getSettings();
+        const mode = settings.stripe?.walletTopUpMode || 'live';
+        
+        // Return appropriate publishable key based on mode
+        const publishableKey = mode === 'live' 
+            ? process.env.STRIPE_PUBLISHABLE_KEY_LIVE || process.env.STRIPE_PUBLISHABLE_KEY
+            : process.env.STRIPE_PUBLISHABLE_KEY_TEST || process.env.STRIPE_PUBLISHABLE_KEY;
+        
+        res.json({ 
+            publishableKey: publishableKey || '',
+            mode: mode
+        });
+    } catch (error) {
+        console.error('Error fetching Stripe publishable key:', error);
+        res.status(500).json({ error: 'Failed to fetch Stripe publishable key' });
+    }
+});
+
 // Update admin settings (admin only)
 router.put('/admin/settings', authMiddleware, async (req, res) => {
     try {
@@ -463,10 +485,20 @@ router.put('/admin/settings', authMiddleware, async (req, res) => {
             }
         }
         
+        // Update Stripe settings
+        if (req.body.stripe) {
+            if (req.body.stripe.walletTopUpMode !== undefined) {
+                if (!['test', 'live'].includes(req.body.stripe.walletTopUpMode)) {
+                    return res.status(400).json({ error: 'Stripe mode must be either "test" or "live"' });
+                }
+                settings.stripe.walletTopUpMode = req.body.stripe.walletTopUpMode;
+            }
+        }
+        
         settings.updatedBy = req.user._id;
         await settings.save();
         
-        console.log(`⚙️ Admin settings updated by ${user.username}: threshold=${settings.youtubeQuota.disableSearchThreshold}%, enabled=${settings.youtubeQuota.enabled}`);
+        console.log(`⚙️ Admin settings updated by ${user.username}: threshold=${settings.youtubeQuota.disableSearchThreshold}%, enabled=${settings.youtubeQuota.enabled}, stripeMode=${settings.stripe?.walletTopUpMode || 'live'}`);
         
         res.json({ 
             message: 'Settings updated successfully',

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ToastContainer, cssTransition } from 'react-toastify';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import { useState, useEffect } from 'react';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -44,8 +45,6 @@ import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import ArtistEscrowDashboard from './pages/ArtistEscrowDashboard';
 import JoinUs from './pages/JoinUs';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 // Define fade transition for toast notifications
 // Duration is controlled by CSS animations (0.3s for fadeIn, 0.2s for fadeOut)
@@ -296,6 +295,46 @@ const AppContent = () => {
 };
 
 function App() {
+  const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
+  const [isLoadingStripe, setIsLoadingStripe] = useState(true);
+
+  useEffect(() => {
+    // Fetch the Stripe publishable key from the backend
+    const fetchStripeKey = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/search/stripe/publishable-key`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.publishableKey) {
+            setStripePromise(loadStripe(data.publishableKey));
+          } else {
+            // Fallback to env variable if API doesn't return a key
+            setStripePromise(loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''));
+          }
+        } else {
+          // Fallback to env variable on error
+          setStripePromise(loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''));
+        }
+      } catch (error) {
+        console.error('Error fetching Stripe publishable key:', error);
+        // Fallback to env variable on error
+        setStripePromise(loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''));
+      } finally {
+        setIsLoadingStripe(false);
+      }
+    };
+
+    fetchStripeKey();
+  }, []);
+
+  if (isLoadingStripe) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   return (
     <Elements stripe={stripePromise}>
       <AuthProvider>

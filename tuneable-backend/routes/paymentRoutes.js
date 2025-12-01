@@ -7,11 +7,30 @@ const WalletTransaction = require('../models/WalletTransaction'); // Import wall
 const { sendPaymentNotification } = require('../utils/emailService');
 require('dotenv').config();
 
-// Test mode Stripe (for wallet top-ups)
+// Test mode Stripe (for wallet top-ups - can be overridden by AdminSettings)
 const stripeTest = new Stripe(process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY);
 
-// Live mode Stripe (for share purchases/funding)
+// Live mode Stripe (for share purchases/funding and wallet top-ups when enabled)
 const stripeLive = process.env.STRIPE_SECRET_KEY_LIVE ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE) : null;
+
+// Helper function to get the appropriate Stripe instance for wallet top-ups
+const getWalletTopUpStripe = async () => {
+  try {
+    const AdminSettings = require('../models/AdminSettings');
+    const settings = await AdminSettings.getSettings();
+    const mode = settings.stripe?.walletTopUpMode || 'live';
+    
+    if (mode === 'live' && stripeLive) {
+      return stripeLive;
+    }
+    // Default to test mode if live not configured or mode is 'test'
+    return stripeTest;
+  } catch (error) {
+    console.error('Error getting Stripe instance for wallet top-up:', error);
+    // Fallback to test mode on error
+    return stripeTest;
+  }
+};
 
 // Create Payment Intent
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
@@ -23,7 +42,8 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    const paymentIntent = await stripeTest.paymentIntents.create({
+    const stripe = await getWalletTopUpStripe();
+    const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100, // Convert to cents
       currency: currency || 'gbp',
       automatic_payment_methods: { enabled: true },
@@ -36,7 +56,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   }
 });
 
-// Create Stripe Checkout Session for Wallet Top-up (TEST MODE)
+// Create Stripe Checkout Session for Wallet Top-up (uses AdminSettings to determine test/live mode)
 router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   try {
     const { amount, currency = 'gbp' } = req.body;
@@ -46,7 +66,8 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    const session = await stripeTest.checkout.sessions.create({
+    const stripe = await getWalletTopUpStripe();
+    const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
