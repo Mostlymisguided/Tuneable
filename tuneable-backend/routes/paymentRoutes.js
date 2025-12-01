@@ -156,19 +156,32 @@ router.post('/create-share-checkout-session', authMiddleware, async (req, res) =
 
 // Webhook to handle successful payments (handles both test and live modes)
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  console.log('🔔 Stripe webhook received - checking signature...');
   const sig = req.headers['stripe-signature'];
   let event;
   let isLiveMode = false;
 
+  if (!sig) {
+    console.error('❌ Webhook request missing stripe-signature header');
+    return res.status(400).send('Missing stripe-signature header');
+  }
+
   // Try test mode webhook first
   try {
+    const testSecret = process.env.STRIPE_WEBHOOK_SECRET_TEST || process.env.STRIPE_WEBHOOK_SECRET;
+    if (!testSecret) {
+      console.warn('⚠️ STRIPE_WEBHOOK_SECRET_TEST not configured, skipping test mode verification');
+      throw new Error('Test webhook secret not configured');
+    }
     event = stripeTest.webhooks.constructEvent(
       req.body, 
       sig, 
-      process.env.STRIPE_WEBHOOK_SECRET_TEST || process.env.STRIPE_WEBHOOK_SECRET
+      testSecret
     );
     isLiveMode = false;
+    console.log(`✅ Webhook signature verified (TEST mode): Event type: ${event.type}`);
   } catch (testErr) {
+    console.log(`⚠️ Test mode webhook verification failed: ${testErr.message}`);
     // If test webhook fails, try live webhook
     if (stripeLive && process.env.STRIPE_WEBHOOK_SECRET_LIVE) {
       try {
@@ -178,12 +191,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           process.env.STRIPE_WEBHOOK_SECRET_LIVE
         );
         isLiveMode = true;
+        console.log(`✅ Webhook signature verified (LIVE mode): Event type: ${event.type}`);
       } catch (liveErr) {
-        console.log(`Webhook signature verification failed for both test and live modes.`, liveErr.message);
+        console.error(`❌ Webhook signature verification failed for both test and live modes. Test error: ${testErr.message}, Live error: ${liveErr.message}`);
         return res.status(400).send(`Webhook Error: ${liveErr.message}`);
       }
     } else {
-      console.log(`Webhook signature verification failed.`, testErr.message);
+      console.error(`❌ Webhook signature verification failed. Test error: ${testErr.message}, Live mode not configured or secret missing`);
       return res.status(400).send(`Webhook Error: ${testErr.message}`);
     }
   }
@@ -191,8 +205,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   // Handle the checkout.session.completed event
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    console.log(`📦 Checkout session completed: Session ID ${session.id}, Metadata:`, session.metadata);
     
-    if (session.metadata.type === 'wallet_topup') {
+    if (session.metadata && session.metadata.type === 'wallet_topup') {
       console.log(`🔔 Webhook received for wallet top-up: Session ${session.id}, User ${session.metadata.userId}`);
       try {
         const userId = session.metadata.userId;
