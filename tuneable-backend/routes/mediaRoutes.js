@@ -2342,6 +2342,17 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     const previousTopBidderId = media.globalMediaBidTopUser;
     const wasNewTopBid = bidAmountPence > previousTopBidAmount; // Compare pence to pence
 
+    // Capture PRE balances BEFORE updating media and user
+    const userBalancePre = user.balance;
+    const mediaAggregatePre = media.globalMediaAggregate || 0;
+    
+    // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
+    const userBidsPre = await Bid.find({
+      userId: userId,
+      status: 'active'
+    }).lean();
+    const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
+
     // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
     media.bids.push(bid._id);
@@ -2355,6 +2366,42 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     // Note: media.bids array already contains this bid (added above)
     // No need to maintain separate globalBids array - bidScope field on Bid model is sufficient
     await media.save();
+
+    // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
+    try {
+      const tuneableLedgerService = require('../services/tuneableLedgerService');
+      await tuneableLedgerService.createTipEntry({
+        userId,
+        mediaId: media._id,
+        partyId: globalParty._id,
+        bidId: bid._id,
+        amount: bidAmountPence,
+        userBalancePre,
+        userAggregatePre,
+        mediaAggregatePre,
+        referenceTransactionId: bid._id,
+        metadata: {
+          bidScope: 'global',
+          isNewMedia: !partyMediaEntry,
+          platform: 'global-bid'
+        }
+      });
+      console.log(`✅ Ledger entry created for global bid ${bid._id}`);
+    } catch (error) {
+      console.error('❌ Failed to create ledger entry for global bid:', bid._id);
+      console.error('Ledger error details:', {
+        userId,
+        mediaId: media._id,
+        bidId: bid._id,
+        amount: bidAmountPence,
+        userBalancePre,
+        userAggregatePre,
+        mediaAggregatePre,
+        error: error.message,
+        stack: error.stack
+      });
+      // Don't fail the bid if ledger entry fails - log and continue
+    }
 
     // Send notifications (async, don't block response)
     try {
@@ -2387,7 +2434,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up notifications:', error);
     }
 
-    // Update user balance (already in pence, no conversion needed)
+    // Update user balance (already in pence, no conversion needed) - AFTER ledger entry
     user.balance = user.balance - bidAmountPence;
     await user.save();
 
