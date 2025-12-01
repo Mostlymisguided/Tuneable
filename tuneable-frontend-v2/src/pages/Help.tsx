@@ -223,15 +223,22 @@ const Help: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
             >
               <Flag className="h-5 w-5" />
-              Report a Problem or Suggest a Feature
+              Report a Problem
             </button>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Feature Requests</h3>
-            <p className="text-gray-300">
+            <p className="text-gray-300 mb-4">
               We're always improving Tuneable! Share your ideas and feedback through the platform. Your 
               suggestions help shape the future of Tuneable.
             </p>
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+            >
+              <Flag className="h-5 w-5" />
+              Suggest a Feature
+            </button>
           </div>
         </div>
       )
