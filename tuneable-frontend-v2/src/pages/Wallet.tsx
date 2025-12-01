@@ -88,6 +88,13 @@ const Wallet: React.FC = () => {
   const handleConfirmTopUp = async () => {
     if (!pendingTopUpAmount || isLoading) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast.error('Please log in to top up your wallet');
+      navigate('/login');
+      return;
+    }
+    
     const topUpAmount = pendingTopUpAmount;
     const totalCharge = calculateTotalCharge(topUpAmount);
     
