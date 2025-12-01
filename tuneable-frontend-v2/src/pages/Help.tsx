@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail } from 'lucide-react';
+import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag } from 'lucide-react';
 import { SUPPORT_EMAIL } from '../constants';
+import GeneralReportModal from '../components/GeneralReportModal';
 
 const Help: React.FC = () => {
+  const [showReportModal, setShowReportModal] = useState(false);
+
   const sections = [
     {
       id: 'getting-started',
@@ -211,10 +214,17 @@ const Help: React.FC = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Reporting Problems</h3>
-            <p className="text-gray-300">
+            <p className="text-gray-300 mb-4">
               Use the report feature to flag inappropriate content, technical issues, or other concerns. 
               Reports are reviewed by our moderation team.
             </p>
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+            >
+              <Flag className="h-5 w-5" />
+              Report a Problem or Suggest a Feature
+            </button>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Feature Requests</h3>
@@ -272,18 +282,6 @@ const Help: React.FC = () => {
               <p className="text-gray-300 mb-4">
                 Can't find what you're looking for? Contact us directly or check out our other resources:
               </p>
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Mail className="h-5 w-5 text-purple-400" />
-                  <span className="text-sm font-medium text-purple-300">Email Support</span>
-                </div>
-                <a 
-                  href={`mailto:${SUPPORT_EMAIL}`}
-                  className="text-purple-300 hover:text-purple-200 transition-colors text-lg font-semibold break-all"
-                >
-                  {SUPPORT_EMAIL}
-                </a>
-              </div>
               <div className="flex flex-wrap gap-4 pt-4 border-t border-purple-500/20">
                 <Link 
                   to="/privacy-policy" 
@@ -308,6 +306,12 @@ const Help: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* General Report Modal */}
+      <GeneralReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+      />
     </div>
   );
 };
