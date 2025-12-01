@@ -3353,7 +3353,61 @@ router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User associated with bid not found' });
     }
 
-    // Refund the bid amount (balance is stored in pence)
+    // Get media and party info for ledger entry
+    const Media = require('../models/Media');
+    const Party = require('../models/Party');
+    const media = await Media.findById(bid.mediaId);
+    const party = bid.partyId ? await Party.findById(bid.partyId) : null;
+
+    if (!media) {
+      return res.status(404).json({ error: 'Media associated with bid not found' });
+    }
+
+    // Capture PRE balances BEFORE updating
+    const userBalancePre = user.balance || 0;
+
+    // Calculate user aggregate PRE (sum of all active bids BEFORE refund)
+    const userBidsPre = await Bid.find({
+      userId: user._id,
+      status: 'active'
+    }).lean();
+    const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+    // Calculate media aggregate PRE
+    const mediaAggregatePre = media.globalMediaAggregate || 0;
+
+    // Create ledger entry BEFORE balance update
+    try {
+      const tuneableLedgerService = require('../services/tuneableLedgerService');
+      await tuneableLedgerService.createRefundEntry({
+        userId: user._id,
+        mediaId: media._id,
+        partyId: bid.partyId || null,
+        bidId: bid._id,
+        amount: bid.amount,
+        userBalancePre,
+        userAggregatePre,
+        mediaAggregatePre,
+        referenceTransactionId: null,
+        metadata: {
+          reason: reason || 'Bid vetoed by admin',
+          vetoedBy: req.user._id.toString()
+        }
+      });
+      console.log(`✅ Ledger entry created for vetoed bid ${bidId}`);
+    } catch (ledgerError) {
+      console.error('❌ Failed to create ledger entry for vetoed bid:', ledgerError);
+      console.error('Ledger error details:', {
+        bidId: bid._id,
+        userId: user._id,
+        mediaId: media._id,
+        error: ledgerError.message,
+        stack: ledgerError.stack
+      });
+      // Continue with refund even if ledger entry fails
+    }
+
+    // Refund the bid amount (balance is stored in pence) - AFTER ledger entry
     await User.findByIdAndUpdate(user._id, {
       $inc: { balance: bid.amount }
     });
