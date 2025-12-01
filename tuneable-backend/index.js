@@ -95,9 +95,16 @@ app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 console.log('CORS enabled for allowed origins:', allowedOrigins);
 
 // Middleware to parse JSON bodies (exclude webhook route which needs raw body)
+// IMPORTANT: Check both req.path and req.originalUrl to catch the webhook route
 app.use((req, res, next) => {
   // Skip JSON parsing for Stripe webhook (needs raw body for signature verification)
-  if (req.path === '/api/payments/webhook') {
+  const isWebhook = req.path === '/api/payments/webhook' || 
+                    req.originalUrl === '/api/payments/webhook' ||
+                    req.path === '/webhook' ||
+                    req.originalUrl === '/webhook';
+  
+  if (isWebhook) {
+    console.log('⚠️ Skipping JSON parsing for webhook route');
     return next();
   }
   express.json()(req, res, next);
@@ -144,6 +151,17 @@ app.get('/health', (req, res) => {
 app.get('/api/test', (req, res) => {
   console.log('GET /api/test');
   res.json({ message: 'API is working!' });
+});
+
+// Test webhook route accessibility
+app.get('/api/payments/webhook/test', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    url: '/api/payments/webhook',
+    methods: ['POST']
+  });
 });
 
 // Add routes
