@@ -308,17 +308,16 @@ function App() {
           if (data.publishableKey) {
             setStripePromise(loadStripe(data.publishableKey));
           } else {
-            // Fallback to env variable if API doesn't return a key
-            setStripePromise(loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''));
+            console.error('Stripe publishable key not returned from backend');
+            setStripePromise(null);
           }
         } else {
-          // Fallback to env variable on error
-          setStripePromise(loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''));
+          console.error('Failed to fetch Stripe publishable key from backend:', response.status);
+          setStripePromise(null);
         }
       } catch (error) {
         console.error('Error fetching Stripe publishable key:', error);
-        // Fallback to env variable on error
-        setStripePromise(loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''));
+        setStripePromise(null);
       } finally {
         setIsLoadingStripe(false);
       }

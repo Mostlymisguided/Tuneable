@@ -8,10 +8,10 @@ const { sendPaymentNotification } = require('../utils/emailService');
 require('dotenv').config();
 
 // Test mode Stripe (for wallet top-ups - can be overridden by AdminSettings)
-const stripeTest = new Stripe(process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY);
+const stripeTest = new Stripe(process.env.STRIPE_SECRET_KEY_TEST || '');
 
 // Live mode Stripe (for share purchases/funding and wallet top-ups when enabled)
-const stripeLive = process.env.STRIPE_SECRET_KEY_LIVE ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE) : null;
+const stripeLive = process.env.STRIPE_SECRET_KEY_LIVE ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE || '') : null;
 
 // Helper function to get the appropriate Stripe instance for wallet top-ups
 const getWalletTopUpStripe = async () => {
