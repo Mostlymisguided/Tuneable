@@ -28,9 +28,12 @@ import {
   CheckCircle,
   Flag,
   Users,
-  Award
+  Award,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
-import { userAPI, authAPI, creatorAPI } from '../lib/api';
+import { userAPI, authAPI, creatorAPI, mediaAPI } from '../lib/api';
 import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import ReportModal from '../components/ReportModal';
@@ -40,6 +43,23 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import { toast } from 'react-toastify';
+
+interface LibraryItem {
+  mediaId: string;
+  mediaUuid: string;
+  title: string;
+  artist: string;
+  coverArt?: string;
+  duration?: number;
+  bpm?: number;
+  globalMediaAggregate: number;
+  globalMediaAggregateAvg: number;
+  globalUserMediaAggregate: number;
+  bidCount: number;
+  tuneBytesEarned: number;
+  lastBidAt: string;
+}
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -155,7 +175,7 @@ const UserProfile: React.FC = () => {
   const { user: currentUser, handleOAuthCallback } = useAuth();
   
   // Web player store for playing media
-  const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -189,12 +209,18 @@ const UserProfile: React.FC = () => {
   });
   const [walletHistoryPagination, setWalletHistoryPagination] = useState<any>(null);
   
+  // Tune Library state
+  const [tuneLibrary, setTuneLibrary] = useState<LibraryItem[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [librarySortField, setLibrarySortField] = useState<string>('lastBidAt');
+  const [librarySortDirection, setLibrarySortDirection] = useState<'asc' | 'desc'>('desc');
+  
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
   const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
   
   // View mode tabs - controlled by query params
-  const viewTab = (searchParams.get('view') as 'overview' | 'tip-history' | 'wallet-history') || 'overview';
+  const viewTab = (searchParams.get('view') as 'overview' | 'tip-history' | 'wallet-history' | 'tune-library') || 'overview';
   
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -375,7 +401,7 @@ const UserProfile: React.FC = () => {
     setSearchParams({ settings: 'true', tab });
   };
 
-  const handleViewTabChange = (tab: 'overview' | 'tip-history' | 'wallet-history') => {
+  const handleViewTabChange = (tab: 'overview' | 'tip-history' | 'wallet-history' | 'tune-library') => {
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
       newParams.set('view', tab);
@@ -627,6 +653,13 @@ const UserProfile: React.FC = () => {
     }
   }, [viewTab, isOwnProfile, isSettingsMode, walletHistoryFilters]);
 
+  // Load tune library when viewing tune library tab
+  useEffect(() => {
+    if (viewTab === 'tune-library' && isOwnProfile && !isSettingsMode) {
+      loadTuneLibrary();
+    }
+  }, [viewTab, isOwnProfile, isSettingsMode]);
+
   const formatJoinDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
@@ -635,9 +668,9 @@ const UserProfile: React.FC = () => {
   };
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'Unknown';
+    if (!seconds) return '--:--';
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -698,6 +731,128 @@ const UserProfile: React.FC = () => {
     setGlobalPlayerActive(true);
     
     toast.success(`Now playing: ${cleanedMedia.title}`);
+  };
+
+  // Load tune library
+  const loadTuneLibrary = async () => {
+    try {
+      setIsLoadingLibrary(true);
+      const data = await userAPI.getTuneLibrary();
+      setTuneLibrary(data.library || []);
+    } catch (error) {
+      console.error('Failed to load tune library:', error);
+      toast.error('Failed to load tune library');
+    } finally {
+      setIsLoadingLibrary(false);
+    }
+  };
+
+  // Handle playing media from Tune Library with auto-transition
+  const handlePlayLibrary = async (item: LibraryItem, index: number) => {
+    try {
+      // Use sorted library to maintain the order the user sees
+      const sortedLibrary = getSortedLibrary();
+      
+      // Fetch all media details for the entire library to create the queue
+      const allMediaPromises = sortedLibrary.map(async (libItem) => {
+        const mediaId = libItem.mediaUuid || libItem.mediaId;
+        const mediaData = await mediaAPI.getProfile(mediaId);
+        const media = mediaData.media || mediaData;
+        
+        // Format sources
+        let sources: any = {};
+        if (media.sources) {
+          if (Array.isArray(media.sources)) {
+            for (const source of media.sources) {
+              if (source?.platform === 'youtube' && source?.url) {
+                sources.youtube = source.url;
+              }
+            }
+          } else if (typeof media.sources === 'object') {
+            sources = media.sources;
+          }
+        }
+        
+        return {
+          id: libItem.mediaUuid || libItem.mediaId,
+          _id: libItem.mediaId,
+          title: libItem.title,
+          artist: libItem.artist,
+          duration: libItem.duration,
+          coverArt: libItem.coverArt,
+          sources: sources,
+          globalMediaAggregate: libItem.globalMediaAggregate,
+          bids: [],
+          addedBy: null,
+          totalBidValue: libItem.globalMediaAggregate
+        } as any;
+      });
+      
+      const allFormattedMedia = await Promise.all(allMediaPromises);
+      
+      // Set entire library as queue for auto-transition
+      setQueue(allFormattedMedia);
+      // Set current media to the clicked item (with its index)
+      setCurrentMedia(allFormattedMedia[index], index, true);
+      setGlobalPlayerActive(true);
+      toast.success(`Now playing: ${item.title}`);
+    } catch (error) {
+      console.error('Error loading media for playback:', error);
+      toast.error('Failed to load media for playback');
+    }
+  };
+
+  // Sort library items
+  const getSortedLibrary = () => {
+    return [...tuneLibrary].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (librarySortField) {
+        case 'title':
+          aValue = a.title?.toLowerCase() || '';
+          bValue = b.title?.toLowerCase() || '';
+          break;
+        case 'artist':
+          aValue = a.artist?.toLowerCase() || '';
+          bValue = b.artist?.toLowerCase() || '';
+          break;
+        case 'duration':
+          aValue = a.duration || 0;
+          bValue = b.duration || 0;
+          break;
+        case 'globalMediaAggregateAvg':
+          aValue = a.globalMediaAggregateAvg || 0;
+          bValue = b.globalMediaAggregateAvg || 0;
+          break;
+        case 'globalUserMediaAggregate':
+          aValue = a.globalUserMediaAggregate || 0;
+          bValue = b.globalUserMediaAggregate || 0;
+          break;
+        case 'tuneBytesEarned':
+          aValue = a.tuneBytesEarned || 0;
+          bValue = b.tuneBytesEarned || 0;
+          break;
+        case 'lastBidAt':
+        default:
+          aValue = new Date(a.lastBidAt).getTime();
+          bValue = new Date(b.lastBidAt).getTime();
+          break;
+      }
+
+      if (aValue < bValue) return librarySortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return librarySortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const getLibrarySortIcon = (field: string) => {
+    if (librarySortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
+    }
+    return librarySortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
+      : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
   };
 
   // Get social media links based on manual URLs only
@@ -1369,6 +1524,16 @@ const UserProfile: React.FC = () => {
               >
                 Top Up History
               </button>
+              <button
+                onClick={() => handleViewTabChange('tune-library')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'tune-library'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Tune Library
+              </button>
             </nav>
           </div>
         )}
@@ -1943,6 +2108,202 @@ const UserProfile: React.FC = () => {
                 >
                   Next
                 </button>
+              </div>
+            )}
+          </div>
+        ) : viewTab === 'tune-library' ? (
+          /* TUNE LIBRARY TAB */
+          <div className="space-y-6">
+            <div className="card flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <Music className="h-6 w-6 text-purple-400 mr-2" />
+                <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
+                <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+                  {tuneLibrary.length}
+                </span>
+              </div>
+            </div>
+            
+            {isLoadingLibrary ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : tuneLibrary.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
+                <p>You haven't tipped on any media yet.</p>
+                <p className="text-sm mt-2">Start tipping on tunes to build your library!</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Artwork
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        onClick={() => {
+                          if (librarySortField === 'title') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('title');
+                            setLibrarySortDirection('asc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Title
+                          {getLibrarySortIcon('title')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        onClick={() => {
+                          if (librarySortField === 'artist') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('artist');
+                            setLibrarySortDirection('asc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Artist
+                          {getLibrarySortIcon('artist')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        onClick={() => {
+                          if (librarySortField === 'duration') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('duration');
+                            setLibrarySortDirection('asc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Duration
+                          {getLibrarySortIcon('duration')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        onClick={() => {
+                          if (librarySortField === 'globalMediaAggregateAvg') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('globalMediaAggregateAvg');
+                            setLibrarySortDirection('desc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Avg Tip
+                          {getLibrarySortIcon('globalMediaAggregateAvg')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        onClick={() => {
+                          if (librarySortField === 'globalUserMediaAggregate') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('globalUserMediaAggregate');
+                            setLibrarySortDirection('desc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Your Tip
+                          {getLibrarySortIcon('globalUserMediaAggregate')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        onClick={() => {
+                          if (librarySortField === 'tuneBytesEarned') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('tuneBytesEarned');
+                            setLibrarySortDirection('desc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          TuneBytes
+                          {getLibrarySortIcon('tuneBytesEarned')}
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800 divide-y divide-gray-700">
+                    {getSortedLibrary().map((item, index) => (
+                      <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlayLibrary(item, index)}>
+                            {item.coverArt ? (
+                              <img 
+                                src={item.coverArt} 
+                                alt={item.title}
+                                className="w-full h-full rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-700 rounded flex items-center justify-center">
+                                <Music className="h-6 w-6 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors shadow-lg">
+                                <Play className="h-4 w-4 text-white ml-0.5" fill="currentColor" />
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
+                            className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                          >
+                            {item.title}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">
+                            <ClickableArtistDisplay media={item} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{penceToPounds(item.globalMediaAggregateAvg)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-green-400">{penceToPounds(item.globalUserMediaAggregate)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
+                            className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                            title="View tune"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

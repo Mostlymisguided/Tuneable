@@ -65,10 +65,10 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
           <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-yellow-200 mb-1">
-              🚧 Tuneable is in Beta Testing 🚧
+              🚧 Tuneable is in Beta 🚧
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed"> 
-              Add your favourite tunes and tip to vote for a solstice/festive/xmas number one.
+              Add your favourite tunes and tip to vote for a solstice number one.
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed"> 
               Please report any features not working as expected.
