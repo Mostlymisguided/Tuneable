@@ -123,6 +123,7 @@ const createTagParty = async (tag) => {
   // Get Tuneable user as host
   const tuneableUser = await User.findOne({ username: 'Tuneable' });
   if (!tuneableUser) {
+    console.error('❌ Tuneable user not found. Cannot create tag party without host.');
     throw new Error('Tuneable user not found. Cannot create tag party without host.');
   }
   

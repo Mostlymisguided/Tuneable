@@ -421,23 +421,38 @@ mediaSchema.pre('save', function (next) {
 });
 
 // Post-save hook: Check and create tag parties when media is saved
-mediaSchema.post('save', async function() {
-  // Only process if media has tags and is newly created or tags were updated
-  if (!this.tags || !Array.isArray(this.tags) || this.tags.length === 0) {
-    return;
-  }
-  
-  // Run tag party creation asynchronously (don't block the save operation)
-  // Use setImmediate to ensure it runs after the save is complete
-  setImmediate(async () => {
-    try {
-      const tagPartyService = require('../services/tagPartyService');
-      await tagPartyService.checkAndCreateTagParties(this.tags);
-    } catch (error) {
-      console.error('❌ Error in post-save tag party creation:', error);
-      // Don't throw - this is a background operation
+// Note: This hook is intentionally NOT async to avoid blocking the save operation
+mediaSchema.post('save', function(doc) {
+  try {
+    // Only process if media has tags
+    if (!doc || !doc.tags || !Array.isArray(doc.tags) || doc.tags.length === 0) {
+      return;
     }
-  });
+    
+    // Store tags in a variable to avoid closure issues
+    const mediaTags = doc.tags;
+    
+    // Run tag party creation asynchronously (don't block the save operation)
+    // Use setImmediate to ensure it runs after the save is complete and response is sent
+    setImmediate(() => {
+      // Wrap in promise to handle async operations
+      Promise.resolve().then(async () => {
+        try {
+          const tagPartyService = require('../services/tagPartyService');
+          await tagPartyService.checkAndCreateTagParties(mediaTags);
+        } catch (error) {
+          console.error('❌ Error in post-save tag party creation:', error);
+          // Don't throw - this is a background operation
+        }
+      }).catch(err => {
+        console.error('❌ Unhandled error in tag party creation promise:', err);
+      });
+    });
+  } catch (error) {
+    // Catch any synchronous errors in the hook itself
+    console.error('❌ Error in post-save hook setup:', error);
+    // Don't throw - allow the save to complete
+  }
 });
 
 // Indexes for performance
