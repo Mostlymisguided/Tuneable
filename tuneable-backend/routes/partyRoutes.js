@@ -435,6 +435,10 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
 
         let party;
         
+        // First, check if this is a tag party
+        party = await Party.findById(id);
+        const isTagParty = party && party.type === 'tag';
+        
         if (isRequestingGlobalParty) {
             // For Global Party, we need to aggregate ALL media with ANY bids
             console.log('🌍 Fetching Global Party - aggregating all media with bids...');
@@ -562,6 +566,121 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             // Log warning if processing takes too long (performance canary)
             if (processingTime > 5000) {
                 console.warn(`⚠️  Global Party processing took ${processingTime}ms - consider optimization!`);
+            }
+            
+        } else if (isTagParty) {
+            // For Tag Party, we need to aggregate ALL media with the tag that has ANY bids
+            const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
+            
+            if (!tagPartyTag) {
+                console.warn(`⚠️  Tag party ${id} has no tags`);
+                party.media = [];
+            } else {
+                console.log(`🏷️  Fetching Tag Party for tag "${tagPartyTag}" - aggregating all media with this tag and bids...`);
+                
+                // Performance monitoring for Tag Party
+                const startTime = Date.now();
+                
+                // Normalize tag for case-insensitive matching
+                const { capitalizeTag } = require('../services/tagPartyService');
+                const normalizedTag = capitalizeTag(tagPartyTag);
+                const lowerTag = normalizedTag.toLowerCase().trim();
+                
+                // Find ALL media with this tag that has ANY bids
+                const allMediaWithTagAndBids = await Media.find({
+                    tags: { 
+                        $elemMatch: { 
+                            $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+                        } 
+                    },
+                    bids: { $exists: true, $ne: [] },
+                    status: { $ne: 'vetoed' } // Exclude globally vetoed media
+                })
+                .populate({
+                    path: 'bids',
+                    model: 'Bid',
+                    match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
+                    populate: {
+                        path: 'userId',
+                        select: 'username profilePic uuid homeLocation secondaryLocation'
+                    }
+                })
+                .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+                .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+                .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
+
+                // Convert to party media format for consistent frontend handling
+                // Recalculate partyMediaAggregate from active bids on-the-fly to ensure accuracy
+                party.media = allMediaWithTagAndBids
+                    .map(media => {
+                        // Filter to only active bids (populate match may not filter all cases)
+                        const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
+                        
+                        // Skip media with no active bids
+                        if (activeBids.length === 0) {
+                            return null;
+                        }
+                        
+                        // Recalculate globalMediaAggregate from active bids only (in pence)
+                        const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
+                            return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
+                        }, 0);
+                        
+                        // Calculate top bid from active bids
+                        const topBid = activeBids.reduce((max, bid) => {
+                            return (bid.amount || 0) > (max.amount || 0) ? bid : max;
+                        }, activeBids[0] || { amount: 0 });
+                        
+                        // Calculate user aggregates to find top aggregate user
+                        const userAggregates = {};
+                        activeBids.forEach(bid => {
+                            const userId = bid.userId?._id?.toString() || bid.userId?.toString();
+                            if (userId) {
+                                if (!userAggregates[userId]) {
+                                    userAggregates[userId] = {
+                                        userId: bid.userId?._id || bid.userId,
+                                        total: 0
+                                    };
+                                }
+                                userAggregates[userId].total += (bid.amount || 0);
+                            }
+                        });
+                        
+                        // Find user with highest aggregate
+                        const topAggregateUser = Object.values(userAggregates).reduce(
+                            (max, user) => user.total > max.total ? user : max,
+                            { total: 0, userId: null }
+                        );
+                        
+                        return {
+                            mediaId: media,
+                            media_uuid: media.uuid,
+                            addedBy: media.addedBy?._id || media.addedBy,
+                            // Use calculated aggregate from active bids (accurate, not stale)
+                            partyMediaAggregate: calculatedGlobalMediaAggregate,
+                            partyBids: activeBids, // Only include active bids
+                            status: 'active',
+                            queuedAt: media.createdAt || new Date(),
+                            partyMediaBidTop: topBid.amount || 0,
+                            partyMediaBidTopUser: topBid.userId?._id || topBid.userId || null,
+                            partyMediaAggregateTop: topAggregateUser.total || 0,
+                            partyMediaAggregateTopUser: topAggregateUser.userId || null
+                        };
+                    })
+                    .filter(media => media !== null); // Remove media with no active bids
+                
+                // Performance monitoring - log Tag Party metrics
+                const endTime = Date.now();
+                const processingTime = endTime - startTime;
+                console.log(`🏷️  Tag Party Performance Metrics:`);
+                console.log(`   - Tag: "${normalizedTag}"`);
+                console.log(`   - Processing time: ${processingTime}ms`);
+                console.log(`   - Media count: ${party.media.length}`);
+                
+                // Log warning if processing takes too long (performance canary)
+                if (processingTime > 5000) {
+                    console.warn(`⚠️  Tag Party processing took ${processingTime}ms - consider optimization!`);
+                }
             }
             
         } else {
@@ -863,6 +982,10 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
 
         let party;
         
+        // Check if this is a tag party
+        party = await Party.findById(partyId);
+        const isTagParty = party && party.type === 'tag';
+        
         if (isRequestingGlobalParty) {
             // For Global Party, search through ALL media with ANY bids
             console.log('🌍 Searching Global Party - searching all media with bids...');
@@ -879,6 +1002,37 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                     mediaId: media
                 }))
             };
+        } else if (isTagParty) {
+            // For Tag Party, search through ALL media with the tag that has ANY bids
+            const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
+            
+            if (!tagPartyTag) {
+                party.media = [];
+            } else {
+                console.log(`🏷️  Searching Tag Party for tag "${tagPartyTag}" - searching all media with this tag and bids...`);
+                
+                const Media = require('../models/Media');
+                const { capitalizeTag } = require('../services/tagPartyService');
+                const normalizedTag = capitalizeTag(tagPartyTag);
+                const lowerTag = normalizedTag.toLowerCase().trim();
+                
+                const allMediaWithTagAndBids = await Media.find({
+                    tags: { 
+                        $elemMatch: { 
+                            $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+                        } 
+                    },
+                    bids: { $exists: true, $ne: [] },
+                    status: { $ne: 'vetoed' } // Exclude globally vetoed media
+                }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm');
+                
+                // Convert to party format for consistent handling
+                party = {
+                    media: allMediaWithTagAndBids.map(media => ({
+                        mediaId: media
+                    }))
+                };
+            }
         } else {
             // Regular party search logic
             party = await Party.findById(partyId)
@@ -1133,7 +1287,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaId: media._id, // Use mediaId instead of songId
             amount: bidAmountPence, // Store in pence
             status: 'active',
-            bidScope: party.type === 'global' ? 'global' : 'party', // Set bidScope based on party type
+            bidScope: (party.type === 'global' || party.type === 'tag') ? 'global' : 'party', // Set bidScope based on party type
             
             // Required denormalized fields
             username: user.username,
@@ -1395,7 +1549,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }
 
         // Get party and check if media exists in party
-        const party = await Party.findById(partyId).populate('media.mediaId');
+        let party = await Party.findById(partyId).populate('media.mediaId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
@@ -1403,6 +1557,9 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // Check if this is the Global Party
         const isGlobalParty = await Party.getGlobalParty();
         const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
+
+        // Check if this is a tag party
+        const isTagParty = party && party.type === 'tag';
 
         let partyMediaEntry;
         let actualMediaId;
@@ -1442,6 +1599,71 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             }, 0);
 
             // Create a virtual party media entry for Global Party
+            partyMediaEntry = {
+                mediaId: populatedMedia._id,
+                media_uuid: populatedMedia.uuid,
+                partyMediaAggregate: calculatedGlobalMediaAggregate, // Use calculated value from active bids
+                partyBids: activeBids, // Only include active bids
+                status: 'active'
+            };
+
+        } else if (isTagParty) {
+            // For Tag Party, media doesn't exist in party.media array
+            // We need to find the media directly from the Media collection and verify it has the tag
+            console.log('🏷️  Tag Party bidding - finding media directly from Media collection');
+            
+            // Resolve media ID (handle both ObjectId and UUID)
+            const Media = require('../models/Media');
+            if (mongoose.isValidObjectId(mediaId)) {
+                actualMediaId = mediaId;
+                populatedMedia = await Media.findById(actualMediaId);
+            } else {
+                // Try finding by UUID
+                populatedMedia = await Media.findOne({ uuid: mediaId });
+                if (populatedMedia) {
+                    actualMediaId = populatedMedia._id;
+                }
+            }
+
+            if (!populatedMedia) {
+                return res.status(404).json({ error: 'Media not found' });
+            }
+
+            // Verify media has the tag party's tag
+            const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
+            if (tagPartyTag) {
+                const { capitalizeTag } = require('../services/tagPartyService');
+                const normalizedTag = capitalizeTag(tagPartyTag);
+                const lowerTag = normalizedTag.toLowerCase().trim();
+                const mediaHasTag = populatedMedia.tags && Array.isArray(populatedMedia.tags) && 
+                    populatedMedia.tags.some(tag => {
+                        const tagLower = typeof tag === 'string' ? tag.toLowerCase().trim() : '';
+                        return tagLower === lowerTag;
+                    });
+                
+                if (!mediaHasTag) {
+                    return res.status(400).json({ 
+                        error: `Media does not have the tag "${normalizedTag}" required for this tag party`,
+                        mediaId: actualMediaId,
+                        mediaTitle: populatedMedia.title,
+                        requiredTag: normalizedTag
+                    });
+                }
+            }
+
+            // Get active bids for this media to calculate accurate aggregate
+            const activeBids = await Bid.find({
+                mediaId: actualMediaId,
+                status: 'active'
+            })
+            .populate('userId', 'username profilePic uuid homeLocation secondaryLocation');
+
+            // Calculate aggregate from active bids only (in pence)
+            const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
+                return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
+            }, 0);
+
+            // Create a virtual party media entry for Tag Party
             partyMediaEntry = {
                 mediaId: populatedMedia._id,
                 media_uuid: populatedMedia.uuid,
@@ -1529,6 +1751,28 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             // For Global Party, all media is considered "active" and we get it from Media collection
             const Media = require('../models/Media');
             queuedMedia = await Media.find({ bids: { $exists: true, $ne: [] } });
+            queueSize = queuedMedia.length;
+            queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
+        } else if (isTagParty) {
+            // For Tag Party, get all media with the tag that has bids
+            const Media = require('../models/Media');
+            const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
+            if (tagPartyTag) {
+                const { capitalizeTag } = require('../services/tagPartyService');
+                const normalizedTag = capitalizeTag(tagPartyTag);
+                const lowerTag = normalizedTag.toLowerCase().trim();
+                
+                queuedMedia = await Media.find({
+                    tags: { 
+                        $elemMatch: { 
+                            $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+                        } 
+                    },
+                    bids: { $exists: true, $ne: [] }
+                });
+            } else {
+                queuedMedia = [];
+            }
             queueSize = queuedMedia.length;
             queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
         } else {
@@ -1648,10 +1892,14 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }
 
         // Update party media entry bid aggregate (schema grammar)
-        if (isRequestingGlobalParty) {
-            // For Global Party, we don't update the party.media array since it's virtual
+        if (isRequestingGlobalParty || isTagParty) {
+            // For Global Party and Tag Party, we don't update the party.media array since it's virtual
             // The media aggregate is updated in the Media model below
-            console.log('🌍 Global Party bidding - skipping party.media update (virtual)');
+            if (isRequestingGlobalParty) {
+                console.log('🌍 Global Party bidding - skipping party.media update (virtual)');
+            } else {
+                console.log('🏷️  Tag Party bidding - skipping party.media update (virtual)');
+            }
         } else {
             // Regular party logic - update party media entry
             // Note: partyMediaAggregate will be recalculated by BidMetricsEngine post-save hook
