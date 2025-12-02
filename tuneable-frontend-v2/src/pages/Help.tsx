@@ -140,6 +140,20 @@ const Help: React.FC = () => {
               members and admins, manage the collective's presence, and collaborate on releases.
             </p>
           </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">AI in Music Creation</h3>
+            <p className="text-gray-300">
+              Tuneable supports AI as a tool for music creation. We recognize that AI can help newcomers 
+              experiment with making music and can aid the creative process. However, we believe in 
+              transparency and clarity about the role of AI in music production.
+            </p>
+            <p className="text-gray-300 mt-2">
+              Artists must acknowledge if, how, and where they have used AI in the production of their music. 
+              This allows listeners to distinguish between music created by humans and music created with AI 
+              assistance, and enables filtering and discovery based on these distinctions. Our goal is to 
+              celebrate all forms of creativity while maintaining honesty about the creative process.
+            </p>
+          </div>
         </div>
       )
     },

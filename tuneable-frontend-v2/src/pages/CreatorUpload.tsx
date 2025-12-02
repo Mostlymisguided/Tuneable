@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building } from 'lucide-react';
+import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building, Bot, Plus, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
 import { labelAPI, emailAPI } from '../lib/api';
@@ -72,7 +72,11 @@ const CreatorUpload: React.FC = () => {
     composer: '',
     producer: '',
     label: '',
-    language: ''
+    language: '',
+    // AI Usage fields
+    aiUsed: false,
+    aiDisclosure: 'none' as 'none' | 'partial' | 'full',
+    aiTools: [] as Array<{ category: string; name: string; provider: string }>
   });
   const [useMultipleArtists, setUseMultipleArtists] = useState(false);
   const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>(() => [
@@ -86,6 +90,17 @@ const CreatorUpload: React.FC = () => {
   ]);
   const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // AI tool categories
+  const aiToolCategories = [
+    { value: 'generation', label: 'Generation' },
+    { value: 'enhancement', label: 'Enhancement' },
+    { value: 'mixing', label: 'Mixing' },
+    { value: 'mastering', label: 'Mastering' },
+    { value: 'composition', label: 'Composition' },
+    { value: 'lyrics', label: 'Lyrics' },
+    { value: 'other', label: 'Other' }
+  ];
 
   // Check if user is verified creator or admin
   const isAdmin = user && (user as any).role?.includes('admin');
@@ -397,6 +412,13 @@ const CreatorUpload: React.FC = () => {
       uploadData.append('explicit', formData.explicit.toString());
       if (formData.tags) uploadData.append('tags', formData.tags);
       if (formData.description) uploadData.append('description', formData.description.trim());
+      
+      // AI Usage fields
+      uploadData.append('aiUsed', formData.aiUsed.toString());
+      uploadData.append('aiDisclosure', formData.aiDisclosure);
+      if (formData.aiTools.length > 0) {
+        uploadData.append('aiTools', JSON.stringify(formData.aiTools.filter(tool => tool.name && tool.provider)));
+      }
       // Add cover art file if selected
       if (coverArtFile) {
         uploadData.append('coverArtFile', coverArtFile);
@@ -920,6 +942,130 @@ const CreatorUpload: React.FC = () => {
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
                 placeholder="Tell fans about this track..."
               />
+            </div>
+
+            {/* AI Usage Section */}
+            <div className="border-t border-gray-600 pt-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <Bot className="h-5 w-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">AI Usage Disclosure</h3>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Tuneable supports AI in music creation. Please disclose if, how, and where you've used AI in your creative process.
+              </p>
+
+              {/* AI Used Checkbox */}
+              <div className="flex items-center space-x-3 mb-4">
+                <input
+                  type="checkbox"
+                  id="aiUsed"
+                  checked={formData.aiUsed}
+                  onChange={(e) => {
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      aiUsed: e.target.checked,
+                      aiDisclosure: e.target.checked ? prev.aiDisclosure : 'none',
+                      aiTools: e.target.checked ? prev.aiTools : []
+                    }));
+                  }}
+                  className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-purple-600 focus:ring-purple-500"
+                />
+                <label htmlFor="aiUsed" className="text-white font-medium">
+                  I used AI in the creation of this track
+                </label>
+              </div>
+
+              {formData.aiUsed && (
+                <div className="space-y-4 pl-8 border-l-2 border-purple-500/30">
+                  {/* Disclosure Level */}
+                  <div>
+                    <label className="block text-white font-medium mb-2">
+                      Disclosure Level
+                    </label>
+                    <select
+                      value={formData.aiDisclosure}
+                      onChange={(e) => setFormData(prev => ({ ...prev, aiDisclosure: e.target.value as 'none' | 'partial' | 'full' }))}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="none">None - No AI disclosure</option>
+                      <option value="partial">Partial - Some AI assistance</option>
+                      <option value="full">Full - Complete AI disclosure</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Select the level of AI involvement in your track
+                    </p>
+                  </div>
+
+                  {/* AI Tools */}
+                  <div>
+                    <label className="block text-white font-medium mb-2">
+                      AI Tools Used
+                    </label>
+                    {formData.aiTools.map((tool, index) => (
+                      <div key={index} className="flex gap-2 mb-2">
+                        <select
+                          value={tool.category}
+                          onChange={(e) => {
+                            const newTools = [...formData.aiTools];
+                            newTools[index].category = e.target.value;
+                            setFormData(prev => ({ ...prev, aiTools: newTools }));
+                          }}
+                          className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                        >
+                          {aiToolCategories.map(cat => (
+                            <option key={cat.value} value={cat.value}>{cat.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Tool name (e.g., ChatGPT)"
+                          value={tool.name}
+                          onChange={(e) => {
+                            const newTools = [...formData.aiTools];
+                            newTools[index].name = e.target.value;
+                            setFormData(prev => ({ ...prev, aiTools: newTools }));
+                          }}
+                          className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-2 text-white text-sm placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Provider (e.g., OpenAI)"
+                          value={tool.provider}
+                          onChange={(e) => {
+                            const newTools = [...formData.aiTools];
+                            newTools[index].provider = e.target.value;
+                            setFormData(prev => ({ ...prev, aiTools: newTools }));
+                          }}
+                          className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-2 text-white text-sm placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newTools = formData.aiTools.filter((_, i) => i !== index);
+                            setFormData(prev => ({ ...prev, aiTools: newTools }));
+                          }}
+                          className="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          aiTools: [...prev.aiTools, { category: 'other', name: '', provider: '' }]
+                        }));
+                      }}
+                      className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add AI Tool</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Explicit Content */}

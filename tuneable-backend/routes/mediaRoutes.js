@@ -452,7 +452,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       tags,
       description,
       coverArt,
-      language
+      language,
+      aiUsed,
+      aiDisclosure,
+      aiTools
     } = req.body;
     
     // Upload audio file to R2 manually
@@ -612,6 +615,29 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       // System fields
       addedBy: userId,
       uploadedAt: new Date(),
+      
+      // AI Usage fields
+      aiUsage: {
+        used: aiUsed === 'true' || aiUsed === true,
+        disclosure: aiDisclosure || 'none',
+        tools: (() => {
+          try {
+            if (aiTools) {
+              const parsed = typeof aiTools === 'string' ? JSON.parse(aiTools) : aiTools;
+              if (Array.isArray(parsed)) {
+                return parsed.filter(tool => tool.name && tool.provider).map(tool => ({
+                  category: tool.category || 'other',
+                  name: tool.name,
+                  provider: tool.provider
+                }));
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing AI tools:', e);
+          }
+          return [];
+        })()
+      },
       
       // Rights confirmation (assumed true when uploaded via checkbox)
       rightsCleared: true,
