@@ -58,7 +58,12 @@ class MetadataExtractor {
         songwriter: metadata.common.songwriter || null,
         producer: metadata.common.producer || null,
         publisher: metadata.common.publisher || null,
-        label: metadata.common.label || null,
+        // Handle label - can be string or array, extract first value if array
+        label: metadata.common.label 
+          ? (Array.isArray(metadata.common.label) 
+              ? (metadata.common.label[0] || metadata.common.label.join(', '))
+              : metadata.common.label)
+          : null,
         encodedBy: metadata.common.encodedBy || null,
         
         // Content flags
@@ -248,9 +253,10 @@ class MetadataExtractor {
       
       // Publisher information
       publisher: extractedData.publisher || null,
-      label: extractedData.label ? [{
+      // Handle label - ensure it's a string, not an array
+      label: extractedData.label && typeof extractedData.label === 'string' ? [{
         name: extractedData.label,
-        userId: null,
+        labelId: null,
         verified: false
       }] : [],
       
