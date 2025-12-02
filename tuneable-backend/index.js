@@ -155,14 +155,281 @@ app.get('/api/test', (req, res) => {
 
 // Test webhook route accessibility
 app.get('/api/payments/webhook/test', (req, res) => {
+  console.log('✅ Webhook test endpoint hit:', req.path);
   res.json({ 
     status: 'ok', 
     message: 'Webhook endpoint is accessible',
     timestamp: new Date().toISOString(),
     url: '/api/payments/webhook',
-    methods: ['POST']
+    methods: ['POST'],
+    environment: process.env.NODE_ENV || 'development',
+    backendUrl: process.env.BACKEND_URL || 'not set'
   });
 });
+
+// Handle OPTIONS for webhook (CORS preflight)
+app.options('/api/payments/webhook', (req, res) => {
+  console.log('OPTIONS request for webhook endpoint');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, stripe-signature');
+  res.status(200).end();
+});
+
+// Register webhook route DIRECTLY on app BEFORE mounting paymentRoutes router
+// This ensures it's registered with raw body parsing and avoids route conflicts
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  console.log('🔔 Stripe webhook received (direct route) - checking signature...');
+  console.log('Webhook request details:', {
+    method: req.method,
+    path: req.path,
+    originalUrl: req.originalUrl,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'stripe-signature': req.headers['stripe-signature'] ? 'present' : 'missing'
+    }
+  });
+  
+  // Import Stripe instances
+  const Stripe = require('stripe');
+  const stripeTest = new Stripe(process.env.STRIPE_SECRET_KEY_TEST || '');
+  const stripeLive = process.env.STRIPE_SECRET_KEY_LIVE ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE) : null;
+  
+  const sig = req.headers['stripe-signature'];
+  let event;
+  let isLiveMode = false;
+
+  if (!sig) {
+    console.error('❌ Webhook request missing stripe-signature header');
+    return res.status(400).send('Missing stripe-signature header');
+  }
+
+  // Try test mode webhook first
+  try {
+    const testSecret = process.env.STRIPE_WEBHOOK_SECRET_TEST || process.env.STRIPE_WEBHOOK_SECRET;
+    if (!testSecret) {
+      console.warn('⚠️ STRIPE_WEBHOOK_SECRET_TEST not configured, skipping test mode verification');
+      throw new Error('Test webhook secret not configured');
+    }
+    event = stripeTest.webhooks.constructEvent(req.body, sig, testSecret);
+    isLiveMode = false;
+    console.log(`✅ Webhook signature verified (TEST mode): Event type: ${event.type}`);
+  } catch (testErr) {
+    console.log(`⚠️ Test mode webhook verification failed: ${testErr.message}`);
+    // If test webhook fails, try live webhook
+    if (stripeLive && process.env.STRIPE_WEBHOOK_SECRET_LIVE) {
+      try {
+        event = stripeLive.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET_LIVE);
+        isLiveMode = true;
+        console.log(`✅ Webhook signature verified (LIVE mode): Event type: ${event.type}`);
+      } catch (liveErr) {
+        console.error(`❌ Webhook signature verification failed for both test and live modes. Test error: ${testErr.message}, Live error: ${liveErr.message}`);
+        return res.status(400).send(`Webhook Error: ${liveErr.message}`);
+      }
+    } else {
+      console.error(`❌ Webhook signature verification failed. Test error: ${testErr.message}, Live mode not configured or secret missing`);
+      return res.status(400).send(`Webhook Error: ${testErr.message}`);
+    }
+  }
+
+  // Handle the checkout.session.completed event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    console.log(`📦 Checkout session completed: Session ID ${session.id}, Metadata:`, session.metadata);
+    
+    if (session.metadata && session.metadata.type === 'wallet_topup') {
+      // Call the wallet top-up handler - we'll import the handler logic
+      try {
+        // Import required modules
+        const User = require('./models/User');
+        const WalletTransaction = require('./models/WalletTransaction');
+        const { sendPaymentNotification } = require('./utils/emailService');
+        
+        const userId = session.metadata.userId;
+        
+        if (!userId) {
+          console.error('❌ Wallet top-up webhook: userId missing from session metadata');
+          return res.json({ received: true }); // Still acknowledge to Stripe
+        }
+        
+        // Get the actual Stripe instance (test or live)
+        const stripe = isLiveMode ? stripeLive : stripeTest;
+        
+        // Retrieve PaymentIntent to get actual amount received (net after fees)
+        let paymentIntent;
+        if (session.payment_intent) {
+          paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+        }
+        
+        // Use actual amount received from Stripe (net after fees)
+        const amountReceivedPence = paymentIntent
+          ? paymentIntent.amount_received || paymentIntent.amount
+          : session.amount_total;
+        
+        // Calculate fees for transparency
+        const amountRequestedPence = Math.round(parseFloat(session.metadata.amount) * 100);
+        const stripeFeesPence = amountRequestedPence - amountReceivedPence;
+        
+        // Convert to pounds for display
+        const amountReceivedPounds = amountReceivedPence / 100;
+        const stripeFeesPounds = stripeFeesPence / 100;
+        
+        // Find user first to get current balance
+        const user = await User.findOne({ uuid: userId });
+        
+        if (!user) {
+          console.error(`User not found for wallet top-up: ${userId}`);
+          return res.json({ received: true }); // Still acknowledge to Stripe
+        }
+        
+        const balanceBefore = user.balance || 0;
+        
+        // Calculate user aggregate PRE (total tips placed)
+        const Bid = require('./models/Bid');
+        const userBidsPre = await Bid.find({
+          userId: user._id,
+          status: 'active'
+        }).lean();
+        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        
+        // Update user balance with ACTUAL amount received (net after fees)
+        const updatedUser = await User.findOneAndUpdate(
+          { uuid: userId },
+          { $inc: { balance: amountReceivedPence } },
+          { new: true }
+        );
+        
+        if (updatedUser) {
+          console.log(`Wallet top-up successful: User ${userId} requested £${(amountRequestedPence / 100).toFixed(2)}, received £${amountReceivedPounds.toFixed(2)} (fees: £${stripeFeesPounds.toFixed(2)}), new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
+          
+          // Create wallet transaction record
+          let walletTransaction;
+          try {
+            walletTransaction = await WalletTransaction.create({
+              userId: updatedUser._id,
+              user_uuid: updatedUser.uuid,
+              amount: amountReceivedPence,
+              type: 'topup',
+              status: 'completed',
+              paymentMethod: 'stripe',
+              stripeSessionId: session.id,
+              stripePaymentIntentId: session.payment_intent,
+              balanceBefore: balanceBefore,
+              balanceAfter: updatedUser.balance,
+              description: `Wallet top-up via Stripe (net: £${amountReceivedPounds.toFixed(2)})`,
+              username: updatedUser.username,
+              metadata: {
+                currency: session.currency || 'gbp',
+                customerEmail: session.customer_email,
+                customerDetails: session.customer_details,
+                amountRequested: amountRequestedPence,
+                amountReceived: amountReceivedPence,
+                stripeFees: stripeFeesPence,
+                stripeFeesPounds: stripeFeesPounds.toFixed(2),
+                isLiveMode: isLiveMode
+              }
+            });
+            console.log(`✅ Wallet transaction created: ${walletTransaction._id} for user ${userId}`);
+            
+            // Store verification hash
+            try {
+              const verificationService = require('./services/transactionVerificationService');
+              await verificationService.storeVerificationHash(walletTransaction, 'WalletTransaction');
+            } catch (verifyError) {
+              console.error('Failed to store verification hash:', verifyError);
+            }
+          } catch (txError) {
+            console.error('❌ Failed to create wallet transaction record:', txError);
+          }
+          
+          // Create ledger entry
+          console.log(`📝 Attempting to create ledger entry for top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}`);
+          try {
+            const tuneableLedgerService = require('./services/tuneableLedgerService');
+            
+            if (!updatedUser._id) {
+              throw new Error('updatedUser._id is missing');
+            }
+            if (typeof amountReceivedPence !== 'number' || isNaN(amountReceivedPence)) {
+              throw new Error(`Invalid amountReceivedPence: ${amountReceivedPence}`);
+            }
+            if (typeof balanceBefore !== 'number' || isNaN(balanceBefore)) {
+              throw new Error(`Invalid balanceBefore: ${balanceBefore}`);
+            }
+            if (typeof userAggregatePre !== 'number' || isNaN(userAggregatePre)) {
+              throw new Error(`Invalid userAggregatePre: ${userAggregatePre}`);
+            }
+            
+            console.log(`📝 Ledger entry parameters validated: userId=${updatedUser._id}, amount=${amountReceivedPence}, balancePre=${balanceBefore}, aggregatePre=${userAggregatePre}`);
+            
+            const ledgerEntry = await tuneableLedgerService.createTopUpEntry({
+              userId: updatedUser._id,
+              amount: amountReceivedPence,
+              userBalancePre: balanceBefore,
+              userAggregatePre,
+              referenceTransactionId: walletTransaction?._id || null,
+              metadata: {
+                stripeSessionId: session.id,
+                stripePaymentIntentId: session.payment_intent,
+                currency: session.currency || 'gbp',
+                customerEmail: session.customer_email,
+                customerDetails: session.customer_details,
+                amountRequested: amountRequestedPence,
+                amountReceived: amountReceivedPence,
+                stripeFees: stripeFeesPence,
+                isLiveMode: isLiveMode,
+                walletTransactionCreated: !!walletTransaction?._id
+              }
+            });
+            
+            console.log(`✅ Ledger entry created successfully: Entry ID ${ledgerEntry._id}, User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}, Transaction: ${walletTransaction?._id || 'N/A'}`);
+          } catch (ledgerError) {
+            console.error('❌ CRITICAL: Failed to create ledger entry for top-up');
+            console.error('Ledger error details:', {
+              userId: updatedUser._id,
+              user_uuid: updatedUser.uuid,
+              amount: amountReceivedPence,
+              amountType: typeof amountReceivedPence,
+              walletTransactionId: walletTransaction?._id || null,
+              userBalancePre: balanceBefore,
+              userBalancePreType: typeof balanceBefore,
+              userAggregatePre: userAggregatePre,
+              userAggregatePreType: typeof userAggregatePre,
+              error: ledgerError.message,
+              errorName: ledgerError.name,
+              stack: ledgerError.stack
+            });
+          }
+          
+          // Send email notification
+          try {
+            await sendPaymentNotification(updatedUser, amountReceivedPounds);
+          } catch (emailError) {
+            console.error('Failed to send payment notification email:', emailError);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error processing wallet top-up webhook:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          sessionId: session.id,
+          userId: session.metadata?.userId
+        });
+      }
+    } else if (session.metadata && session.metadata.type === 'share_purchase') {
+      console.log(`✅ Share purchase successful: User ${session.metadata.userId}`);
+    } else {
+      console.log(`⚠️ Unhandled checkout session type: ${session.metadata?.type || 'no metadata'}`);
+    }
+  } else {
+    console.log(`⚠️ Unhandled webhook event type: ${event.type}`);
+  }
+
+  // Always respond to Stripe to acknowledge receipt
+  res.json({ received: true });
+});
+console.log('Webhook route registered directly on app (raw body preserved).');
 
 // Add routes
 console.log('Registering API routes...');

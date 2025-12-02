@@ -114,8 +114,16 @@ const PartySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['remote', 'live', 'global'],
+    enum: ['remote', 'live', 'global', 'tag'],
     default: 'remote',
+  },
+  slug: {
+    type: String,
+    unique: true,
+    sparse: true, // Allow null/undefined for non-tag parties
+    trim: true,
+    lowercase: true,
+    maxlength: [100, 'Slug cannot exceed 100 characters']
   },
   status: {
     type: String,
@@ -129,7 +137,7 @@ const PartySchema = new mongoose.Schema({
   tags: [{
     type: String,
     trim: true,
-    lowercase: true,
+    // Title case (first letter of each word capitalized) - handled by application logic
     maxlength: [50, 'Tag cannot exceed 50 characters']
   }],
   description: {
@@ -200,5 +208,6 @@ PartySchema.index({ 'media.partyMediaBidTop': -1 });
 PartySchema.index({ 'media.partyMediaAggregateTop': -1 });
 PartySchema.index({ type: 1 }); // Index for Global Party lookup
 PartySchema.index({ tags: 1 }); // Index for tag-based filtering
+PartySchema.index({ slug: 1 }); // Index for slug-based lookup
 
 module.exports = mongoose.model('Party', PartySchema);

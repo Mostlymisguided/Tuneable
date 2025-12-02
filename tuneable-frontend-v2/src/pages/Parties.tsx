@@ -26,11 +26,12 @@ interface PartyType {
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live' | 'global';
+  type: 'remote' | 'live' | 'global' | 'tag';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   tags?: string[];
   description?: string;
+  slug?: string; // URL-friendly slug for tag parties (e.g., "electronic")
   createdAt: string;
   updatedAt: string;
 }
@@ -376,10 +377,18 @@ const Parties: React.FC = () => {
           ? 'hover:shadow-lg hover:scale-105 hover:bg-gray-800/50 cursor-pointer group'
           : 'hover:shadow-md'
       }`}
-      onClick={isUserInParty(party) || party.type === 'global' ? () => navigate(party.type === 'global' ? '/party/global' : `/party/${party._id || party.id || party.uuid}`) : undefined}
+      onClick={isUserInParty(party) || party.type === 'global' || party.type === 'tag' ? () => {
+        if (party.type === 'global') {
+          navigate('/party/global');
+        } else if (party.type === 'tag' && party.slug) {
+          navigate(`/party/${party.slug}`);
+        } else {
+          navigate(`/party/${party._id || party.id || party.uuid}`);
+        }
+      } : undefined}
     >
       {/* Purple overlay for clickable cards */}
-      {(isUserInParty(party) || party.type === 'global') && (
+      {(isUserInParty(party) || party.type === 'global' || party.type === 'tag') && (
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/85 to-slate-900/85 backdrop-blur-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
           <span className="bg-slate-900/50 text-white/70 font-semibold text-base px-4 py-2 rounded-lg shadow-lg hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-500 hover:text-white hover:shadow-lg hover:shadow-pink-500/30 transition-all">
             Go To Party

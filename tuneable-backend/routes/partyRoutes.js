@@ -350,6 +350,7 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                     watershed: 1,
                     tags: 1,
                     description: 1,
+                    slug: 1, // ✅ Include slug for tag parties
                     createdAt: 1,
                     updatedAt: 1,
                     minimumBid: 1,
@@ -769,7 +770,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             return (b.totalBidValue || 0) - (a.totalBidValue || 0);
         });
 
-        // ✅ **Return a cleaned response (don’t overwrite `party.songs`)**
+        // ✅ **Return a cleaned response (don't overwrite `party.songs`)**
         const responseParty = {
             _id: party._id,
             name: party.name,
@@ -784,6 +785,11 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             type: party.type,
             status: party.status,
             mediaSource: party.mediaSource,
+            tags: party.tags || [], // ✅ Include tags
+            description: party.description || '', // ✅ Include description
+            slug: party.slug || null, // ✅ Include slug for tag parties
+            privacy: party.privacy || 'public', // ✅ Include privacy
+            minimumBid: party.minimumBid || 0.33, // ✅ Include minimumBid
             createdAt: party.createdAt,
             updatedAt: party.updatedAt,
             media: processedMedia, // ✅ Return flattened, sorted media

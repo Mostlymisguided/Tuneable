@@ -1,0 +1,26 @@
+# Cloudflare Worker configuration for API proxy
+# 
+# To deploy:
+# 1. Install Wrangler: npm install -g wrangler
+# 2. Login: wrangler login
+# 3. Set your backend URL: wrangler secret put BACKEND_URL
+# 4. Deploy: wrangler deploy
+
+name = "tuneable-api-proxy"
+main = "api-proxy.js"
+compatibility_date = "2024-01-01"
+
+# Route configuration - this will be set when deploying
+# The worker will be attached to your Cloudflare Pages domain
+# Routes are configured in Cloudflare Dashboard or via wrangler.toml routes
+
+[env.production]
+routes = [
+  { pattern = "tuneable.stream/api/*", zone_name = "tuneable.stream" },
+  { pattern = "www.tuneable.stream/api/*", zone_name = "tuneable.stream" }
+]
+
+# Environment variables (secrets should be set via wrangler secret put)
+# BACKEND_URL should be set to your backend URL, e.g., https://tuneable.onrender.com
+
+

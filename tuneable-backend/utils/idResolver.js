@@ -24,8 +24,8 @@ async function resolveId(id, Model, field = 'uuid') {
 }
 
 /**
- * Resolves a party ID, handling special "global" slug
- * @param {string} partyId - The party ID (can be "global", ObjectId, or UUID)
+ * Resolves a party ID, handling special "global" slug and tag party slugs
+ * @param {string} partyId - The party ID (can be "global", tag slug, ObjectId, or UUID)
  * @returns {Promise<string|null>} - The resolved MongoDB ObjectId or null if not found
  */
 async function resolvePartyIdValue(partyId) {
@@ -37,7 +37,26 @@ async function resolvePartyIdValue(partyId) {
             return globalParty ? globalParty._id.toString() : null;
         }
         
-        // Otherwise, use standard resolution
+        // Check if it's a valid MongoDB ObjectId first
+        if (mongoose.isValidObjectId(partyId)) {
+            return partyId;
+        }
+        
+        // Check if it's a tag party slug (lowercase, hyphenated)
+        // Tag slugs are lowercase and contain only alphanumeric characters and hyphens
+        const slugPattern = /^[a-z0-9-]+$/;
+        if (slugPattern.test(partyId)) {
+            const Party = require('../models/Party');
+            const tagParty = await Party.findOne({ 
+                slug: partyId.toLowerCase(),
+                type: 'tag' 
+            });
+            if (tagParty) {
+                return tagParty._id.toString();
+            }
+        }
+        
+        // Otherwise, try UUID resolution
         const Party = require('../models/Party');
         return await resolveId(partyId, Party, 'uuid');
     } catch (error) {

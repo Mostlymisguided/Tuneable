@@ -1,0 +1,24 @@
+{
+  "name": "tuneable-api-proxy-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker to proxy /api/* requests to backend",
+  "main": "api-proxy.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "proxy",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
+
+

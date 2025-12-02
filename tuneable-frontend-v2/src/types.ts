@@ -277,10 +277,11 @@ export interface Party {
   mediaSource: 'youtube' | 'direct_upload';
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live' | 'global';
+  type: 'remote' | 'live' | 'global' | 'tag';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   minimumBid: number;
+  slug?: string; // URL-friendly slug for tag parties (e.g., "electronic")
   createdAt: string;
   updatedAt: string;
 }

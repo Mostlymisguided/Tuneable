@@ -420,6 +420,26 @@ mediaSchema.pre('save', function (next) {
   next();
 });
 
+// Post-save hook: Check and create tag parties when media is saved
+mediaSchema.post('save', async function() {
+  // Only process if media has tags and is newly created or tags were updated
+  if (!this.tags || !Array.isArray(this.tags) || this.tags.length === 0) {
+    return;
+  }
+  
+  // Run tag party creation asynchronously (don't block the save operation)
+  // Use setImmediate to ensure it runs after the save is complete
+  setImmediate(async () => {
+    try {
+      const tagPartyService = require('../services/tagPartyService');
+      await tagPartyService.checkAndCreateTagParties(this.tags);
+    } catch (error) {
+      console.error('❌ Error in post-save tag party creation:', error);
+      // Don't throw - this is a background operation
+    }
+  });
+});
+
 // Indexes for performance
 mediaSchema.index({ globalMediaAggregate: -1 });
 mediaSchema.index({ globalMediaBidTop: -1 });
