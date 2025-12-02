@@ -2854,7 +2854,7 @@ Join here: ${inviteLink}`.trim();
                 </tr>
               </thead>
               <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {(showAllLibrary ? getSortedLibrary() : getSortedLibrary().slice(0, 5)).map((item, displayIndex) => {
+                {(showAllLibrary ? getSortedLibrary() : getSortedLibrary().slice(0, 5)).map((item) => {
                   // Find the actual index in the full sorted library
                   const sortedLibrary = getSortedLibrary();
                   const actualIndex = sortedLibrary.findIndex(libItem => libItem.mediaId === item.mediaId);

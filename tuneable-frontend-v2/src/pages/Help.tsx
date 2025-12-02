@@ -17,8 +17,8 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">What is Tuneable?</h3>
             <p className="text-gray-300">
-              Tuneable is a music discovery and tipping platform where you can tip on tunes, join parties, 
-              and discover new music. Your tips help create charts and you earn TuneByte Tokens by adding and tipping on music that later becomes popular on the platform.
+              Tuneable is a music platform where you can tip on tunes, influence charts, support your favorite artists and discover new music.
+              Your tips help create charts and you earn TuneBytes by tipping on music that becomes popular on the platform.
             </p>
           </div>
           <div>
@@ -41,7 +41,7 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">How Tipping Works</h3>
             <p className="text-gray-300">
-              When you tip on a tune, you're voting for it to be moved up the charts. Higher tips give tunes more weight 
+              When you tip on a tune, you're voting for it to be moved up the charts. It is also added to your Library. Higher tips give tunes more weight 
               in the charts. The minimum tip is usually £0.01, but party hosts can set their own minimum.
             </p>
           </div>

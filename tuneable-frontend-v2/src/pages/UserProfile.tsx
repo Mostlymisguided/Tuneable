@@ -43,7 +43,6 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
-import { toast } from 'react-toastify';
 
 interface LibraryItem {
   mediaId: string;
