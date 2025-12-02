@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag } from 'lucide-react';
+import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Youtube, Wallet } from 'lucide-react';
 import { SUPPORT_EMAIL } from '../constants';
 import GeneralReportModal from '../components/GeneralReportModal';
 
@@ -33,9 +33,9 @@ const Help: React.FC = () => {
       )
     },
     {
-      id: 'bidding',
+      id: 'tipping',
       icon: <CreditCard className="h-6 w-6" />,
-      title: 'Tipping & Credits',
+      title: 'Tipping',
       content: (
         <div className="space-y-4">
           <div>
@@ -52,20 +52,13 @@ const Help: React.FC = () => {
               the more you earn. TuneBytes can't be spent yet but they will be tradeable for all sorts of artist swag in the future.
             </p>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Adding Credit</h3>
-            <p className="text-gray-300">
-              You can add credit to your account through the Wallet page. We accept secure payments via 
-              Stripe. Your balance is always displayed in your profile and wallet.
-            </p>
-          </div>
         </div>
       )
     },
     {
       id: 'parties',
       icon: <PartyPopper className="h-6 w-6" />,
-      title: 'Parties & Events',
+      title: 'Parties',
       content: (
         <div className="space-y-4">
           <div>
@@ -95,7 +88,30 @@ const Help: React.FC = () => {
       )
     },
     {
-      id: 'content',
+      id: 'credit-top-ups',
+      icon: <Wallet className="h-6 w-6" />,
+      title: 'Credit and Top Ups',
+      content: (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Adding Credit</h3>
+            <p className="text-gray-300">
+              You can add credit to your account through the Wallet page. We accept secure payments via 
+              Stripe. Your balance is always displayed in your profile and wallet.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Managing Your Balance</h3>
+            <p className="text-gray-300">
+              Keep track of your credit balance, transaction history, and top-up activity in your Wallet. 
+              All transactions are secure and processed through our payment provider.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'creating-content',
       icon: <Music className="h-6 w-6" />,
       title: 'Creating Content',
       content: (
@@ -126,9 +142,9 @@ const Help: React.FC = () => {
       )
     },
     {
-      id: 'profile',
+      id: 'profiles-accounts',
       icon: <Users className="h-6 w-6" />,
-      title: 'Profile & Account',
+      title: 'Profiles & Accounts',
       content: (
         <div className="space-y-4">
           <div>
@@ -150,6 +166,30 @@ const Help: React.FC = () => {
             <p className="text-gray-300">
               Stay updated with notifications about tips, party updates, and platform activity. 
               Manage your notification preferences in your account settings.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'youtube-third-party',
+      icon: <Youtube className="h-6 w-6" />,
+      title: 'Youtube and Third Party Platforms',
+      content: (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Adding YouTube Tracks</h3>
+            <p className="text-gray-300">
+              You can search for and add tracks from YouTube to parties and your library. Simply use the 
+              search feature and select tracks from YouTube results. These tracks will be playable through 
+              YouTube's player.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Third Party Integration</h3>
+            <p className="text-gray-300">
+              Tuneable integrates with various third-party platforms to provide a rich music experience. 
+              Content from these platforms is subject to their respective terms of service and licensing agreements.
             </p>
           </div>
         </div>
