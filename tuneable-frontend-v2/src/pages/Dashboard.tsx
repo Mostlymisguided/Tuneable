@@ -509,44 +509,53 @@ Join here: ${inviteLink}`.trim();
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = async (item: LibraryItem) => {
+  const handlePlay = async (item: LibraryItem, index: number) => {
     try {
-      // Fetch full media details with sources
-      const mediaId = item.mediaUuid || item.mediaId;
-      const mediaData = await mediaAPI.getProfile(mediaId);
-      const media = mediaData.media || mediaData;
-
-      // Clean and format sources
-      let sources: any = {};
-      if (media.sources) {
-        if (Array.isArray(media.sources)) {
-          for (const source of media.sources) {
-            if (source?.platform === 'youtube' && source?.url) {
-              sources.youtube = source.url;
+      // Use sorted library to maintain the order the user sees
+      const sortedLibrary = getSortedLibrary();
+      
+      // Fetch all media details for the entire library to create the queue
+      const allMediaPromises = sortedLibrary.map(async (libItem) => {
+        const mediaId = libItem.mediaUuid || libItem.mediaId;
+        const mediaData = await mediaAPI.getProfile(mediaId);
+        const media = mediaData.media || mediaData;
+        
+        // Format sources
+        let sources: any = {};
+        if (media.sources) {
+          if (Array.isArray(media.sources)) {
+            for (const source of media.sources) {
+              if (source?.platform === 'youtube' && source?.url) {
+                sources.youtube = source.url;
+              }
             }
+          } else if (typeof media.sources === 'object') {
+            sources = media.sources;
           }
-        } else if (typeof media.sources === 'object') {
-          sources = media.sources;
         }
-      }
-
-      const formattedMedia = {
-        id: item.mediaUuid || item.mediaId,
-        _id: item.mediaId,
-        title: item.title,
-        artist: item.artist,
-        duration: item.duration,
-        coverArt: item.coverArt,
-        sources: sources,
-        globalMediaAggregate: item.globalMediaAggregate,
-        bids: [],
-        addedBy: null,
-        totalBidValue: item.globalMediaAggregate
-      } as any;
-
-      setQueue([formattedMedia]);
-      setCurrentMedia(formattedMedia, 0, true);
-    setGlobalPlayerActive(true);
+        
+        return {
+          id: libItem.mediaUuid || libItem.mediaId,
+          _id: libItem.mediaId,
+          title: libItem.title,
+          artist: libItem.artist,
+          duration: libItem.duration,
+          coverArt: libItem.coverArt,
+          sources: sources,
+          globalMediaAggregate: libItem.globalMediaAggregate,
+          bids: [],
+          addedBy: null,
+          totalBidValue: libItem.globalMediaAggregate
+        } as any;
+      });
+      
+      const allFormattedMedia = await Promise.all(allMediaPromises);
+      
+      // Set entire library as queue for auto-transition
+      setQueue(allFormattedMedia);
+      // Set current media to the clicked item (with its index)
+      setCurrentMedia(allFormattedMedia[index], index, true);
+      setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
     } catch (error) {
       console.error('Error loading media for playback:', error);
@@ -2845,10 +2854,14 @@ Join here: ${inviteLink}`.trim();
                 </tr>
               </thead>
               <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {(showAllLibrary ? getSortedLibrary() : getSortedLibrary().slice(0, 5)).map((item) => (
-                  <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlay(item)}>
+                {(showAllLibrary ? getSortedLibrary() : getSortedLibrary().slice(0, 5)).map((item, displayIndex) => {
+                  // Find the actual index in the full sorted library
+                  const sortedLibrary = getSortedLibrary();
+                  const actualIndex = sortedLibrary.findIndex(libItem => libItem.mediaId === item.mediaId);
+                  return (
+                    <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlay(item, actualIndex)}>
                         {item.coverArt ? (
                           <img 
                             src={item.coverArt} 
@@ -2903,7 +2916,8 @@ Join here: ${inviteLink}`.trim();
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {getSortedLibrary().length > 5 && (
