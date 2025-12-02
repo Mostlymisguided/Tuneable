@@ -60,7 +60,7 @@ const Home: React.FC = () => {
             
             {/* Description */}
             <p className="text-xl md:text-2xl p-12 text-gray-200 max-w-3xl mx-auto leading-relaxed" style={{ marginTop: '20px' }}>
-              Support Your Favourite Artists - Tip Your Favourite Tunes - Contribute To Global Charts
+            Tip Your Favourite Tunes - Support Your Favourite Artists - Influence Global Charts
             </p>
             
             {/* CTA Button */}
