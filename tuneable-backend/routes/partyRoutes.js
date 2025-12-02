@@ -361,7 +361,7 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
             }
         ]);
 
-        // For tag parties, calculate partiers as all unique users who have tipped on media with that tag
+        // For tag parties, calculate partiers, mediaCount, and partyAggregate dynamically
         const Bid = require('../models/Bid');
         const Media = require('../models/Media');
         const User = require('../models/User');
@@ -380,7 +380,8 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                             $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
                         } 
                     },
-                    bids: { $exists: true, $ne: [] }
+                    bids: { $exists: true, $ne: [] },
+                    status: { $ne: 'vetoed' } // Exclude globally vetoed media
                 }).select('_id').lean();
                 
                 if (mediaWithTag.length > 0) {
@@ -401,8 +402,33 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                     } else {
                         party.partiers = [];
                     }
+                    
+                    // Calculate mediaCount and partyAggregate for tag parties
+                    // Get all active bids for media with this tag
+                    const activeBids = await Bid.find({
+                        mediaId: { $in: mediaIds },
+                        status: 'active'
+                    }).lean();
+                    
+                    // Group bids by mediaId and calculate aggregate per media
+                    const mediaAggregates = {};
+                    activeBids.forEach(bid => {
+                        const mediaId = bid.mediaId.toString();
+                        if (!mediaAggregates[mediaId]) {
+                            mediaAggregates[mediaId] = 0;
+                        }
+                        mediaAggregates[mediaId] += (bid.amount || 0);
+                    });
+                    
+                    // Count media with active bids (mediaCount)
+                    party.mediaCount = Object.keys(mediaAggregates).length;
+                    
+                    // Sum all aggregates (partyAggregate)
+                    party.partyAggregate = Object.values(mediaAggregates).reduce((sum, agg) => sum + agg, 0);
                 } else {
                     party.partiers = [];
+                    party.mediaCount = 0;
+                    party.partyAggregate = 0;
                 }
             }
         }
