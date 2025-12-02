@@ -17,8 +17,10 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">What is Tuneable?</h3>
             <p className="text-gray-300">
-              Tuneable is a music platform where you can tip on tunes, influence charts, support your favorite artists and discover new music.
-              Your tips help create charts and you earn TuneBytes by tipping on music that becomes popular on the platform.
+              Tuneable is a music platform where you tip on tunes, influence charts, support your favorite artists and discover new music.
+            </p>
+            <p>
+            Your tips help create charts and you earn TuneBytes by tipping on music that becomes popular on the platform.
             </p>
           </div>
           <div>

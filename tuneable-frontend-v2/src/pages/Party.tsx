@@ -1784,32 +1784,38 @@ const Party: React.FC = () => {
     // Get all active media entries
     const activeMedia = media.filter((item: any) => item.status === 'active');
     
-    // Count total bids and sum total amounts across all active media
-    let totalBids = 0;
+    // Sum total amounts and count media items with tips
     let totalAmount = 0;
+    let mediaWithTips = 0;
     
     activeMedia.forEach((item: any) => {
-      // Get bids from party-specific bids array
-      const bids = item.partyBids || item.bids || [];
-      if (Array.isArray(bids)) {
-        bids.forEach((bid: any) => {
-          // Only count active bids
-          if (bid && bid.status !== 'vetoed') {
-            totalBids++;
-            const amount = typeof bid.amount === 'number' ? bid.amount : 0;
-            totalAmount += amount;
+      // Use partyMediaAggregate if available (most accurate for party-specific aggregates)
+      const aggregate = item.partyMediaAggregate;
+      if (typeof aggregate === 'number' && aggregate > 0) {
+        totalAmount += aggregate;
+        mediaWithTips++;
+      } else {
+        // Fallback: calculate from bids if aggregate not available
+        const bids = item.partyBids || item.bids || [];
+        if (Array.isArray(bids) && bids.length > 0) {
+          const mediaTotal = bids.reduce((sum: number, bid: any) => {
+            if (bid && bid.status !== 'vetoed') {
+              const amount = typeof bid.amount === 'number' ? bid.amount : 0;
+              return sum + amount;
+            }
+            return sum;
+          }, 0);
+          if (mediaTotal > 0) {
+            totalAmount += mediaTotal;
+            mediaWithTips++;
           }
-        });
+        }
       }
-      
-      // Also check if partyMediaAggregate exists (fallback calculation)
-      // If we have aggregate but no bid count, we can't calculate average accurately
-      // So we'll rely on the bids array above
     });
     
-    // Calculate average (return in pence for consistency)
-    if (totalBids === 0) return 0;
-    return totalAmount / totalBids;
+    // Calculate average tip per media item (return in pence for consistency)
+    if (mediaWithTips === 0) return 0;
+    return totalAmount / mediaWithTips;
   };
 
   // Detect mobile device

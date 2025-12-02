@@ -361,6 +361,52 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
             }
         ]);
 
+        // For tag parties, calculate partiers as all unique users who have tipped on media with that tag
+        const Bid = require('../models/Bid');
+        const Media = require('../models/Media');
+        const User = require('../models/User');
+        
+        for (let party of partiesWithCounts) {
+            if (party.type === 'tag' && party.tags && party.tags.length > 0) {
+                const tagPartyTag = party.tags[0];
+                const { capitalizeTag } = require('../services/tagPartyService');
+                const normalizedTag = capitalizeTag(tagPartyTag);
+                const lowerTag = normalizedTag.toLowerCase().trim();
+                
+                // Find all media with this tag that has bids
+                const mediaWithTag = await Media.find({
+                    tags: { 
+                        $elemMatch: { 
+                            $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+                        } 
+                    },
+                    bids: { $exists: true, $ne: [] }
+                }).select('_id').lean();
+                
+                if (mediaWithTag.length > 0) {
+                    const mediaIds = mediaWithTag.map(m => m._id);
+                    
+                    // Find all unique users who have active bids on this media
+                    const uniqueUserIds = await Bid.distinct('userId', {
+                        mediaId: { $in: mediaIds },
+                        status: 'active'
+                    });
+                    
+                    // Populate partiers
+                    if (uniqueUserIds.length > 0) {
+                        const partierUsers = await User.find({ _id: { $in: uniqueUserIds } })
+                            .select('username uuid')
+                            .lean();
+                        party.partiers = partierUsers;
+                    } else {
+                        party.partiers = [];
+                    }
+                } else {
+                    party.partiers = [];
+                }
+            }
+        }
+
         res.status(200).json({ message: 'Parties fetched successfully', parties: partiesWithCounts });
     } catch (err) {
         handleError(res, err, 'Failed to fetch parties');
@@ -669,6 +715,34 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                     })
                     .filter(media => media !== null); // Remove media with no active bids
                 
+                // For tag parties, calculate partiers as all unique users who have tipped on media
+                const User = require('../models/User');
+                const uniqueUserIds = new Set();
+                party.media.forEach(mediaEntry => {
+                    const bids = mediaEntry.partyBids || [];
+                    bids.forEach(bid => {
+                        if (bid && bid.userId) {
+                            const userId = bid.userId._id?.toString() || bid.userId.toString();
+                            if (userId) {
+                                uniqueUserIds.add(userId);
+                            }
+                        }
+                    });
+                });
+                
+                // Populate partiers with all unique users who have tipped
+                if (uniqueUserIds.size > 0) {
+                    const partierUsers = await User.find({ _id: { $in: Array.from(uniqueUserIds) } })
+                        .select('username uuid')
+                        .lean();
+                    party.partiers = partierUsers;
+                } else {
+                    party.partiers = [];
+                }
+                
+                // Set host to Tuneable user
+                party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid').lean();
+                
                 // Performance monitoring - log Tag Party metrics
                 const endTime = Date.now();
                 const processingTime = endTime - startTime;
@@ -676,6 +750,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 console.log(`   - Tag: "${normalizedTag}"`);
                 console.log(`   - Processing time: ${processingTime}ms`);
                 console.log(`   - Media count: ${party.media.length}`);
+                console.log(`   - Partiers count: ${party.partiers.length}`);
                 
                 // Log warning if processing takes too long (performance canary)
                 if (processingTime > 5000) {
