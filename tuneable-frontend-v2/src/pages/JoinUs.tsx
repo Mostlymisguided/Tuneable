@@ -349,6 +349,15 @@ const JoinUs: React.FC = () => {
               </a>
               
               <Link
+                to="/register"
+                className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+              >
+                <Users className="h-5 w-5 mr-2" />
+                Join as a User
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Link>
+              
+              <Link
                 to="/creator/register"
                 className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold text-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
               >
