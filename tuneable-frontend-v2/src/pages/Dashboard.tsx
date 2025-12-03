@@ -822,8 +822,8 @@ Join here: ${inviteLink}`.trim();
           Welcome {user?.username}!
         </h1>
         <p className="text-center text-gray-400 mt-2">
-          Ready to create some amazing music experiences?
-        </p>
+              Add your favourite tunes and tip to influence the charts.
+            </p>
       </div>
 
 

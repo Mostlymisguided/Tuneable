@@ -68,10 +68,7 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
               🚧 Tuneable is in Beta 🚧
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed"> 
-              Add your favourite tunes and tip to influence the charts.
-            </p>
-            <p className="text-xs text-yellow-100/90 leading-relaxed"> 
-              Please report any features not working as expected.
+              Please report any features not working
             </p>
           </div>  
           {dismissible && (
