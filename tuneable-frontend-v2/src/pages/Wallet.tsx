@@ -44,8 +44,11 @@ const Wallet: React.FC = () => {
   };
 
   // Calculate total charge (amount + fees)
+  // Round up to nearest penny to ensure we don't underestimate the charge
   const calculateTotalCharge = (amount: number): number => {
-    return amount + calculateStripeFee(amount);
+    const total = amount + calculateStripeFee(amount);
+    // Round up to nearest penny (2 decimal places)
+    return Math.ceil(total * 100) / 100;
   };
 
   // Check for payment success/cancel in URL params
