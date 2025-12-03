@@ -277,18 +277,64 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         
         // Retrieve PaymentIntent to get actual amount received (net after fees)
         let paymentIntent;
+        let amountReceivedPence;
+        
         if (session.payment_intent) {
-          paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+          paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
+            expand: ['charges.data.balance_transaction']
+          });
+          
+          // Get the net amount after fees
+          if (paymentIntent.amount_received && paymentIntent.amount_received > 0) {
+            // amount_received is the net amount after fees (most accurate)
+            amountReceivedPence = paymentIntent.amount_received;
+          } else if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+            // Calculate net from charge and balance transaction
+            const charge = paymentIntent.charges.data[0];
+            if (charge.balance_transaction && charge.balance_transaction.net) {
+              // net is the amount after fees (in the smallest currency unit)
+              amountReceivedPence = charge.balance_transaction.net;
+            } else {
+              // Fallback: estimate net amount (gross - estimated fees)
+              // UK cards: 1.4% + 20p, but this is approximate
+              const grossAmount = paymentIntent.amount;
+              const estimatedFee = Math.round(grossAmount * 0.014 + 20); // 1.4% + 20p
+              amountReceivedPence = grossAmount - estimatedFee;
+              console.warn(`⚠️ Using estimated net amount (fee calculation): Gross £${(grossAmount/100).toFixed(2)}, Estimated fee £${(estimatedFee/100).toFixed(2)}, Net £${(amountReceivedPence/100).toFixed(2)}`);
+            }
+          } else {
+            // No charge yet, use amount (gross) as fallback but log warning
+            amountReceivedPence = paymentIntent.amount;
+            console.warn(`⚠️ PaymentIntent has no charges yet, using gross amount: £${(amountReceivedPence/100).toFixed(2)}`);
+          }
+        } else {
+          // No payment intent, calculate from session metadata
+          // session.amount_total is gross, but we have metadata.amount (wallet credit)
+          // The wallet credit amount is what we want to credit, which should be close to net
+          const walletCreditAmount = Math.round(parseFloat(session.metadata.amount) * 100);
+          const grossAmount = session.amount_total;
+          // Estimate net: gross - estimated fees
+          const estimatedFee = Math.round(grossAmount * 0.014 + 20); // 1.4% + 20p
+          amountReceivedPence = Math.max(walletCreditAmount, grossAmount - estimatedFee);
+          console.warn(`⚠️ No payment intent, using estimated net amount: Gross £${(grossAmount/100).toFixed(2)}, Estimated fee £${(estimatedFee/100).toFixed(2)}, Net £${(amountReceivedPence/100).toFixed(2)}`);
         }
         
-        // Use actual amount received from Stripe (net after fees)
-        const amountReceivedPence = paymentIntent
-          ? paymentIntent.amount_received || paymentIntent.amount
-          : session.amount_total;
-        
         // Calculate fees for transparency
-        const amountRequestedPence = Math.round(parseFloat(session.metadata.amount) * 100);
+        // amountRequested is what user paid (gross, from session.amount_total or metadata.totalCharge)
+        // session.amount_total is the gross amount charged to the user
+        const amountRequestedPence = session.amount_total || Math.round(parseFloat(session.metadata.totalCharge || session.metadata.amount) * 100);
         const stripeFeesPence = amountRequestedPence - amountReceivedPence;
+        
+        // Wallet credit amount (what user wanted to add, from metadata)
+        const walletCreditAmountPence = Math.round(parseFloat(session.metadata.amount) * 100);
+        
+        // Log the amounts for debugging
+        console.log(`💰 Amount breakdown:`);
+        console.log(`   User wanted to add: £${(walletCreditAmountPence/100).toFixed(2)}`);
+        console.log(`   User paid (gross): £${(amountRequestedPence/100).toFixed(2)}`);
+        console.log(`   Tuneable received (net): £${(amountReceivedPence/100).toFixed(2)}`);
+        console.log(`   Stripe fees: £${(stripeFeesPence/100).toFixed(2)}`);
+        console.log(`   Ledger will record: £${(amountReceivedPence/100).toFixed(2)} (net amount)`);
         
         // Convert to pounds for display
         const amountReceivedPounds = amountReceivedPence / 100;
