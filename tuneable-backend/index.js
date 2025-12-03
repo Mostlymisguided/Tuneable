@@ -288,6 +288,7 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         }
         
         // Retrieve PaymentIntent with balance transaction expanded to get exact net amount
+        // NOTE: Sometimes charges aren't immediately available when webhook fires, so we retry
         paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
           expand: ['charges.data.balance_transaction']
         });
@@ -303,28 +304,72 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         // CRITICAL: amount_received is the GROSS amount, not net after fees
         // We MUST use balance_transaction.net for the actual net amount Tuneable receives
         let balanceTransaction = null;
+        let charge = null;
         
-        if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
-          const charge = paymentIntent.charges.data[0];
-          if (charge.balance_transaction) {
-            // If balance_transaction is expanded, use it directly
-            if (typeof charge.balance_transaction === 'object' && charge.balance_transaction.net) {
-              balanceTransaction = charge.balance_transaction;
-              amountReceivedPence = balanceTransaction.net;
-              console.log(`✅ Using balance_transaction.net (expanded): £${(amountReceivedPence/100).toFixed(2)} (exact net amount after fees)`);
-            } else if (typeof charge.balance_transaction === 'string') {
-              // If it's just an ID, retrieve it
-              balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
-              amountReceivedPence = balanceTransaction.net;
-              console.log(`✅ Using balance_transaction.net (retrieved): £${(amountReceivedPence/100).toFixed(2)} (exact net amount after fees)`);
-            } else {
-              throw new Error(`PaymentIntent ${session.payment_intent} has charge but balance_transaction is invalid. Cannot determine exact net amount.`);
-            }
-          } else {
-            throw new Error(`PaymentIntent ${session.payment_intent} has charge but no balance_transaction. Cannot determine exact net amount.`);
+        // Retry logic: Sometimes charges aren't immediately available when webhook fires
+        // Wait up to 5 seconds with exponential backoff for charge to be available
+        const maxRetries = 5;
+        let retryCount = 0;
+        let chargesAvailable = false;
+        
+        while (!chargesAvailable && retryCount < maxRetries) {
+          if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+            charge = paymentIntent.charges.data[0];
+            chargesAvailable = true;
+            break;
           }
+          
+          // If no charges yet, wait and retry
+          if (retryCount < maxRetries - 1) {
+            const waitTime = Math.min(1000 * Math.pow(2, retryCount), 2000); // Exponential backoff, max 2s
+            console.log(`⏳ PaymentIntent has no charges yet (attempt ${retryCount + 1}/${maxRetries}), waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            // Refresh the PaymentIntent
+            paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
+              expand: ['charges.data.balance_transaction']
+            });
+            retryCount++;
+          } else {
+            break;
+          }
+        }
+        
+        // If still no charge after retries, try listing charges directly
+        if (!charge) {
+          console.log(`⚠️ No charge in expanded PaymentIntent, trying to list charges directly...`);
+          const chargesList = await stripe.charges.list({
+            payment_intent: session.payment_intent,
+            limit: 1,
+            expand: ['data.balance_transaction']
+          });
+          
+          if (chargesList.data && chargesList.data.length > 0) {
+            charge = chargesList.data[0];
+            console.log(`✅ Found charge via list: ${charge.id}`);
+          } else {
+            throw new Error(`PaymentIntent ${session.payment_intent} has no charges after ${maxRetries} retries and direct listing. Payment may not be fully processed. Cannot determine exact net amount.`);
+          }
+        }
+        
+        // Now get the balance transaction from the charge
+        if (!charge.balance_transaction) {
+          throw new Error(`Charge ${charge.id} has no balance_transaction. Cannot determine exact net amount.`);
+        }
+        
+        // Get balance transaction (expanded or retrieve)
+        if (typeof charge.balance_transaction === 'object' && charge.balance_transaction.net) {
+          // Already expanded
+          balanceTransaction = charge.balance_transaction;
+          amountReceivedPence = balanceTransaction.net;
+          console.log(`✅ Using balance_transaction.net (expanded): £${(amountReceivedPence/100).toFixed(2)} (exact net amount after fees)`);
+        } else if (typeof charge.balance_transaction === 'string') {
+          // Need to retrieve it
+          balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+          amountReceivedPence = balanceTransaction.net;
+          console.log(`✅ Using balance_transaction.net (retrieved): £${(amountReceivedPence/100).toFixed(2)} (exact net amount after fees)`);
         } else {
-          throw new Error(`PaymentIntent ${session.payment_intent} has no charges. Payment may not be fully processed. Cannot determine exact net amount.`);
+          throw new Error(`Charge ${charge.id} has invalid balance_transaction format. Cannot determine exact net amount.`);
         }
         
         // Log fee breakdown for transparency
