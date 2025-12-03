@@ -64,7 +64,7 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
         <div className="flex items-start space-x-3">
           <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-yellow-200 mb-1">
+            <p className="text-sm text-center font-semibold text-yellow-200 mb-1">
               🚧 Tuneable is in Beta 🚧
             </p>
             <p className="text-xs text-yellow-100/90 leading-relaxed"> 
