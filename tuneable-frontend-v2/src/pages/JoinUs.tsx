@@ -19,12 +19,13 @@ const JoinUs: React.FC = () => {
       name: 'Leg Up',
       shares: 1,
       price: 10,
-      description: 'Get started with a single share',
+      description: '1 share',
       features: [
         '1 share in Tuneable',
         'Discord access',
         'Quarterly updates',
         'Early feature access',
+        'Help Steer The Direction Of Tuneable',
       ]
     },
     {
@@ -32,12 +33,13 @@ const JoinUs: React.FC = () => {
       name: 'Supporter',
       shares: 10,
       price: 100,
-      description: 'For dedicated music enthusiasts',
+      description: '10 shares',
       features: [
         '10 shares in Tuneable',
         'Discord access',
         'Quarterly updates',
         'Early feature access',
+        'Help Steer The Direction Of Tuneable',
       ]
     },
     {
@@ -45,12 +47,13 @@ const JoinUs: React.FC = () => {
       name: 'Investor',
       shares: 50,
       price: 500,
-      description: 'For serious investors',
+      description: '50 shares',
       features: [
         '50 shares in Tuneable',
         'Discord access',
         'Quarterly updates',
         'Early feature access',
+        'Help Steer The Direction Of Tuneable',
       ]
     }
   ];
@@ -168,9 +171,6 @@ const JoinUs: React.FC = () => {
                 <div className="mb-6">
                   <div className="text-5xl font-bold text-white mb-2">
                     £{pkg.price.toLocaleString()}
-                  </div>
-                  <div className="text-gray-400">
-                    {pkg.shares} shares
                   </div>
                 </div>
 
