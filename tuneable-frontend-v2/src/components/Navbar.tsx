@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, PartyPopper, Music } from 'lucide-react';
+import { User as UserIcon, PartyPopper, Music, Home, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
@@ -39,10 +39,11 @@ const Navbar: React.FC = () => {
               <>
                 <Link
                   to="/dashboard"
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
                   style={{ textDecoration: 'none' }}
                 >
-                  Home
+                  <Home className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Home</span>
                 </Link>
                 {user.role?.includes('admin') && (
                   <Link
@@ -121,7 +122,7 @@ const Navbar: React.FC = () => {
                   <NotificationBell />
                   <button
                     onClick={handleLogout}
-                    className="px-2 sm:px-3 py-1 sm:py-2 text-gray-300 rounded-lg font-medium transition-colors text-sm sm:text-base"
+                    className="px-2 sm:px-3 py-1 sm:py-2 text-gray-300 rounded-lg font-medium transition-colors text-sm sm:text-base flex items-center justify-center"
                     style={{ textDecoration: 'none' }}
                     onMouseEnter={(e) => {
                       (e.target as HTMLElement).style.backgroundColor = '#4B5563';
@@ -132,8 +133,8 @@ const Navbar: React.FC = () => {
                       (e.target as HTMLElement).style.color = '#D1D5DB';
                     }}
                   >
+                    <LogOut className="h-5 w-5 sm:hidden" />
                     <span className="hidden sm:inline">Logout</span>
-                    <span className="sm:hidden">Out</span>
                   </button>
                 </div>
               </>
