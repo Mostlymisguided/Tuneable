@@ -27,12 +27,17 @@ const Wallet: React.FC = () => {
   // - EEA standard cards: 1.5% + €0.25  
   // - EEA premium cards: 1.9% + €0.25
   // - International cards: 3.25% + €0.25
-  // - +2% if currency conversion required
+  // - +2% if currency conversion required (e.g., customer pays in EUR, you receive GBP)
   //
   // We use UK card rates (2.5% + €0.25) as default estimate for GBP transactions
+  // Note: If customer pays in different currency, additional 2% conversion fee applies
   // €0.25 ≈ £0.22 (approximate, actual conversion rate may vary)
   const calculateStripeFee = (amount: number): number => {
     // Stripe fee estimate for UK cards: 2.5% + €0.25 (≈ £0.22)
+    // This is a conservative estimate - actual fees may vary based on:
+    // - Card type (UK, EEA standard/premium, international)
+    // - Currency conversion (if customer pays in different currency)
+    // - Payment method
     const percentageFee = amount * 0.025; // 2.5%
     const fixedFee = 0.22; // £0.22 (€0.25 converted, approximate)
     return percentageFee + fixedFee;

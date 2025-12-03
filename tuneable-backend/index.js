@@ -205,6 +205,7 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
   }
 
   // Try test mode webhook first
+  // NOTE: Share purchases always use live mode, so they will fail test verification and fall through to live
   try {
     const testSecret = process.env.STRIPE_WEBHOOK_SECRET_TEST || process.env.STRIPE_WEBHOOK_SECRET;
     if (!testSecret) {
@@ -217,6 +218,7 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
   } catch (testErr) {
     console.log(`⚠️ Test mode webhook verification failed: ${testErr.message}`);
     // If test webhook fails, try live webhook
+    // CRITICAL: Share purchases always use live mode, so STRIPE_WEBHOOK_SECRET_LIVE MUST be configured
     if (stripeLive && process.env.STRIPE_WEBHOOK_SECRET_LIVE) {
       try {
         event = stripeLive.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET_LIVE);
@@ -227,8 +229,9 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         return res.status(400).send(`Webhook Error: ${liveErr.message}`);
       }
     } else {
-      console.error(`❌ Webhook signature verification failed. Test error: ${testErr.message}, Live mode not configured or secret missing`);
-      return res.status(400).send(`Webhook Error: ${testErr.message}`);
+      const errorMsg = `❌ Webhook signature verification failed. Test error: ${testErr.message}. Live mode not configured or STRIPE_WEBHOOK_SECRET_LIVE missing. NOTE: Share purchases require STRIPE_WEBHOOK_SECRET_LIVE to be configured.`;
+      console.error(errorMsg);
+      return res.status(400).send(`Webhook Error: ${testErr.message}. Live webhook secret required for share purchases.`);
     }
   }
 
@@ -284,39 +287,55 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
           throw new Error(`Missing payment_intent in checkout session ${session.id}. Cannot determine exact net amount received.`);
         }
         
+        // Retrieve PaymentIntent with balance transaction expanded to get exact net amount
         paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
           expand: ['charges.data.balance_transaction']
         });
+        
+        console.log(`🔍 PaymentIntent retrieved: ${session.payment_intent}, Status: ${paymentIntent.status}`);
         
         // Verify payment was successful
         if (paymentIntent.status !== 'succeeded') {
           throw new Error(`PaymentIntent ${session.payment_intent} status is ${paymentIntent.status}, not succeeded. Cannot process.`);
         }
         
-        // Get the exact net amount after fees - try multiple sources for accuracy
-        if (paymentIntent.amount_received && paymentIntent.amount_received > 0) {
-          // amount_received is the net amount after fees (most accurate, preferred)
-          amountReceivedPence = paymentIntent.amount_received;
-          console.log(`✅ Using amount_received: £${(amountReceivedPence/100).toFixed(2)} (exact net amount)`);
-        } else if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
-          // Fallback: get net from balance transaction (also exact)
+        // Get the exact net amount after fees
+        // CRITICAL: amount_received is the GROSS amount, not net after fees
+        // We MUST use balance_transaction.net for the actual net amount Tuneable receives
+        let balanceTransaction = null;
+        
+        if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
           const charge = paymentIntent.charges.data[0];
           if (charge.balance_transaction) {
             // If balance_transaction is expanded, use it directly
-            if (charge.balance_transaction.net) {
-              amountReceivedPence = charge.balance_transaction.net;
-              console.log(`✅ Using balance_transaction.net: £${(amountReceivedPence/100).toFixed(2)} (exact net amount)`);
-            } else {
-              // If not expanded, retrieve it
-              const balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+            if (typeof charge.balance_transaction === 'object' && charge.balance_transaction.net) {
+              balanceTransaction = charge.balance_transaction;
               amountReceivedPence = balanceTransaction.net;
-              console.log(`✅ Using balance_transaction.net (retrieved): £${(amountReceivedPence/100).toFixed(2)} (exact net amount)`);
+              console.log(`✅ Using balance_transaction.net (expanded): £${(amountReceivedPence/100).toFixed(2)} (exact net amount after fees)`);
+            } else if (typeof charge.balance_transaction === 'string') {
+              // If it's just an ID, retrieve it
+              balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+              amountReceivedPence = balanceTransaction.net;
+              console.log(`✅ Using balance_transaction.net (retrieved): £${(amountReceivedPence/100).toFixed(2)} (exact net amount after fees)`);
+            } else {
+              throw new Error(`PaymentIntent ${session.payment_intent} has charge but balance_transaction is invalid. Cannot determine exact net amount.`);
             }
           } else {
             throw new Error(`PaymentIntent ${session.payment_intent} has charge but no balance_transaction. Cannot determine exact net amount.`);
           }
         } else {
           throw new Error(`PaymentIntent ${session.payment_intent} has no charges. Payment may not be fully processed. Cannot determine exact net amount.`);
+        }
+        
+        // Log fee breakdown for transparency
+        if (balanceTransaction) {
+          const grossAmount = balanceTransaction.amount;
+          const fees = balanceTransaction.fee;
+          const netAmount = balanceTransaction.net;
+          console.log(`💰 Stripe Balance Transaction Breakdown:`);
+          console.log(`   Gross amount: £${(grossAmount/100).toFixed(2)}`);
+          console.log(`   Stripe fees: £${(fees/100).toFixed(2)}`);
+          console.log(`   Net amount (what Tuneable receives): £${(netAmount/100).toFixed(2)}`);
         }
         
         // Final validation: ensure we have a valid amount
