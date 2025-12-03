@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon } from 'lucide-react';
+import { User as UserIcon, PartyPopper, Music } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
@@ -64,21 +64,23 @@ const Navbar: React.FC = () => {
                 )}
                 <Link
                   to="/parties"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  Parties
+                  <PartyPopper className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Parties</span>
                 </Link>
                 <Link
                   to="/party/global"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  Tunes
+                  <Music className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Tunes</span>
                 </Link>
                 {/* <Link
                   to="/podcasts"
