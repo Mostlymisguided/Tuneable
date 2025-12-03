@@ -276,47 +276,52 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         const stripe = isLiveMode ? stripeLive : stripeTest;
         
         // Retrieve PaymentIntent to get actual amount received (net after fees)
+        // CRITICAL: We MUST have the exact net amount for audit integrity - NO ESTIMATES
         let paymentIntent;
         let amountReceivedPence;
         
-        if (session.payment_intent) {
-          paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
-            expand: ['charges.data.balance_transaction']
-          });
-          
-          // Get the net amount after fees
-          if (paymentIntent.amount_received && paymentIntent.amount_received > 0) {
-            // amount_received is the net amount after fees (most accurate)
-            amountReceivedPence = paymentIntent.amount_received;
-          } else if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
-            // Calculate net from charge and balance transaction
-            const charge = paymentIntent.charges.data[0];
-            if (charge.balance_transaction && charge.balance_transaction.net) {
-              // net is the amount after fees (in the smallest currency unit)
+        if (!session.payment_intent) {
+          throw new Error(`Missing payment_intent in checkout session ${session.id}. Cannot determine exact net amount received.`);
+        }
+        
+        paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent, {
+          expand: ['charges.data.balance_transaction']
+        });
+        
+        // Verify payment was successful
+        if (paymentIntent.status !== 'succeeded') {
+          throw new Error(`PaymentIntent ${session.payment_intent} status is ${paymentIntent.status}, not succeeded. Cannot process.`);
+        }
+        
+        // Get the exact net amount after fees - try multiple sources for accuracy
+        if (paymentIntent.amount_received && paymentIntent.amount_received > 0) {
+          // amount_received is the net amount after fees (most accurate, preferred)
+          amountReceivedPence = paymentIntent.amount_received;
+          console.log(`✅ Using amount_received: £${(amountReceivedPence/100).toFixed(2)} (exact net amount)`);
+        } else if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+          // Fallback: get net from balance transaction (also exact)
+          const charge = paymentIntent.charges.data[0];
+          if (charge.balance_transaction) {
+            // If balance_transaction is expanded, use it directly
+            if (charge.balance_transaction.net) {
               amountReceivedPence = charge.balance_transaction.net;
+              console.log(`✅ Using balance_transaction.net: £${(amountReceivedPence/100).toFixed(2)} (exact net amount)`);
             } else {
-              // Fallback: estimate net amount (gross - estimated fees)
-              // UK cards: 1.4% + 20p, but this is approximate
-              const grossAmount = paymentIntent.amount;
-              const estimatedFee = Math.round(grossAmount * 0.014 + 20); // 1.4% + 20p
-              amountReceivedPence = grossAmount - estimatedFee;
-              console.warn(`⚠️ Using estimated net amount (fee calculation): Gross £${(grossAmount/100).toFixed(2)}, Estimated fee £${(estimatedFee/100).toFixed(2)}, Net £${(amountReceivedPence/100).toFixed(2)}`);
+              // If not expanded, retrieve it
+              const balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+              amountReceivedPence = balanceTransaction.net;
+              console.log(`✅ Using balance_transaction.net (retrieved): £${(amountReceivedPence/100).toFixed(2)} (exact net amount)`);
             }
           } else {
-            // No charge yet, use amount (gross) as fallback but log warning
-            amountReceivedPence = paymentIntent.amount;
-            console.warn(`⚠️ PaymentIntent has no charges yet, using gross amount: £${(amountReceivedPence/100).toFixed(2)}`);
+            throw new Error(`PaymentIntent ${session.payment_intent} has charge but no balance_transaction. Cannot determine exact net amount.`);
           }
         } else {
-          // No payment intent, calculate from session metadata
-          // session.amount_total is gross, but we have metadata.amount (wallet credit)
-          // The wallet credit amount is what we want to credit, which should be close to net
-          const walletCreditAmount = Math.round(parseFloat(session.metadata.amount) * 100);
-          const grossAmount = session.amount_total;
-          // Estimate net: gross - estimated fees
-          const estimatedFee = Math.round(grossAmount * 0.014 + 20); // 1.4% + 20p
-          amountReceivedPence = Math.max(walletCreditAmount, grossAmount - estimatedFee);
-          console.warn(`⚠️ No payment intent, using estimated net amount: Gross £${(grossAmount/100).toFixed(2)}, Estimated fee £${(estimatedFee/100).toFixed(2)}, Net £${(amountReceivedPence/100).toFixed(2)}`);
+          throw new Error(`PaymentIntent ${session.payment_intent} has no charges. Payment may not be fully processed. Cannot determine exact net amount.`);
+        }
+        
+        // Final validation: ensure we have a valid amount
+        if (!amountReceivedPence || amountReceivedPence <= 0) {
+          throw new Error(`Invalid net amount received: ${amountReceivedPence}. Cannot proceed with transaction.`);
         }
         
         // Calculate fees for transparency
