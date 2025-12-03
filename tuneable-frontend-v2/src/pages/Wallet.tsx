@@ -43,8 +43,13 @@ const Wallet: React.FC = () => {
       // The backend will check if webhook already processed it and avoid duplicates
       const checkAndUpdateBalance = async () => {
         try {
-          // Wait a bit for webhook to process (2 seconds)
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Wait longer for webhook to process (5 seconds) to reduce race conditions
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Refresh user data first to get latest balance
+          if (refreshUser) {
+            await refreshUser();
+          }
           
           // Call update-balance endpoint - it will check for existing webhook transaction
           const response = await paymentAPI.updateBalance(parseFloat(amount));
