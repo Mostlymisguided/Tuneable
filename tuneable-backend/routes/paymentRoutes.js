@@ -195,18 +195,26 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
     }
     
     // Also check for recent Stripe transactions with same amount (to catch webhook-processed payments)
+    // Use a wider time window (10 minutes) and allow for small amount differences (fees might vary)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const amountTolerance = 50; // Allow ±50 pence difference (for fee variations)
+    
     const existingTransaction = await WalletTransaction.findOne({
       userId: userId,
-      amount: amountPence,
+      amount: { 
+        $gte: amountPence - amountTolerance, 
+        $lte: amountPence + amountTolerance 
+      },
       paymentMethod: 'stripe',
       type: 'topup',
       status: 'completed',
-      createdAt: { $gte: fiveMinutesAgo }
+      createdAt: { $gte: tenMinutesAgo }
     });
     
     if (existingTransaction) {
       // Webhook already processed this payment, just return the current balance
       console.log(`✅ Payment already processed by webhook (found existing transaction: ${existingTransaction._id})`);
+      console.log(`   Existing amount: £${(existingTransaction.amount / 100).toFixed(2)}, Requested: £${(amountPence / 100).toFixed(2)}`);
       const user = await User.findById(userId);
       return res.json({
         message: 'Payment already processed by webhook',
@@ -223,6 +231,14 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
     
     const balanceBefore = userBefore.balance || 0;
 
+    // Calculate user aggregate PRE (total tips placed) for ledger entry
+    const Bid = require('../models/Bid');
+    const userBidsPre = await Bid.find({
+      userId: userId,
+      status: 'active'
+    }).lean();
+    const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+
     // Update user balance
     const user = await User.findByIdAndUpdate(
       userId,
@@ -237,8 +253,9 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
     // Create wallet transaction record
     // If this is a Stripe payment fallback, mark it appropriately
     const isStripeFallback = !!stripeSessionId;
+    let walletTransaction;
     try {
-      const walletTransaction = await WalletTransaction.create({
+      walletTransaction = await WalletTransaction.create({
         userId: user._id,
         user_uuid: user.uuid,
         amount: amountPence,
@@ -262,6 +279,29 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
     } catch (txError) {
       console.error('Failed to create wallet transaction record:', txError);
       // Don't fail the request if transaction record creation fails
+    }
+
+    // Create ledger entry for top-ups (only for Stripe fallbacks, not manual adjustments)
+    if (isStripeFallback) {
+      try {
+        const tuneableLedgerService = require('../services/tuneableLedgerService');
+        const ledgerEntry = await tuneableLedgerService.createTopUpEntry({
+          userId: user._id,
+          amount: amountPence,
+          userBalancePre: balanceBefore,
+          userAggregatePre,
+          referenceTransactionId: walletTransaction?._id || null,
+          metadata: {
+            stripeSessionId: stripeSessionId,
+            isFallback: true, // Mark as fallback so we know webhook didn't process it
+            description: description || 'Wallet top-up via Stripe (fallback)'
+          }
+        });
+        console.log(`✅ Ledger entry created for fallback top-up: Entry ID ${ledgerEntry._id}`);
+      } catch (ledgerError) {
+        console.error('❌ Failed to create ledger entry for fallback top-up:', ledgerError);
+        // Don't fail the request, but log the error
+      }
     }
 
     res.json({ message: 'Balance updated successfully', balance: user.balance });

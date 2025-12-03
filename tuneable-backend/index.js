@@ -252,6 +252,26 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
           return res.json({ received: true }); // Still acknowledge to Stripe
         }
         
+        // IDEMPOTENCY CHECK: Check if this webhook has already been processed
+        // This prevents duplicate balance credits if Stripe retries the webhook
+        console.log(`🔍 Checking for existing transaction with session ID: ${session.id}`);
+        const existingTransaction = await WalletTransaction.findOne({
+          stripeSessionId: session.id,
+          type: 'topup',
+          status: 'completed'
+        });
+        
+        if (existingTransaction) {
+          console.log(`⚠️ DUPLICATE WEBHOOK DETECTED: Session ${session.id} already processed`);
+          console.log(`   Existing transaction ID: ${existingTransaction._id}`);
+          console.log(`   User was already credited: £${(existingTransaction.amount / 100).toFixed(2)}`);
+          console.log(`   Transaction created at: ${existingTransaction.createdAt}`);
+          console.log(`   User ID: ${existingTransaction.userId}`);
+          // Still acknowledge to Stripe to prevent retries
+          return res.json({ received: true, message: 'Already processed' });
+        }
+        console.log(`✅ No existing transaction found - proceeding with webhook processing`);
+        
         // Get the actual Stripe instance (test or live)
         const stripe = isLiveMode ? stripeLive : stripeTest;
         
@@ -292,121 +312,169 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         }).lean();
         const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
         
-        // Update user balance with ACTUAL amount received (net after fees)
-        const updatedUser = await User.findOneAndUpdate(
-          { uuid: userId },
-          { $inc: { balance: amountReceivedPence } },
-          { new: true }
-        );
+        // Use MongoDB transaction to ensure atomicity
+        // If ledger creation fails, balance update will be rolled back
+        const mongoose = require('mongoose');
+        const dbSession = await mongoose.startSession();
+        dbSession.startTransaction();
         
-        if (updatedUser) {
-          console.log(`Wallet top-up successful: User ${userId} requested £${(amountRequestedPence / 100).toFixed(2)}, received £${amountReceivedPounds.toFixed(2)} (fees: £${stripeFeesPounds.toFixed(2)}), new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
+        try {
+          console.log(`🔄 Starting transaction for wallet top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}`);
+          
+          // Update user balance with ACTUAL amount received (net after fees)
+          const updatedUser = await User.findOneAndUpdate(
+            { uuid: userId },
+            { $inc: { balance: amountReceivedPence } },
+            { new: true, session: dbSession }
+          );
+          
+          if (!updatedUser) {
+            throw new Error(`User not found after balance update: ${userId}`);
+          }
+          
+          console.log(`✅ Balance updated in transaction: User ${userId}, new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
           
           // Create wallet transaction record
-          let walletTransaction;
+          const walletTransaction = await WalletTransaction.create([{
+            userId: updatedUser._id,
+            user_uuid: updatedUser.uuid,
+            amount: amountReceivedPence,
+            type: 'topup',
+            status: 'completed',
+            paymentMethod: 'stripe',
+            stripeSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent,
+            balanceBefore: balanceBefore,
+            balanceAfter: updatedUser.balance,
+            description: `Wallet top-up via Stripe (net: £${amountReceivedPounds.toFixed(2)})`,
+            username: updatedUser.username,
+            metadata: {
+              currency: session.currency || 'gbp',
+              customerEmail: session.customer_email,
+              customerDetails: session.customer_details,
+              amountRequested: amountRequestedPence,
+              amountReceived: amountReceivedPence,
+              stripeFees: stripeFeesPence,
+              stripeFeesPounds: stripeFeesPounds.toFixed(2),
+              isLiveMode: isLiveMode
+            }
+          }], { session: dbSession });
+          
+          const walletTx = walletTransaction[0];
+          console.log(`✅ Wallet transaction created in transaction: ${walletTx._id} for user ${userId}`);
+          
+          // Store verification hash (non-critical, don't fail transaction if this fails)
           try {
-            walletTransaction = await WalletTransaction.create({
-              userId: updatedUser._id,
-              user_uuid: updatedUser.uuid,
-              amount: amountReceivedPence,
-              type: 'topup',
-              status: 'completed',
-              paymentMethod: 'stripe',
+            const verificationService = require('./services/transactionVerificationService');
+            await verificationService.storeVerificationHash(walletTx, 'WalletTransaction');
+          } catch (verifyError) {
+            console.error('Failed to store verification hash (non-critical):', verifyError);
+          }
+          
+          // Create ledger entry - THIS IS CRITICAL, transaction will fail if this fails
+          console.log(`📝 Creating ledger entry in transaction: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}`);
+          
+          if (!updatedUser._id) {
+            throw new Error('updatedUser._id is missing');
+          }
+          if (typeof amountReceivedPence !== 'number' || isNaN(amountReceivedPence)) {
+            throw new Error(`Invalid amountReceivedPence: ${amountReceivedPence}`);
+          }
+          if (typeof balanceBefore !== 'number' || isNaN(balanceBefore)) {
+            throw new Error(`Invalid balanceBefore: ${balanceBefore}`);
+          }
+          if (typeof userAggregatePre !== 'number' || isNaN(userAggregatePre)) {
+            throw new Error(`Invalid userAggregatePre: ${userAggregatePre}`);
+          }
+          
+          // Create ledger entry directly with session support
+          const TuneableLedger = require('./models/TuneableLedger');
+          const globalAggregatePre = await TuneableLedger.aggregate([
+            { $match: { transactionType: { $in: ['TIP', 'TOP_UP'] } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+          ]).session(dbSession);
+          
+          const globalAggregateValue = globalAggregatePre.length > 0 ? globalAggregatePre[0].total : 0;
+          
+          const ledgerEntry = new TuneableLedger({
+            userId: updatedUser._id,
+            mediaId: null,
+            partyId: null,
+            bidId: null,
+            user_uuid: updatedUser.uuid,
+            media_uuid: null,
+            transactionType: 'TOP_UP',
+            amount: amountReceivedPence,
+            userBalancePre: balanceBefore,
+            userBalancePost: balanceBefore + amountReceivedPence,
+            userAggregatePre: userAggregatePre,
+            userAggregatePost: userAggregatePre, // Top-up doesn't change aggregate
+            mediaAggregatePre: 0,
+            mediaAggregatePost: 0,
+            globalAggregatePre: globalAggregateValue,
+            globalAggregatePost: globalAggregateValue, // Top-up doesn't change global aggregate
+            referenceTransactionId: walletTx._id,
+            referenceTransactionType: 'WalletTransaction',
+            username: updatedUser.username,
+            mediaTitle: null,
+            partyName: null,
+            description: `Top-up of £${amountReceivedPounds.toFixed(2)}`,
+            metadata: {
               stripeSessionId: session.id,
               stripePaymentIntentId: session.payment_intent,
-              balanceBefore: balanceBefore,
-              balanceAfter: updatedUser.balance,
-              description: `Wallet top-up via Stripe (net: £${amountReceivedPounds.toFixed(2)})`,
-              username: updatedUser.username,
-              metadata: {
-                currency: session.currency || 'gbp',
-                customerEmail: session.customer_email,
-                customerDetails: session.customer_details,
-                amountRequested: amountRequestedPence,
-                amountReceived: amountReceivedPence,
-                stripeFees: stripeFeesPence,
-                stripeFeesPounds: stripeFeesPounds.toFixed(2),
-                isLiveMode: isLiveMode
-              }
-            });
-            console.log(`✅ Wallet transaction created: ${walletTransaction._id} for user ${userId}`);
-            
-            // Store verification hash
-            try {
-              const verificationService = require('./services/transactionVerificationService');
-              await verificationService.storeVerificationHash(walletTransaction, 'WalletTransaction');
-            } catch (verifyError) {
-              console.error('Failed to store verification hash:', verifyError);
+              currency: session.currency || 'gbp',
+              customerEmail: session.customer_email,
+              customerDetails: session.customer_details,
+              amountRequested: amountRequestedPence,
+              amountReceived: amountReceivedPence,
+              stripeFees: stripeFeesPence,
+              isLiveMode: isLiveMode,
+              walletTransactionCreated: true
             }
-          } catch (txError) {
-            console.error('❌ Failed to create wallet transaction record:', txError);
-          }
+          });
           
-          // Create ledger entry
-          console.log(`📝 Attempting to create ledger entry for top-up: User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}`);
+          await ledgerEntry.save({ session: dbSession });
+          console.log(`✅ Ledger entry created in transaction: Entry ID ${ledgerEntry._id}, User ${userId}`);
+          
+          // Store verification hash for ledger (non-critical)
           try {
-            const tuneableLedgerService = require('./services/tuneableLedgerService');
-            
-            if (!updatedUser._id) {
-              throw new Error('updatedUser._id is missing');
-            }
-            if (typeof amountReceivedPence !== 'number' || isNaN(amountReceivedPence)) {
-              throw new Error(`Invalid amountReceivedPence: ${amountReceivedPence}`);
-            }
-            if (typeof balanceBefore !== 'number' || isNaN(balanceBefore)) {
-              throw new Error(`Invalid balanceBefore: ${balanceBefore}`);
-            }
-            if (typeof userAggregatePre !== 'number' || isNaN(userAggregatePre)) {
-              throw new Error(`Invalid userAggregatePre: ${userAggregatePre}`);
-            }
-            
-            console.log(`📝 Ledger entry parameters validated: userId=${updatedUser._id}, amount=${amountReceivedPence}, balancePre=${balanceBefore}, aggregatePre=${userAggregatePre}`);
-            
-            const ledgerEntry = await tuneableLedgerService.createTopUpEntry({
-              userId: updatedUser._id,
-              amount: amountReceivedPence,
-              userBalancePre: balanceBefore,
-              userAggregatePre,
-              referenceTransactionId: walletTransaction?._id || null,
-              metadata: {
-                stripeSessionId: session.id,
-                stripePaymentIntentId: session.payment_intent,
-                currency: session.currency || 'gbp',
-                customerEmail: session.customer_email,
-                customerDetails: session.customer_details,
-                amountRequested: amountRequestedPence,
-                amountReceived: amountReceivedPence,
-                stripeFees: stripeFeesPence,
-                isLiveMode: isLiveMode,
-                walletTransactionCreated: !!walletTransaction?._id
-              }
-            });
-            
-            console.log(`✅ Ledger entry created successfully: Entry ID ${ledgerEntry._id}, User ${userId}, Amount: £${amountReceivedPounds.toFixed(2)}, Transaction: ${walletTransaction?._id || 'N/A'}`);
-          } catch (ledgerError) {
-            console.error('❌ CRITICAL: Failed to create ledger entry for top-up');
-            console.error('Ledger error details:', {
-              userId: updatedUser._id,
-              user_uuid: updatedUser.uuid,
-              amount: amountReceivedPence,
-              amountType: typeof amountReceivedPence,
-              walletTransactionId: walletTransaction?._id || null,
-              userBalancePre: balanceBefore,
-              userBalancePreType: typeof balanceBefore,
-              userAggregatePre: userAggregatePre,
-              userAggregatePreType: typeof userAggregatePre,
-              error: ledgerError.message,
-              errorName: ledgerError.name,
-              stack: ledgerError.stack
-            });
+            const verificationService = require('./services/transactionVerificationService');
+            await verificationService.storeVerificationHash(ledgerEntry, 'TuneableLedger');
+          } catch (verifyError) {
+            console.error('Failed to store verification hash for ledger (non-critical):', verifyError);
           }
           
-          // Send email notification
+          // Commit the transaction - all operations succeed or all fail
+          await dbSession.commitTransaction();
+          console.log(`✅ Transaction committed successfully: User ${userId} requested £${(amountRequestedPence / 100).toFixed(2)}, received £${amountReceivedPounds.toFixed(2)} (fees: £${stripeFeesPounds.toFixed(2)}), new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
+          
+          // Send email notification (non-critical, don't fail if this fails)
           try {
             await sendPaymentNotification(updatedUser, amountReceivedPounds);
           } catch (emailError) {
-            console.error('Failed to send payment notification email:', emailError);
+            console.error('Failed to send payment notification email (non-critical):', emailError);
           }
+          
+          // Only respond to Stripe after successful transaction
+          // This ensures we don't acknowledge if anything failed
+          return res.json({ received: true });
+          
+        } catch (transactionError) {
+          // Rollback the transaction - balance update will be undone
+          await dbSession.abortTransaction();
+          console.error('❌ Transaction failed, rolling back:', transactionError);
+          console.error('Transaction error details:', {
+            message: transactionError.message,
+            stack: transactionError.stack,
+            stripeSessionId: session.id,
+            userId: userId
+          });
+          
+          // Re-throw to trigger error response to Stripe (so it retries)
+          throw transactionError;
+        } finally {
+          // Always end the session
+          await dbSession.endSession();
         }
       } catch (error) {
         console.error('❌ Error processing wallet top-up webhook:', error);
@@ -416,6 +484,13 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
           sessionId: session.id,
           userId: session.metadata?.userId
         });
+        
+        // If transaction failed, respond with 500 so Stripe retries
+        // This ensures we get another chance to process the payment
+        return res.status(500).json({ 
+          error: 'Failed to process webhook',
+          message: error.message 
+        });
       }
     } else if (session.metadata && session.metadata.type === 'share_purchase') {
       console.log(`✅ Share purchase successful: User ${session.metadata.userId}`);
@@ -424,10 +499,15 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
     }
   } else {
     console.log(`⚠️ Unhandled webhook event type: ${event.type}`);
+    // For unhandled events, still acknowledge to Stripe
+    return res.json({ received: true });
   }
 
-  // Always respond to Stripe to acknowledge receipt
-  res.json({ received: true });
+  // If we get here and haven't responded yet, acknowledge receipt
+  // (This should only happen for non-wallet-topup events that don't return early)
+  if (!res.headersSent) {
+    res.json({ received: true });
+  }
 });
 console.log('Webhook route registered directly on app (raw body preserved).');
 
