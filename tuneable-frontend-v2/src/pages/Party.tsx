@@ -1872,7 +1872,8 @@ const Party: React.FC = () => {
 
   // Share functionality
   const shareUrl = window.location.href;
-  const shareText = `Join "${party?.name || 'this party'}" on Tuneable! ${party?.partyCode ? `Party Code: ${party.partyCode}` : ''}`;
+  const partyName = party?.name || 'this party';
+  const shareText = `You have been invited to join ${partyName} party on Tuneable. Get involved...`;
 
   const handleNativeShare = async () => {
     if (navigator.share) {
