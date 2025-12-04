@@ -540,6 +540,14 @@ const Party: React.FC = () => {
   const handleAddMediaSearch = async () => {
     if (!addMediaSearchQuery.trim()) return;
     
+    // Check if user is logged in - redirect to registration if not
+    if (!user) {
+      const redirectUrl = getRegistrationUrl();
+      toast.info('Please sign up to search for tunes');
+      navigate(redirectUrl);
+      return;
+    }
+    
     setIsSearchingNewMedia(true);
     setHasSearchedDatabase(true); // Mark that we've performed a database/YouTube search
     try {
@@ -1371,6 +1379,14 @@ const Party: React.FC = () => {
 
   const handleInlineBid = async (media: any) => {
     if (!partyId) return;
+    
+    // Check if user is logged in - redirect to registration if not
+    if (!user) {
+      const redirectUrl = getRegistrationUrl();
+      toast.info('Please sign up to place tips');
+      navigate(redirectUrl);
+      return;
+    }
     
     const mediaData = media.mediaId || media;
     // For queue items, use the queue item's _id (party media ID), not the media's _id
