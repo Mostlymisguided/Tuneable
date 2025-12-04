@@ -23,7 +23,7 @@ const Navbar: React.FC = () => {
               <img 
                 src="/Tuneable-Logo-180x180.svg" 
                 alt="Tuneable Logo" 
-                className="h-6 w-6 sm:h-8 sm:w-8"
+                className="h-8 w-8"
               />
               <div className="hidden sm:flex flex-col items-start">
                 <span className="text-lg sm:text-xl font-bold text-white">Tuneable</span>
@@ -117,7 +117,7 @@ const Navbar: React.FC = () => {
                     onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                   >
                     <span className="hidden sm:inline">{user.username}</span>
-                    <UserIcon className="h-4 w-4 sm:hidden" />
+                    <UserIcon className="h-5 w-5 sm:hidden" />
                   </Link>
                   <NotificationBell />
                   <button

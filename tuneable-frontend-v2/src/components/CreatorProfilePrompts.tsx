@@ -104,8 +104,8 @@ const CreatorProfilePrompts: React.FC<CreatorProfilePromptsProps> = ({ user, onD
   if (!user.oauthVerified?.facebook) {
     prompts.push({
       id: 'facebook',
-      title: 'Verify with Facebook',
-      description: 'Connect your Facebook account for verification',
+      title: 'Verify Account',
+      description: 'Connect Facebook',
       icon: Facebook,
       action: () => handleOAuthConnect('facebook'),
       priority: 3
@@ -115,9 +115,8 @@ const CreatorProfilePrompts: React.FC<CreatorProfilePromptsProps> = ({ user, onD
   if (!user.oauthVerified?.soundcloud) {
     prompts.push({
       id: 'soundcloud',
-      title: 'Verify with SoundCloud',
-      description: 'Connect your SoundCloud account for verification',
-      icon: Music2,
+      title: 'Verify Account',
+      description: 'Connect SoundCloud',
       action: () => handleOAuthConnect('soundcloud'),
       priority: 4
     });
@@ -126,8 +125,8 @@ const CreatorProfilePrompts: React.FC<CreatorProfilePromptsProps> = ({ user, onD
   if (!user.oauthVerified?.google) {
     prompts.push({
       id: 'youtube',
-      title: 'Verify with Google/YouTube',
-      description: 'Connect your Google account for YouTube verification',
+      title: 'Verify Account',
+      description: 'Connect Google/YouTube',
       icon: Youtube,
       action: () => handleOAuthConnect('google'),
       priority: 5

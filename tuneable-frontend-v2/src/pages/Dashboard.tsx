@@ -833,7 +833,7 @@ Join here: ${inviteLink}`.trim();
             {/* Header */}
             <div className="bg-gray-800 border-b border-gray-700 rounded-t-lg">
               <div className="px-4 sm:px-6 lg:px-8 py-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-center">
                   <div className="flex items-center">
                     <Award className="hidden md:inline h-6 w-6 text-purple-400 mr-3" />
                     <h2 className="text-xl font-semibold text-white">Creator Dashboard</h2>
@@ -930,7 +930,7 @@ Join here: ${inviteLink}`.trim();
                             <Coins className="h-8 w-8 text-green-400 opacity-50" />
                           </div>
                         </div>
-                        <div className="bg-gray-900 rounded-lg p-4">
+                        <div className="hidden md:block bg-gray-900 rounded-lg p-4">
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm text-gray-400">Labels Owned</p>
@@ -941,7 +941,7 @@ Join here: ${inviteLink}`.trim();
                             <Building className="h-8 w-8 text-blue-400 opacity-50" />
                           </div>
                         </div>
-                        <div className="bg-gray-900 rounded-lg p-4">
+                        <div className="hidden md:block bg-gray-900 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
                               <p className="text-sm text-gray-400">Labels Admin</p>
@@ -961,7 +961,7 @@ Join here: ${inviteLink}`.trim();
 
                       {/* Quick Actions */}
                       <div className="bg-gray-900 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+                        <h3 className="text-lg text-center md:text-left font-semibold text-white mb-4">Quick Actions</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <button
                             onClick={handleUploadClick}
@@ -987,7 +987,7 @@ Join here: ${inviteLink}`.trim();
                             <>
                               <button
                                 onClick={() => setIsLabelModalOpen(true)}
-                                className="flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                className="hidden md:flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                               >
                                 <div className="flex items-center">
                                   <Building className="h-5 w-5 text-white mr-3" />
@@ -997,7 +997,7 @@ Join here: ${inviteLink}`.trim();
                               </button>
                               <button
                                 onClick={() => setIsCollectiveModalOpen(true)}
-                                className="flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
+                                className="hidden md:flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
                               >
                                 <div className="flex items-center">
                                   <Users className="h-5 w-5 text-white mr-3" />
@@ -1009,41 +1009,6 @@ Join here: ${inviteLink}`.trim();
                           )}
                         </div>
                       </div>
-
-                      {/* Recent Media */}
-                      {creatorStats.recentMedia && creatorStats.recentMedia.length > 0 && (
-                        <div className="bg-gray-900 rounded-lg p-6">
-                          <h3 className="text-lg font-semibold text-white mb-4">Recent Media</h3>
-                          <div className="space-y-3">
-                            {creatorStats.recentMedia.map((media: any) => (
-                              <div
-                                key={media._id}
-                                onClick={() => navigate(`/tune/${media._id || media.uuid}`)}
-                                className="flex items-center gap-3 p-3 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
-                              >
-                                {media.coverArt && (
-                                  <img
-                                    src={media.coverArt}
-                                    alt={media.title}
-                                    className="h-12 w-12 rounded object-cover"
-                                  />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-white font-medium truncate">{media.title}</p>
-                                  <p className="text-gray-400 text-sm truncate">
-                                    <ClickableArtistDisplay media={media} />
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-purple-400 font-medium">
-                                    {penceToPounds(media.globalMediaAggregate || 0)}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -2375,7 +2340,7 @@ Join here: ${inviteLink}`.trim();
 
       {/* Add Tune Section */}
       <div className="card mb-8">
-        <div className="flex items-center mb-4">
+        <div className="flex items-center justify-center md:justify-start mb-4">
           <Music className="h-6 w-6 text-purple-400 mr-2" />
           <h2 className="text-2xl font-semibold text-white">Add Tune</h2>
         </div>
@@ -2498,7 +2463,7 @@ Join here: ${inviteLink}`.trim();
       </div>
 
 {/* User Stats */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
         <div className="card grid grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-gray-900 rounded-lg p-4">
           <div className="flex items-center">
@@ -2587,7 +2552,7 @@ Join here: ${inviteLink}`.trim();
       </div>
 
       {/* User Profile Prompts - for all users */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <UserProfilePrompts user={user} />
       </div>
 
@@ -2595,7 +2560,7 @@ Join here: ${inviteLink}`.trim();
       {user && 
         !isCreatorBannerDismissed &&
         !user.role?.includes('creator') && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-lg p-6 flex flex-col md:flex-row items-center justify-between gap-4 relative">
             <button
               onClick={handleDismissCreatorBanner}
@@ -2632,8 +2597,8 @@ Join here: ${inviteLink}`.trim();
       )}
 
       {/* Invited Users Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-8">
-        <div className="card flex items-center mb-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="card flex items-center justify-center md:justify-start mb-4">
           <Users className="h-6 w-6 text-purple-400 mr-2" />
           <h2 className="text-2xl font-semibold text-white">Invited Users</h2>
           <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
@@ -2755,8 +2720,8 @@ Join here: ${inviteLink}`.trim();
       </div>
 
       {/* Tune Library Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="card flex items-center justify-between mb-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="card flex items-center justify-center md:justify-between mb-4">
           <div className="flex items-center">
             <Music className="h-6 w-6 text-purple-400 mr-2" />
             <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
@@ -2767,11 +2732,11 @@ Join here: ${inviteLink}`.trim();
           {user && (user._id || user.uuid) && (
             <button
               onClick={() => navigate(`/user/${user._id || user.uuid}?view=tip-history`)}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
+              className="flex items-center space-x-2 px-4 mx-4 md:mx-0 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
             >
               <History className="h-4 w-4" />
-              <span>View Tip History</span>
-              <ArrowRight className="h-4 w-4" />
+              <span className="hidden md:block">View Tip History</span>
+              <ArrowRight className="hidden md:block h-4 w-4" />
             </button>
           )}
         </div>
