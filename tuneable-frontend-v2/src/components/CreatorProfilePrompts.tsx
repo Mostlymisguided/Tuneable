@@ -117,6 +117,7 @@ const CreatorProfilePrompts: React.FC<CreatorProfilePromptsProps> = ({ user, onD
       id: 'soundcloud',
       title: 'Verify Account',
       description: 'Connect SoundCloud',
+      icon: Music2,
       action: () => handleOAuthConnect('soundcloud'),
       priority: 4
     });
