@@ -780,7 +780,8 @@ const AuthPage: React.FC = () => {
           )}
         </div>
 
-        <div className="flex flex-col flex items-center justify-center">       
+        <div className="flex flex-col flex items-center justify-center">
+          <div className="relative w-full">
             <input
               name="password"
               type={showPassword ? 'text' : 'password'}
@@ -794,12 +795,14 @@ const AuthPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="right-3 mt-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
+          </div>
         </div>
         <div className="flex flex-col flex items-center justify-center">
+          <div className="relative w-full">
             <input
               name="confirmPassword"
               type={showConfirmPassword ? 'text' : 'password'}
@@ -813,10 +816,11 @@ const AuthPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="right-3 top-1/2 mt-2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
+          </div>
         </div>
 
         {/* Location Fields */}
