@@ -735,10 +735,24 @@ const Party: React.FC = () => {
     return 'Unknown';
   };
 
+  // Helper function to get registration URL with invite code for private parties
+  const getRegistrationUrl = () => {
+    if (party?.privacy === 'private' && party?.host) {
+      const hostInviteCode = typeof party.host === 'object' && party.host.personalInviteCode
+        ? party.host.personalInviteCode
+        : null;
+      if (hostInviteCode) {
+        return `/register?invite=${hostInviteCode}`;
+      }
+    }
+    return '/register';
+  };
+
   const handleAddMediaToParty = async (media: any) => {
     if (!user) {
-      toast.info('Please log in to add media to parties');
-      navigate('/login');
+      const redirectUrl = getRegistrationUrl();
+      toast.info('Please sign up to add media to parties');
+      navigate(redirectUrl);
       return;
     }
     if (!partyId) return;
@@ -814,8 +828,9 @@ const Party: React.FC = () => {
     
     // Check if user is logged in
     if (!user) {
-      toast.info('Please log in to place tips');
-      navigate('/login');
+      const redirectUrl = getRegistrationUrl();
+      toast.info('Please sign up to place tips');
+      navigate(redirectUrl);
       setIsBidding(false); // Reset on early return
       return;
     }
@@ -1648,6 +1663,17 @@ const Party: React.FC = () => {
       setSelectedMedia(null);
     } catch (error: any) {
       console.error('Error placing bid:', error);
+      
+      // Handle authentication errors - redirect to registration with invite code for private parties
+      if (error.response?.status === 401) {
+        const redirectUrl = getRegistrationUrl();
+        toast.info('Please sign up to place tips');
+        navigate(redirectUrl);
+        setBidModalOpen(false);
+        setSelectedMedia(null);
+        return;
+      }
+      
       if (error.response?.data?.error === 'Insufficient funds') {
         toast.error(`Insufficient funds. You have £${error.response.data.currentBalance.toFixed(2)} but need £${error.response.data.requiredAmount.toFixed(2)}`);
       } else {

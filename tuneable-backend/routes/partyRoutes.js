@@ -859,7 +859,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             .populate({
                 path: 'host',
                 model: 'User',
-                select: 'username uuid',  // ✅ Include uuid for isHost comparison
+                select: 'username uuid personalInviteCode',  // ✅ Include uuid for isHost comparison and personalInviteCode for registration redirects
             })
             .populate({
                 path: 'kickedUsers.userId',
@@ -882,34 +882,9 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Check if party is private and user is not authenticated or not joined
-        if (party.privacy === 'private' && !isRequestingGlobalParty) {
-            if (!userId) {
-                return res.status(403).json({ 
-                    error: 'Private party', 
-                    message: 'This is a private party. Please log in and join to view it.' 
-                });
-            }
-            
-            // Check if user is host, partier, or has joined
-            const User = require('../models/User');
-            const user = await User.findById(userId).select('joinedParties');
-            const joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId.toString()) || [];
-            const isHost = party.host.toString() === userId.toString();
-            const isPartier = party.partiers.some(p => {
-                if (!p) return false;
-                const partierId = typeof p === 'object' ? p._id.toString() : p.toString();
-                return partierId === userId.toString();
-            });
-            const hasJoined = joinedPartyIds.includes(party._id.toString());
-            
-            if (!isHost && !isPartier && !hasJoined) {
-                return res.status(403).json({ 
-                    error: 'Access denied', 
-                    message: 'You must join this private party to view it.' 
-                });
-            }
-        }
+        // Note: Private parties are now viewable via direct URL even for unauthenticated users
+        // Private parties are excluded from the public parties list (see GET /api/parties)
+        // Actions (tips, adding media, etc.) still require authentication
 
         console.log('Fetched Party Details:', JSON.stringify(party, null, 2));
 
