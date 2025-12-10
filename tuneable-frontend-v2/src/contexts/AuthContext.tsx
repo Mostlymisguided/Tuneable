@@ -10,6 +10,15 @@ interface User {
   email: string;
   profilePic?: string;
   personalInviteCode: string;
+  personalInviteCodes?: Array<{
+    _id: string;
+    code: string;
+    label?: string;
+    isActive: boolean;
+    createdAt: string;
+    usageCount: number;
+  }>;
+  primaryInviteCode?: string;
   balance: number;
   inviteCredits?: number;
   homeLocation?: {

@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save, Filter } from 'lucide-react';
+import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { authAPI } from '../lib/api';
 import { DEFAULT_PROFILE_PIC } from '../constants';
-import { InviteCode, Referral, ReferralsResponse } from '../types';
+import type { InviteCode, Referral, ReferralsResponse } from '../types';
 
 const InviteReferrals: React.FC = () => {
-  const [referralsData, setReferralsData] = useState<ReferralsResponse | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [selectedCodeFilter, setSelectedCodeFilter] = useState<string>('');
@@ -34,7 +33,6 @@ const InviteReferrals: React.FC = () => {
   const loadReferrals = async (code?: string) => {
     try {
       const response = await authAPI.getReferrals(code) as ReferralsResponse;
-      setReferralsData(response);
       setReferrals(response.referrals || []);
       setInviteCodes(response.personalInviteCodes || []);
     } catch (error) {
@@ -52,7 +50,7 @@ const InviteReferrals: React.FC = () => {
     }
 
     try {
-      const response = await authAPI.createInviteCode(newCodeLabel.trim());
+      await authAPI.createInviteCode(newCodeLabel.trim());
       toast.success('Invite code created successfully!');
       setShowCreateModal(false);
       setNewCodeLabel('');

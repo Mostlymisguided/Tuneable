@@ -69,6 +69,15 @@ interface UserProfile {
   email: string;
   balance: number;
   personalInviteCode?: string;
+  personalInviteCodes?: Array<{
+    _id: string;
+    code: string;
+    label?: string;
+    isActive: boolean;
+    createdAt: string;
+    usageCount: number;
+  }>;
+  primaryInviteCode?: string;
   givenName?: string;
   familyName?: string;
   cellPhone?: string;
