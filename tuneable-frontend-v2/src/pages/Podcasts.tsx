@@ -1196,6 +1196,7 @@ const Podcasts: React.FC = () => {
         songTitle={selectedEpisode?.title || ''}
         songArtist={selectedEpisode?.creatorDisplay || selectedEpisode?.podcastSeries?.title || 'Unknown'}
         currentBid={selectedEpisode ? penceToPoundsNumber(selectedEpisode.globalMediaAggregate) : 0}
+        minimumBid={(selectedEpisode as any)?.minimumBid ?? 0.01}
         userBalance={user ? penceToPoundsNumber((user as any).balance) : 0}
         isLoading={isPlacingBid}
       />

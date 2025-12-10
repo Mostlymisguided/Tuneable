@@ -11,6 +11,7 @@ interface BidModalProps {
   currentBid: number;
   userBalance?: number;
   isLoading?: boolean;
+  minimumBid?: number; // Media-level or party-level minimum bid
 }
 
 const BidModal: React.FC<BidModalProps> = ({
@@ -22,13 +23,14 @@ const BidModal: React.FC<BidModalProps> = ({
   currentBid,
   userBalance = 0,
   isLoading = false,
+  minimumBid = 0.01,
 }) => {
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
 
   const adjustBidAmount = (delta: number) => {
     const current = parseFloat(bidAmount) || 0;
-    const newAmount = Math.max(0.01, current + delta);
+    const newAmount = Math.max(minimumBid, current + delta);
     const maxAmount = userBalance || 999999;
     const finalAmount = Math.min(newAmount, maxAmount);
     setBidAmount(finalAmount.toFixed(2));
@@ -45,8 +47,8 @@ const BidModal: React.FC<BidModalProps> = ({
       return;
     }
     
-    if (amount < 0.01) {
-      setError('Minimum bid amount is £0.01');
+    if (amount < minimumBid) {
+      setError(`Minimum bid amount is £${minimumBid.toFixed(2)}`);
       return;
     }
     
@@ -101,7 +103,7 @@ const BidModal: React.FC<BidModalProps> = ({
               <button
                 type="button"
                 onClick={() => adjustBidAmount(-0.01)}
-                disabled={isLoading || parseFloat(bidAmount) <= 0.01}
+                disabled={isLoading || parseFloat(bidAmount) <= minimumBid}
                 className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
                 <Minus className="h-4 w-4 text-gray-600" />
@@ -114,7 +116,7 @@ const BidModal: React.FC<BidModalProps> = ({
                   type="number"
                   id="bidAmount"
                   step="0.01"
-                  min="0.01"
+                  min={minimumBid}
                   value={bidAmount}
                   onChange={(e) => {
                     setBidAmount(e.target.value);

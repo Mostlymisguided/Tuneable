@@ -3405,6 +3405,7 @@ const Party: React.FC = () => {
         currentBid={penceToPoundsNumber(selectedMedia?.partyMediaAggregate || 0)}
         userBalance={penceToPoundsNumber(user?.balance || 0)}
         isLoading={isBidding}
+        minimumBid={getEffectiveMinimumBid(selectedMedia)}
       />
 
       {/* Player Warning Modal */}

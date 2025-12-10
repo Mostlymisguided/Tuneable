@@ -237,7 +237,8 @@ const TuneProfile: React.FC = () => {
     pitch: 440,
     timeSignature: '',
     elements: [] as string[],
-    coverArt: ''
+    coverArt: '',
+    minimumBid: null as number | null
   });
   const [useMultipleArtists, setUseMultipleArtists] = useState(false);
   const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>([]);
@@ -555,7 +556,8 @@ const TuneProfile: React.FC = () => {
         pitch: media.pitch || 440,
         timeSignature: media.timeSignature || '',
         elements: media.elements || [],
-        coverArt: media.coverArt || DEFAULT_COVER_ART // Always show the URL that's actually stored (or default)
+        coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
+        minimumBid: (media as any).minimumBid ?? null
       });
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
@@ -3356,6 +3358,48 @@ const TuneProfile: React.FC = () => {
                     placeholder="UPC code"
                   />
                 </div>
+              </div>
+
+              {/* Minimum Tip/Bid */}
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Minimum Tip Amount (Optional)
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-400">£</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={editForm.minimumBid ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditForm({ 
+                          ...editForm, 
+                          minimumBid: value === '' ? null : parseFloat(value) || null 
+                        });
+                      }}
+                      className="input pl-8"
+                      placeholder="Leave empty to use party default"
+                    />
+                  </div>
+                  {editForm.minimumBid !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, minimumBid: null })}
+                      className="px-3 py-2 text-sm text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
+                      title="Clear to use party default"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Set a custom minimum tip amount for this media. If not set, the party's minimum tip will be used.
+                </p>
               </div>
 
                 {/* Cover Art URL */}
