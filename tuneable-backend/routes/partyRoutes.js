@@ -501,7 +501,8 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                     // Group bids by mediaId and calculate aggregate per media
                     const mediaAggregates = {};
                     activeBids.forEach(bid => {
-                        const mediaId = bid.mediaId.toString();
+                        if (!bid || !bid.mediaId) return; // Skip bids with null mediaId
+                        const mediaId = bid.mediaId.toString ? bid.mediaId.toString() : String(bid.mediaId);
                         if (!mediaAggregates[mediaId]) {
                             mediaAggregates[mediaId] = 0;
                         }
@@ -662,12 +663,15 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
 
         // Check if this is the Global Party
         const isGlobalParty = await Party.getGlobalParty();
-        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === id;
+        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id && isGlobalParty._id.toString() === id;
 
         let party;
         
         // First, check if this is a tag party
         party = await Party.findById(id);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
         const isTagParty = party && party.type === 'tag';
         
         if (isRequestingGlobalParty) {
@@ -986,7 +990,9 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                     }
                 ]);
                 
-                const mediaIds = mediaWithBids.map(m => m._id);
+                const mediaIds = mediaWithBids
+                    .map(m => m && m._id ? m._id : null)
+                    .filter(id => id !== null && id !== undefined);
                 
                 if (mediaIds.length === 0) {
                     console.log(`📍 No media found with bids from users in this location`);
@@ -1018,8 +1024,24 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                     // Convert to party media format
                     party.media = allMediaWithBids
                         .map(media => {
+                            // Skip if media doesn't have an _id
+                            if (!media || !media._id) {
+                                return null;
+                            }
+                            
                             // Get bids for this media from location users
-                            const mediaBidData = mediaWithBids.find(m => m._id.toString() === media._id.toString());
+                            const mediaBidData = mediaWithBids.find(m => {
+                                if (!m || !m._id || !media || !media._id) return false;
+                                try {
+                                    const mId = m._id ? (typeof m._id === 'object' && m._id.toString ? m._id.toString() : String(m._id)) : null;
+                                    const mediaId = media._id ? (typeof media._id === 'object' && media._id.toString ? media._id.toString() : String(media._id)) : null;
+                                    if (!mId || !mediaId) return false;
+                                    return mId === mediaId;
+                                } catch (e) {
+                                    console.error('Error comparing media IDs:', e, { m_id: m._id, media_id: media._id });
+                                    return false;
+                                }
+                            });
                             const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
                             
                             // Skip media with no active bids from location users
@@ -1238,9 +1260,9 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             }
 
             return {
-                _id: entry.mediaId._id,
-                id: entry.mediaId._id || entry.mediaId.uuid, // Use ObjectId first, fallback to UUID
-                uuid: entry.mediaId._id || entry.mediaId.uuid, // Also include uuid field for consistency
+                _id: entry.mediaId?._id || null,
+                id: entry.mediaId?._id || entry.mediaId?.uuid || null, // Use ObjectId first, fallback to UUID
+                uuid: entry.mediaId?._id || entry.mediaId?.uuid || null, // Also include uuid field for consistency
                 title: entry.mediaId.title,
                 artist: Array.isArray(entry.mediaId.artist) && entry.mediaId.artist.length > 0 
                     ? entry.mediaId.artist[0].name 
