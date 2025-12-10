@@ -23,8 +23,18 @@ const userSchema = new mongoose.Schema({
   givenName:{ type: String },
   familyName:{ type: String },
   profilePic: { type: String, default: 'https://uploads.tuneable.stream/profile-pictures/default-profile.png' }, // Stores URL or file path
-  personalInviteCode: { type: String, required: true, unique: true },
+  // Legacy field - kept for backward compatibility, will be migrated to personalInviteCodes
+  personalInviteCode: { type: String, required: false, unique: true, sparse: true },
+  // New multiple invite codes structure
+  personalInviteCodes: [{
+    code: { type: String, required: true },
+    isActive: { type: Boolean, default: true },
+    label: { type: String }, // Optional label like "Reddit", "Twitter", etc.
+    createdAt: { type: Date, default: Date.now },
+    usageCount: { type: Number, default: 0 } // Track how many users signed up with this code
+  }],
   parentInviteCode: { type: String, required: false },
+  parentInviteCodeId: { type: mongoose.Schema.Types.ObjectId }, // Reference to specific invite code object (optional, for tracking)
   balance: { type: Number, default: 0 }, // Wallet balance stored in PENCE (integer), not pounds
   // Example: 1050 represents £10.50, 3300 represents £33.00
   inviteCredits: { type: Number, default: 10 }, // Invite credits for inviting new users
@@ -317,7 +327,69 @@ userSchema.methods.generateUnsubscribeToken = function() {
   return token;
 };
 
+// Helper method to find user by invite code (checks both old and new structure)
+userSchema.statics.findByInviteCode = async function(code) {
+  if (!code || code.length !== 5) {
+    return null;
+  }
+  const upperCode = code.toUpperCase();
+  
+  // First check new structure (personalInviteCodes array)
+  const userByNewCode = await this.findOne({
+    'personalInviteCodes.code': upperCode,
+    'personalInviteCodes.isActive': true
+  });
+  if (userByNewCode) {
+    return userByNewCode;
+  }
+  
+  // Fallback to legacy personalInviteCode field for backward compatibility
+  return await this.findOne({ personalInviteCode: upperCode });
+};
+
+// Helper method to get active invite codes
+userSchema.methods.getActiveInviteCodes = function() {
+  if (this.personalInviteCodes && this.personalInviteCodes.length > 0) {
+    return this.personalInviteCodes.filter(ic => ic.isActive);
+  }
+  // Fallback to legacy code if array is empty
+  if (this.personalInviteCode) {
+    return [{ code: this.personalInviteCode, isActive: true, label: 'Primary', createdAt: this.createdAt || new Date(), usageCount: 0 }];
+  }
+  return [];
+};
+
+// Helper method to get primary invite code (for backward compatibility)
+userSchema.methods.getPrimaryInviteCode = function() {
+  const activeCodes = this.getActiveInviteCodes();
+  if (activeCodes.length > 0) {
+    return activeCodes[0].code;
+  }
+  // Fallback to legacy field
+  return this.personalInviteCode || null;
+};
+
+// Helper method to find specific invite code object by code string
+userSchema.methods.findInviteCodeObject = function(code) {
+  if (!this.personalInviteCodes || this.personalInviteCodes.length === 0) {
+    // If no array, check legacy field
+    if (this.personalInviteCode === code.toUpperCase()) {
+      return { code: this.personalInviteCode, isActive: true, _id: null };
+    }
+    return null;
+  }
+  return this.personalInviteCodes.find(ic => ic.code === code.toUpperCase());
+};
+
+// Virtual for backward compatibility - returns primary code
+userSchema.virtual('primaryInviteCode').get(function() {
+  return this.getPrimaryInviteCode();
+});
+
 // Indexes
+// Index for invite code lookups
+userSchema.index({ 'personalInviteCodes.code': 1 });
+// Note: personalInviteCode already has unique: true which creates an index automatically
 
 //comment to check debug restart
 

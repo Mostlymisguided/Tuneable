@@ -7,7 +7,16 @@ interface User {
   username: string;
   email: string;
   profilePic?: string;
-  personalInviteCode: string;
+  personalInviteCode: string; // Legacy - kept for backward compatibility
+  personalInviteCodes?: Array<{
+    _id: string;
+    code: string;
+    label?: string;
+    isActive: boolean;
+    createdAt: string;
+    usageCount: number;
+  }>;
+  primaryInviteCode?: string;
   balance: number;
   inviteCredits?: number;
   tuneBytes?: number;
@@ -183,8 +192,25 @@ export const authAPI = {
     return response.data;
   },
   
-  getReferrals: async () => {
-    const response = await api.get('/users/referrals');
+  getReferrals: async (code?: string) => {
+    const params = code ? { code } : {};
+    const response = await api.get('/users/referrals', { params });
+    return response.data;
+  },
+
+  // Invite code management
+  createInviteCode: async (label?: string) => {
+    const response = await api.post('/users/invite-codes', { label });
+    return response.data;
+  },
+
+  updateInviteCode: async (codeId: string, updates: { isActive?: boolean; label?: string }) => {
+    const response = await api.patch(`/users/invite-codes/${codeId}`, updates);
+    return response.data;
+  },
+
+  deleteInviteCode: async (codeId: string) => {
+    const response = await api.delete(`/users/invite-codes/${codeId}`);
     return response.data;
   },
 

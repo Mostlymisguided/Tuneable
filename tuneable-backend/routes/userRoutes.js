@@ -246,7 +246,8 @@ router.get('/validate-invite/:code', async (req, res) => {
       return res.json({ valid: false });
     }
     
-    const inviter = await User.findOne({ personalInviteCode: code.toUpperCase() });
+    // Use new helper method that checks both old and new structure
+    const inviter = await User.findByInviteCode(code);
     
     if (inviter) {
       return res.json({ 
@@ -334,9 +335,16 @@ router.post(
         return res.status(400).json({ error: 'Valid invite code is required to register' });
       }
       
-      const inviter = await User.findOne({ personalInviteCode: parentInviteCode.toUpperCase() });
+      // Use new helper method that checks both old and new structure
+      const inviter = await User.findByInviteCode(parentInviteCode);
       if (!inviter) {
         return res.status(400).json({ error: 'Invalid invite code' });
+      }
+      
+      // Find the specific invite code object to track usage
+      const inviteCodeObj = inviter.findInviteCodeObject(parentInviteCode);
+      if (inviteCodeObj && !inviteCodeObj.isActive) {
+        return res.status(400).json({ error: 'This invite code has been deactivated' });
       }
       
       // Check if inviter has invite credits (admins have unlimited credits)
@@ -426,14 +434,28 @@ router.post(
       const userId = new mongoose.Types.ObjectId();
       const personalInviteCode = deriveCodeFromUserId(userId);
       
+      // Find the invite code object ID for tracking
+      let parentInviteCodeId = null;
+      if (inviteCodeObj && inviteCodeObj._id) {
+        parentInviteCodeId = inviteCodeObj._id;
+      }
+      
       // Default string fields to empty string if falsy
       const user = new User({
         _id: userId,
         username,
         email,
         password,
-        personalInviteCode,
+        personalInviteCode, // Keep for backward compatibility
+        personalInviteCodes: [{
+          code: personalInviteCode,
+          isActive: true,
+          label: 'Primary',
+          createdAt: new Date(),
+          usageCount: 0
+        }],
         parentInviteCode: parentInviteCode.toUpperCase(),
+        parentInviteCodeId: parentInviteCodeId, // Track which specific code was used
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
@@ -441,6 +463,33 @@ router.post(
         secondaryLocation: secondaryLocationData
       });
       await user.save();
+      
+      // Increment usage count for the invite code that was used
+      if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
+        const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic._id && ic._id.toString() === inviteCodeObj._id.toString());
+        if (codeIndex !== -1) {
+          inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
+          await inviter.save();
+        }
+      } else if (inviter.personalInviteCode === parentInviteCode.toUpperCase()) {
+        // Legacy code - if array doesn't exist yet, create it
+        if (!inviter.personalInviteCodes || inviter.personalInviteCodes.length === 0) {
+          inviter.personalInviteCodes = [{
+            code: inviter.personalInviteCode,
+            isActive: true,
+            label: 'Primary',
+            createdAt: inviter.createdAt || new Date(),
+            usageCount: 1
+          }];
+        } else {
+          // Find and increment
+          const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic.code === parentInviteCode.toUpperCase());
+          if (codeIndex !== -1) {
+            inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
+          }
+        }
+        await inviter.save();
+      }
       
       // Set profile picture URL using custom domain (R2_PUBLIC_URL)
       // req.file.key contains the S3 key, use it with getPublicUrl for custom domain
@@ -2355,30 +2404,246 @@ router.post('/request-invite', async (req, res) => {
 // @access  Private
 router.get('/referrals', authMiddleware, async (req, res) => {
   try {
-    const user = req.user;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
     
-    // Find all users who used this user's invite code
-    const referrals = await User.find({ 
-      parentInviteCode: user.personalInviteCode 
-    })
-      .select('username profilePic createdAt homeLocation secondaryLocation uuid')
+    const { code } = req.query; // Optional filter by specific invite code
+    
+    // Build query - find users who used any of this user's invite codes
+    let query = {};
+    if (code) {
+      // Filter by specific code
+      query.parentInviteCode = code.toUpperCase();
+    } else {
+      // Get all active invite codes for this user
+      const activeCodes = user.getActiveInviteCodes().map(ic => ic.code);
+      // Also include legacy code if it exists
+      if (user.personalInviteCode && !activeCodes.includes(user.personalInviteCode)) {
+        activeCodes.push(user.personalInviteCode);
+      }
+      query.parentInviteCode = { $in: activeCodes };
+    }
+    
+    const referrals = await User.find(query)
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId')
       .sort({ createdAt: -1 })
       .lean();
     
+    // Get invite codes with stats
+    const inviteCodes = user.getActiveInviteCodes().map(ic => ({
+      code: ic.code,
+      label: ic.label || 'Primary',
+      isActive: ic.isActive,
+      createdAt: ic.createdAt,
+      usageCount: ic.usageCount || 0,
+      _id: ic._id ? ic._id.toString() : null
+    }));
+    
+    // Add legacy code if it exists and not in array
+    if (user.personalInviteCode && !inviteCodes.find(ic => ic.code === user.personalInviteCode)) {
+      const legacyCount = referrals.filter(r => r.parentInviteCode === user.personalInviteCode).length;
+      inviteCodes.push({
+        code: user.personalInviteCode,
+        label: 'Primary',
+        isActive: true,
+        createdAt: user.createdAt || new Date(),
+        usageCount: legacyCount,
+        _id: null
+      });
+    }
+    
     res.json({
-      personalInviteCode: user.personalInviteCode,
+      personalInviteCodes: inviteCodes,
+      primaryInviteCode: user.getPrimaryInviteCode(),
       referralCount: referrals.length,
       referrals: referrals.map(r => ({
         username: r.username,
         profilePic: r.profilePic,
         joinedAt: r.createdAt,
-        location: r.homeLocation || null, // Return home location, or null
-        uuid: r.uuid
+        location: r.homeLocation || null,
+        uuid: r.uuid,
+        usedCode: r.parentInviteCode
       }))
     });
   } catch (error) {
     console.error('Error fetching referrals:', error);
     res.status(500).json({ error: 'Failed to fetch referrals' });
+  }
+});
+
+// @route   POST /api/users/invite-codes
+// @desc    Create a new invite code for the current user
+// @access  Private
+router.post('/invite-codes', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { label } = req.body;
+    
+    // Generate unique invite code
+    let newCode;
+    let isUnique = false;
+    let attempts = 0;
+    const maxAttempts = 100;
+    
+    while (!isUnique && attempts < maxAttempts) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let result = '';
+      for (let i = 0; i < 5; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      newCode = result;
+      
+      // Check if code already exists (in any user's codes)
+      const existingUser = await User.findOne({
+        $or: [
+          { 'personalInviteCodes.code': newCode },
+          { personalInviteCode: newCode }
+        ]
+      });
+      
+      if (!existingUser) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+    
+    if (!isUnique) {
+      return res.status(500).json({ error: 'Failed to generate unique invite code. Please try again.' });
+    }
+    
+    // Add new code to user's array
+    if (!user.personalInviteCodes) {
+      user.personalInviteCodes = [];
+    }
+    
+    user.personalInviteCodes.push({
+      code: newCode,
+      isActive: true,
+      label: label || null,
+      createdAt: new Date(),
+      usageCount: 0
+    });
+    
+    await user.save();
+    
+    const newCodeObj = user.personalInviteCodes[user.personalInviteCodes.length - 1];
+    
+    res.status(201).json({
+      message: 'Invite code created successfully',
+      inviteCode: {
+        code: newCodeObj.code,
+        label: newCodeObj.label || null,
+        isActive: newCodeObj.isActive,
+        createdAt: newCodeObj.createdAt,
+        usageCount: newCodeObj.usageCount,
+        _id: newCodeObj._id.toString()
+      }
+    });
+  } catch (error) {
+    console.error('Error creating invite code:', error);
+    res.status(500).json({ error: 'Failed to create invite code' });
+  }
+});
+
+// @route   PATCH /api/users/invite-codes/:codeId
+// @desc    Update an invite code (activate/deactivate or change label)
+// @access  Private
+router.patch('/invite-codes/:codeId', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { codeId } = req.params;
+    const { isActive, label } = req.body;
+    
+    if (!user.personalInviteCodes || user.personalInviteCodes.length === 0) {
+      return res.status(404).json({ error: 'No invite codes found' });
+    }
+    
+    const codeIndex = user.personalInviteCodes.findIndex(ic => 
+      ic._id && ic._id.toString() === codeId
+    );
+    
+    if (codeIndex === -1) {
+      return res.status(404).json({ error: 'Invite code not found' });
+    }
+    
+    // Update fields
+    if (typeof isActive === 'boolean') {
+      user.personalInviteCodes[codeIndex].isActive = isActive;
+    }
+    if (label !== undefined) {
+      user.personalInviteCodes[codeIndex].label = label;
+    }
+    
+    await user.save();
+    
+    res.json({
+      message: 'Invite code updated successfully',
+      inviteCode: {
+        code: user.personalInviteCodes[codeIndex].code,
+        label: user.personalInviteCodes[codeIndex].label,
+        isActive: user.personalInviteCodes[codeIndex].isActive,
+        createdAt: user.personalInviteCodes[codeIndex].createdAt,
+        usageCount: user.personalInviteCodes[codeIndex].usageCount,
+        _id: user.personalInviteCodes[codeIndex]._id.toString()
+      }
+    });
+  } catch (error) {
+    console.error('Error updating invite code:', error);
+    res.status(500).json({ error: 'Failed to update invite code' });
+  }
+});
+
+// @route   DELETE /api/users/invite-codes/:codeId
+// @desc    Delete an invite code (soft delete by deactivating)
+// @access  Private
+router.delete('/invite-codes/:codeId', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { codeId } = req.params;
+    
+    if (!user.personalInviteCodes || user.personalInviteCodes.length === 0) {
+      return res.status(404).json({ error: 'No invite codes found' });
+    }
+    
+    // Don't allow deleting the last active code
+    const activeCodes = user.personalInviteCodes.filter(ic => ic.isActive);
+    if (activeCodes.length <= 1) {
+      return res.status(400).json({ error: 'Cannot delete your last active invite code' });
+    }
+    
+    const codeIndex = user.personalInviteCodes.findIndex(ic => 
+      ic._id && ic._id.toString() === codeId
+    );
+    
+    if (codeIndex === -1) {
+      return res.status(404).json({ error: 'Invite code not found' });
+    }
+    
+    // Soft delete by deactivating
+    user.personalInviteCodes[codeIndex].isActive = false;
+    
+    await user.save();
+    
+    res.json({
+      message: 'Invite code deactivated successfully',
+      inviteCode: {
+        code: user.personalInviteCodes[codeIndex].code,
+        label: user.personalInviteCodes[codeIndex].label,
+        isActive: false,
+        createdAt: user.personalInviteCodes[codeIndex].createdAt,
+        usageCount: user.personalInviteCodes[codeIndex].usageCount,
+        _id: user.personalInviteCodes[codeIndex]._id.toString()
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting invite code:', error);
+    res.status(500).json({ error: 'Failed to delete invite code' });
   }
 });
 

@@ -119,20 +119,22 @@ const Dashboard: React.FC = () => {
   }>({ owned: false, admin: false, member: false });
 
   const inviteLink = useMemo(() => {
-    if (!user?.personalInviteCode) {
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    if (!inviteCode) {
       return window.location.origin;
     }
-    return `${window.location.origin}/register?invite=${user.personalInviteCode}`;
-  }, [user?.personalInviteCode]);
+    return `${window.location.origin}/register?invite=${inviteCode}`;
+  }, [user?.primaryInviteCode, user?.personalInviteCode]);
 
   const inviteMessage = useMemo(() => {
-    const codeLine = user?.personalInviteCode ? `Use my invite code ${user.personalInviteCode} when you sign up.` : '';
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    const codeLine = inviteCode ? `Use my invite code ${inviteCode} when you sign up.` : '';
     return `Hey! I'm inviting you to try Tuneable, the social music app for supporting your favourite artists by tipping on tunes.
 
 ${codeLine}
 
 Join here: ${inviteLink}`.trim();
-  }, [inviteLink, user?.personalInviteCode]);
+  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
 
 
   const handleCopyInvite = useCallback(async () => {
@@ -190,23 +192,25 @@ Join here: ${inviteLink}`.trim();
   }, []);
 
   const handleFacebookShare = useCallback(() => {
-    const quote = user?.personalInviteCode 
-      ? `Support your favourite Artists on Tuneable! Join with this invite code: ${user.personalInviteCode}`
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    const quote = inviteCode 
+      ? `Support your favourite Artists on Tuneable! Join with this invite code: ${inviteCode}`
       : 'Support your favourite Artists on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;
     window.open(shareUrl, '_blank', 'noopener');
-  }, [inviteLink, user?.personalInviteCode]);
+  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
 
   const handleInstagramShare = useCallback(async () => {
-    if (!user?.personalInviteCode) {
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    if (!inviteCode) {
       toast.error('You need an invite code to share on Instagram');
       return;
     }
 
     // Create Instagram-friendly invite message
-    const instagramMessage = `Support your favourite Artists on Tuneable! 🎵\n\nJoin with this invite code: ${user.personalInviteCode}\n\n${inviteLink}`;
+    const instagramMessage = `Support your favourite Artists on Tuneable! 🎵\n\nJoin with this invite code: ${inviteCode}\n\n${inviteLink}`;
 
     try {
       // Copy message to clipboard first
@@ -268,7 +272,7 @@ Join here: ${inviteLink}`.trim();
       console.error('Failed to share to Instagram:', error);
       toast.error('Could not share to Instagram. Please try again.');
     }
-  }, [user?.personalInviteCode, inviteLink]);
+  }, [user?.primaryInviteCode, user?.personalInviteCode, inviteLink]);
 
   const handleSystemShare = useCallback(() => {
     const sharePayload = {
@@ -2666,7 +2670,7 @@ Join here: ${inviteLink}`.trim();
           <div className="text-center py-8 text-gray-400">
             <Users className="h-12 w-12 mx-auto mb-4 text-gray-500" />
             <p>No users have signed up with your invite code yet.</p>
-            <p className="text-sm mt-2">Share your invite code: <span className="font-mono text-purple-400">{user?.personalInviteCode}</span></p>
+            <p className="text-sm mt-2">Share your invite code: <span className="font-mono text-purple-400">{user?.primaryInviteCode || user?.personalInviteCode}</span></p>
           </div>
         )}
         {!isLoadingInvited && invitedUsers.length > 0 && (
@@ -2949,7 +2953,7 @@ Join here: ${inviteLink}`.trim();
       <EmailInviteModal
         isOpen={isEmailInviteModalOpen}
         onClose={() => setIsEmailInviteModalOpen(false)}
-        inviteCode={user?.personalInviteCode || ''}
+        inviteCode={user?.primaryInviteCode || user?.personalInviteCode || ''}
         inviterUsername={user?.username || ''}
       />
     </React.Fragment>

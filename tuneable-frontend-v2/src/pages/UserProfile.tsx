@@ -946,8 +946,9 @@ const UserProfile: React.FC = () => {
 
   // Copy invite code to clipboard
   const copyInviteCode = () => {
-    if (user?.personalInviteCode) {
-      navigator.clipboard.writeText(user.personalInviteCode);
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    if (inviteCode) {
+      navigator.clipboard.writeText(inviteCode);
       toast.success('Invite code copied to clipboard!');
     }
   };
@@ -1464,13 +1465,13 @@ const UserProfile: React.FC = () => {
               )}
 
               {/* Personal Invite Code - Only visible to profile owner */}
-              {isOwnProfile && user.personalInviteCode && (
+              {isOwnProfile && (user.primaryInviteCode || user.personalInviteCode) && (
                 <button onClick={copyInviteCode}
                 title="Copy invite code"
                 className="block w-fit px-4 py-2 bg-yellow-600/30 rounded-full text-yellow-200 hover:bg-yellow-600/60 transition-colors text-sm font-medium items-center">
                   <Gift className="inline h-4 w-4 mr-2" />
                   <span className="text-gray-300">Invite Code:</span>{' '}
-                  <span className="font-mono font-bold">{user.personalInviteCode}</span>
+                  <span className="font-mono font-bold">{user.primaryInviteCode || user.personalInviteCode}</span>
                  
                     <Copy className="ml-2 inline h-3.5 w-3.5" />
                   </button>

@@ -746,8 +746,8 @@ const Party: React.FC = () => {
   // Helper function to get registration URL with invite code for private parties
   const getRegistrationUrl = () => {
     if (party?.privacy === 'private' && party?.host) {
-      const hostInviteCode = typeof party.host === 'object' && party.host.personalInviteCode
-        ? party.host.personalInviteCode
+      const hostInviteCode = typeof party.host === 'object' && (party.host.primaryInviteCode || party.host.personalInviteCode)
+        ? (party.host.primaryInviteCode || party.host.personalInviteCode)
         : null;
       if (hostInviteCode) {
         return `/register?invite=${hostInviteCode}`;

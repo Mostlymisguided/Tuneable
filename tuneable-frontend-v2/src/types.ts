@@ -6,7 +6,9 @@ export interface User {
   username: string;
   email: string;
   profilePic?: string;
-  personalInviteCode: string;
+  personalInviteCode: string; // Legacy - kept for backward compatibility
+  personalInviteCodes?: InviteCode[]; // New multiple invite codes
+  primaryInviteCode?: string; // Computed primary code
   balance: number;
   inviteCredits?: number;
   tuneBytes?: number;
@@ -348,4 +350,36 @@ export interface TuneBytesHistoryResponse {
     offset: number;
     hasMore: boolean;
   };
+}
+
+// Invite code interface
+export interface InviteCode {
+  _id: string;
+  code: string;
+  label?: string;
+  isActive: boolean;
+  createdAt: string;
+  usageCount: number;
+}
+
+// Referrals response interface
+export interface ReferralsResponse {
+  personalInviteCodes: InviteCode[];
+  primaryInviteCode: string;
+  referralCount: number;
+  referrals: Referral[];
+}
+
+export interface Referral {
+  username: string;
+  profilePic: string;
+  joinedAt: string;
+  location: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+  } | null;
+  uuid: string;
+  usedCode?: string;
 }
