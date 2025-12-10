@@ -271,7 +271,8 @@ export interface PartyMedia {
 }
 
 export interface Party {
-  id: string;
+  id?: string;
+  _id?: string; // MongoDB ObjectId
   name: string;
   location: string;
   host: string | { id: string; username: string; uuid?: string; userId?: string; _id?: string };

@@ -26,7 +26,7 @@ interface PartyType {
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live' | 'global' | 'tag';
+  type: 'remote' | 'live' | 'global' | 'tag' | 'location';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   tags?: string[];

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { authAPI } from '../lib/api';
 
 // Define types directly to avoid import issues
-interface User {
+export interface User {
   id: string;
   _id?: string; // MongoDB ObjectId for internal matching
   uuid?: string; // UUIDv7 for external API

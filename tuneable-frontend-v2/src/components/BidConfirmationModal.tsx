@@ -16,7 +16,7 @@ interface BidConfirmationModalProps {
   userBalance?: number;
   isLoading?: boolean;
   party?: Party;
-  user?: User;
+  user?: User | null;
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -33,14 +33,15 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [userLocationParty, setUserLocationParty] = useState<Party | null>(null);
+  const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
   const navigate = useNavigate();
   
   // Check if location mismatch and fetch user's location party
   const isLocationMismatch = party?.type === 'location' && 
     party?.locationFilter && 
+    party.locationFilter.countryCode &&
     user?.homeLocation && 
-    !isLocationMatch(party.locationFilter, user.homeLocation);
+    !isLocationMatch(party.locationFilter as { city?: string; countryCode: string }, user.homeLocation);
   
   useEffect(() => {
     if (isLocationMismatch && user?.homeLocation?.countryCode) {
@@ -50,7 +51,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         user.homeLocation.city
       ).then(({ party }) => {
         if (party) {
-          setUserLocationParty(party);
+          setUserLocationParty({ id: party.id, _id: party._id });
         }
       }).catch(() => {
         // Location party doesn't exist yet - that's okay
@@ -189,7 +190,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               {userLocationParty && (
                 <button
                   onClick={() => {
-                    navigate(`/party/${userLocationParty.id || userLocationParty._id}`);
+                    navigate(`/party/${(userLocationParty as any)?.id || (userLocationParty as any)?._id || ''}`);
                     onClose();
                   }}
                   className="text-xs text-blue-300 underline mt-1 hover:text-blue-200 transition-colors"

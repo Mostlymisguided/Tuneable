@@ -93,6 +93,7 @@ interface Party {
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   minimumBid?: number;
+  mediaSource?: 'youtube' | 'direct_upload';
   locationFilter?: {
     city?: string;
     region?: string;

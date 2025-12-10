@@ -2627,7 +2627,7 @@ const Party: React.FC = () => {
                                     <input
                                       type="number"
                                       step="0.01"
-                                              min={getEffectiveMinimumBid(mediaData)}
+                                              min={getEffectiveMinimumBid(media)}
                                       value={newMediaBidAmounts[media._id || media.id] ?? (() => {
                                         const avgBid = calculateAverageBid(media);
                                         const minBid = getEffectiveMinimumBid(media);
@@ -2663,7 +2663,7 @@ const Party: React.FC = () => {
                                       className="z-999 px-3 md:px-4 py-2 bg-purple-800 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                     >
                                       {(() => {
-                                                const defaultBid = Math.max(0.33, getEffectiveMinimumBid(mediaData));
+                                                const defaultBid = Math.max(0.33, getEffectiveMinimumBid(media));
                                         const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
                                         const parsed = parseFloat(raw);
                                         if (!Number.isFinite(parsed)) {
@@ -2742,7 +2742,7 @@ const Party: React.FC = () => {
                                     <input
                                       type="number"
                                       step="0.01"
-                                              min={getEffectiveMinimumBid(mediaData)}
+                                              min={getEffectiveMinimumBid(media)}
                                       value={newMediaBidAmounts[media._id || media.id] ?? (() => {
                                         const avgBid = calculateAverageBid(media);
                                         const minBid = getEffectiveMinimumBid(media);
@@ -2778,7 +2778,7 @@ const Party: React.FC = () => {
                                       className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                                     >
                                       {(() => {
-                                                const defaultBid = Math.max(0.33, getEffectiveMinimumBid(mediaData));
+                                                const defaultBid = Math.max(0.33, getEffectiveMinimumBid(media));
                                         const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
                                         const parsed = parseFloat(raw);
                                         if (!Number.isFinite(parsed)) {
