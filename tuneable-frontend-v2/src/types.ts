@@ -1,4 +1,15 @@
 // Simple types file to avoid module resolution issues
+
+// Invite code interface (defined early for use in User interface)
+export interface InviteCode {
+  _id: string;
+  code: string;
+  label?: string;
+  isActive: boolean;
+  createdAt: string;
+  usageCount: number;
+}
+
 export interface User {
   id: string;
   _id?: string; // MongoDB ObjectId for internal matching
@@ -350,16 +361,6 @@ export interface TuneBytesHistoryResponse {
     offset: number;
     hasMore: boolean;
   };
-}
-
-// Invite code interface
-export interface InviteCode {
-  _id: string;
-  code: string;
-  label?: string;
-  isActive: boolean;
-  createdAt: string;
-  usageCount: number;
 }
 
 // Referrals response interface
