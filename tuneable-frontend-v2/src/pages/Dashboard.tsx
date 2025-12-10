@@ -68,6 +68,11 @@ const Dashboard: React.FC = () => {
   const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, string>>({});
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
+  
+  // Helper function to get effective minimum bid (media-level override takes precedence)
+  const getEffectiveMinimumBid = (media?: any): number => {
+    return media?.minimumBid ?? minimumBid ?? 0.01;
+  };
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
   
@@ -633,7 +638,7 @@ Join here: ${inviteLink}`.trim();
         const defaultBid = 0.33;
         const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid).toFixed(2);
+          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, getEffectiveMinimumBid(media)).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       } else {
@@ -654,7 +659,7 @@ Join here: ${inviteLink}`.trim();
         const defaultBid = 0.33;
         const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, minimumBid).toFixed(2);
+          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, getEffectiveMinimumBid(media)).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       }

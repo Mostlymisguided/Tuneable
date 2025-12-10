@@ -228,6 +228,13 @@ const mediaSchema = new mongoose.Schema({
   genres: { type: [String], default: [] }, // Multiple genres (was singular 'genre')
   category: { type: String, default: null }, // YouTube category name (mapped from categoryId)
   
+  // Minimum bid/tip amount (media-level override, falls back to party minimumBid if not set)
+  minimumBid: {
+    type: Number,
+    default: null,
+    min: [0.01, 'Minimum bid must be at least £0.01']
+  },
+  
   // Release information
   album: { type: String },
   EP: { type: String },

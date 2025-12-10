@@ -160,6 +160,9 @@ export interface Media {
   genres: string[];
   category?: string;
   
+  // Minimum bid/tip amount (media-level override, falls back to party minimumBid if not set)
+  minimumBid?: number | null;
+  
   // Release information
   album?: string;
   EP?: string;

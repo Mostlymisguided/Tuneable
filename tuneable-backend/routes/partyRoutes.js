@@ -1201,10 +1201,29 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        if (bidAmount < party.minimumBid) {
+        // Check if media already exists to get its minimumBid
+        let existingMedia = null;
+        if (url) {
+            existingMedia = await Media.findOne({
+                $or: [
+                    { 'sources.youtube': url },
+                    { 'sources.upload': url }
+                ]
+            });
+        }
+        if (!existingMedia && title && artist) {
+            existingMedia = await Media.findOne({
+                title: title,
+                'artist.name': artist
+            });
+        }
+
+        // Use media-level minimumBid if available, otherwise fall back to party minimumBid
+        const effectiveMinimumBid = existingMedia?.minimumBid ?? party.minimumBid ?? 0.01;
+        if (bidAmount < effectiveMinimumBid) {
             return res.status(400).json({ 
-                error: `Bid amount must be at least £${party.minimumBid}`,
-                minimumBid: party.minimumBid,
+                error: `Bid amount must be at least £${effectiveMinimumBid}`,
+                minimumBid: effectiveMinimumBid,
                 providedBid: bidAmount
             });
         }
@@ -1791,11 +1810,12 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             }
         }
 
-        // Check minimum bid
-        if (bidAmount < party.minimumBid) {
+        // Check minimum bid (media-level override takes precedence over party minimum)
+        const effectiveMinimumBid = populatedMedia?.minimumBid ?? party.minimumBid ?? 0.01;
+        if (bidAmount < effectiveMinimumBid) {
             return res.status(400).json({ 
-                error: `Bid amount must be at least £${party.minimumBid}`,
-                minimumBid: party.minimumBid,
+                error: `Bid amount must be at least £${effectiveMinimumBid}`,
+                minimumBid: effectiveMinimumBid,
                 providedBid: bidAmount
             });
         }

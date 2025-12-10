@@ -1402,7 +1402,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       'title', 'producer', 'album', 'genre',
       'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'description', 'language'
+      'lyrics', 'description', 'language', 'minimumBid'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
     
@@ -1411,11 +1411,25 @@ router.put('/:id', authMiddleware, async (req, res) => {
         let value = req.body[field];
         
         // Convert numeric fields from string to number if needed
-        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear'];
+        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear', 'minimumBid'];
         if (numericFields.includes(field) && typeof value === 'string' && value.trim() !== '') {
           const numValue = field === 'releaseYear' ? parseInt(value) : parseFloat(value);
           if (!isNaN(numValue)) {
             value = numValue;
+          }
+        }
+        
+        // Validate minimumBid (must be at least 0.01 or null to clear override)
+        if (field === 'minimumBid') {
+          if (value !== null && value !== undefined && value !== '') {
+            const numValue = typeof value === 'string' ? parseFloat(value) : value;
+            if (isNaN(numValue) || numValue < 0.01) {
+              return res.status(400).json({ error: 'Minimum bid must be at least £0.01 or null to clear override' });
+            }
+            value = numValue;
+          } else {
+            // Allow null/undefined/empty string to clear the media-level override
+            value = null;
           }
         }
         
