@@ -67,7 +67,7 @@ const BetaWarningBanner: React.FC<BetaWarningBannerProps> = ({
             <p className="text-sm text-center font-semibold text-yellow-200 mb-1">
               🚧 Tuneable is in Beta 🚧
             </p>
-            <p className="text-xs text-yellow-100/90 leading-relaxed"> 
+            <p className="text-xs text-center text-yellow-100/90 leading-relaxed"> 
               Please report any features not working
             </p>
           </div>  
