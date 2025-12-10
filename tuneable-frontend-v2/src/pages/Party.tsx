@@ -21,6 +21,7 @@ import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
+import { isLocationMatch, formatLocation } from '../utils/locationHelpers';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -932,7 +933,38 @@ const Party: React.FC = () => {
         try {
           await partyAPI.placeBid(partyId, queueItemId, bidAmount, tags);
           const mediaTitle = safePendingMedia?.title || 'media';
-          toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
+          // Check if location mismatch and show redirect option
+          if (party?.type === 'location' && 
+              party?.locationFilter && 
+              user?.homeLocation && 
+              !isLocationMatch(party.locationFilter, user.homeLocation)) {
+            const userLocationParty = await partyAPI.findLocationParty(
+              user.homeLocation.countryCode!,
+              user.homeLocation.city
+            );
+            
+            if (userLocationParty.party) {
+              toast.success(
+                <div>
+                  <p>Tip placed successfully! 🎉</p>
+                  <p className="text-sm mt-1">
+                    Your tip appears in the {formatLocation(user.homeLocation)} party.
+                  </p>
+                  <button
+                    onClick={() => navigate(`/party/${userLocationParty.party!.id || userLocationParty.party!._id}`)}
+                    className="mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm text-white"
+                  >
+                    View {formatLocation(user.homeLocation)} Party
+                  </button>
+                </div>,
+                { autoClose: 5000 }
+              );
+            } else {
+              toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
+            }
+          } else {
+            toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
+          }
           
           // Wait a bit for BidMetricsEngine to update partyMediaAggregate via post-save hook
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -1002,7 +1034,38 @@ const Party: React.FC = () => {
             category: safePendingMedia.category || 'Music'
           });
           
-          toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
+          // Check if location mismatch and show redirect option
+          if (party?.type === 'location' && 
+              party?.locationFilter && 
+              user?.homeLocation && 
+              !isLocationMatch(party.locationFilter, user.homeLocation)) {
+            const userLocationParty = await partyAPI.findLocationParty(
+              user.homeLocation.countryCode!,
+              user.homeLocation.city
+            );
+            
+            if (userLocationParty.party) {
+              toast.success(
+                <div>
+                  <p>Tip placed successfully! 🎉</p>
+                  <p className="text-sm mt-1">
+                    Your tip appears in the {formatLocation(user.homeLocation)} party.
+                  </p>
+                  <button
+                    onClick={() => navigate(`/party/${userLocationParty.party!.id || userLocationParty.party!._id}`)}
+                    className="mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm text-white"
+                  >
+                    View {formatLocation(user.homeLocation)} Party
+                  </button>
+                </div>,
+                { autoClose: 5000 }
+              );
+            } else {
+              toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
+            }
+          } else {
+            toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
+          }
           
           // Wait a bit for BidMetricsEngine to update partyMediaAggregate via post-save hook
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -3489,7 +3552,9 @@ const Party: React.FC = () => {
             ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'
             : typeof pendingMedia?.artist === 'object' && pendingMedia?.artist?.name
             ? pendingMedia.artist.name
-            : pendingMedia?.artist || undefined}
+            : pendingMedia?.artist || 'Unknown Artist'}
+          party={party}
+          user={user}
           userBalance={confirmationUserBalance}
         />
       )}

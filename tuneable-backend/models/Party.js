@@ -114,8 +114,14 @@ const PartySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['remote', 'live', 'global', 'tag'],
+    enum: ['remote', 'live', 'global', 'tag', 'location'],
     default: 'remote',
+  },
+  locationFilter: {
+    city: { type: String },
+    region: { type: String }, // State, province, or region
+    country: { type: String },
+    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
   },
   slug: {
     type: String,
@@ -209,5 +215,6 @@ PartySchema.index({ 'media.partyMediaAggregateTop': -1 });
 PartySchema.index({ type: 1 }); // Index for Global Party lookup
 PartySchema.index({ tags: 1 }); // Index for tag-based filtering
 PartySchema.index({ slug: 1 }); // Index for slug-based lookup
+PartySchema.index({ 'locationFilter.countryCode': 1, 'locationFilter.city': 1 }); // Index for location-based filtering
 
 module.exports = mongoose.model('Party', PartySchema);

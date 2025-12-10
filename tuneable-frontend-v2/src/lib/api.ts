@@ -89,10 +89,16 @@ interface Party {
   startTime: string;
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live' | 'global';
+  type: 'remote' | 'live' | 'global' | 'tag' | 'location';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   minimumBid?: number;
+  locationFilter?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+  };
   createdAt: string;
   updatedAt: string;
   host_uuid?: string; // UUID reference for host
@@ -286,6 +292,21 @@ export const partyAPI = {
   searchByCode: async (code: string): Promise<{ party: any }> => {
     const response = await api.get(`/parties/search-by-code/${code}`);
     return response.data;
+  },
+  
+  findLocationParty: async (countryCode: string, city?: string): Promise<{ party: Party | null }> => {
+    const url = city 
+      ? `/parties/location/${countryCode}/${encodeURIComponent(city)}`
+      : `/parties/location/${countryCode}`;
+    try {
+      const response = await api.get(url);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return { party: null };
+      }
+      throw error;
+    }
   },
   
   // Admin: Get party statistics

@@ -78,6 +78,93 @@ const mergeTags = (existingTags, newTags) => {
 };
 
 /**
+ * Auto-create location party for user's home location if it doesn't exist
+ * @param {Object} user - User object with homeLocation
+ * @returns {Promise<Party|null>} - Created or existing location party, or null if user has no location
+ */
+async function ensureLocationPartyExists(user) {
+    if (!user || !user.homeLocation || !user.homeLocation.countryCode) {
+        return null;
+    }
+
+    const locationFilter = {
+        countryCode: user.homeLocation.countryCode.toUpperCase(),
+        city: user.homeLocation.city || null,
+        region: user.homeLocation.region || null,
+        country: user.homeLocation.country || null
+    };
+
+    // Check if location party already exists
+    const existingParty = await Party.findOne({
+        type: 'location',
+        'locationFilter.countryCode': locationFilter.countryCode,
+        ...(locationFilter.city && {
+            'locationFilter.city': { $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        })
+    });
+
+    if (existingParty) {
+        return existingParty;
+    }
+
+    // Generate party name
+    let partyName;
+    if (locationFilter.city && locationFilter.country) {
+        partyName = `${locationFilter.city} Party`;
+    } else if (locationFilter.city) {
+        partyName = `${locationFilter.city} Party`;
+    } else if (locationFilter.country) {
+        partyName = `${locationFilter.country} Party`;
+    } else {
+        partyName = `${locationFilter.countryCode} Party`;
+    }
+
+    // Find or create Tuneable user as host
+    let tuneableUser = await User.findOne({ username: 'Tuneable' });
+    if (!tuneableUser) {
+        // Create Tuneable user if it doesn't exist (should exist, but handle edge case)
+        tuneableUser = new User({
+            username: 'Tuneable',
+            email: 'tuneable@tuneable.stream',
+            role: ['admin'],
+            balance: 0,
+            isActive: true
+        });
+        await tuneableUser.save();
+    }
+
+    // Generate party code
+    const objectId = new mongoose.Types.ObjectId();
+    const partyCode = deriveCodeFromPartyId(objectId);
+
+    // Create location party
+    const locationParty = new Party({
+        _id: objectId,
+        name: partyName,
+        location: locationFilter.city 
+            ? `${locationFilter.city}, ${locationFilter.country || locationFilter.countryCode}`
+            : locationFilter.country || locationFilter.countryCode,
+        host: tuneableUser._id,
+        partyCode,
+        partiers: [],
+        type: 'location',
+        locationFilter,
+        privacy: 'public',
+        status: 'active',
+        startTime: new Date(),
+        mediaSource: 'youtube',
+        minimumBid: 0.33,
+        tags: [],
+        description: `Community party for ${locationFilter.city ? locationFilter.city + ', ' : ''}${locationFilter.country || locationFilter.countryCode}`
+    });
+
+    await locationParty.save();
+    console.log(`📍 Auto-created location party: ${partyName} (${locationFilter.countryCode}${locationFilter.city ? ', ' + locationFilter.city : ''})`);
+
+    return locationParty;
+}
+
+/**
  * Route: POST /
  * Create a new party
  * Access: Admin only (requires admin role)
@@ -361,12 +448,13 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
             }
         ]);
 
-        // For tag parties, calculate partiers, mediaCount, and partyAggregate dynamically
+        // For tag parties and location parties, calculate partiers, mediaCount, and partyAggregate dynamically
         const Bid = require('../models/Bid');
         const Media = require('../models/Media');
         const User = require('../models/User');
         
         for (let party of partiesWithCounts) {
+            // Handle tag parties
             if (party.type === 'tag' && party.tags && party.tags.length > 0) {
                 const tagPartyTag = party.tags[0];
                 const { capitalizeTag } = require('../services/tagPartyService');
@@ -425,6 +513,77 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                     
                     // Sum all aggregates (partyAggregate)
                     party.partyAggregate = Object.values(mediaAggregates).reduce((sum, agg) => sum + agg, 0);
+                } else {
+                    party.partiers = [];
+                    party.mediaCount = 0;
+                    party.partyAggregate = 0;
+                }
+            }
+            
+            // Handle location parties
+            if (party.type === 'location' && party.locationFilter && party.locationFilter.countryCode) {
+                const locationFilter = party.locationFilter;
+                
+                // Step 1: Find all users with matching homeLocation
+                const matchingUsers = await User.find({
+                    'homeLocation.countryCode': locationFilter.countryCode,
+                    ...(locationFilter.city && { 
+                        'homeLocation.city': { $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+                    }),
+                    'homeLocation': { $exists: true, $ne: null }
+                }).select('_id').lean();
+                
+                const matchingUserIds = matchingUsers.map(u => u._id);
+                
+                if (matchingUserIds.length > 0) {
+                    // Step 2: Find all media that has bids from these users (global bids only)
+                    const mediaWithBids = await Bid.aggregate([
+                        {
+                            $match: {
+                                userId: { $in: matchingUserIds },
+                                status: 'active',
+                                bidScope: 'global'
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: '$mediaId',
+                                bidCount: { $sum: 1 },
+                                totalBidAmount: { $sum: '$amount' }
+                            }
+                        }
+                    ]);
+                    
+                    const mediaIds = mediaWithBids.map(m => m._id);
+                    
+                    if (mediaIds.length > 0) {
+                        // Step 3: Find all unique users who have bid on this media
+                        // BUT filter to only those matching the location
+                        const allBiddersOnLocationMedia = await Bid.distinct('userId', {
+                            mediaId: { $in: mediaIds },
+                            status: 'active',
+                            bidScope: 'global'
+                        });
+                        
+                        // Step 4: Filter bidders to only those in the location
+                        const locationPartiers = await User.find({
+                            _id: { $in: allBiddersOnLocationMedia },
+                            'homeLocation.countryCode': locationFilter.countryCode,
+                            ...(locationFilter.city && { 
+                                'homeLocation.city': { $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+                            })
+                        }).select('username uuid').lean();
+                        
+                        party.partiers = locationPartiers;
+                        
+                        // Calculate mediaCount and partyAggregate
+                        party.mediaCount = mediaIds.length;
+                        party.partyAggregate = mediaWithBids.reduce((sum, m) => sum + (m.totalBidAmount || 0), 0);
+                    } else {
+                        party.partiers = [];
+                        party.mediaCount = 0;
+                        party.partyAggregate = 0;
+                    }
                 } else {
                     party.partiers = [];
                     party.mediaCount = 0;
@@ -784,6 +943,174 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 }
             }
             
+        } else if (party && party.type === 'location' && party.locationFilter && party.locationFilter.countryCode) {
+            // For Location Party, we need to aggregate ALL media that has bids from users in that location
+            const locationFilter = party.locationFilter;
+            console.log(`📍 Fetching Location Party for ${locationFilter.city || ''} ${locationFilter.countryCode} - aggregating media with bids from users in this location...`);
+            
+            // Performance monitoring for Location Party
+            const startTime = Date.now();
+            
+            // Step 1: Find all users with matching homeLocation
+            const matchingUsers = await User.find({
+                'homeLocation.countryCode': locationFilter.countryCode,
+                ...(locationFilter.city && { 
+                    'homeLocation.city': { $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+                }),
+                'homeLocation': { $exists: true, $ne: null }
+            }).select('_id username uuid').lean();
+            
+            const matchingUserIds = matchingUsers.map(u => u._id);
+            
+            if (matchingUserIds.length === 0) {
+                console.log(`📍 No users found with matching location`);
+                party.media = [];
+                party.partiers = [];
+            } else {
+                // Step 2: Find all media that has bids from these users (global bids only)
+                const mediaWithBids = await Bid.aggregate([
+                    {
+                        $match: {
+                            userId: { $in: matchingUserIds },
+                            status: 'active',
+                            bidScope: 'global'
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$mediaId',
+                            bidCount: { $sum: 1 },
+                            totalBidAmount: { $sum: '$amount' },
+                            bids: { $push: '$$ROOT' }
+                        }
+                    }
+                ]);
+                
+                const mediaIds = mediaWithBids.map(m => m._id);
+                
+                if (mediaIds.length === 0) {
+                    console.log(`📍 No media found with bids from users in this location`);
+                    party.media = [];
+                    party.partiers = [];
+                } else {
+                    // Step 3: Get the actual media documents
+                    const allMediaWithBids = await Media.find({
+                        _id: { $in: mediaIds },
+                        status: { $ne: 'vetoed' } // Exclude globally vetoed media
+                    })
+                    .populate({
+                        path: 'bids',
+                        model: 'Bid',
+                        match: { 
+                            status: 'active',
+                            bidScope: 'global',
+                            userId: { $in: matchingUserIds } // Only bids from location users
+                        },
+                        populate: {
+                            path: 'userId',
+                            select: 'username profilePic uuid homeLocation secondaryLocation'
+                        }
+                    })
+                    .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+                    .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
+                    .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
+                    
+                    // Convert to party media format
+                    party.media = allMediaWithBids
+                        .map(media => {
+                            // Get bids for this media from location users
+                            const mediaBidData = mediaWithBids.find(m => m._id.toString() === media._id.toString());
+                            const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
+                            
+                            // Skip media with no active bids from location users
+                            if (activeBids.length === 0) {
+                                return null;
+                            }
+                            
+                            // Calculate aggregate from active bids (in pence)
+                            const calculatedLocationMediaAggregate = activeBids.reduce((sum, bid) => {
+                                return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
+                            }, 0);
+                            
+                            // Calculate top bid from active bids
+                            const topBid = activeBids.reduce((max, bid) => {
+                                return (bid.amount || 0) > (max.amount || 0) ? bid : max;
+                            }, activeBids[0] || { amount: 0 });
+                            
+                            // Calculate user aggregates to find top aggregate user
+                            const userAggregates = {};
+                            activeBids.forEach(bid => {
+                                const userId = bid.userId?._id?.toString() || bid.userId?.toString();
+                                if (userId) {
+                                    if (!userAggregates[userId]) {
+                                        userAggregates[userId] = {
+                                            userId: bid.userId?._id || bid.userId,
+                                            total: 0
+                                        };
+                                    }
+                                    userAggregates[userId].total += (bid.amount || 0);
+                                }
+                            });
+                            
+                            // Find user with highest aggregate
+                            const topAggregateUser = Object.values(userAggregates).reduce(
+                                (max, user) => user.total > max.total ? user : max,
+                                { total: 0, userId: null }
+                            );
+                            
+                            return {
+                                mediaId: media,
+                                media_uuid: media.uuid,
+                                addedBy: media.addedBy?._id || media.addedBy,
+                                partyMediaAggregate: calculatedLocationMediaAggregate,
+                                partyBids: activeBids,
+                                status: 'active',
+                                queuedAt: media.createdAt || new Date(),
+                                partyMediaBidTop: topBid.amount || 0,
+                                partyMediaBidTopUser: topBid.userId?._id || topBid.userId || null,
+                                partyMediaAggregateTop: topAggregateUser.total || 0,
+                                partyMediaAggregateTopUser: topAggregateUser.userId || null
+                            };
+                        })
+                        .filter(media => media !== null); // Remove media with no active bids
+                    
+                    // Step 4: Calculate partiers - filter to only users matching the location
+                    const allBiddersOnLocationMedia = await Bid.distinct('userId', {
+                        mediaId: { $in: mediaIds },
+                        status: 'active',
+                        bidScope: 'global'
+                    });
+                    
+                    // Filter bidders to only those in the location
+                    const locationPartiers = await User.find({
+                        _id: { $in: allBiddersOnLocationMedia },
+                        'homeLocation.countryCode': locationFilter.countryCode,
+                        ...(locationFilter.city && { 
+                            'homeLocation.city': { $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+                        })
+                    }).select('username uuid').lean();
+                    
+                    party.partiers = locationPartiers;
+                    
+                    // Set host to Tuneable user
+                    party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid').lean();
+                    
+                    // Performance monitoring - log Location Party metrics
+                    const endTime = Date.now();
+                    const processingTime = endTime - startTime;
+                    console.log(`📍 Location Party Performance Metrics:`);
+                    console.log(`   - Location: ${locationFilter.city ? locationFilter.city + ', ' : ''}${locationFilter.countryCode}`);
+                    console.log(`   - Processing time: ${processingTime}ms`);
+                    console.log(`   - Media count: ${party.media.length}`);
+                    console.log(`   - Partiers count: ${party.partiers.length}`);
+                    
+                    // Log warning if processing takes too long (performance canary)
+                    if (processingTime > 5000) {
+                        console.warn(`⚠️  Location Party processing took ${processingTime}ms - consider optimization!`);
+                    }
+                }
+            }
+            
         } else {
             // Regular party fetching logic
             party = await Party.findById(id)
@@ -1021,6 +1348,41 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
 //         handleError(res, error, 'Error converting from What3words');
 //     }
 // });
+
+// @route   GET /api/parties/location/:countryCode/:city?
+// @desc    Find location party by location filter
+// @access  Public
+router.get('/location/:countryCode/:city?', optionalAuthMiddleware, async (req, res) => {
+    try {
+        const { countryCode, city } = req.params;
+        
+        if (!countryCode) {
+            return res.status(400).json({ error: 'Country code is required' });
+        }
+        
+        const query = {
+            type: 'location',
+            'locationFilter.countryCode': countryCode.toUpperCase()
+        };
+        
+        if (city) {
+            query['locationFilter.city'] = { $regex: new RegExp(`^${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
+        }
+        
+        const party = await Party.findOne(query)
+            .populate('host', 'username uuid')
+            .lean();
+        
+        if (!party) {
+            return res.status(404).json({ error: 'Location party not found' });
+        }
+        
+        res.json({ party });
+    } catch (err) {
+        console.error('Error finding location party:', err);
+        handleError(res, err, 'Failed to find location party');
+    }
+});
 
 // Google Maps: Convert address to lat/lon
 router.post('/geocode-address', async (req, res) => {
@@ -1278,11 +1640,9 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         let videoTags = Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [];
         let videoCategory = category || 'Unknown';
         
-        // Check if media already exists to prevent duplicates
-        let existingMedia = null;
-
+        // Re-check if media already exists to prevent duplicates (existingMedia was already checked above for minimumBid)
         // First, try to find by URL (most reliable)
-        if (url) {
+        if (url && !existingMedia) {
             existingMedia = await Media.findOne({
                 $or: [
                     { 'sources.youtube': url },
@@ -1382,7 +1742,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaId: media._id, // Use mediaId instead of songId
             amount: bidAmountPence, // Store in pence
             status: 'active',
-            bidScope: (party.type === 'global' || party.type === 'tag') ? 'global' : 'party', // Set bidScope based on party type
+            bidScope: (party.type === 'global' || party.type === 'tag' || party.type === 'location') ? 'global' : 'party', // Set bidScope based on party type
             
             // Required denormalized fields
             username: user.username,
@@ -1406,6 +1766,14 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         });
 
         await bid.save();
+
+        // Auto-create location party for user's home location if it doesn't exist (async, don't block response)
+        if (user.homeLocation && user.homeLocation.countryCode) {
+            ensureLocationPartyExists(user).catch(error => {
+                console.error('Failed to ensure location party exists:', error);
+                // Don't fail the bid if location party creation fails
+            });
+        }
 
         // Allocate artist escrow for this bid (async, don't block response)
         try {
@@ -1653,8 +2021,9 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         const isGlobalParty = await Party.getGlobalParty();
         const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
 
-        // Check if this is a tag party
+        // Check if this is a tag party or location party
         const isTagParty = party && party.type === 'tag';
+        const isLocationParty = party && party.type === 'location';
 
         let partyMediaEntry;
         let actualMediaId;
@@ -1871,6 +2240,43 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             }
             queueSize = queuedMedia.length;
             queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
+        } else if (isLocationParty) {
+            // For Location Party, get all media that has bids from users in that location
+            const Media = require('../models/Media');
+            const locationFilter = party.locationFilter;
+            
+            if (locationFilter && locationFilter.countryCode) {
+                // Find users matching the location
+                const matchingUsers = await User.find({
+                    'homeLocation.countryCode': locationFilter.countryCode,
+                    ...(locationFilter.city && { 
+                        'homeLocation.city': { $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+                    }),
+                    'homeLocation': { $exists: true, $ne: null }
+                }).select('_id').lean();
+                
+                const matchingUserIds = matchingUsers.map(u => u._id);
+                
+                if (matchingUserIds.length > 0) {
+                    // Find media with bids from these users
+                    const mediaWithBids = await Bid.distinct('mediaId', {
+                        userId: { $in: matchingUserIds },
+                        status: 'active',
+                        bidScope: 'global'
+                    });
+                    
+                    queuedMedia = await Media.find({
+                        _id: { $in: mediaWithBids },
+                        status: { $ne: 'vetoed' }
+                    });
+                } else {
+                    queuedMedia = [];
+                }
+            } else {
+                queuedMedia = [];
+            }
+            queueSize = queuedMedia.length;
+            queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
         } else {
             // Regular party logic
             queuedMedia = party.media.filter(m => m.status === 'active' && m.mediaId); // Filter out null mediaId entries
@@ -1897,7 +2303,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             mediaId: actualMediaId, // Use mediaId instead of songId
             amount: bidAmountPence, // Store in pence
             status: 'active',
-            bidScope: party.type === 'global' ? 'global' : 'party', // Set bidScope based on party type
+            bidScope: (party.type === 'global' || party.type === 'tag' || party.type === 'location') ? 'global' : 'party', // Set bidScope based on party type
             
             // Required denormalized fields
             username: user.username,
@@ -1988,7 +2394,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }
 
         // Update party media entry bid aggregate (schema grammar)
-        if (isRequestingGlobalParty || isTagParty) {
+        if (isRequestingGlobalParty || isTagParty || isLocationParty) {
             // For Global Party and Tag Party, we don't update the party.media array since it's virtual
             // The media aggregate is updated in the Media model below
             if (isRequestingGlobalParty) {

@@ -293,11 +293,17 @@ export interface Party {
   mediaSource: 'youtube' | 'direct_upload';
   endTime?: string;
   privacy: 'public' | 'private';
-  type: 'remote' | 'live' | 'global' | 'tag';
+  type: 'remote' | 'live' | 'global' | 'tag' | 'location';
   status: 'scheduled' | 'active' | 'ended';
   watershed: boolean;
   minimumBid: number;
   slug?: string; // URL-friendly slug for tag parties (e.g., "electronic")
+  locationFilter?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import { X, Music, Tag, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Music, Tag, AlertCircle, Loader2, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/locationHelpers';
+import { partyAPI } from '../lib/api';
+import type { Party } from '../types';
+import type { User } from '../contexts/AuthContext';
 
 interface BidConfirmationModalProps {
   isOpen: boolean;
@@ -10,6 +15,8 @@ interface BidConfirmationModalProps {
   mediaArtist?: string;
   userBalance?: number;
   isLoading?: boolean;
+  party?: Party;
+  user?: User;
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -21,9 +28,38 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   mediaArtist,
   userBalance = 0,
   isLoading = false,
+  party,
+  user,
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [userLocationParty, setUserLocationParty] = useState<Party | null>(null);
+  const navigate = useNavigate();
+  
+  // Check if location mismatch and fetch user's location party
+  const isLocationMismatch = party?.type === 'location' && 
+    party?.locationFilter && 
+    user?.homeLocation && 
+    !isLocationMatch(party.locationFilter, user.homeLocation);
+  
+  useEffect(() => {
+    if (isLocationMismatch && user?.homeLocation?.countryCode) {
+      // Fetch user's location party
+      partyAPI.findLocationParty(
+        user.homeLocation.countryCode,
+        user.homeLocation.city
+      ).then(({ party }) => {
+        if (party) {
+          setUserLocationParty(party);
+        }
+      }).catch(() => {
+        // Location party doesn't exist yet - that's okay
+        setUserLocationParty(null);
+      });
+    } else {
+      setUserLocationParty(null);
+    }
+  }, [isLocationMismatch, user?.homeLocation]);
 
   // Capitalize tag: first letter of each word (title case)
   const capitalizeTag = (tag: string): string => {
@@ -135,6 +171,33 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               <p className="text-xs text-red-400 mt-1">
                 You need £{bidAmount.toFixed(2)} but only have £{userBalance.toFixed(2)}
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Location Mismatch Info */}
+        {isLocationMismatch && party?.locationFilter && user?.homeLocation && (
+          <div className="mb-4 p-3 bg-blue-900/30 border border-blue-600 rounded-lg flex items-start space-x-2">
+            <MapPin className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-300">Your Tip Location</p>
+              <p className="text-xs text-blue-400 mt-1">
+                Your tip will appear in the <strong>{formatLocation(user.homeLocation)}</strong> party, 
+                not this {formatLocationFilter(party.locationFilter)} party. 
+                This helps support artists in your local community!
+              </p>
+              {userLocationParty && (
+                <button
+                  onClick={() => {
+                    navigate(`/party/${userLocationParty.id || userLocationParty._id}`);
+                    onClose();
+                  }}
+                  className="text-xs text-blue-300 underline mt-1 hover:text-blue-200 transition-colors"
+                  type="button"
+                >
+                  View {formatLocation(user.homeLocation)} Party →
+                </button>
+              )}
             </div>
           </div>
         )}
