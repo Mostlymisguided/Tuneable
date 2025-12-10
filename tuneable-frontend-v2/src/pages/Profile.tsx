@@ -17,7 +17,6 @@ import {
   DollarSign,
   Gift
 } from 'lucide-react';
-import InviteReferrals from '../components/InviteReferrals';
 
 interface UserProfile {
   id: string;
@@ -532,10 +531,6 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          {/* Invite & Referrals Section */}
-          <div className="mt-8">
-            <InviteReferrals />
-          </div>
         </div>
       </div>
     </div>

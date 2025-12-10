@@ -19,7 +19,8 @@ import {
   ArrowDown,
   Building,
   Bell,
-  DollarSign
+  DollarSign,
+  Gift
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
@@ -27,6 +28,7 @@ import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
+import InviteReferrals from '../components/InviteReferrals';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
@@ -1177,6 +1179,15 @@ const Admin: React.FC = () => {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Invite Codes Management - Admin Only */}
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <Gift className="h-5 w-5 mr-2" />
+                Invite Codes Management
+              </h3>
+              <InviteReferrals />
             </div>
 
             <div className="bg-gray-800 rounded-lg p-6">
