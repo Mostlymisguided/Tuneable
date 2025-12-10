@@ -2394,12 +2394,19 @@ Join here: ${inviteLink}`.trim();
         {/* Search Results */}
         {addTuneResults.length > 0 && (
         <div className="mt-4 space-y-2">
-            {addTuneResults.map((result) => (
+            {addTuneResults.map((result) => {
+              const mediaId = result._id || result.id;
+              const isClickable = result.isLocal && mediaId;
+              
+              return (
                 <div
-                  key={result._id || result.id}
+                  key={mediaId}
                   className="bg-black/20 rounded px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                 >
-                  <div className="flex items-start md:items-center gap-3 flex-1 min-w-0">
+                  <div 
+                    className={`flex items-start md:items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                    onClick={isClickable ? () => navigate(`/tune/${mediaId}`) : undefined}
+                  >
                   {result.coverArt && (
                     <img 
                       src={result.coverArt} 
@@ -2427,19 +2434,22 @@ Join here: ${inviteLink}`.trim();
                       )}
                     </div>
                 </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div 
+                    className="flex flex-col sm:flex-row sm:items-center gap-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div>
                       <div className="text-gray-400 text-xs mb-1">Bid Amount</div>
                     <input
                       type="number"
                       min={minimumBid}
                       step="0.01"
-                        value={addTuneBidAmounts[result._id || result.id || ''] ?? ''}
+                        value={addTuneBidAmounts[mediaId || ''] ?? ''}
                       onChange={(e) => {
                           const value = e.target.value;
                           setAddTuneBidAmounts((prev) => ({
                           ...prev,
-                            [result._id || result.id || '']: value
+                            [mediaId || '']: value
                         }));
                       }}
                         className="w-full sm:w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
@@ -2447,13 +2457,16 @@ Join here: ${inviteLink}`.trim();
                   </div>
                   <button
                     disabled={isAddingTune}
-                      onClick={() => startAddTune(result)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startAddTune(result);
+                      }}
                       className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                     >
                       <Play className="h-4 w-4" />
                       <span>
                         {(() => {
-                          const raw = addTuneBidAmounts[result._id || result.id || ''] ?? '';
+                          const raw = addTuneBidAmounts[mediaId || ''] ?? '';
                           const parsed = parseFloat(raw);
                           if (!Number.isFinite(parsed)) {
                             return 'Add';
@@ -2464,7 +2477,8 @@ Join here: ${inviteLink}`.trim();
                   </button>
                 </div>
             </div>
-          ))}
+              );
+            })}
         </div>
         )}
       </div>
