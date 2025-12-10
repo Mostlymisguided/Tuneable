@@ -2328,6 +2328,14 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 
         await bid.save();
 
+        // Auto-create location party for user's home location if it doesn't exist (async, don't block response)
+        if (user.homeLocation && user.homeLocation.countryCode) {
+            ensureLocationPartyExists(user).catch(error => {
+                console.error('Failed to ensure location party exists:', error);
+                // Don't fail the bid if location party creation fails
+            });
+        }
+
         // Allocate artist escrow for this bid (async, don't block response)
         try {
           const artistEscrowService = require('../services/artistEscrowService');
