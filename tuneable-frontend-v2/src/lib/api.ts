@@ -326,6 +326,16 @@ export const partyAPI = {
     return response.data;
   },
   
+  followParty: async (partyId: string) => {
+    const response = await api.post(`/parties/${partyId}/follow`);
+    return response.data;
+  },
+  
+  unfollowParty: async (partyId: string) => {
+    const response = await api.delete(`/parties/${partyId}/follow`);
+    return response.data;
+  },
+  
   addMediaToParty: async (partyId: string, mediaData: any) => {
     const response = await api.post(`/parties/${partyId}/media/add`, mediaData);
     return response.data;

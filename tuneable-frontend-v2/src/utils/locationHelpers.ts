@@ -16,10 +16,16 @@ export interface Location {
  * Check if user location matches party location filter
  */
 export function isLocationMatch(
-  partyFilter: { city?: string; countryCode: string },
+  partyFilter: { city?: string; countryCode?: string; region?: string; country?: string } | null | undefined,
   userLocation: Location | null | undefined
 ): boolean {
-  if (!userLocation || !userLocation.countryCode) {
+  // If no party filter or no user location, no match
+  if (!partyFilter || !userLocation || !userLocation.countryCode) {
+    return false;
+  }
+  
+  // If party filter has no country code, can't match
+  if (!partyFilter.countryCode) {
     return false;
   }
   
@@ -31,6 +37,11 @@ export function isLocationMatch(
   // If party specifies a city, user must match that city
   if (partyFilter.city) {
     return userLocation.city?.toLowerCase() === partyFilter.city.toLowerCase();
+  }
+  
+  // If party specifies a region, user must match that region
+  if (partyFilter.region) {
+    return userLocation.region?.toLowerCase() === partyFilter.region.toLowerCase();
   }
   
   // If party is country-level, any city in that country matches

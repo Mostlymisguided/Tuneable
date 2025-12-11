@@ -107,6 +107,12 @@ async function ensureLocationPartyExists(user) {
         return existingParty;
     }
 
+    // Find Tuneable user as host (throw error if not found - don't create)
+    const tuneableUser = await User.findOne({ username: 'Tuneable' });
+    if (!tuneableUser) {
+        throw new Error('Tuneable user not found. Please create it first.');
+    }
+
     // Generate party name
     let partyName;
     if (locationFilter.city && locationFilter.country) {
@@ -117,20 +123,6 @@ async function ensureLocationPartyExists(user) {
         partyName = `${locationFilter.country} Party`;
     } else {
         partyName = `${locationFilter.countryCode} Party`;
-    }
-
-    // Find or create Tuneable user as host
-    let tuneableUser = await User.findOne({ username: 'Tuneable' });
-    if (!tuneableUser) {
-        // Create Tuneable user if it doesn't exist (should exist, but handle edge case)
-        tuneableUser = new User({
-            username: 'Tuneable',
-            email: 'tuneable@tuneable.stream',
-            role: ['admin'],
-            balance: 0,
-            isActive: true
-        });
-        await tuneableUser.save();
     }
 
     // Generate party code
@@ -153,7 +145,7 @@ async function ensureLocationPartyExists(user) {
         status: 'active',
         startTime: new Date(),
         mediaSource: 'youtube',
-        minimumBid: 0.33,
+        minimumBid: 0.01, // 1p default
         tags: [],
         description: `Community party for ${locationFilter.city ? locationFilter.city + ', ' : ''}${locationFilter.country || locationFilter.countryCode}`
     });
@@ -333,12 +325,14 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
     try {
         const userId = req.user?._id; // Optional - may be null for unauthenticated users
         
-        // Get user's joined parties to filter private parties (only if logged in)
+        // Get user's joined parties and followed parties to filter private parties and add isFollowed status (only if logged in)
         let joinedPartyIds = [];
+        let followedPartyIds = [];
         if (userId) {
             const User = require('../models/User');
-            const user = await User.findById(userId).select('joinedParties');
+            const user = await User.findById(userId).select('joinedParties followedParties');
             joinedPartyIds = user?.joinedParties?.map(jp => jp.partyId) || [];
+            followedPartyIds = user?.followedParties?.map(fp => fp.partyId) || [];
         }
         
         // Use aggregation to get parties with media counts in a single query
@@ -591,6 +585,20 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                     party.partyAggregate = 0;
                 }
             }
+        }
+
+        // Add isFollowed status to each party (if user is logged in)
+        if (userId) {
+            partiesWithCounts.forEach(party => {
+                party.isFollowed = followedPartyIds.some(
+                    fpId => fpId && fpId.toString() === party._id.toString()
+                ) || false;
+            });
+        } else {
+            // Set isFollowed to false for unauthenticated users
+            partiesWithCounts.forEach(party => {
+                party.isFollowed = false;
+            });
         }
 
         res.status(200).json({ message: 'Parties fetched successfully', parties: partiesWithCounts });
@@ -1419,6 +1427,97 @@ router.post('/geocode-address', async (req, res) => {
         res.json({ lat: location.lat, lon: location.lng });
     } catch (error) {
         handleError(res, error, 'Error geocoding address');
+    }
+});
+
+// Follow a party
+// @route   POST /api/parties/:partyId/follow
+// @desc    Follow a party (for parties user hasn't joined)
+// @access  Private
+router.post('/:partyId/follow', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const userId = req.user._id;
+
+        const party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Check if user is already following
+        const isAlreadyFollowing = user.followedParties && user.followedParties.some(
+            fp => fp.partyId && fp.partyId.toString() === partyId
+        );
+
+        if (isAlreadyFollowing) {
+            return res.status(400).json({ error: 'Already following this party' });
+        }
+
+        // Check if user is already joined (can't follow if already joined)
+        const isAlreadyJoined = user.joinedParties && user.joinedParties.some(
+            jp => jp.partyId && jp.partyId.toString() === partyId
+        );
+
+        if (isAlreadyJoined) {
+            return res.status(400).json({ error: 'Cannot follow a party you have already joined' });
+        }
+
+        // Add to followedParties
+        if (!user.followedParties) {
+            user.followedParties = [];
+        }
+        user.followedParties.push({
+            partyId: party._id,
+            followedAt: new Date()
+        });
+
+        await user.save();
+
+        res.json({ 
+            message: 'Party followed successfully',
+            party: {
+                _id: party._id,
+                name: party.name,
+                type: party.type
+            }
+        });
+    } catch (err) {
+        console.error('Error following party:', err);
+        handleError(res, err, 'Failed to follow party');
+    }
+});
+
+// Unfollow a party
+// @route   DELETE /api/parties/:partyId/follow
+// @desc    Unfollow a party
+// @access  Private
+router.delete('/:partyId/follow', authMiddleware, resolvePartyId(), async (req, res) => {
+    try {
+        const { partyId } = req.params;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Remove from followedParties
+        if (user.followedParties && user.followedParties.length > 0) {
+            user.followedParties = user.followedParties.filter(
+                fp => !fp.partyId || fp.partyId.toString() !== partyId
+            );
+            await user.save();
+        }
+
+        res.json({ message: 'Party unfollowed successfully' });
+    } catch (err) {
+        console.error('Error unfollowing party:', err);
+        handleError(res, err, 'Failed to unfollow party');
     }
 });
 
@@ -2487,6 +2586,24 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             // No need to maintain separate globalBids array - bidScope field on Bid model is sufficient
             await media.save();
             console.log(`✅ Saved media with tags: "${media.title}" (${media._id}) - final tags: [${(media.tags || []).join(', ')}]`);
+
+            // Auto-join user to tag parties based on media tags (async, don't block response)
+            if (media.tags && Array.isArray(media.tags) && media.tags.length > 0) {
+                try {
+                    const { autoJoinTagParties } = require('../services/partyAutoJoinService');
+                    // Reload user to get latest data
+                    const refreshedUser = await User.findById(userId);
+                    if (refreshedUser) {
+                        autoJoinTagParties(refreshedUser, media).catch(error => {
+                            console.error('Failed to auto-join tag parties:', error);
+                            // Don't fail the bid if auto-join fails
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error setting up tag party auto-join:', error);
+                    // Don't fail the bid if auto-join setup fails
+                }
+            }
 
             // Send notifications (async, don't block response)
             try {

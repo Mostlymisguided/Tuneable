@@ -1832,9 +1832,11 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     // Handle location updates
     // Support both new format (homeLocation/secondaryLocation) and legacy (locations)
-    if (homeLocation !== undefined || (locations && locations.primary !== undefined)) {
+    const homeLocationChanged = homeLocation !== undefined || (locations && locations.primary !== undefined);
+    if (homeLocationChanged) {
       const locationData = homeLocation || locations?.primary;
       if (locationData) {
+        const oldHomeLocation = user.homeLocation ? { ...user.homeLocation } : null;
         user.homeLocation = {
           ...user.homeLocation,
           city: locationData.city !== undefined ? locationData.city : user.homeLocation?.city,
@@ -1846,6 +1848,26 @@ router.put('/profile', authMiddleware, async (req, res) => {
           coordinates: locationData.coordinates !== undefined ? locationData.coordinates : user.homeLocation?.coordinates,
           detectedFromIP: locationData.detectedFromIP !== undefined ? locationData.detectedFromIP : (user.homeLocation?.detectedFromIP || false)
         };
+        
+        // Check if location actually changed (for auto-join logic)
+        const locationChanged = !oldHomeLocation || 
+          oldHomeLocation.city !== user.homeLocation.city ||
+          oldHomeLocation.region !== user.homeLocation.region ||
+          oldHomeLocation.country !== user.homeLocation.country ||
+          oldHomeLocation.countryCode !== user.homeLocation.countryCode;
+        
+        // Auto-join location parties if location changed and has countryCode
+        if (locationChanged && user.homeLocation.countryCode) {
+          try {
+            const { autoJoinLocationParties } = require('../services/partyAutoJoinService');
+            await autoJoinLocationParties(user);
+            // Reload user to get updated joinedParties
+            await user.populate('joinedParties.partyId');
+          } catch (error) {
+            console.error('Error auto-joining location parties:', error);
+            // Don't fail profile update if auto-join fails
+          }
+        }
       }
     }
     

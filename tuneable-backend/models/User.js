@@ -229,6 +229,12 @@ const userSchema = new mongoose.Schema({
     role: { type: String, enum: ['partier', 'host', 'moderator'], default: 'partier' }
   }],
   
+  // Followed parties - track which parties user follows (but hasn't joined)
+  followedParties: [{
+    partyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
+    followedAt: { type: Date, default: Date.now }
+  }],
+  
   // Tag rankings - cached top tags by bid aggregate (performance optimization)
   tagRankings: [{
     tag: { type: String, required: true },

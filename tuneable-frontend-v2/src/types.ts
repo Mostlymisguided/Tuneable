@@ -59,6 +59,10 @@ export interface User {
     joinedAt: string;
     role: 'partier' | 'host' | 'moderator';
   }[];
+  followedParties?: {
+    partyId: string;
+    followedAt: string;
+  }[];
   globalUserAggregateRank?: number;
   globalUserBidAvg?: number;
   globalUserBids?: number;
@@ -305,6 +309,7 @@ export interface Party {
     country?: string;
     countryCode?: string;
   };
+  isFollowed?: boolean; // Whether the current user is following this party
   createdAt: string;
   updatedAt: string;
 }

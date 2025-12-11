@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { partyAPI } from '../lib/api';
+import { partyAPI, authAPI } from '../lib/api';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import { toast } from 'react-toastify';
-import { Music, Users, MapPin, Coins } from 'lucide-react';
+import { Music, Users, MapPin, Coins, Heart } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
+import { isLocationMatch } from '../utils/locationHelpers';
 
 // Define types directly to avoid import issues
 interface PartyType {
@@ -191,29 +192,62 @@ const Parties: React.FC = () => {
     return aggregateB - aggregateA;
   });
 
-  // Separate parties into joined and available (already sorted by partyAggregate)
+  // Separate parties into categories
   const joinedParties = filteredParties.filter(party => isUserInParty(party));
-  const availableParties = filteredParties.filter(party => !isUserInParty(party));
+  
+  // Location parties: not joined, type is 'location', and doesn't match user's location
+  const locationParties = filteredParties.filter(party => {
+    if (isUserInParty(party) || party.type !== 'location') {
+      return false;
+    }
+    
+    // If user has no location, show all location parties
+    if (!user?.homeLocation?.countryCode) {
+      return true;
+    }
+    
+    // Show location parties that don't match user's location
+    return !isLocationMatch(party.locationFilter, user.homeLocation);
+  });
+  
+  // Tag parties: not joined, type is 'tag'
+  const tagParties = filteredParties.filter(party => 
+    !isUserInParty(party) && 
+    party.type === 'tag'
+  );
+  
+  // Other parties (remote, live) - not joined, not location, not tag
+  const otherParties = filteredParties.filter(party => 
+    !isUserInParty(party) && 
+    party.type !== 'location' && 
+    party.type !== 'tag' &&
+    party.type !== 'global'
+  );
   
   // Debug logging
   console.log('📊 Party separation results:', {
     totalParties: filteredParties.length,
     joinedParties: joinedParties.length,
-    availableParties: availableParties.length,
+    locationParties: locationParties.length,
+    tagParties: tagParties.length,
+    otherParties: otherParties.length,
     joinedPartyNames: joinedParties.map(p => p.name),
-    availablePartyNames: availableParties.map(p => p.name),
+    locationPartyNames: locationParties.map(p => p.name),
+    tagPartyNames: tagParties.map(p => p.name),
     user: user ? { 
       id: user.id, 
       _id: user._id, 
       uuid: user.uuid,
-      joinedParties: user.joinedParties || []
+      joinedParties: user.joinedParties || [],
+      followedParties: user.followedParties || []
     } : null,
     allParties: filteredParties.map(p => ({
       name: p.name,
       id: p.id,
       _id: p._id,
       uuid: p.uuid,
-      type: p.type
+      type: p.type,
+      isFollowed: p.isFollowed
     }))
   });
 
@@ -286,6 +320,44 @@ const Parties: React.FC = () => {
         // Regular search term
         handleAddSearchTerm(trimmedInput);
       }
+    }
+  };
+
+  const handleFollowParty = async (partyId: string, partyName: string) => {
+    try {
+      if (!user) {
+        toast.info('Please log in to follow parties');
+        navigate('/login');
+        return;
+      }
+      
+      await partyAPI.followParty(partyId);
+      toast.success(`Following ${partyName}`);
+      
+      // Refresh parties list
+      const response = await partyAPI.getParties();
+      setParties(response.parties);
+    } catch (error: any) {
+      console.error('Error following party:', error);
+      toast.error(error.response?.data?.error || 'Failed to follow party');
+    }
+  };
+
+  const handleUnfollowParty = async (partyId: string, partyName: string) => {
+    try {
+      if (!user) {
+        return;
+      }
+      
+      await partyAPI.unfollowParty(partyId);
+      toast.success(`Unfollowed ${partyName}`);
+      
+      // Refresh parties list
+      const response = await partyAPI.getParties();
+      setParties(response.parties);
+    } catch (error: any) {
+      console.error('Error unfollowing party:', error);
+      toast.error(error.response?.data?.error || 'Failed to unfollow party');
     }
   };
 
@@ -490,25 +562,56 @@ const Parties: React.FC = () => {
             Joined
           </div>
         ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent card click
-              if (!user) {
-                toast.info('Please log in to join parties');
-                navigate('/login');
-                return;
-              }
-              const partyId = party._id || party.id || party.uuid;
-              if (partyId) {
-                handleJoinParty(partyId, party.name, party.privacy, party.host, party.partiers);
-              } else {
-                toast.error('Unable to join party: Party ID not found');
-              }
-            }}
-            className="btn-primary text-base"
-          >
-            {user ? 'Join Party' : 'Login to Join'}
-          </button>
+          <div className="flex gap-2">
+            {(party.type === 'location' || party.type === 'tag') && party.isFollowed !== undefined && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!user) {
+                    toast.info('Please log in to follow parties');
+                    navigate('/login');
+                    return;
+                  }
+                  const partyId = party._id || party.id || party.uuid;
+                  if (partyId) {
+                    if (party.isFollowed) {
+                      handleUnfollowParty(partyId, party.name);
+                    } else {
+                      handleFollowParty(partyId, party.name);
+                    }
+                  }
+                }}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  party.isFollowed
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                    : 'bg-gray-700 hover:bg-gray-600 text-white'
+                }`}
+                title={party.isFollowed ? 'Unfollow party' : 'Follow party'}
+              >
+                <Heart className={`h-4 w-4 ${party.isFollowed ? 'fill-current' : ''}`} />
+                {party.isFollowed ? 'Following' : 'Follow'}
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent card click
+                if (!user) {
+                  toast.info('Please log in to join parties');
+                  navigate('/login');
+                  return;
+                }
+                const partyId = party._id || party.id || party.uuid;
+                if (partyId) {
+                  handleJoinParty(partyId, party.name, party.privacy, party.host, party.partiers);
+                } else {
+                  toast.error('Unable to join party: Party ID not found');
+                }
+              }}
+              className="btn-primary text-base"
+            >
+              {user ? 'Join Party' : 'Login to Join'}
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -590,12 +693,34 @@ const Parties: React.FC = () => {
         </div>
       )}
 
-      {/* Active Parties Section */}
-      {availableParties.length > 0 && (
+      {/* Location Parties Section */}
+      {locationParties.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6">Active Parties</h2>
+          <h2 className="text-2xl font-bold text-white mb-6">Location Parties</h2>
+          <p className="text-gray-400 text-sm mb-4">Discover parties from other locations around the world</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availableParties.map(renderPartyCard)}
+            {locationParties.map(renderPartyCard)}
+          </div>
+        </div>
+      )}
+
+      {/* Tag Parties Section */}
+      {tagParties.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">Tag Parties</h2>
+          <p className="text-gray-400 text-sm mb-4">Explore music by genre and tag</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tagParties.map(renderPartyCard)}
+          </div>
+        </div>
+      )}
+
+      {/* Other Parties Section (remote, live) */}
+      {otherParties.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">Other Parties</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {otherParties.map(renderPartyCard)}
           </div>
         </div>
       )}
