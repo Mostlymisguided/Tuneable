@@ -49,6 +49,10 @@ export interface User {
     joinedAt: string;
     role: 'partier' | 'host' | 'moderator';
   }[];
+  followedParties?: {
+    partyId: string;
+    followedAt: string;
+  }[];
   globalUserAggregateRank?: number;
   globalUserBidAvg?: number;
   globalUserBids?: number;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { partyAPI, authAPI } from '../lib/api';
+import { partyAPI } from '../lib/api';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,13 @@ interface PartyType {
   tags?: string[];
   description?: string;
   slug?: string; // URL-friendly slug for tag parties (e.g., "electronic")
+  locationFilter?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+  };
+  isFollowed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
