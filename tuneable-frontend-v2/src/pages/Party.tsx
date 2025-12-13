@@ -82,7 +82,8 @@ const Party: React.FC = () => {
   const [isEndingParty, setIsEndingParty] = useState(false);
 
   // Sorting state
-  const [selectedTimePeriod, setSelectedTimePeriod] = useState('all-time');
+  // Default to "today" so the queue initially shows tracks ranked by last-24h bids
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState('today');
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
