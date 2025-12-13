@@ -107,6 +107,21 @@ async function ensureLocationPartyExists(user) {
         return existingParty;
     }
 
+    // Check threshold before creating (only creates city-level parties in this function)
+    const { shouldCreateLocationParty } = require('../services/partyAutoJoinService');
+    const meetsThreshold = await shouldCreateLocationParty(locationFilter);
+    if (!meetsThreshold) {
+        const level = locationFilter.city ? 'city' : locationFilter.region ? 'region' : 'country';
+        const threshold = locationFilter.city 
+            ? parseInt(process.env.LOCATION_PARTY_CITY_THRESHOLD || '3', 10)
+            : locationFilter.region
+            ? parseInt(process.env.LOCATION_PARTY_REGION_THRESHOLD || '5', 10)
+            : parseInt(process.env.LOCATION_PARTY_COUNTRY_THRESHOLD || '10', 10);
+        
+        console.log(`   ⚠️  ${level}-level location party does not meet threshold (${threshold} users), skipping creation`);
+        return null; // Return null instead of creating
+    }
+
     // Find Tuneable user as host (throw error if not found - don't create)
     const tuneableUser = await User.findOne({ username: 'Tuneable' });
     if (!tuneableUser) {

@@ -131,6 +131,13 @@ const PartySchema = new mongoose.Schema({
     lowercase: true,
     maxlength: [100, 'Slug cannot exceed 100 characters']
   },
+  canonicalTag: {
+    type: String,
+    index: true, // Index for fast fuzzy matching lookups
+    sparse: true, // Only for tag parties
+    trim: true,
+    lowercase: true
+  },
   status: {
     type: String,
     enum: ['scheduled', 'active', 'ended'],

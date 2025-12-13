@@ -3,8 +3,10 @@ const Media = require('../models/Media');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { getCanonicalTag } = require('../utils/tagNormalizer');
 
-const TAG_PARTY_THRESHOLD = 10; // Minimum number of media items with a tag before creating a party
+// Configurable threshold from environment variable, default to 3
+const TAG_PARTY_THRESHOLD = parseInt(process.env.TAG_PARTY_THRESHOLD || '3', 10);
 
 /**
  * Capitalize the first letter of each word in a tag (title case)
@@ -39,55 +41,76 @@ const generateSlug = (tag) => {
 
 /**
  * Check if a tag party should be created based on threshold
- * @param {string} tag - The tag to check (should be normalized to title case)
+ * Uses fuzzy matching to count all variations of the tag
+ * @param {string} tag - The tag to check (will be normalized)
  * @returns {Promise<boolean>} - True if threshold is met
  */
 const shouldCreateTagParty = async (tag) => {
   if (!tag || typeof tag !== 'string') return false;
   
-  const normalizedTag = capitalizeTag(tag);
-  const lowerTag = normalizedTag.toLowerCase().trim();
+  const canonicalTag = getCanonicalTag(tag);
   
-  // Count media items with this tag (case-insensitive match)
-  // Tags in Media are stored as strings, so we need to check if any tag matches (case-insensitive)
-  const mediaCount = await Media.countDocuments({
-    tags: { 
-      $elemMatch: { 
-        $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
-      } 
+  // Count all media with tags that match canonically
+  // This handles variations like D&b, Dnb, Drum and Bass, etc.
+  const allMedia = await Media.find({
+    tags: { $exists: true, $ne: [] },
+    status: { $ne: 'vetoed' }
+  }).select('tags').lean();
+  
+  let count = 0;
+  for (const media of allMedia) {
+    if (media.tags && Array.isArray(media.tags)) {
+      for (const mediaTag of media.tags) {
+        if (getCanonicalTag(mediaTag) === canonicalTag) {
+          count++;
+          break; // Count media once even if it has multiple matching tags
+        }
+      }
     }
-  });
+  }
   
-  return mediaCount >= TAG_PARTY_THRESHOLD;
+  return count >= TAG_PARTY_THRESHOLD;
 };
 
 /**
- * Check if a tag party already exists for a given tag
- * @param {string} tag - The tag to check (should be normalized to title case)
+ * Check if a tag party already exists for a given tag (using fuzzy matching)
+ * Uses canonicalTag field for fast lookups
+ * @param {string} tag - The tag to check (will be normalized)
  * @returns {Promise<Party|null>} - The existing party or null
  */
 const getExistingTagParty = async (tag) => {
   if (!tag || typeof tag !== 'string') return null;
   
-  const normalizedTag = capitalizeTag(tag);
-  const slug = generateSlug(normalizedTag);
+  const canonicalTag = getCanonicalTag(tag);
   
-  // First try to find by slug (most reliable)
-  const partyBySlug = await Party.findOne({ slug, type: 'tag' });
-  if (partyBySlug) return partyBySlug;
-  
-  // Fallback: find by tag match (case-insensitive)
-  const lowerTag = normalizedTag.toLowerCase().trim();
-  const partyByTag = await Party.findOne({
+  // Fast lookup using canonicalTag index
+  const party = await Party.findOne({
     type: 'tag',
-    tags: { 
-      $elemMatch: { 
-        $regex: new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
-      } 
-    }
+    canonicalTag: canonicalTag
   });
   
-  return partyByTag;
+  if (party) return party;
+  
+  // Fallback: if canonicalTag not set (for old parties), check tags array
+  // This handles legacy parties that don't have canonicalTag yet
+  const allTagParties = await Party.find({ 
+    type: 'tag',
+    canonicalTag: { $exists: false } // Only check parties without canonicalTag
+  }).select('tags slug').lean();
+  
+  // Find party where any tag matches canonically
+  for (const legacyParty of allTagParties) {
+    if (legacyParty.tags && Array.isArray(legacyParty.tags)) {
+      for (const partyTag of legacyParty.tags) {
+        if (getCanonicalTag(partyTag) === canonicalTag) {
+          // Found a match, return full party
+          return await Party.findById(legacyParty._id);
+        }
+      }
+    }
+  }
+  
+  return null;
 };
 
 /**
@@ -113,8 +136,8 @@ const createTagParty = async (tag) => {
   const normalizedTag = capitalizeTag(tag);
   const slug = generateSlug(normalizedTag);
   
-  // Check if party already exists
-  const existingParty = await getExistingTagParty(normalizedTag);
+  // Check if party already exists (pass original tag for fuzzy matching)
+  const existingParty = await getExistingTagParty(tag);
   if (existingParty) {
     console.log(`ℹ️  Tag party already exists for tag: ${normalizedTag}`);
     return existingParty;
@@ -131,21 +154,25 @@ const createTagParty = async (tag) => {
   const objectId = new mongoose.Types.ObjectId();
   const partyCode = deriveCodeFromPartyId(objectId);
   
+  // Get canonical tag for fast lookups
+  const canonicalTag = getCanonicalTag(tag);
+  
   // Create the tag party
   const party = new Party({
     _id: objectId,
-    name: normalizedTag, // Party name is the tag itself
+    name: `${normalizedTag} Party`, // Party name includes "Party" suffix
     host: tuneableUser._id,
     host_uuid: tuneableUser.uuid,
     partyCode,
     location: 'Global', // Tag parties are global
     mediaSource: 'youtube', // Default media source
-    minimumBid: 0.33, // Default minimum bid
+    minimumBid: 0.01, // 1p default minimum bid
     type: 'tag',
     privacy: 'public', // Tag parties are public by default
     status: 'active', // Tag parties are active immediately
     tags: [normalizedTag], // Store the normalized tag
     slug, // Store the slug for URL access
+    canonicalTag, // Store canonical tag for fast fuzzy matching
     description: `Discover and support music tagged with "${normalizedTag}"`,
     startTime: new Date(),
     watershed: true
@@ -177,15 +204,15 @@ const checkAndCreateTagParties = async (tags) => {
     const normalizedTag = capitalizeTag(tag);
     
     try {
-      // Check if threshold is met
-      const shouldCreate = await shouldCreateTagParty(normalizedTag);
+      // Check if threshold is met (pass original tag for fuzzy matching)
+      const shouldCreate = await shouldCreateTagParty(tag);
       if (!shouldCreate) {
         console.log(`ℹ️  Tag "${normalizedTag}" does not meet threshold (${TAG_PARTY_THRESHOLD} media items)`);
         continue;
       }
       
-      // Check if party already exists
-      const existingParty = await getExistingTagParty(normalizedTag);
+      // Check if party already exists (pass original tag for fuzzy matching)
+      const existingParty = await getExistingTagParty(tag);
       if (existingParty) {
         console.log(`ℹ️  Tag party already exists for tag: ${normalizedTag}`);
         createdParties.push(existingParty);

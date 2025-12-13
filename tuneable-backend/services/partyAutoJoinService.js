@@ -1,12 +1,61 @@
 const Party = require('../models/Party');
 const User = require('../models/User');
+const Media = require('../models/Media');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { getCanonicalTag } = require('../utils/tagNormalizer');
+const { getExistingTagParty, shouldCreateTagParty, capitalizeTag, generateSlug, TAG_PARTY_THRESHOLD } = require('../services/tagPartyService');
 
 // Generate unique party code
 const deriveCodeFromPartyId = (objectId) => {
     return crypto.createHash('md5').update(objectId.toString()).digest('hex').substring(0, 6).toUpperCase();
 };
+
+/**
+ * Check if a location party should be created based on threshold
+ * @param {Object} locationFilter - Location filter object
+ * @returns {Promise<boolean>} - True if threshold is met
+ */
+async function shouldCreateLocationParty(locationFilter) {
+    if (!locationFilter || !locationFilter.countryCode) {
+        return false;
+    }
+
+    // Get thresholds from environment (with defaults)
+    const cityThreshold = parseInt(process.env.LOCATION_PARTY_CITY_THRESHOLD || '3', 10);
+    const regionThreshold = parseInt(process.env.LOCATION_PARTY_REGION_THRESHOLD || '5', 10);
+    const countryThreshold = parseInt(process.env.LOCATION_PARTY_COUNTRY_THRESHOLD || '10', 10);
+
+    // Build query to count users matching this location
+    const query = {
+        'homeLocation.countryCode': locationFilter.countryCode.toUpperCase(),
+        isActive: true
+    };
+
+    if (locationFilter.city) {
+        // City-level: count users with matching city
+        query['homeLocation.city'] = { 
+            $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+        };
+        const userCount = await User.countDocuments(query);
+        return userCount >= cityThreshold;
+    } else if (locationFilter.region) {
+        // Region-level: count users with matching region (no specific city)
+        query['homeLocation.region'] = { 
+            $regex: new RegExp(`^${locationFilter.region.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+        };
+        // Exclude users with specific cities (they belong to city parties)
+        query['homeLocation.city'] = { $in: [null, ''] };
+        const userCount = await User.countDocuments(query);
+        return userCount >= regionThreshold;
+    } else {
+        // Country-level: count users with matching country (no city or region)
+        query['homeLocation.city'] = { $in: [null, ''] };
+        query['homeLocation.region'] = { $in: [null, ''] };
+        const userCount = await User.countDocuments(query);
+        return userCount >= countryThreshold;
+    }
+}
 
 /**
  * Auto-join user to location parties matching their homeLocation
@@ -74,6 +123,20 @@ async function autoJoinLocationParties(user) {
 
             // Create party if it doesn't exist
             if (!party) {
+                // Check threshold before creating
+                const meetsThreshold = await shouldCreateLocationParty(locationFilter);
+                if (!meetsThreshold) {
+                    const level = locationFilter.city ? 'city' : locationFilter.region ? 'region' : 'country';
+                    const threshold = locationFilter.city 
+                        ? parseInt(process.env.LOCATION_PARTY_CITY_THRESHOLD || '3', 10)
+                        : locationFilter.region
+                        ? parseInt(process.env.LOCATION_PARTY_REGION_THRESHOLD || '5', 10)
+                        : parseInt(process.env.LOCATION_PARTY_COUNTRY_THRESHOLD || '10', 10);
+                    
+                    console.log(`   ⚠️  ${level}-level location party does not meet threshold (${threshold} users), skipping creation`);
+                    continue; // Skip creating this party
+                }
+
                 const tuneableUser = await User.findOne({ username: 'Tuneable' });
                 if (!tuneableUser) {
                     console.error('⚠️  Cannot auto-join location parties: Tuneable user not found');
@@ -165,6 +228,7 @@ async function autoJoinLocationParties(user) {
 /**
  * Auto-join user to tag parties based on media tags
  * Called after user places a bid on tagged media
+ * Uses fuzzy matching and threshold checks
  */
 async function autoJoinTagParties(user, media) {
     if (!user || !media || !media.tags || !Array.isArray(media.tags) || media.tags.length === 0) {
@@ -172,53 +236,30 @@ async function autoJoinTagParties(user, media) {
     }
 
     const joinedParties = [];
-    const { capitalizeTag } = require('../services/tagPartyService');
 
     for (const tag of media.tags) {
         try {
             const normalizedTag = capitalizeTag(tag);
-            const lowerTag = normalizedTag.toLowerCase().trim();
-
-            // Find or create tag party
-            let party = await Party.findOne({
-                type: 'tag',
-                $or: [
-                    { slug: lowerTag },
-                    { tags: { $in: [new RegExp(`^${lowerTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')] } }
-                ]
-            });
+            
+            // Check if tag party already exists (using fuzzy matching)
+            let party = await getExistingTagParty(tag);
 
             if (!party) {
-                // Create tag party
-                const tuneableUser = await User.findOne({ username: 'Tuneable' });
-                if (!tuneableUser) {
-                    console.error('⚠️  Cannot auto-join tag parties: Tuneable user not found');
+                // Check if threshold is met before creating
+                const meetsThreshold = await shouldCreateTagParty(tag);
+                if (!meetsThreshold) {
+                    console.log(`   ⚠️  Tag "${normalizedTag}" does not meet threshold (${TAG_PARTY_THRESHOLD} media items), skipping party creation`);
                     continue;
                 }
-
-                const objectId = new mongoose.Types.ObjectId();
-                const partyCode = deriveCodeFromPartyId(objectId);
-
-                party = new Party({
-                    _id: objectId,
-                    name: `${normalizedTag} Party`,
-                    location: 'Global',
-                    host: tuneableUser._id,
-                    partyCode,
-                    partiers: [],
-                    type: 'tag',
-                    privacy: 'public',
-                    status: 'active',
-                    startTime: new Date(),
-                    mediaSource: 'youtube',
-                    minimumBid: 0.01, // 1p default
-                    tags: [normalizedTag],
-                    slug: lowerTag,
-                    description: `Community party for ${normalizedTag} music`
-                });
-
-                await party.save();
-                console.log(`🏷️  Auto-created tag party: ${normalizedTag}`);
+                
+                // Create tag party using tagPartyService
+                const { createTagParty } = require('../services/tagPartyService');
+                party = await createTagParty(tag);
+                
+                if (!party) {
+                    console.log(`   ⚠️  Failed to create tag party for "${normalizedTag}"`);
+                    continue;
+                }
             }
 
             // Check if user is already joined
@@ -265,6 +306,7 @@ async function autoJoinTagParties(user, media) {
 
 module.exports = {
     autoJoinLocationParties,
-    autoJoinTagParties
+    autoJoinTagParties,
+    shouldCreateLocationParty
 };
 

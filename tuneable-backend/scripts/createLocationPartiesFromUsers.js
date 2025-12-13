@@ -29,6 +29,47 @@ function partyNameFromFilter(filter) {
   return `${filter.countryCode} Party`;
 }
 
+async function shouldCreateLocationParty(locationFilter) {
+  if (!locationFilter || !locationFilter.countryCode) {
+    return false;
+  }
+
+  // Get thresholds from environment (with defaults)
+  const cityThreshold = parseInt(process.env.LOCATION_PARTY_CITY_THRESHOLD || '3', 10);
+  const regionThreshold = parseInt(process.env.LOCATION_PARTY_REGION_THRESHOLD || '5', 10);
+  const countryThreshold = parseInt(process.env.LOCATION_PARTY_COUNTRY_THRESHOLD || '10', 10);
+
+  // Build query to count users matching this location
+  const query = {
+    'homeLocation.countryCode': locationFilter.countryCode.toUpperCase(),
+    isActive: true
+  };
+
+  if (locationFilter.city) {
+    // City-level: count users with matching city
+    query['homeLocation.city'] = { 
+      $regex: new RegExp(`^${locationFilter.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+    };
+    const userCount = await User.countDocuments(query);
+    return userCount >= cityThreshold;
+  } else if (locationFilter.region) {
+    // Region-level: count users with matching region (no specific city)
+    query['homeLocation.region'] = { 
+      $regex: new RegExp(`^${locationFilter.region.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') 
+    };
+    // Exclude users with specific cities (they belong to city parties)
+    query['homeLocation.city'] = { $in: [null, ''] };
+    const userCount = await User.countDocuments(query);
+    return userCount >= regionThreshold;
+  } else {
+    // Country-level: count users with matching country (no city or region)
+    query['homeLocation.city'] = { $in: [null, ''] };
+    query['homeLocation.region'] = { $in: [null, ''] };
+    const userCount = await User.countDocuments(query);
+    return userCount >= countryThreshold;
+  }
+}
+
 async function ensureLocationParty(filter, hostId) {
   if (!filter.countryCode) return null;
 
@@ -41,6 +82,27 @@ async function ensureLocationParty(filter, hostId) {
 
   const existing = await Party.findOne(query);
   if (existing) return existing;
+
+  // Check threshold before creating
+  const locationFilter = {
+    countryCode: filter.countryCode,
+    city: filter.city || null,
+    region: filter.region || null,
+    country: filter.country || null
+  };
+  
+  const meetsThreshold = await shouldCreateLocationParty(locationFilter);
+  if (!meetsThreshold) {
+    const level = locationFilter.city ? 'city' : locationFilter.region ? 'region' : 'country';
+    const threshold = locationFilter.city 
+      ? parseInt(process.env.LOCATION_PARTY_CITY_THRESHOLD || '3', 10)
+      : locationFilter.region
+      ? parseInt(process.env.LOCATION_PARTY_REGION_THRESHOLD || '5', 10)
+      : parseInt(process.env.LOCATION_PARTY_COUNTRY_THRESHOLD || '10', 10);
+    
+    console.log(`   ⚠️  ${level}-level location party does not meet threshold (${threshold} users), skipping creation`);
+    return null; // Skip creating this party
+  }
 
   const objectId = new mongoose.Types.ObjectId();
   const partyCode = deriveCodeFromPartyId(objectId);
