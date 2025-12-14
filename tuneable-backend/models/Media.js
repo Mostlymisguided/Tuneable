@@ -15,7 +15,7 @@ const mediaSchema = new mongoose.Schema({
     verified: { type: Boolean, default: false },
     relationToNext: { 
       type: String, 
-      enum: [',', '&', 'and', 'with', 'ft.', 'feat.', 'vs.', 'x', '×', null],
+      enum: [',', '&', 'and', 'with', 'ft.', 'feat.', 'vs.', 'x', 'X', null],
       default: null 
     }, // Controls how this artist connects to the next artist in display string
     _id: false
