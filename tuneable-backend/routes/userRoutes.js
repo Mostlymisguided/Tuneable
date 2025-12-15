@@ -2754,6 +2754,195 @@ router.post('/admin/replenish-invite-credits', authMiddleware, async (req, res) 
   }
 });
 
+// @route   POST /api/users/admin/top-up-balance
+// @desc    Top up user balance (admin only)
+// @access  Private (Admin)
+router.post('/admin/top-up-balance', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, amount, description } = req.body;
+    
+    if (!userId || amount === undefined || amount <= 0) {
+      return res.status(400).json({ error: 'userId and valid amount (greater than 0) are required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Convert amount from pounds to pence
+    const amountPence = Math.round(amount * 100);
+    
+    // Get current balance
+    const balanceBefore = targetUser.balance || 0;
+    const balanceAfter = balanceBefore + amountPence;
+
+    // Update user balance
+    targetUser.balance = balanceAfter;
+    await targetUser.save();
+
+    // Create wallet transaction record
+    const WalletTransaction = require('../models/WalletTransaction');
+    const transaction = new WalletTransaction({
+      userId: targetUser._id,
+      user_uuid: targetUser.uuid,
+      amount: amountPence,
+      type: 'adjustment',
+      status: 'completed',
+      paymentMethod: 'manual',
+      balanceBefore: balanceBefore,
+      balanceAfter: balanceAfter,
+      description: description || `Admin top-up by ${req.user.username}`,
+      username: targetUser.username,
+      metadata: {
+        adminUserId: req.user._id.toString(),
+        adminUsername: req.user.username,
+        reason: description || 'Admin top-up'
+      }
+    });
+
+    await transaction.save();
+
+    // Create ledger entry
+    try {
+      const tuneableLedgerService = require('../services/tuneableLedgerService');
+      const Bid = require('../models/Bid');
+      
+      // Calculate user aggregate (sum of all active bids)
+      const userBids = await Bid.find({ userId: targetUser._id, status: 'active' });
+      const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+      
+      await tuneableLedgerService.createTopUpEntry({
+        userId: targetUser._id,
+        amount: amountPence,
+        userBalancePre: balanceBefore,
+        userAggregatePre: userAggregatePre,
+        userTuneBytesPre: targetUser.tuneBytes || 0,
+        referenceTransactionId: transaction._id,
+        metadata: {
+          adminUserId: req.user._id.toString(),
+          adminUsername: req.user.username,
+          description: description || 'Admin top-up',
+          paymentMethod: 'manual'
+        }
+      });
+    } catch (ledgerError) {
+      console.error('⚠️ Failed to create ledger entry for balance top-up:', ledgerError);
+      // Don't fail the transaction if ledger entry fails
+    }
+
+    // Log to console for audit
+    console.log(`✅ Admin ${req.user.username} topped up balance for ${targetUser.username}: £${amount.toFixed(2)} (${amountPence} pence). New balance: £${(balanceAfter / 100).toFixed(2)}`);
+
+    res.json({
+      message: `Successfully topped up balance by £${amount.toFixed(2)} for ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        balance: targetUser.balance,
+        balancePounds: (targetUser.balance / 100).toFixed(2)
+      },
+      transaction: {
+        _id: transaction._id,
+        uuid: transaction.uuid,
+        amount: transaction.amount,
+        amountPounds: amount.toFixed(2)
+      }
+    });
+  } catch (error) {
+    console.error('Error topping up balance:', error);
+    res.status(500).json({ error: 'Failed to top up balance' });
+  }
+});
+
+// @route   POST /api/users/admin/top-up-tunebytes
+// @desc    Top up user tunebytes (admin only)
+// @access  Private (Admin)
+router.post('/admin/top-up-tunebytes', authMiddleware, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, amount, description } = req.body;
+    
+    if (!userId || amount === undefined || amount <= 0) {
+      return res.status(400).json({ error: 'userId and valid amount (greater than 0) are required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Parse amount as integer
+    const tunebytesAmount = Math.round(parseFloat(amount));
+    
+    // Get current tunebytes
+    const tunebytesBefore = targetUser.tuneBytes || 0;
+    const tunebytesAfter = tunebytesBefore + tunebytesAmount;
+
+    // Update user tunebytes
+    targetUser.tuneBytes = tunebytesAfter;
+    await targetUser.save();
+
+    // Create ledger entry for tunebytes top-up
+    try {
+      const tuneableLedgerService = require('../services/tuneableLedgerService');
+      const Bid = require('../models/Bid');
+      
+      // Calculate user aggregate (sum of all active bids) - for completeness
+      const userBids = await Bid.find({ userId: targetUser._id, status: 'active' });
+      const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+      
+      await tuneableLedgerService.createTuneBytesTopUpEntry({
+        userId: targetUser._id,
+        amount: tunebytesAmount,
+        userTuneBytesPre: tunebytesBefore,
+        userBalancePre: targetUser.balance || 0,
+        userAggregatePre: userAggregatePre,
+        metadata: {
+          adminUserId: req.user._id.toString(),
+          adminUsername: req.user.username,
+          description: description || 'Admin tunebytes top-up'
+        }
+      });
+    } catch (ledgerError) {
+      console.error('⚠️ Failed to create ledger entry for tunebytes top-up:', ledgerError);
+      // Don't fail the transaction if ledger entry fails
+    }
+
+    // Log to console for audit
+    console.log(`✅ Admin ${req.user.username} topped up tunebytes for ${targetUser.username}: ${tunebytesAmount} tunebytes. New balance: ${tunebytesAfter}`);
+
+    res.json({
+      message: `Successfully topped up tunebytes by ${tunebytesAmount} for ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        tuneBytes: targetUser.tuneBytes
+      },
+      adjustment: {
+        amount: tunebytesAmount,
+        before: tunebytesBefore,
+        after: tunebytesAfter,
+        description: description || `Admin top-up by ${req.user.username}`,
+        adminUserId: req.user._id.toString(),
+        adminUsername: req.user.username
+      }
+    });
+  } catch (error) {
+    console.error('Error topping up tunebytes:', error);
+    res.status(500).json({ error: 'Failed to top up tunebytes' });
+  }
+});
+
 // @route   GET /api/users/admin/invite-requests
 // @desc    Get all invite requests (admin only)
 // @access  Private (Admin)

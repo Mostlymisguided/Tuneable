@@ -821,6 +821,18 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Top up user balance
+  topUpBalance: async (userId: string, amount: number, description?: string) => {
+    const response = await api.post('/users/admin/top-up-balance', { userId, amount, description });
+    return response.data;
+  },
+
+  // Admin: Top up user tunebytes
+  topUpTunebytes: async (userId: string, amount: number, description?: string) => {
+    const response = await api.post('/users/admin/top-up-tunebytes', { userId, amount, description });
+    return response.data;
+  },
+
   // Get user's tune library (all media they've bid on)
   getTuneLibrary: async () => {
     const response = await api.get('/users/me/tune-library');

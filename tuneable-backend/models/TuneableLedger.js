@@ -90,6 +90,13 @@ const tuneableLedgerSchema = new mongoose.Schema({
     // User's wallet balance before transaction (in pence)
   },
   
+  userTuneBytesPre: {
+    type: Number,
+    default: null
+    // User's tunebytes balance before transaction
+    // Null for transactions that don't affect tunebytes
+  },
+  
   userAggregatePre: {
     type: Number,
     required: true,
@@ -118,6 +125,13 @@ const tuneableLedgerSchema = new mongoose.Schema({
     type: Number,
     required: true
     // User's wallet balance after transaction (in pence)
+  },
+  
+  userTuneBytesPost: {
+    type: Number,
+    default: null
+    // User's tunebytes balance after transaction
+    // Null for transactions that don't affect tunebytes
   },
   
   userAggregatePost: {
@@ -224,6 +238,8 @@ tuneableLedgerSchema.methods.generateHash = function() {
     timestamp: this.timestamp?.toISOString() || this.timestamp,
     userBalancePre: this.userBalancePre,
     userBalancePost: this.userBalancePost,
+    userTuneBytesPre: this.userTuneBytesPre,
+    userTuneBytesPost: this.userTuneBytesPost,
     userAggregatePre: this.userAggregatePre,
     userAggregatePost: this.userAggregatePost,
     mediaAggregatePre: this.mediaAggregatePre,
@@ -302,6 +318,8 @@ tuneableLedgerSchema.pre('save', async function(next) {
         this.isModified('amount') || 
         this.isModified('userBalancePre') || 
         this.isModified('userBalancePost') ||
+        this.isModified('userTuneBytesPre') ||
+        this.isModified('userTuneBytesPost') ||
         this.isModified('userAggregatePre') ||
         this.isModified('userAggregatePost') ||
         this.isModified('mediaAggregatePre') ||

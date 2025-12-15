@@ -221,6 +221,7 @@ class TuneableLedgerService {
     amount,
     userBalancePre,
     userAggregatePre,
+    userTuneBytesPre = null,
     referenceTransactionId,
     metadata = {}
   }) {
@@ -235,6 +236,8 @@ class TuneableLedgerService {
       // Calculate POST balances using passed PRE values
       const userBalancePost = userBalancePre + amount; // Top-up adds
       const userAggregatePost = userAggregatePre; // Top-up doesn't change aggregate
+      // Tunebytes don't change for balance top-ups (unless explicitly provided in metadata)
+      const userTuneBytesPost = userTuneBytesPre !== null ? (metadata.tuneBytesChange ? userTuneBytesPre + metadata.tuneBytesChange : userTuneBytesPre) : null;
       
       // Calculate global aggregate PRE and POST
       const globalAggregatePre = await this._calculateGlobalAggregate();
@@ -254,6 +257,8 @@ class TuneableLedgerService {
         amount,
         userBalancePre,
         userBalancePost,
+        userTuneBytesPre,
+        userTuneBytesPost,
         userAggregatePre,
         userAggregatePost,
         mediaAggregatePre: null,
@@ -293,6 +298,93 @@ class TuneableLedgerService {
         errorName: error.name,
         errorStack: error.stack
       });
+      throw error;
+    }
+  }
+  
+  /**
+   * Create a ledger entry for a TUNEBYTES_TOP_UP transaction (admin tunebytes adjustment)
+   * @param {Object} params
+   * @param {ObjectId} params.userId - User ID
+   * @param {number} params.amount - Tunebytes amount added
+   * @param {number} params.userTuneBytesPre - User tunebytes BEFORE transaction
+   * @param {number} params.userBalancePre - User balance BEFORE transaction (in pence) - optional
+   * @param {number} params.userAggregatePre - User aggregate BEFORE transaction (in pence) - optional
+   * @param {Object} params.metadata - Additional metadata (admin info, description, etc.)
+   * @returns {Promise<Object>} Created ledger entry
+   */
+  async createTuneBytesTopUpEntry({
+    userId,
+    amount,
+    userTuneBytesPre,
+    userBalancePre = null,
+    userAggregatePre = null,
+    metadata = {}
+  }) {
+    try {
+      // Fetch user for other fields (uuid, username, etc.)
+      const user = await User.findById(userId).lean();
+      
+      if (!user) {
+        throw new Error(`User ${userId} not found`);
+      }
+      
+      // Calculate POST balances
+      const userTuneBytesPost = userTuneBytesPre + amount;
+      // For tunebytes-only top-ups, balance and aggregate don't change
+      const userBalancePost = userBalancePre !== null ? userBalancePre : null;
+      const userAggregatePost = userAggregatePre !== null ? userAggregatePre : null;
+      
+      // Calculate global aggregate PRE and POST
+      const globalAggregatePre = await this._calculateGlobalAggregate();
+      // For TUNEBYTES_TOP_UP: global aggregate doesn't change (no bid activity)
+      const globalAggregatePost = globalAggregatePre;
+      
+      // Get denormalized fields
+      const username = user.username;
+      
+      const ledgerEntry = new TuneableLedger({
+        userId,
+        mediaId: null,
+        partyId: null,
+        bidId: null,
+        user_uuid: user.uuid,
+        transactionType: 'TOP_UP', // Use TOP_UP type but track tunebytes separately
+        amount: 0, // No balance change, amount is 0
+        userBalancePre: userBalancePre !== null ? userBalancePre : 0,
+        userBalancePost: userBalancePost !== null ? userBalancePost : 0,
+        userTuneBytesPre,
+        userTuneBytesPost,
+        userAggregatePre: userAggregatePre !== null ? userAggregatePre : 0,
+        userAggregatePost: userAggregatePost !== null ? userAggregatePost : 0,
+        mediaAggregatePre: null,
+        mediaAggregatePost: null,
+        globalAggregatePre,
+        globalAggregatePost,
+        referenceTransactionId: null,
+        referenceTransactionType: null,
+        username,
+        description: `TuneBytes top-up of ${amount.toLocaleString()} tunebytes${metadata.description ? `: ${metadata.description}` : ''}`,
+        metadata: {
+          ...metadata,
+          tunebytesAmount: amount,
+          isTuneBytesOnly: true
+        }
+      });
+      
+      await ledgerEntry.save();
+      
+      // Store verification hash
+      try {
+        const verificationService = require('./transactionVerificationService');
+        await verificationService.storeVerificationHash(ledgerEntry, 'TuneableLedger');
+      } catch (verifyError) {
+        console.error('Failed to store verification hash for ledger entry:', verifyError);
+      }
+      
+      return ledgerEntry;
+    } catch (error) {
+      console.error('Error creating TUNEBYTES_TOP_UP ledger entry:', error);
       throw error;
     }
   }

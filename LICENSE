@@ -1,0 +1,101 @@
+TUNEABLE COMMUNITY LICENSE v1.0
+
+Copyright (c) 2024 Tuneable CIC
+
+Permission is hereby granted, free of charge, to any person or entity obtaining
+a copy of this software and associated documentation files (the "Software"), 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+1. CONTRIBUTION REQUIREMENT FOR DEPLOYMENTS
+
+   If you deploy, operate, or provide access to a version of this Software
+   (including modified versions) that generates revenue, provides services to
+   users, or operates as a commercial or non-commercial service, you MUST
+   contribute a minimum of 11% (eleven percent) of your gross revenue or equivalent
+   value to the Tuneable CIC main project.
+
+   This contribution requirement applies to:
+   - Any deployment of the Software that serves users (whether free or paid)
+   - Any commercial use of the Software
+   - Any derivative works or forks that are publicly accessible
+   - Any service built using this Software that generates revenue
+
+   The 11% contribution may be fulfilled through:
+   - Direct financial contributions to Tuneable CIC
+   - Code contributions (pull requests) of equivalent value
+   - Infrastructure or resource sharing of equivalent value
+   - Other contributions agreed upon with Tuneable CIC
+
+2. CONTRIBUTION REPORTING
+
+   You must report your contributions to Tuneable CIC on an annual basis,
+   or more frequently if your annual revenue exceeds £100,000. Reports should
+   be sent to: t@tuneable.stream
+
+   Reports must include:
+   - Total gross revenue or equivalent value generated
+   - Calculated 11% contribution amount
+   - Method of contribution (financial, code, resources, etc.)
+   - Date of contribution
+
+3. EXEMPTIONS
+
+   The following uses are EXEMPT from the contribution requirement:
+   - Personal, non-commercial use (not serving other users)
+   - Development and testing environments
+   - Educational or research purposes (non-commercial)
+   - Contributions to the main Tuneable project itself
+
+4. DEFINITIONS
+
+   "Gross Revenue" means all revenue generated from the deployment, including
+   but not limited to:
+   - User subscriptions or payments
+   - Advertising revenue
+   - Transaction fees
+   - Donations received
+   - Any other income directly or indirectly related to the deployment
+
+   "Equivalent Value" means the fair market value of non-financial contributions,
+   as determined by Tuneable CIC in good faith.
+
+5. ENFORCEMENT
+
+   Failure to comply with the contribution requirement constitutes a breach of
+   this license. Tuneable CIC reserves the right to:
+   - Revoke your license to use the Software
+   - Require immediate payment of outstanding contributions
+   - Pursue legal remedies as appropriate
+
+6. DISCLAIMER OF WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+   THE SOFTWARE.
+
+7. COMMUNITY INTEREST COMPANY STATUS
+
+   Tuneable CIC is a registered Community Interest Company committed to using
+   all contributions for community benefit. All contributions received under
+   this license will be used in accordance with Tuneable CIC's community
+   interest objectives.
+
+8. CONTACT
+
+   For questions about this license or to arrange contributions:
+   Email: t@tuneable.stream
+   Website: https://tuneable.stream
+
+---
+
+This license is designed to ensure that the Tuneable platform continues to
+benefit the music community while allowing others to build upon and deploy
+the Software. The 11% contribution requirement helps sustain the main project
+and ensures continued development for the benefit of all users.
+

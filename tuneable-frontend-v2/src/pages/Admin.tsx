@@ -29,6 +29,7 @@ import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
 import InviteReferrals from '../components/InviteReferrals';
+import UserTopUpModal from '../components/UserTopUpModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
@@ -42,6 +43,7 @@ interface User {
   role: string[];
   balance: number;
   inviteCredits?: number;
+  tuneBytes?: number;
   createdAt: string;
   lastLoginAt?: string;
   oauthVerified?: {
@@ -136,6 +138,10 @@ const Admin: React.FC = () => {
   // Warning modal state
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [selectedUserForWarning, setSelectedUserForWarning] = useState<{ id: string; username: string } | null>(null);
+
+  // Top-up modal state
+  const [topUpModalOpen, setTopUpModalOpen] = useState(false);
+  const [selectedUserForTopUp, setSelectedUserForTopUp] = useState<{ id: string; username: string; balance?: number; tuneBytes?: number } | null>(null);
 
   // Payout management state
   const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
@@ -1382,6 +1388,9 @@ const Admin: React.FC = () => {
                           {getSortIcon('balance')}
                         </div>
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        TuneBytes
+                      </th>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-600 transition-colors"
                         onClick={() => handleSort('inviteCredits')}
@@ -1492,6 +1501,11 @@ const Admin: React.FC = () => {
                           <div className="text-sm text-gray-300">{penceToPounds(user.balance)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">
+                            {(user.tuneBytes ?? 0).toLocaleString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div className={`text-sm font-semibold ${
                               (user.inviteCredits ?? 10) === 0 
@@ -1546,6 +1560,22 @@ const Admin: React.FC = () => {
                           <div className="flex items-center space-x-2 flex-wrap gap-1">
                             {!user.role.includes('admin') && (
                               <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedUserForTopUp({ 
+                                      id: user._id, 
+                                      username: user.username,
+                                      balance: user.balance,
+                                      tuneBytes: user.tuneBytes
+                                    });
+                                    setTopUpModalOpen(true);
+                                  }}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center gap-1"
+                                  title="Top Up Account"
+                                >
+                                  <DollarSign className="w-3 h-3" />
+                                  Top Up
+                                </button>
                                 <button
                                   onClick={() => {
                                     setSelectedUserForWarning({ id: user._id, username: user.username });
@@ -3745,6 +3775,25 @@ const Admin: React.FC = () => {
             username={selectedUserForWarning.username}
             onWarningIssued={() => {
               // Refresh users list to show updated warning counts
+              loadUsers();
+            }}
+          />
+        )}
+
+        {/* Top Up Modal */}
+        {topUpModalOpen && selectedUserForTopUp && (
+          <UserTopUpModal
+            isOpen={topUpModalOpen}
+            onClose={() => {
+              setTopUpModalOpen(false);
+              setSelectedUserForTopUp(null);
+            }}
+            userId={selectedUserForTopUp.id}
+            username={selectedUserForTopUp.username}
+            currentBalance={selectedUserForTopUp.balance}
+            currentTunebytes={selectedUserForTopUp.tuneBytes}
+            onTopUpComplete={() => {
+              // Refresh users list to show updated balances
               loadUsers();
             }}
           />

@@ -166,6 +166,10 @@ class TuneBytesService {
         // Don't fail the transaction if verification storage fails
       }
 
+      // Get current tunebytes before update
+      const tunebytesBefore = user.tuneBytes || 0;
+      const tunebytesAfter = tunebytesBefore + calculation.tuneBytesEarned;
+
       // Update user's TuneBytes balance
       await User.findByIdAndUpdate(user._id, {
         $inc: { tuneBytes: calculation.tuneBytesEarned },
@@ -180,6 +184,37 @@ class TuneBytesService {
           }
         }
       });
+
+      // Log to ledger (optional - tunebytes earned from bids)
+      try {
+        const tuneableLedgerService = require('../services/tuneableLedgerService');
+        const Bid = require('../models/Bid');
+        
+        // Get user's current balance and aggregate for ledger
+        const updatedUser = await User.findById(user._id).lean();
+        const userBids = await Bid.find({ userId: user._id, status: 'active' });
+        const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+        
+        await tuneableLedgerService.createTuneBytesTopUpEntry({
+          userId: user._id,
+          amount: calculation.tuneBytesEarned,
+          userTuneBytesPre: tunebytesBefore,
+          userBalancePre: updatedUser.balance || 0,
+          userAggregatePre: userAggregatePre,
+          metadata: {
+            source: 'bid_award',
+            bidId: bid._id.toString(),
+            mediaId: media._id.toString(),
+            mediaTitle: media.title,
+            discoveryRank: calculation.calculation.discoveryRank,
+            reason: calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth',
+            calculationSnapshot: calculation.calculation
+          }
+        });
+      } catch (ledgerError) {
+        console.error('⚠️ Failed to create ledger entry for tunebytes award:', ledgerError);
+        // Don't fail the transaction if ledger entry fails
+      }
 
       // Send notification if TuneBytes earned is significant (> 0.1)
       if (calculation.tuneBytesEarned >= 0.1) {

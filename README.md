@@ -179,7 +179,9 @@ We welcome contributions! As a CIC, we're building this platform for the communi
 
 ## 📄 License
 
-MIT License - See LICENSE file for details
+Tuneable Community License v1.0 - See LICENSE file for details
+
+This license requires a minimum 11% contribution to Tuneable CIC for any deployments that generate revenue or serve users.
 
 ## 🌐 Links
 
@@ -191,7 +193,7 @@ MIT License - See LICENSE file for details
 ## 💬 Contact
 
 For questions, partnerships, or to get involved:
-- **Email**: [e@tuneable.stream](mailto:e@tuneable.stream)
+- **Email**: [t@tuneable.stream](mailto:t@tuneable.stream)
 - **Discord**: [Join our community](https://discord.gg/hwGMZV89up)
 - **GitHub Issues**: For technical questions and bug reports
 
