@@ -32,6 +32,9 @@ const AuthPage: React.FC = () => {
   const [accountLockedUntil, setAccountLockedUntil] = useState<Date | null>(null);
   const [countdownTick, setCountdownTick] = useState(0); // Force re-render for countdown
   
+  // Login error message
+  const [loginError, setLoginError] = useState<string>('');
+  
   // Field-specific error messages
   const [fieldErrors, setFieldErrors] = useState({
     email: '',
@@ -272,6 +275,11 @@ const AuthPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
+    // Clear login error when user starts typing in email or password fields
+    if (name === 'email' || name === 'password') {
+      setLoginError('');
+    }
+    
     if (name === 'city' || name === 'region' || name === 'country') {
       setFormData({
         ...formData,
@@ -310,12 +318,14 @@ const AuthPage: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginError(''); // Clear any previous errors
 
     try {
       await login(formData.email, formData.password);
       // Reset failed attempts on successful login
       setFailedAttempts(0);
       setAccountLockedUntil(null);
+      setLoginError(''); // Clear error on success
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
@@ -334,6 +344,7 @@ const AuthPage: React.FC = () => {
           autoClose: 7000,
           pauseOnHover: true,
         });
+        setLoginError(''); // Clear inline error for network issues
       } else if (error.response.status === 423) {
         // Account locked - inline message will be shown
         const lockedUntil = error.response?.data?.lockedUntil;
@@ -343,12 +354,14 @@ const AuthPage: React.FC = () => {
           setAccountLockedUntil(new Date(lockedUntil));
           setFailedAttempts(failedAttemptsCount);
         }
-        // No toast - inline error message is sufficient
+        setLoginError(''); // Clear inline error, account locked message is shown separately
       } else if (error.response.status === 401) {
-        // Authentication failed - track attempts, inline message will be shown
+        // Authentication failed - track attempts, show error message
         const failedAttemptsCount = error.response?.data?.failedAttempts || 0;
         setFailedAttempts(failedAttemptsCount);
-        // No toast - inline error message is sufficient
+        // Display the error message from server
+        const serverErrorMessage = error.response?.data?.error || 'Invalid email or password';
+        setLoginError(serverErrorMessage);
       } else if (error.response.status === 400) {
         // Validation error
         const validationError = error.response?.data?.error || error.response?.data?.details?.[0]?.msg;
@@ -542,6 +555,18 @@ const AuthPage: React.FC = () => {
               <p className="text-xs text-yellow-600 mt-1">
                 {6 - failedAttempts} attempt{6 - failedAttempts > 1 ? 's' : ''} remaining before account lockout.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Error Message */}
+      {loginError && !accountLockedUntil && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">{loginError}</p>
             </div>
           </div>
         </div>
