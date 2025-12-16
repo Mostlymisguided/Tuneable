@@ -1570,10 +1570,9 @@ const Admin: React.FC = () => {
                                     });
                                     setTopUpModalOpen(true);
                                   }}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center gap-1"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
                                   title="Top Up Account"
                                 >
-                                  <DollarSign className="w-3 h-3" />
                                   Top Up
                                 </button>
                                 <button
@@ -1584,7 +1583,7 @@ const Admin: React.FC = () => {
                                   className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm transition-colors"
                                   title="Issue Warning"
                                 >
-                                  ⚠️ Warn
+                                  Warn
                                 </button>
                                 {(user as any).accountLockedUntil && (
                                   <button
