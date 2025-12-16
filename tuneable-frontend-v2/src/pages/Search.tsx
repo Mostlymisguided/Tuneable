@@ -43,7 +43,7 @@ const SearchPage: React.FC = () => {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [activeTab] = useState<'songs' | 'podcasts'>('songs');
   const [party, setParty] = useState<any>(null);
-  const [mediaSource, setMediaSource] = useState<'youtube'>('youtube');
+  const [mediaSource, setMediaSource] = useState<'youtube' | 'mixed' | 'direct_upload'>('youtube');
   const [podcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
   const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
   const [hasMoreExternal, setHasMoreExternal] = useState(false);
@@ -561,9 +561,11 @@ const SearchPage: React.FC = () => {
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 mediaSource === 'youtube' 
                   ? 'bg-red-100 text-red-800' 
+                  : mediaSource === 'mixed'
+                  ? 'bg-purple-100 text-purple-800'
                   : 'bg-green-100 text-green-800'
               }`}>
-                YouTube
+                {mediaSource === 'youtube' ? 'YouTube' : mediaSource === 'mixed' ? 'Mixed' : 'Upload'}
               </span>
             </div>
           </div>

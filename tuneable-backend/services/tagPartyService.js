@@ -165,7 +165,7 @@ const createTagParty = async (tag) => {
     host_uuid: tuneableUser.uuid,
     partyCode,
     location: 'Global', // Tag parties are global
-    mediaSource: 'youtube', // Default media source
+    mediaSource: 'mixed', // Supports both YouTube and uploads
     minimumBid: 0.01, // 1p default minimum bid
     type: 'tag',
     privacy: 'public', // Tag parties are public by default

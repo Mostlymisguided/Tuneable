@@ -37,7 +37,7 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
         };
 
         // If source is specified, filter by platform (always include uploads)
-        if (source === 'youtube') {
+        if (source === 'youtube' || source === 'mixed') {
             searchCriteria.$and.push({ 
                 $or: [
                     { 'sources.youtube': { $exists: true, $ne: null } },
@@ -161,7 +161,7 @@ router.get('/', async (req, res) => {
             }
             
             // Check quota before making external API calls
-            if (source === 'youtube') {
+            if (source === 'youtube' || source === 'mixed') {
                 const quotaStatus = await getQuotaStatus();
                 
                 if (quotaStatus.searchDisabled) {
@@ -183,7 +183,7 @@ router.get('/', async (req, res) => {
             // Step 2: Fall back to external APIs
             let result;
 
-            if (source === 'youtube') {
+            if (source === 'youtube' || source === 'mixed') {
                 console.log('Using YouTube service');
                 result = await youtubeService.searchYouTube(query, pageToken);
             } else {
@@ -191,7 +191,7 @@ router.get('/', async (req, res) => {
                 return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
             }
 
-            if (source === 'youtube') {
+            if (source === 'youtube' || source === 'mixed') {
                 console.log(`YouTube service returned ${result?.videos?.length || 0} items for query: "${query}"`);
                 formattedResults = {
                     nextPageToken: result.nextPageToken || null,

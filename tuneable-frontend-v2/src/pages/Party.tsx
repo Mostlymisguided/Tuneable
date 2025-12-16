@@ -1017,7 +1017,7 @@ const Party: React.FC = () => {
           const mediaSource = currentParty?.mediaSource || 'youtube';
           let url = '';
           
-          if (mediaSource === 'youtube' && safePendingMedia.sources?.youtube) {
+          if ((mediaSource === 'youtube' || mediaSource === 'mixed') && safePendingMedia.sources?.youtube) {
             url = safePendingMedia.sources.youtube;
           } else if (safePendingMedia.sources) {
             // Fallback to first available source
@@ -1118,7 +1118,7 @@ const Party: React.FC = () => {
       const mediaSource = party?.mediaSource || 'youtube';
       let url = '';
       
-      if (mediaSource === 'youtube' && pendingMedia.sources?.youtube) {
+      if ((mediaSource === 'youtube' || mediaSource === 'mixed') && pendingMedia.sources?.youtube) {
         url = pendingMedia.sources.youtube;
       } else if (pendingMedia.sources) {
         // Fallback to first available source

@@ -173,7 +173,7 @@ async function autoJoinLocationParties(user) {
                     privacy: 'public',
                     status: 'active',
                     startTime: new Date(),
-                    mediaSource: 'youtube',
+                    mediaSource: 'mixed', // Supports both YouTube and uploads
                     minimumBid: 0.01, // 1p default
                     tags: [],
                     description: `Community party for ${locationFilter.city || locationFilter.region || ''}${locationFilter.city || locationFilter.region ? ', ' : ''}${locationFilter.country || locationFilter.countryCode}`

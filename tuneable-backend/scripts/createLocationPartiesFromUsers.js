@@ -129,7 +129,7 @@ async function ensureLocationParty(filter, hostId) {
     privacy: 'public',
     status: 'active',
     startTime: new Date(),
-    mediaSource: 'youtube',
+    mediaSource: 'mixed', // Supports both YouTube and uploads
     minimumBid: 0.01, // Default bid: 1p
     tags: [],
     description: `Community party for ${filter.city ? filter.city + ', ' : filter.region ? filter.region + ', ' : ''}${filter.country || filter.countryCode}`,

@@ -1203,7 +1203,7 @@ const TuneProfile: React.FC = () => {
       const mediaSource = selectedPartyForAdd.mediaSource || 'youtube';
       let url = '';
       
-      if (mediaSource === 'youtube' && media.sources?.youtube) {
+      if ((mediaSource === 'youtube' || mediaSource === 'mixed') && media.sources?.youtube) {
         url = media.sources.youtube;
       } else if (media.sources) {
         // Fallback to first available source

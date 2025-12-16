@@ -295,7 +295,7 @@ export interface Party {
   partyUserBidTopUser?: string; // User who made highest bid
   
   startTime: string;
-  mediaSource: 'youtube' | 'direct_upload';
+  mediaSource: 'youtube' | 'direct_upload' | 'mixed';
   endTime?: string;
   privacy: 'public' | 'private';
   type: 'remote' | 'live' | 'global' | 'tag' | 'location';
