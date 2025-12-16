@@ -251,15 +251,34 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     try {
       if (isPlaying) {
         console.log('MP3Player: Playing audio');
-        audioRef.current.play().catch(error => {
-          console.error('MP3Player: Error playing audio:', error);
-        });
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log('MP3Player: Audio playback started successfully');
+            })
+            .catch(error => {
+              console.error('MP3Player: Error playing audio:', error);
+              // Reset playing state if play fails (important for iOS autoplay restrictions)
+              // Check current state to avoid race conditions
+              const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
+              if (stillShouldBePlaying) {
+                console.warn('MP3Player: Play failed (likely iOS autoplay restriction), resetting isPlaying state');
+                useWebPlayerStore.getState().pause();
+              }
+            });
+        }
       } else {
         console.log('MP3Player: Pausing audio');
         audioRef.current.pause();
       }
     } catch (error) {
       console.error('MP3Player: Error controlling audio:', error);
+      // Reset playing state if there's an error
+      const currentIsPlaying = useWebPlayerStore.getState().isPlaying;
+      if (currentIsPlaying) {
+        useWebPlayerStore.getState().pause();
+      }
     }
   }, [isPlaying, isPlayerReady]);
 
