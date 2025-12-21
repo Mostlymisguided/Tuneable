@@ -121,17 +121,21 @@ class PodcastAdapter {
       ),
       
       // System
-      // Taddy returns datePublished as Unix timestamp (seconds) or ISO string
+      // Taddy returns datePublished as Unix timestamp in SECONDS (not milliseconds)
       releaseDate: (() => {
         if (!taddyEpisode.datePublished) return new Date();
         
         if (typeof taddyEpisode.datePublished === 'number') {
-          // If it's a number, check if it's in seconds (less than year 2000 in milliseconds)
-          if (taddyEpisode.datePublished < 946684800) {
+          // Taddy always returns Unix timestamps in seconds
+          // Check if it's a reasonable timestamp (not in milliseconds)
+          // Timestamps in seconds for dates after 2001 would be > 1000000000
+          // Timestamps in milliseconds for dates after 2001 would be > 1000000000000
+          // So if it's less than 1000000000000, it's likely in seconds
+          if (taddyEpisode.datePublished < 1000000000000) {
             // It's in seconds, convert to milliseconds
             return new Date(taddyEpisode.datePublished * 1000);
           } else {
-            // It's already in milliseconds
+            // It's already in milliseconds (unlikely from Taddy, but handle it)
             return new Date(taddyEpisode.datePublished);
           }
         } else if (typeof taddyEpisode.datePublished === 'string') {
