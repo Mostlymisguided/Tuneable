@@ -165,9 +165,11 @@ const PodcastSeriesProfile: React.FC = () => {
     
     setIsLoadingMore(true);
     try {
+      // Use current episode count as offset (how many we've already loaded)
       const params = new URLSearchParams({
-        importMore: 'true'
-        // No limit - will import ALL remaining episodes
+        loadMore: 'true',
+        limit: '20',
+        offset: episodes.length.toString() // Offset based on currently loaded episodes
       });
       
       const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}?${params.toString()}`;
@@ -179,8 +181,13 @@ const PodcastSeriesProfile: React.FC = () => {
 
       const data = await response.json();
       
-      // Replace episodes list with updated list (includes all newly imported)
-      setEpisodes(data.episodes || []);
+      // Append new episodes to existing list
+      const newEpisodes = data.episodes || [];
+      setEpisodes(prev => {
+        const existingIds = new Set(prev.map(ep => ep._id));
+        const uniqueNewEpisodes = newEpisodes.filter(ep => !existingIds.has(ep._id));
+        return [...prev, ...uniqueNewEpisodes];
+      });
       
       // Update stats
       if (data.stats) {
@@ -188,11 +195,9 @@ const PodcastSeriesProfile: React.FC = () => {
       }
       
       if (data.importInfo && data.importInfo.imported > 0) {
-        toast.success(`Imported ${data.importInfo.imported} more episode${data.importInfo.imported === 1 ? '' : 's'}. All episodes are now available!`);
-      } else if (data.taddyLimitation && data.taddyLimitation.missingEpisodes > 0) {
-        toast.info(`All ${data.taddyLimitation.returnedEpisodes} episodes available via Taddy API have been imported. Note: ${data.taddyLimitation.missingEpisodes} additional episode${data.taddyLimitation.missingEpisodes === 1 ? '' : 's'} exist but are not accessible via the Taddy API (API limitation).`);
+        toast.success(`Loaded ${data.importInfo.imported} more episode${data.importInfo.imported === 1 ? '' : 's'}`);
       } else {
-        toast.info('All available episodes have already been imported');
+        toast.info('No more episodes available to load');
       }
     } catch (error: any) {
       console.error('Error loading more episodes:', error);
@@ -783,12 +788,12 @@ const PodcastSeriesProfile: React.FC = () => {
                   {isLoadingMore ? (
                     <>
                       <RefreshCw className="h-5 w-5 animate-spin" />
-                      <span>Importing all remaining episodes...</span>
+                      <span>Loading more episodes...</span>
                     </>
                   ) : (
                     <>
                       <RefreshCw className="h-5 w-5" />
-                      <span>Import All Remaining Episodes</span>
+                      <span>Load More Episodes</span>
                     </>
                   )}
                 </button>

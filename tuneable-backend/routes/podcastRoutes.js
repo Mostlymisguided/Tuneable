@@ -1373,7 +1373,7 @@ router.post('/discovery/create-or-find-series', authMiddleware, async (req, res)
 router.get('/series/:seriesId', async (req, res) => {
   try {
     const { seriesId } = req.params;
-    const { autoImport = 'true', refresh = 'false', importMore = 'false', limit = '20' } = req.query;
+    const { autoImport = 'true', refresh = 'false', loadMore = 'false', limit = '20', offset = '0' } = req.query;
     
     if (!isValidObjectId(seriesId)) {
       return res.status(400).json({ error: 'Invalid series ID' });
@@ -1407,7 +1407,8 @@ router.get('/series/:seriesId', async (req, res) => {
     let importedCount = 0;
     let importErrors = [];
     const maxEpisodesToImport = parseInt(limit, 10) || 20; // Import episodes (default 20 for initial load)
-    const shouldImport = autoImport === 'true' || importMore === 'true';
+    const episodeOffset = parseInt(offset, 10) || 0; // Offset for pagination
+    const shouldImport = autoImport === 'true' || loadMore === 'true';
     let taddyResult = null; // Declare outside if block for use in response
     
     if (shouldImport && series.externalIds) {
@@ -1432,11 +1433,11 @@ router.get('/series/:seriesId', async (req, res) => {
       
       try {
         if (taddyUuid) {
-          const importAction = importMore === 'true' ? 'Loading more' : 'Auto-importing';
+          const importAction = loadMore === 'true' ? 'Loading more' : 'Auto-importing';
           console.log(`🔄 ${importAction} episodes from Taddy for series: ${series.title}`);
           
-          // Fetch episodes from Taddy - use higher limit for importMore to get all episodes
-          const maxEpisodesToFetch = importMore === 'true' ? 500 : 200; // Get more episodes when importing all
+          // Fetch episodes from Taddy - fetch enough to cover offset + limit
+          const maxEpisodesToFetch = loadMore === 'true' ? episodeOffset + maxEpisodesToImport + 10 : 200;
           try {
             taddyResult = await taddyService.getPodcastEpisodes(taddyUuid, maxEpisodesToFetch);
           } catch (taddyError) {
@@ -1491,7 +1492,7 @@ router.get('/series/:seriesId', async (req, res) => {
             // Check if Taddy API is limited (often returns exactly 10 episodes)
             // If so, try RSS feed to get remaining episodes
             const returnedCount = taddyResult.returnedCount || taddyResult.episodes.length;
-            const taddyLikelyLimited = returnedCount === 10 || (importMore === 'true' && returnedCount < 50);
+            const taddyLikelyLimited = returnedCount === 10 || (loadMore === 'true' && returnedCount < 50);
             
             // If Taddy API is likely limited and we have an RSS feed, try to get remaining episodes from RSS
             let rssEpisodes = [];
@@ -1509,8 +1510,9 @@ router.get('/series/:seriesId', async (req, res) => {
               if (rssUrl) {
                 console.log(`📡 Taddy API likely limited (returned ${returnedCount} episodes), fetching from RSS feed...`);
                 try {
-                  // Fetch up to 100 episodes from RSS (should cover most podcasts)
-                  rssEpisodes = await parseRSSFeed(rssUrl, 100);
+                  // Fetch enough episodes from RSS to cover offset + limit
+                  const rssFetchLimit = loadMore === 'true' ? episodeOffset + maxEpisodesToImport + 10 : 100;
+                  rssEpisodes = await parseRSSFeed(rssUrl, rssFetchLimit);
                   console.log(`📡 Retrieved ${rssEpisodes.length} episodes from RSS feed`);
                   
                   // Filter out episodes already imported (check by title and date, or GUID if available)
@@ -1546,10 +1548,15 @@ router.get('/series/:seriesId', async (req, res) => {
               }
             }
             
-            // If importMore is true, import ALL remaining episodes, otherwise limit to maxEpisodesToImport
-            const episodesToProcess = importMore === 'true' 
-              ? episodesToImport  // Import all remaining
-              : episodesToImport.slice(0, maxEpisodesToImport);  // Import only the limit
+            // Apply pagination: if loadMore, start from offset and take limit
+            let episodesToProcess;
+            if (loadMore === 'true') {
+              // For "load more", start from offset and take the next batch
+              episodesToProcess = episodesToImport.slice(episodeOffset, episodeOffset + maxEpisodesToImport);
+            } else {
+              // For initial load, just take the first batch
+              episodesToProcess = episodesToImport.slice(0, maxEpisodesToImport);
+            }
             
             if (episodesToProcess.length > 0) {
               // Prepare series data for linking
@@ -1597,11 +1604,12 @@ router.get('/series/:seriesId', async (req, res) => {
                   importErrors.push({ title: episodeTitle, error: epError.message });
                 }
               }
-              if (importMore === 'true') {
-                console.log(`✅ Imported ${importedCount} new episodes from Taddy (all remaining episodes)`);
+              if (loadMore === 'true') {
+                const remainingCount = episodesToImport.length - (episodeOffset + episodesToProcess.length);
+                console.log(`✅ Imported ${importedCount} new episodes (${remainingCount} remaining to import)`);
               } else {
                 const remainingCount = episodesToImport.length - episodesToProcess.length;
-                console.log(`✅ Imported ${importedCount} new episodes from Taddy (${remainingCount} remaining to import)`);
+                console.log(`✅ Imported ${importedCount} new episodes (${remainingCount} remaining to import)`);
               }
             } else {
               const returnedCount = taddyResult ? (taddyResult.returnedCount || (taddyResult.episodes ? taddyResult.episodes.length : 0)) : 0;
@@ -1653,9 +1661,13 @@ router.get('/series/:seriesId', async (req, res) => {
                     taddyUuid: taddyUuid
                   };
                   
-                  const episodesToProcess = importMore === 'true' 
-                    ? rssEpisodesToImport
-                    : rssEpisodesToImport.slice(0, maxEpisodesToImport);
+                  // Apply pagination for RSS episodes too
+                  let episodesToProcess;
+                  if (loadMore === 'true') {
+                    episodesToProcess = rssEpisodesToImport.slice(episodeOffset, episodeOffset + maxEpisodesToImport);
+                  } else {
+                    episodesToProcess = rssEpisodesToImport.slice(0, maxEpisodesToImport);
+                  }
                   
                   for (const episode of episodesToProcess) {
                     try {
