@@ -6,6 +6,8 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
+const axios = require('axios');
+const xml2js = require('xml2js');
 
 // Import services
 const podcastIndexService = require('../services/podcastIndexService');
@@ -13,6 +15,97 @@ const applePodcastsService = require('../services/applePodcastsService');
 const taddyService = require('../services/taddyService');
 const podcastAdapter = require('../services/podcastAdapter');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
+
+// RSS Feed Parser
+async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
+  try {
+    console.log(`📡 Fetching RSS feed: ${rssUrl}`);
+    const response = await axios.get(rssUrl, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Tuneable Podcast Importer'
+      }
+    });
+    
+    const parser = new xml2js.Parser({
+      explicitArray: false,
+      mergeAttrs: true,
+      explicitRoot: false
+    });
+    
+    const result = await parser.parseStringPromise(response.data);
+    const channel = result.channel || result;
+    const items = Array.isArray(channel.item) ? channel.item : (channel.item ? [channel.item] : []);
+    
+    const episodes = items.slice(0, maxEpisodes).map(item => {
+      const enclosure = item.enclosure || {};
+      const itunes = item['itunes:episode'] ? {
+        episode: item['itunes:episode'],
+        season: item['itunes:season'],
+        duration: item['itunes:duration'],
+        image: item['itunes:image']?.href || item['itunes:image'],
+        explicit: item['itunes:explicit']
+      } : {};
+      
+      // Parse pubDate
+      let pubDate = null;
+      if (item.pubDate) {
+        pubDate = new Date(item.pubDate);
+        if (isNaN(pubDate.getTime())) {
+          pubDate = null;
+        }
+      }
+      
+      return {
+        title: item.title || 'Untitled Episode',
+        description: item.description || item['content:encoded'] || '',
+        content: item['content:encoded'] || item.description || '',
+        contentSnippet: item.description || '',
+        author: item['itunes:author'] || item.author || channel['itunes:author'] || channel.managingEditor || '',
+        pubDate: pubDate,
+        guid: item.guid?._ || item.guid || item.link || '',
+        link: item.link || '',
+        enclosure: {
+          url: enclosure.url || enclosure.$.url || '',
+          type: enclosure.type || enclosure.$.type || 'audio/mpeg',
+          length: enclosure.length || enclosure.$.length || null
+        },
+        image: item.image || (itunes.image ? { url: itunes.image } : null),
+        itunes: itunes,
+        categories: item.category ? (Array.isArray(item.category) ? item.category : [item.category]) : [],
+        episodeNumber: itunes.episode ? parseInt(itunes.episode) : null,
+        seasonNumber: itunes.season ? parseInt(itunes.season) : null,
+        duration: parseDuration(itunes.duration) || 0,
+        explicit: itunes.explicit === 'yes' || itunes.explicit === true,
+        feedUrl: rssUrl
+      };
+    });
+    
+    console.log(`📡 Parsed ${episodes.length} episodes from RSS feed`);
+    return episodes;
+  } catch (error) {
+    console.error(`❌ Error parsing RSS feed ${rssUrl}:`, error.message);
+    throw error;
+  }
+}
+
+// Helper to parse duration string (e.g., "01:23:45" or "1234")
+function parseDuration(durationStr) {
+  if (!durationStr) return 0;
+  if (typeof durationStr === 'number') return durationStr;
+  
+  // Try parsing as "HH:MM:SS" or "MM:SS"
+  const parts = durationStr.split(':').map(Number);
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  
+  // Try parsing as seconds
+  const seconds = parseInt(durationStr);
+  return isNaN(seconds) ? 0 : seconds;
+}
 
 const router = express.Router();
 
@@ -1315,6 +1408,7 @@ router.get('/series/:seriesId', async (req, res) => {
     let importErrors = [];
     const maxEpisodesToImport = parseInt(limit, 10) || 20; // Import episodes (default 20 for initial load)
     const shouldImport = autoImport === 'true' || importMore === 'true';
+    let taddyResult = null; // Declare outside if block for use in response
     
     if (shouldImport && series.externalIds) {
       // Handle both Map and plain object formats
@@ -1341,28 +1435,116 @@ router.get('/series/:seriesId', async (req, res) => {
           const importAction = importMore === 'true' ? 'Loading more' : 'Auto-importing';
           console.log(`🔄 ${importAction} episodes from Taddy for series: ${series.title}`);
           
-          // Fetch all episodes from Taddy (we'll filter out already-imported ones)
-          const taddyResult = await taddyService.getPodcastEpisodes(taddyUuid, 200); // Get up to 200 episodes
+          // Fetch episodes from Taddy - use higher limit for importMore to get all episodes
+          const maxEpisodesToFetch = importMore === 'true' ? 500 : 200; // Get more episodes when importing all
+          try {
+            taddyResult = await taddyService.getPodcastEpisodes(taddyUuid, maxEpisodesToFetch);
+          } catch (taddyError) {
+            console.error('Error fetching episodes from Taddy:', taddyError.message);
+            taddyResult = { success: false, episodes: [], error: taddyError.message };
+          }
+          
+          // If Taddy API fails, try RSS feed as fallback
+          if (!taddyResult.success || !taddyResult.episodes || taddyResult.episodes.length === 0) {
+            console.log(`⚠️ Taddy API failed or returned no episodes, trying RSS feed as fallback...`);
+            // Will try RSS feed below
+            taddyResult = { success: true, episodes: [], returnedCount: 0, totalCount: 0 };
+          }
           
           if (taddyResult.success && taddyResult.episodes && taddyResult.episodes.length > 0) {
             // Get list of already imported episode UUIDs to skip duplicates
+            // Query for episodes in this series with Taddy external IDs
+            // Note: Mongoose Maps are stored as objects in MongoDB, so we query as objects
             const existingEpisodes = await Media.find({
               podcastSeries: seriesId,
-              'externalIds.taddy': { $exists: true }
-            }).select('externalIds').lean();
+              'externalIds.taddy': { $exists: true, $ne: null }
+            }).select('externalIds title').lean();
             
             const existingUuids = new Set();
             existingEpisodes.forEach(ep => {
-              if (ep.externalIds instanceof Map) {
-                const uuid = ep.externalIds.get('taddy');
-                if (uuid) existingUuids.add(uuid);
-              } else if (ep.externalIds && ep.externalIds.taddy) {
-                existingUuids.add(ep.externalIds.taddy);
+              // When using .lean(), externalIds is a plain object (Mongoose Maps serialize to objects)
+              if (ep.externalIds && typeof ep.externalIds === 'object') {
+                // Mongoose Maps are stored as plain objects in MongoDB
+                const uuid = ep.externalIds.taddy;
+                if (uuid) {
+                  existingUuids.add(uuid);
+                }
               }
             });
             
+            console.log(`🔍 Found ${existingUuids.size} already imported episodes out of ${taddyResult.episodes.length} total from Taddy`);
+            if (existingUuids.size > 0) {
+              console.log(`🔍 Sample existing UUIDs:`, Array.from(existingUuids).slice(0, 5));
+            }
+            if (taddyResult.episodes.length > 0) {
+              console.log(`🔍 Sample Taddy episode UUIDs:`, taddyResult.episodes.slice(0, 5).map(ep => ep.uuid));
+            }
+            
             // Filter out already imported episodes
-            const episodesToImport = taddyResult.episodes.filter(ep => !existingUuids.has(ep.uuid));
+            const episodesToImport = taddyResult.episodes.filter(ep => {
+              const isNew = !existingUuids.has(ep.uuid);
+              return isNew;
+            });
+            
+            console.log(`📊 Episodes to import: ${episodesToImport.length} (${taddyResult.episodes.length - episodesToImport.length} already exist)`);
+            
+            // Check if Taddy API is limited (often returns exactly 10 episodes)
+            // If so, try RSS feed to get remaining episodes
+            const returnedCount = taddyResult.returnedCount || taddyResult.episodes.length;
+            const taddyLikelyLimited = returnedCount === 10 || (importMore === 'true' && returnedCount < 50);
+            
+            // If Taddy API is likely limited and we have an RSS feed, try to get remaining episodes from RSS
+            let rssEpisodes = [];
+            if (taddyLikelyLimited) {
+              // Try to get RSS URL from series sources or from Taddy episode data
+              let rssUrl = null;
+              if (series.sources) {
+                rssUrl = series.sources instanceof Map ? series.sources.get('rss') : series.sources.rss;
+              }
+              // Fallback: get RSS URL from first Taddy episode if available
+              if (!rssUrl && taddyResult.episodes.length > 0 && taddyResult.episodes[0].podcastSeries?.rssUrl) {
+                rssUrl = taddyResult.episodes[0].podcastSeries.rssUrl;
+              }
+              
+              if (rssUrl) {
+                console.log(`📡 Taddy API likely limited (returned ${returnedCount} episodes), fetching from RSS feed...`);
+                try {
+                  // Fetch up to 100 episodes from RSS (should cover most podcasts)
+                  rssEpisodes = await parseRSSFeed(rssUrl, 100);
+                  console.log(`📡 Retrieved ${rssEpisodes.length} episodes from RSS feed`);
+                  
+                  // Filter out episodes already imported (check by title and date, or GUID if available)
+                  const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+                  const rssEpisodesToImport = rssEpisodes.filter(rssEp => {
+                    const titleMatch = rssEp.title && existingTitles.has(rssEp.title.toLowerCase().trim());
+                    return !titleMatch; // Only include if title doesn't match
+                  });
+                  
+                  console.log(`📡 ${rssEpisodesToImport.length} new episodes from RSS (${rssEpisodes.length - rssEpisodesToImport.length} already exist)`);
+                  
+                  // Add RSS episodes to the import list
+                  episodesToImport.push(...rssEpisodesToImport);
+                } catch (rssError) {
+                  console.error(`⚠️ Failed to parse RSS feed: ${rssError.message}`);
+                }
+              } else {
+                console.log(`⚠️ Taddy API likely limited (returned ${returnedCount} episodes)`);
+                console.log(`⚠️ No RSS feed URL available to fetch remaining episodes`);
+              }
+            }
+            
+            // If no episodes to import, log why
+            if (episodesToImport.length === 0) {
+              if (taddyResult.episodes.length > 0 || rssEpisodes.length > 0) {
+                const totalReturned = taddyResult.episodes.length + rssEpisodes.length;
+                console.log(`ℹ️ All ${totalReturned} episodes returned are already imported`);
+                if (taddyLikelyLimited && rssEpisodes.length === 0) {
+                  console.log(`ℹ️ Note: Taddy API appears limited (returned ${returnedCount} episodes). RSS feed may provide more episodes.`);
+                }
+              } else {
+                console.log(`⚠️ No episodes returned from Taddy or RSS`);
+              }
+            }
             
             // If importMore is true, import ALL remaining episodes, otherwise limit to maxEpisodesToImport
             const episodesToProcess = importMore === 'true' 
@@ -1383,21 +1565,36 @@ router.get('/series/:seriesId', async (req, res) => {
               };
               
               // Import episodes (deduplication handled by importEpisode, but we've pre-filtered)
-              for (const taddyEpisode of episodesToProcess) {
+              for (const episode of episodesToProcess) {
                 try {
-                  // Pass raw Taddy episode - importEpisodeWithSeries will handle conversion
-                  const result = await podcastAdapter.importEpisodeWithSeries(
-                    'taddy',
-                    taddyEpisode, // Pass raw episode, not converted
-                    seriesData,
-                    importUserId
-                  );
+                  let result;
+                  
+                  // Determine source - if it has a Taddy UUID, it's from Taddy, otherwise it's from RSS
+                  if (episode.uuid) {
+                    // Taddy episode
+                    result = await podcastAdapter.importEpisodeWithSeries(
+                      'taddy',
+                      episode,
+                      seriesData,
+                      importUserId
+                    );
+                  } else {
+                    // RSS episode
+                    result = await podcastAdapter.importEpisodeWithSeries(
+                      'rss',
+                      episode,
+                      seriesData,
+                      importUserId
+                    );
+                  }
+                  
                   if (result && result.episode) {
                     importedCount++;
                   }
                 } catch (epError) {
-                  console.error(`Error importing episode ${taddyEpisode.name || taddyEpisode.uuid}:`, epError.message);
-                  importErrors.push({ title: taddyEpisode.name || 'Unknown', error: epError.message });
+                  const episodeTitle = episode.name || episode.title || episode.uuid || 'Unknown';
+                  console.error(`Error importing episode ${episodeTitle}:`, epError.message);
+                  importErrors.push({ title: episodeTitle, error: epError.message });
                 }
               }
               if (importMore === 'true') {
@@ -1407,7 +1604,81 @@ router.get('/series/:seriesId', async (req, res) => {
                 console.log(`✅ Imported ${importedCount} new episodes from Taddy (${remainingCount} remaining to import)`);
               }
             } else {
-              console.log(`ℹ️ All available episodes already imported`);
+              const returnedCount = taddyResult ? (taddyResult.returnedCount || (taddyResult.episodes ? taddyResult.episodes.length : 0)) : 0;
+              
+              if (returnedCount > 0) {
+                console.log(`ℹ️ All ${returnedCount} episodes returned by Taddy API are already imported`);
+                if (returnedCount === 10) {
+                  console.log(`ℹ️ Note: Taddy API appears to have a default limit of 10 episodes. RSS feed may provide more episodes.`);
+                }
+              } else {
+                console.log(`ℹ️ All available episodes already imported`);
+              }
+            }
+          } else if (taddyUuid) {
+            // Taddy API failed or returned no episodes, but we still have taddyUuid
+            // Try RSS feed as fallback
+            console.log(`⚠️ Taddy API failed or returned no episodes, trying RSS feed as fallback...`);
+            let rssUrl = null;
+            if (series.sources) {
+              rssUrl = series.sources instanceof Map ? series.sources.get('rss') : series.sources.rss;
+            }
+            
+            if (rssUrl) {
+              try {
+                const rssEpisodes = await parseRSSFeed(rssUrl, 100);
+                console.log(`📡 Retrieved ${rssEpisodes.length} episodes from RSS feed`);
+                
+                // Get existing episodes to filter duplicates
+                const existingEpisodes = await Media.find({
+                  podcastSeries: seriesId
+                }).select('title').lean();
+                const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+                
+                const rssEpisodesToImport = rssEpisodes.filter(rssEp => {
+                  return !existingTitles.has(rssEp.title?.toLowerCase().trim());
+                });
+                
+                console.log(`📡 ${rssEpisodesToImport.length} new episodes from RSS (${rssEpisodes.length - rssEpisodesToImport.length} already exist)`);
+                
+                if (rssEpisodesToImport.length > 0) {
+                  const seriesData = {
+                    title: series.title,
+                    description: series.description || '',
+                    author: series.host && series.host.length > 0 ? series.host[0].name : '',
+                    image: series.coverArt || null,
+                    categories: series.genres || [],
+                    language: series.language || 'en',
+                    rssUrl: rssUrl,
+                    taddyUuid: taddyUuid
+                  };
+                  
+                  const episodesToProcess = importMore === 'true' 
+                    ? rssEpisodesToImport
+                    : rssEpisodesToImport.slice(0, maxEpisodesToImport);
+                  
+                  for (const episode of episodesToProcess) {
+                    try {
+                      const result = await podcastAdapter.importEpisodeWithSeries(
+                        'rss',
+                        episode,
+                        seriesData,
+                        importUserId
+                      );
+                      if (result && result.episode) {
+                        importedCount++;
+                      }
+                    } catch (epError) {
+                      const episodeTitle = episode.title || 'Unknown';
+                      console.error(`Error importing RSS episode ${episodeTitle}:`, epError.message);
+                      importErrors.push({ title: episodeTitle, error: epError.message });
+                    }
+                  }
+                  console.log(`✅ Imported ${importedCount} episodes from RSS feed`);
+                }
+              } catch (rssError) {
+                console.error(`⚠️ Failed to parse RSS feed: ${rssError.message}`);
+              }
             }
           }
         } else if (podcastIndexId) {
@@ -1551,7 +1822,14 @@ router.get('/series/:seriesId', async (req, res) => {
         imported: importedCount,
         errors: importErrors.length,
         errorDetails: importErrors.slice(0, 5) // Limit error details
-      } : null
+      } : null,
+      taddyLimitation: taddyResult && taddyResult.returnedCount === 10 ? {
+        returnedEpisodes: taddyResult.returnedCount,
+        note: 'Taddy API appears to have a default limit of 10 episodes. RSS feed may provide more.'
+      } : (taddyResult && taddyResult.episodes && taddyResult.episodes.length === 10 ? {
+        returnedEpisodes: 10,
+        note: 'Taddy API appears to have a default limit of 10 episodes. RSS feed may provide more.'
+      } : null)
     });
   } catch (error) {
     console.error('Error getting podcast series:', error);

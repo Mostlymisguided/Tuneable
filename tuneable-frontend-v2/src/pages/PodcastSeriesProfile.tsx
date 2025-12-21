@@ -189,6 +189,8 @@ const PodcastSeriesProfile: React.FC = () => {
       
       if (data.importInfo && data.importInfo.imported > 0) {
         toast.success(`Imported ${data.importInfo.imported} more episode${data.importInfo.imported === 1 ? '' : 's'}. All episodes are now available!`);
+      } else if (data.taddyLimitation && data.taddyLimitation.missingEpisodes > 0) {
+        toast.info(`All ${data.taddyLimitation.returnedEpisodes} episodes available via Taddy API have been imported. Note: ${data.taddyLimitation.missingEpisodes} additional episode${data.taddyLimitation.missingEpisodes === 1 ? '' : 's'} exist but are not accessible via the Taddy API (API limitation).`);
       } else {
         toast.info('All available episodes have already been imported');
       }

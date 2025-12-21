@@ -243,7 +243,15 @@ class TaddyService {
         }
       });
 
-      const episodes = response.data.data?.getPodcastSeries?.episodes || [];
+      const seriesData = response.data.data?.getPodcastSeries || null;
+      const episodes = seriesData?.episodes || [];
+      // Note: episodeCount is not available in the GraphQL schema, so we use episodes.length
+      // Taddy API appears to have a default limit (often 10 episodes)
+      const totalEpisodeCount = episodes.length;
+      
+      // Debug: log episode count info
+      console.log(`📊 Taddy returned ${episodes.length} episodes`);
+      // Note: We can't know the true total count from Taddy API, so we'll rely on RSS feed if available
       
       // Debug: log first episode to see structure
       if (episodes.length > 0) {
@@ -264,7 +272,8 @@ class TaddyService {
       });
       
       // Limit results in code since GraphQL doesn't support limit argument
-      const limitedEpisodes = sortedEpisodes.slice(0, Math.min(maxResults, 200));
+      // Note: Taddy GraphQL returns all episodes, we just limit here for performance
+      const limitedEpisodes = sortedEpisodes.slice(0, Math.min(maxResults, 500));
       
       // Return raw episodes - let the adapter handle conversion
       return {
