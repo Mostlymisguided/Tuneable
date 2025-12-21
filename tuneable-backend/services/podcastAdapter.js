@@ -35,22 +35,49 @@ class PodcastAdapter {
     }
     
     // Check for existing episode by external ID
+    // Log what we're searching for
+    const searchIds = mediaData.externalIds instanceof Map ? 
+      Array.from(mediaData.externalIds.entries()) : 
+      Object.entries(mediaData.externalIds || {});
+    console.log(`🔍 Searching for existing episode with externalIds:`, searchIds);
+    
     const existingMedia = await this.findExistingEpisode(mediaData.externalIds);
     
     if (existingMedia) {
-      console.log(`✅ Episode already exists: ${existingMedia.title}`);
-      // Optionally update with new data
+      console.log(`✅ Episode already exists: ${existingMedia.title} (searching for: ${mediaData.title})`);
+      
+      // Update releaseDate if it's missing and we have a new one
+      if (!existingMedia.releaseDate && mediaData.releaseDate) {
+        existingMedia.releaseDate = mediaData.releaseDate;
+        await existingMedia.save();
+        console.log(`📅 Updated releaseDate for existing episode: ${existingMedia.title}`);
+      }
+      
       return existingMedia;
     }
     
-    // Create new Media
+    // Debug: log releaseDate before creating
+    if (mediaData.releaseDate) {
+      console.log(`📅 Creating episode with releaseDate: ${mediaData.releaseDate instanceof Date ? mediaData.releaseDate.toISOString() : mediaData.releaseDate} for: ${mediaData.title}`);
+    } else {
+      console.log(`⚠️ Creating episode WITHOUT releaseDate for: ${mediaData.title}`);
+      console.log(`⚠️ mediaData keys:`, Object.keys(mediaData));
+    }
+    
+    // Create new Media - ensure releaseDate is a Date object if provided
+    const mediaDataToSave = { ...mediaData };
+    if (mediaDataToSave.releaseDate && !(mediaDataToSave.releaseDate instanceof Date)) {
+      // Convert to Date if it's not already
+      mediaDataToSave.releaseDate = new Date(mediaDataToSave.releaseDate);
+    }
+    
     const media = new Media({
-      ...mediaData,
+      ...mediaDataToSave,
       addedBy: addedBy
     });
     
     await media.save();
-    console.log(`✨ Created new Media episode: ${media.title}`);
+    console.log(`✨ Created new Media episode: ${media.title}, releaseDate: ${media.releaseDate ? (media.releaseDate instanceof Date ? media.releaseDate.toISOString() : media.releaseDate) : 'null'}`);
     return media;
   }
   
@@ -60,27 +87,70 @@ class PodcastAdapter {
    * @returns {Promise<Media|null>} Existing Media or null
    */
   async findExistingEpisode(externalIds) {
-    if (!externalIds || externalIds.size === 0) return null;
+    if (!externalIds) return null;
     
     const queries = [];
     
-    for (const [platform, id] of externalIds) {
-      queries.push({
-        [`externalIds.${platform}`]: id
-      });
+    // Handle both Map and plain object formats
+    // IMPORTANT: Only search by episode-specific IDs, not series IDs
+    // Series IDs (like podcastSeries_taddy) are the same for all episodes and will cause false matches
+    if (externalIds instanceof Map) {
+      for (const [platform, id] of externalIds) {
+        if (id && !platform.includes('Series') && !platform.includes('series')) {
+          // Only use episode-specific IDs (taddy, podcastIndex, iTunes, etc.)
+          // Skip series IDs (podcastSeries_taddy, etc.)
+          queries.push({
+            [`externalIds.${platform}`]: id
+          });
+        }
+      }
+    } else if (typeof externalIds === 'object') {
+      for (const [platform, id] of Object.entries(externalIds)) {
+        if (id && !platform.includes('Series') && !platform.includes('series')) {
+          // Only use episode-specific IDs
+          queries.push({
+            [`externalIds.${platform}`]: id
+          });
+        }
+      }
     }
     
     if (queries.length === 0) return null;
     
-    return await Media.findOne({ $or: queries });
+    const existing = await Media.findOne({ $or: queries });
+    if (existing) {
+      console.log(`🔍 Found existing episode by external ID: ${existing.title} (UUID: ${existing.uuid})`);
+      console.log(`🔍 Query was:`, JSON.stringify(queries, null, 2));
+      console.log(`🔍 Existing episode externalIds:`, existing.externalIds instanceof Map ? 
+        Array.from(existing.externalIds.entries()) : existing.externalIds);
+    }
+    return existing;
   }
   
   /**
    * Convert Taddy episode to Media format
    */
   fromTaddy(taddyEpisode) {
+    // Debug: log the episode data to see what we're receiving
+    if (!taddyEpisode.name && !taddyEpisode.title) {
+      console.log('⚠️ Taddy episode missing name/title:', {
+        uuid: taddyEpisode.uuid,
+        keys: Object.keys(taddyEpisode),
+        datePublished: taddyEpisode.datePublished,
+        datePublishedType: typeof taddyEpisode.datePublished
+      });
+    }
+    
+    // Debug: log datePublished for all episodes to diagnose the issue
+    console.log('🔍 Taddy episode datePublished:', {
+      title: taddyEpisode.name || taddyEpisode.title,
+      datePublished: taddyEpisode.datePublished,
+      datePublishedType: typeof taddyEpisode.datePublished,
+      datePublishedValue: taddyEpisode.datePublished
+    });
+    
     return {
-      title: taddyEpisode.name || 'Untitled Episode',
+      title: taddyEpisode.name || taddyEpisode.title || 'Untitled Episode',
       contentType: ['spoken'],
       contentForm: ['podcastepisode'],
       mediaType: ['mp3'],
@@ -123,8 +193,12 @@ class PodcastAdapter {
       // System
       // Taddy returns datePublished as Unix timestamp in SECONDS (not milliseconds)
       releaseDate: (() => {
-        if (!taddyEpisode.datePublished) return new Date();
+        if (!taddyEpisode.datePublished) {
+          console.log('⚠️ No datePublished for episode:', taddyEpisode.name || taddyEpisode.uuid);
+          return null;
+        }
         
+        let date;
         if (typeof taddyEpisode.datePublished === 'number') {
           // Taddy always returns Unix timestamps in seconds
           // Check if it's a reasonable timestamp (not in milliseconds)
@@ -133,19 +207,34 @@ class PodcastAdapter {
           // So if it's less than 1000000000000, it's likely in seconds
           if (taddyEpisode.datePublished < 1000000000000) {
             // It's in seconds, convert to milliseconds
-            return new Date(taddyEpisode.datePublished * 1000);
+            date = new Date(taddyEpisode.datePublished * 1000);
           } else {
             // It's already in milliseconds (unlikely from Taddy, but handle it)
-            return new Date(taddyEpisode.datePublished);
+            date = new Date(taddyEpisode.datePublished);
           }
         } else if (typeof taddyEpisode.datePublished === 'string') {
           // ISO string or other date string
-          const date = new Date(taddyEpisode.datePublished);
-          return isNaN(date.getTime()) ? new Date() : date;
+          date = new Date(taddyEpisode.datePublished);
+        } else {
+          console.log('⚠️ Unexpected datePublished type:', typeof taddyEpisode.datePublished, taddyEpisode.datePublished);
+          return null;
         }
-        return new Date();
+        
+        // Validate the date - only return if it's valid
+        if (date && !isNaN(date.getTime())) {
+          // Additional validation: check if date is reasonable (not before 1970 or too far in future)
+          const year = date.getFullYear();
+          if (year >= 1970 && year <= 2100) {
+            return date;
+          } else {
+            console.log('⚠️ Invalid date year:', year, 'for episode:', taddyEpisode.name || taddyEpisode.uuid);
+            return null;
+          }
+        }
+        console.log('⚠️ Invalid date for episode:', taddyEpisode.name || taddyEpisode.uuid, 'datePublished:', taddyEpisode.datePublished);
+        return null;
       })(),
-      fileSize: taddyEpisode.audioLength || null
+      fileSize: taddyEpisode.fileLength || null
     };
   }
   

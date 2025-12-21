@@ -921,15 +921,12 @@ router.post('/discovery/taddy/import-episodes', authMiddleware, async (req, res)
           title: taddyEpisode.name || taddyEpisode.title
         });
 
-        // Convert to Media format using adapter
-        const episodeData = podcastAdapter.fromTaddy(taddyEpisode);
-        
-        // Use podcastAdapter to import (handles deduplication and Media model)
+        // Pass raw Taddy episode - importEpisode will handle conversion
         let importedEpisode;
         if (seriesData) {
           const result = await podcastAdapter.importEpisodeWithSeries(
             'taddy',
-            episodeData,
+            taddyEpisode, // Pass raw episode, not converted
             seriesData,
             userId
           );
@@ -937,7 +934,7 @@ router.post('/discovery/taddy/import-episodes', authMiddleware, async (req, res)
         } else {
           importedEpisode = await podcastAdapter.importEpisode(
             'taddy',
-            episodeData,
+            taddyEpisode, // Pass raw episode, not converted
             userId
           );
         }
@@ -1283,15 +1280,15 @@ router.post('/discovery/create-or-find-series', authMiddleware, async (req, res)
 router.get('/series/:seriesId', async (req, res) => {
   try {
     const { seriesId } = req.params;
+    const { autoImport = 'true', refresh = 'false', importMore = 'false', limit = '20' } = req.query;
     
     if (!isValidObjectId(seriesId)) {
       return res.status(400).json({ error: 'Invalid series ID' });
     }
 
-    // Get series
-    const series = await Media.findById(seriesId)
-      .populate('host.userId', 'username profilePic uuid')
-      .lean();
+    // Get series (need non-lean for potential updates)
+    let series = await Media.findById(seriesId)
+      .populate('host.userId', 'username profilePic uuid');
 
     if (!series) {
       return res.status(404).json({ error: 'Podcast series not found' });
@@ -1302,27 +1299,244 @@ router.get('/series/:seriesId', async (req, res) => {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
 
-    // Get all episodes from this series
-    const episodes = await Media.find({
+    // Get existing episodes first
+    let episodes = await Media.find({
       podcastSeries: seriesId,
       contentType: { $in: ['spoken'] },
       contentForm: { $in: ['podcastepisode'] }
     })
-      .sort({ globalMediaAggregate: -1, releaseDate: -1 })
+      .sort({ releaseDate: -1 }) // Sort by newest first
       .populate('host.userId', 'username profilePic uuid')
       .populate('addedBy', 'username')
-      .lean()
-      .limit(100); // Limit to top 100 episodes
+      .lean();
+
+    // Auto-import episodes from external source if series has external IDs
+    let importedCount = 0;
+    let importErrors = [];
+    const maxEpisodesToImport = parseInt(limit, 10) || 20; // Import episodes (default 20 for initial load)
+    const shouldImport = autoImport === 'true' || importMore === 'true';
+    
+    if (shouldImport && series.externalIds) {
+      // Handle both Map and plain object formats
+      let taddyUuid, podcastIndexId, iTunesId;
+      
+      if (series.externalIds instanceof Map) {
+        taddyUuid = series.externalIds.get('taddy');
+        podcastIndexId = series.externalIds.get('podcastIndex');
+        iTunesId = series.externalIds.get('iTunes');
+      } else if (typeof series.externalIds === 'object') {
+        taddyUuid = series.externalIds.taddy;
+        podcastIndexId = series.externalIds.podcastIndex;
+        iTunesId = series.externalIds.iTunes;
+      }
+      
+      // Only proceed if we have at least one external ID
+      if (taddyUuid || podcastIndexId || iTunesId) {
+      
+      // Use the series creator as the user who imports episodes
+      const importUserId = series.addedBy || new mongoose.Types.ObjectId();
+      
+      try {
+        if (taddyUuid) {
+          const importAction = importMore === 'true' ? 'Loading more' : 'Auto-importing';
+          console.log(`🔄 ${importAction} episodes from Taddy for series: ${series.title}`);
+          
+          // Fetch all episodes from Taddy (we'll filter out already-imported ones)
+          const taddyResult = await taddyService.getPodcastEpisodes(taddyUuid, 200); // Get up to 200 episodes
+          
+          if (taddyResult.success && taddyResult.episodes && taddyResult.episodes.length > 0) {
+            // Get list of already imported episode UUIDs to skip duplicates
+            const existingEpisodes = await Media.find({
+              podcastSeries: seriesId,
+              'externalIds.taddy': { $exists: true }
+            }).select('externalIds').lean();
+            
+            const existingUuids = new Set();
+            existingEpisodes.forEach(ep => {
+              if (ep.externalIds instanceof Map) {
+                const uuid = ep.externalIds.get('taddy');
+                if (uuid) existingUuids.add(uuid);
+              } else if (ep.externalIds && ep.externalIds.taddy) {
+                existingUuids.add(ep.externalIds.taddy);
+              }
+            });
+            
+            // Filter out already imported episodes
+            const episodesToImport = taddyResult.episodes.filter(ep => !existingUuids.has(ep.uuid));
+            
+            // If importMore is true, import ALL remaining episodes, otherwise limit to maxEpisodesToImport
+            const episodesToProcess = importMore === 'true' 
+              ? episodesToImport  // Import all remaining
+              : episodesToImport.slice(0, maxEpisodesToImport);  // Import only the limit
+            
+            if (episodesToProcess.length > 0) {
+              // Prepare series data for linking
+              const seriesData = {
+                title: series.title,
+                description: series.description || '',
+                author: series.host && series.host.length > 0 ? series.host[0].name : '',
+                image: series.coverArt || null,
+                categories: series.genres || [],
+                language: series.language || 'en',
+                rssUrl: series.sources?.get('rss') || '',
+                taddyUuid: taddyUuid
+              };
+              
+              // Import episodes (deduplication handled by importEpisode, but we've pre-filtered)
+              for (const taddyEpisode of episodesToProcess) {
+                try {
+                  // Pass raw Taddy episode - importEpisodeWithSeries will handle conversion
+                  const result = await podcastAdapter.importEpisodeWithSeries(
+                    'taddy',
+                    taddyEpisode, // Pass raw episode, not converted
+                    seriesData,
+                    importUserId
+                  );
+                  if (result && result.episode) {
+                    importedCount++;
+                  }
+                } catch (epError) {
+                  console.error(`Error importing episode ${taddyEpisode.name || taddyEpisode.uuid}:`, epError.message);
+                  importErrors.push({ title: taddyEpisode.name || 'Unknown', error: epError.message });
+                }
+              }
+              if (importMore === 'true') {
+                console.log(`✅ Imported ${importedCount} new episodes from Taddy (all remaining episodes)`);
+              } else {
+                const remainingCount = episodesToImport.length - episodesToProcess.length;
+                console.log(`✅ Imported ${importedCount} new episodes from Taddy (${remainingCount} remaining to import)`);
+              }
+            } else {
+              console.log(`ℹ️ All available episodes already imported`);
+            }
+          }
+        } else if (podcastIndexId) {
+          console.log(`🔄 Auto-importing episodes from Podcast Index for series: ${series.title}`);
+          const piResult = await podcastIndexService.getPodcastEpisodes(podcastIndexId, maxEpisodesToImport);
+          
+          if (piResult.success && piResult.episodes && piResult.episodes.length > 0) {
+            // Get podcast data for series info
+            const podcastResult = await podcastIndexService.getPodcastById(podcastIndexId);
+            const podcastData = podcastResult.success ? podcastResult.podcast : null;
+            
+            const seriesData = {
+              title: series.title,
+              description: series.description || '',
+              author: series.host && series.host.length > 0 ? series.host[0].name : '',
+              image: series.coverArt || null,
+              categories: series.genres || [],
+              language: series.language || 'en',
+              rssUrl: series.sources?.get('rss') || '',
+              podcastIndexId: podcastIndexId
+            };
+            
+            for (const piEpisode of piResult.episodes) {
+              try {
+                const episodeData = podcastIndexService.convertEpisodeToOurFormat(piEpisode, podcastData);
+                const result = await podcastAdapter.importEpisodeWithSeries(
+                  'podcastIndex',
+                  episodeData,
+                  seriesData,
+                  importUserId
+                );
+                if (result && result.episode) {
+                  importedCount++;
+                }
+              } catch (epError) {
+                console.error(`Error importing episode ${piEpisode.title}:`, epError.message);
+                importErrors.push({ title: piEpisode.title || 'Unknown', error: epError.message });
+              }
+            }
+            console.log(`✅ Imported ${importedCount} episodes from Podcast Index`);
+          }
+        } else if (iTunesId) {
+          console.log(`🔄 Auto-importing episodes from Apple Podcasts for series: ${series.title}`);
+          const appleResult = await applePodcastsService.getPodcastEpisodes(iTunesId, maxEpisodesToImport);
+          
+          if (appleResult.success && appleResult.episodes && appleResult.episodes.length > 0) {
+            // Get podcast data for series info
+            const podcastResult = await applePodcastsService.getPodcastById(iTunesId);
+            const podcastData = podcastResult.success ? podcastResult.podcast : null;
+            
+            const seriesData = {
+              title: series.title,
+              description: series.description || '',
+              author: series.host && series.host.length > 0 ? series.host[0].name : '',
+              image: series.coverArt || null,
+              categories: series.genres || [],
+              language: series.language || 'en',
+              rssUrl: series.sources?.get('rss') || '',
+              iTunesId: iTunesId
+            };
+            
+            for (const appleEpisode of appleResult.episodes) {
+              try {
+                const episodeData = applePodcastsService.convertEpisodeToOurFormat(appleEpisode, podcastData);
+                const result = await podcastAdapter.importEpisodeWithSeries(
+                  'apple',
+                  episodeData,
+                  seriesData,
+                  importUserId
+                );
+                if (result && result.episode) {
+                  importedCount++;
+                }
+              } catch (epError) {
+                console.error(`Error importing episode ${appleEpisode.trackName}:`, epError.message);
+                importErrors.push({ title: appleEpisode.trackName || 'Unknown', error: epError.message });
+              }
+            }
+            console.log(`✅ Imported ${importedCount} episodes from Apple Podcasts`);
+          }
+        }
+      } catch (importError) {
+        console.error('Error auto-importing episodes:', importError);
+        // Don't fail the request, just log the error
+      }
+      
+      // Re-fetch episodes after import to get newly imported ones
+      if (importedCount > 0 || refresh === 'true') {
+        episodes = await Media.find({
+          podcastSeries: seriesId,
+          contentType: { $in: ['spoken'] },
+          contentForm: { $in: ['podcastepisode'] }
+        })
+          .sort({ releaseDate: -1 })
+          .populate('host.userId', 'username profilePic uuid')
+          .populate('addedBy', 'username')
+          .lean();
+      }
+      } // Close if (taddyUuid || podcastIndexId || iTunesId)
+    } // Close if (autoImport === 'true' && series.externalIds)
+
+    // Convert series to plain object for response
+    const seriesObj = series.toObject ? series.toObject() : series;
 
     // Calculate stats
     const totalEpisodes = episodes.length;
     const totalTips = episodes.reduce((sum, ep) => sum + (ep.globalMediaAggregate || 0), 0);
     const avgTip = totalEpisodes > 0 ? totalTips / totalEpisodes : 0;
-    const topEpisode = episodes.length > 0 ? episodes[0] : null;
+    const topEpisode = episodes.length > 0 ? 
+      episodes.reduce((top, ep) => 
+        (ep.globalMediaAggregate || 0) > (top.globalMediaAggregate || 0) ? ep : top
+      ) : null;
+
+    // Ensure releaseDate is properly serialized for frontend
+    const serializedEpisodes = episodes.map(ep => {
+      const episode = { ...ep };
+      // Convert releaseDate to ISO string if it's a Date object
+      if (episode.releaseDate && episode.releaseDate instanceof Date) {
+        episode.releaseDate = episode.releaseDate.toISOString();
+      } else if (episode.releaseDate && typeof episode.releaseDate === 'object' && episode.releaseDate.$date) {
+        // Handle MongoDB date format
+        episode.releaseDate = new Date(episode.releaseDate.$date).toISOString();
+      }
+      return episode;
+    });
 
     res.json({
-      series,
-      episodes,
+      series: seriesObj,
+      episodes: serializedEpisodes,
       stats: {
         totalEpisodes,
         totalTips,
@@ -1332,7 +1546,12 @@ router.get('/series/:seriesId', async (req, res) => {
           title: topEpisode.title,
           globalMediaAggregate: topEpisode.globalMediaAggregate || 0
         } : null
-      }
+      },
+      importInfo: importedCount > 0 ? {
+        imported: importedCount,
+        errors: importErrors.length,
+        errorDetails: importErrors.slice(0, 5) // Limit error details
+      } : null
     });
   } catch (error) {
     console.error('Error getting podcast series:', error);

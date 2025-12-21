@@ -205,25 +205,24 @@ class TaddyService {
       
       const graphqlQuery = {
         query: `
-          query GetPodcastEpisodes($uuid: ID!, $limit: Int!) {
+          query GetPodcastEpisodes($uuid: ID!) {
             getPodcastSeries(uuid: $uuid) {
-              episodes(limit: $limit) {
+              uuid
+              name
+              episodes {
                 uuid
                 name
                 description
                 episodeNumber
                 seasonNumber
                 duration
-                isExplicit
                 audioUrl
-                audioLength
+                fileLength
                 datePublished
                 podcastSeries {
                   uuid
                   name
-                  author
                   imageUrl
-                  categories
                   language
                   rssUrl
                 }
@@ -232,8 +231,7 @@ class TaddyService {
           }
         `,
         variables: {
-          uuid: podcastUuid,
-          limit: Math.min(maxResults, 200)
+          uuid: podcastUuid
         }
       };
 
@@ -247,10 +245,32 @@ class TaddyService {
 
       const episodes = response.data.data?.getPodcastSeries?.episodes || [];
       
+      // Debug: log first episode to see structure
+      if (episodes.length > 0) {
+        console.log('🔍 Sample Taddy episode structure:', {
+          uuid: episodes[0].uuid,
+          name: episodes[0].name,
+          datePublished: episodes[0].datePublished,
+          datePublishedType: typeof episodes[0].datePublished,
+          keys: Object.keys(episodes[0])
+        });
+      }
+      
+      // Sort episodes by datePublished (newest first) before limiting
+      const sortedEpisodes = [...episodes].sort((a, b) => {
+        const dateA = a.datePublished || 0;
+        const dateB = b.datePublished || 0;
+        return dateB - dateA; // Newest first
+      });
+      
+      // Limit results in code since GraphQL doesn't support limit argument
+      const limitedEpisodes = sortedEpisodes.slice(0, Math.min(maxResults, 200));
+      
+      // Return raw episodes - let the adapter handle conversion
       return {
         success: true,
-        episodes: episodes.map(episode => this.convertEpisodeToOurFormat(episode)),
-        count: episodes.length
+        episodes: limitedEpisodes,
+        count: limitedEpisodes.length
       };
     } catch (error) {
       console.error('Taddy episode lookup error:', error.response?.data || error.message);

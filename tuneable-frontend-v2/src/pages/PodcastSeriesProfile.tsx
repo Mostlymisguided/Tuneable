@@ -18,7 +18,10 @@ import {
   ChevronDown,
   Twitter,
   Facebook,
-  Linkedin
+  Linkedin,
+  Search,
+  RefreshCw,
+  Filter
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
@@ -70,6 +73,14 @@ const PodcastSeriesProfile: React.FC = () => {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [stats, setStats] = useState<SeriesStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'mostTipped' | 'duration'>('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const episodesPerPage = 20;
   
   // Tipping state
   const [bidModalOpen, setBidModalOpen] = useState(false);
@@ -95,15 +106,29 @@ const PodcastSeriesProfile: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+  
+  // Reset to page 1 when search or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy]);
 
-  const fetchSeriesData = async () => {
+  const fetchSeriesData = async (refresh = false) => {
     if (!seriesId) return;
     
-    setIsLoading(true);
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}`
-      );
+      const params = new URLSearchParams();
+      if (refresh) {
+        params.append('refresh', 'true');
+      }
+      
+      const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url);
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -118,13 +143,114 @@ const PodcastSeriesProfile: React.FC = () => {
       setSeries(data.series);
       setEpisodes(data.episodes || []);
       setStats(data.stats || null);
+      
+      if (data.importInfo && data.importInfo.imported > 0) {
+        toast.success(`Imported ${data.importInfo.imported} new episode${data.importInfo.imported === 1 ? '' : 's'}`);
+      }
     } catch (error: any) {
       console.error('Error fetching series:', error);
       toast.error('Failed to load podcast series');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
+  
+  const handleRefresh = async () => {
+    await fetchSeriesData(true);
+  };
+  
+  const handleLoadMore = async () => {
+    if (!seriesId || isLoadingMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const params = new URLSearchParams({
+        importMore: 'true'
+        // No limit - will import ALL remaining episodes
+      });
+      
+      const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}?${params.toString()}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error('Failed to load more episodes');
+      }
+
+      const data = await response.json();
+      
+      // Replace episodes list with updated list (includes all newly imported)
+      setEpisodes(data.episodes || []);
+      
+      // Update stats
+      if (data.stats) {
+        setStats(data.stats);
+      }
+      
+      if (data.importInfo && data.importInfo.imported > 0) {
+        toast.success(`Imported ${data.importInfo.imported} more episode${data.importInfo.imported === 1 ? '' : 's'}. All episodes are now available!`);
+      } else {
+        toast.info('All available episodes have already been imported');
+      }
+    } catch (error: any) {
+      console.error('Error loading more episodes:', error);
+      toast.error('Failed to load more episodes');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+  
+  // Filter and sort episodes
+  const getFilteredAndSortedEpisodes = () => {
+    let filtered = episodes;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(ep =>
+        ep.title.toLowerCase().includes(query) ||
+        ep.description?.toLowerCase().includes(query) ||
+        ep.host?.some(h => h.name.toLowerCase().includes(query))
+      );
+    }
+    
+    // Apply sort
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+          const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+          return dateB - dateA;
+        case 'oldest':
+          const dateA2 = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+          const dateB2 = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+          return dateA2 - dateB2;
+        case 'mostTipped':
+          return (b.globalMediaAggregate || 0) - (a.globalMediaAggregate || 0);
+        case 'duration':
+          return (b.duration || 0) - (a.duration || 0);
+        default:
+          return 0;
+      }
+    });
+    
+    return sorted;
+  };
+  
+  // Pagination
+  const paginatedEpisodes = () => {
+    const filtered = getFilteredAndSortedEpisodes();
+    const startIndex = (currentPage - 1) * episodesPerPage;
+    const endIndex = startIndex + episodesPerPage;
+    return filtered.slice(startIndex, endIndex);
+  };
+  
+  const totalPages = Math.ceil(getFilteredAndSortedEpisodes().length / episodesPerPage);
+  
+  // Reset to page 1 when search or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy]);
 
   const handleTipClick = (episode: Episode, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -248,8 +374,10 @@ const PodcastSeriesProfile: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+          <div className="flex flex-col items-center justify-center h-64">
+            <RefreshCw className="h-12 w-12 animate-spin text-purple-500 mb-4" />
+            <p className="text-gray-300 text-lg">Loading podcast series...</p>
+            <p className="text-gray-500 text-sm mt-2">Importing latest episodes</p>
           </div>
         </div>
       </div>
@@ -450,15 +578,76 @@ const PodcastSeriesProfile: React.FC = () => {
 
         {/* Episodes List */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Episodes</h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <h2 className="text-2xl font-bold">Episodes</h2>
+            
+            {/* Search and Controls */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              {/* Search Bar */}
+              <div className="relative flex-1 sm:flex-initial sm:w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search episodes..."
+                  className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+              
+              {/* Sort Dropdown */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="mostTipped">Most Tipped</option>
+                <option value="duration">Longest</option>
+              </select>
+              
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+                title="Refresh episodes from external source"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Search Results Count */}
+          {(searchQuery || getFilteredAndSortedEpisodes().length !== episodes.length) && (
+            <p className="text-gray-400 text-sm mb-4">
+              Showing {getFilteredAndSortedEpisodes().length} of {episodes.length} episodes
+            </p>
+          )}
+          
           {episodes.length === 0 ? (
             <div className="text-center py-12 bg-gray-800/50 rounded-lg">
               <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400">No episodes found for this podcast series</p>
+              <p className="text-gray-500 text-sm mt-2">Episodes will be imported automatically when available</p>
+            </div>
+          ) : getFilteredAndSortedEpisodes().length === 0 ? (
+            <div className="text-center py-12 bg-gray-800/50 rounded-lg">
+              <Search className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">No episodes match your search</p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-4 text-purple-400 hover:text-purple-300"
+              >
+                Clear search
+              </button>
             </div>
           ) : (
+            <>
             <div className="space-y-4">
-              {episodes.map((episode, index) => (
+              {paginatedEpisodes().map((episode, index) => (
                 <div
                   key={episode._id}
                   className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50"
@@ -481,7 +670,7 @@ const PodcastSeriesProfile: React.FC = () => {
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-1">
-                            <span className="text-purple-400 font-bold text-lg">#{index + 1}</span>
+                            <span className="text-purple-400 font-bold text-lg">#{(currentPage - 1) * episodesPerPage + index + 1}</span>
                             <h3 
                               className="text-xl font-bold truncate cursor-pointer hover:text-purple-300"
                               onClick={() => handleEpisodeClick(episode)}
@@ -557,6 +746,53 @@ const PodcastSeriesProfile: React.FC = () => {
                 </div>
               ))}
             </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-6">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded-lg transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-gray-400 px-4">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded-lg transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+            
+            {/* Load More Episodes Button */}
+            {!searchQuery && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      <span>Importing all remaining episodes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-5 w-5" />
+                      <span>Import All Remaining Episodes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>
