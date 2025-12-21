@@ -89,6 +89,53 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
   }
 }
 
+// Get all RSS feeds from series sources
+function getAllRSSFeeds(series) {
+  const feeds = [];
+  if (!series.sources) return feeds;
+  
+  const sources = series.sources instanceof Map ? 
+    Array.from(series.sources.entries()) : 
+    Object.entries(series.sources);
+  
+  sources.forEach(([key, url]) => {
+    if ((key.startsWith('rss_') || key === 'rss') && url) {
+      feeds.push({
+        source: key.replace('rss_', '') || 'primary',
+        url: url
+      });
+    }
+  });
+  
+  return feeds;
+}
+
+// Try all RSS feeds and return results sorted by episode count
+async function fetchFromAllRSSFeeds(rssFeeds, maxEpisodes = 100) {
+  const results = [];
+  
+  for (const feed of rssFeeds) {
+    try {
+      console.log(`📡 Trying RSS feed from ${feed.source}: ${feed.url}`);
+      const episodes = await parseRSSFeed(feed.url, maxEpisodes);
+      results.push({
+        source: feed.source,
+        url: feed.url,
+        episodes: episodes,
+        count: episodes.length
+      });
+      console.log(`✅ ${feed.source} RSS feed returned ${episodes.length} episodes`);
+    } catch (error) {
+      console.error(`❌ Failed to fetch from ${feed.source} RSS feed:`, error.message);
+    }
+  }
+  
+  // Sort by episode count (most episodes first)
+  results.sort((a, b) => b.count - a.count);
+  
+  return results;
+}
+
 // Helper to parse duration string (e.g., "01:23:45" or "1234")
 function parseDuration(durationStr) {
   if (!durationStr) return 0;
@@ -1495,15 +1542,31 @@ router.get('/series/:seriesId', async (req, res) => {
       .populate('addedBy', 'username')
       .lean();
 
+    // Check if we have enough episodes already
+    const existingEpisodeCount = episodes.length;
+    const requestedLimit = parseInt(limit, 10) || 20;
+    const hasEnoughEpisodes = existingEpisodeCount >= requestedLimit;
+
     // Auto-import episodes from external source if series has external IDs
     let importedCount = 0;
     let importErrors = [];
     const maxEpisodesToImport = parseInt(limit, 10) || 20; // Import episodes (default 20 for initial load)
     const episodeOffset = parseInt(offset, 10) || 0; // Offset for pagination
     const shouldImport = autoImport === 'true' || loadMore === 'true';
+    
+    // Only import if:
+    // 1. User explicitly requested more (loadMore === 'true')
+    // 2. OR refresh is requested
+    // 3. OR we don't have enough episodes AND autoImport is enabled
+    const needsImport = shouldImport && (
+      loadMore === 'true' || 
+      refresh === 'true' || 
+      !hasEnoughEpisodes
+    );
+    
     let taddyResult = null; // Declare outside if block for use in response
     
-    if (shouldImport && series.externalIds) {
+    if (needsImport && series.externalIds) {
       // Handle both Map and plain object formats
       let taddyUuid, podcastIndexId, iTunesId;
       
@@ -1526,120 +1589,494 @@ router.get('/series/:seriesId', async (req, res) => {
       try {
         if (taddyUuid) {
           const importAction = loadMore === 'true' ? 'Loading more' : 'Auto-importing';
-          console.log(`🔄 ${importAction} episodes from Taddy for series: ${series.title}`);
+          console.log(`🔄 ${importAction} episodes for series: ${series.title}`);
           
-          // Fetch episodes from Taddy - fetch enough to cover offset + limit
-          const maxEpisodesToFetch = loadMore === 'true' ? episodeOffset + maxEpisodesToImport + 10 : 200;
-          try {
-            taddyResult = await taddyService.getPodcastEpisodes(taddyUuid, maxEpisodesToFetch);
-          } catch (taddyError) {
-            console.error('Error fetching episodes from Taddy:', taddyError.message);
-            taddyResult = { success: false, episodes: [], error: taddyError.message };
-          }
+          // Strategy: 
+          // - Initial load: Use RSS feeds (fast, recent episodes)
+          // - Load More: Prioritize API sources (Apple Podcasts, Podcast Index) for historical episodes
+          let rssEpisodes = [];
+          let apiEpisodes = []; // Episodes from Apple/Podcast Index APIs
+          let episodesToImport = [];
+          let bestRssFeed = null;
           
-          // If Taddy API fails, try RSS feed as fallback
-          if (!taddyResult.success || !taddyResult.episodes || taddyResult.episodes.length === 0) {
-            console.log(`⚠️ Taddy API failed or returned no episodes, trying RSS feed as fallback...`);
-            // Will try RSS feed below
-            taddyResult = { success: true, episodes: [], returnedCount: 0, totalCount: 0 };
-          }
+          // Get all RSS feeds from different sources
+          const rssFeeds = getAllRSSFeeds(series);
           
-          if (taddyResult.success && taddyResult.episodes && taddyResult.episodes.length > 0) {
-            // Get list of already imported episode UUIDs to skip duplicates
-            // Query for episodes in this series with Taddy external IDs
-            // Note: Mongoose Maps are stored as objects in MongoDB, so we query as objects
-            const existingEpisodes = await Media.find({
-              podcastSeries: seriesId,
-              'externalIds.taddy': { $exists: true, $ne: null }
-            }).select('externalIds title').lean();
+          // For initial load, prioritize RSS feeds (fast, recent episodes)
+          // For "Load More", we'll fetch from APIs too for historical episodes
+          if (rssFeeds.length > 0 && loadMore !== 'true') {
+            console.log(`📡 Found ${rssFeeds.length} RSS feed(s), trying all...`);
+            const rssFetchLimit = 200;
+            const rssResults = await fetchFromAllRSSFeeds(rssFeeds, rssFetchLimit);
             
-            const existingUuids = new Set();
-            existingEpisodes.forEach(ep => {
-              // When using .lean(), externalIds is a plain object (Mongoose Maps serialize to objects)
-              if (ep.externalIds && typeof ep.externalIds === 'object') {
-                // Mongoose Maps are stored as plain objects in MongoDB
-                const uuid = ep.externalIds.taddy;
-                if (uuid) {
-                  existingUuids.add(uuid);
+            if (rssResults.length > 0) {
+              // Use the feed with most episodes
+              bestRssFeed = rssResults[0];
+              console.log(`📡 Using ${bestRssFeed.source} RSS feed (${bestRssFeed.count} episodes)`);
+              
+              // If we found a better feed than what's stored as primary, update it
+              const currentPrimary = series.sources instanceof Map ? 
+                series.sources.get('rss') : series.sources.rss;
+              
+              if (bestRssFeed.count > 30 && bestRssFeed.url !== currentPrimary) {
+                console.log(`💾 Updating primary RSS feed to ${bestRssFeed.source} (more comprehensive)`);
+                if (series.sources instanceof Map) {
+                  series.sources.set('rss', bestRssFeed.url);
+                } else {
+                  series.sources = series.sources || {};
+                  series.sources.rss = bestRssFeed.url;
                 }
-              }
-            });
-            
-            console.log(`🔍 Found ${existingUuids.size} already imported episodes out of ${taddyResult.episodes.length} total from Taddy`);
-            if (existingUuids.size > 0) {
-              console.log(`🔍 Sample existing UUIDs:`, Array.from(existingUuids).slice(0, 5));
-            }
-            if (taddyResult.episodes.length > 0) {
-              console.log(`🔍 Sample Taddy episode UUIDs:`, taddyResult.episodes.slice(0, 5).map(ep => ep.uuid));
-            }
-            
-            // Filter out already imported episodes
-            const episodesToImport = taddyResult.episodes.filter(ep => {
-              const isNew = !existingUuids.has(ep.uuid);
-              return isNew;
-            });
-            
-            console.log(`📊 Episodes to import: ${episodesToImport.length} (${taddyResult.episodes.length - episodesToImport.length} already exist)`);
-            
-            // Check if Taddy API is limited (often returns exactly 10 episodes)
-            // If so, try RSS feed to get remaining episodes
-            const returnedCount = taddyResult.returnedCount || taddyResult.episodes.length;
-            const taddyLikelyLimited = returnedCount === 10 || (loadMore === 'true' && returnedCount < 50);
-            
-            // If Taddy API is likely limited and we have an RSS feed, try to get remaining episodes from RSS
-            let rssEpisodes = [];
-            if (taddyLikelyLimited) {
-              // Try to get RSS URL from series sources or from Taddy episode data
-              let rssUrl = null;
-              if (series.sources) {
-                rssUrl = series.sources instanceof Map ? series.sources.get('rss') : series.sources.rss;
-              }
-              // Fallback: get RSS URL from first Taddy episode if available
-              if (!rssUrl && taddyResult.episodes.length > 0 && taddyResult.episodes[0].podcastSeries?.rssUrl) {
-                rssUrl = taddyResult.episodes[0].podcastSeries.rssUrl;
+                await series.save();
               }
               
-              if (rssUrl) {
-                console.log(`📡 Taddy API likely limited (returned ${returnedCount} episodes), fetching from RSS feed...`);
-                try {
-                  // Fetch enough episodes from RSS to cover offset + limit
-                  const rssFetchLimit = loadMore === 'true' ? episodeOffset + maxEpisodesToImport + 10 : 100;
-                  rssEpisodes = await parseRSSFeed(rssUrl, rssFetchLimit);
-                  console.log(`📡 Retrieved ${rssEpisodes.length} episodes from RSS feed`);
+              // Merge episodes from all feeds (deduplicate by GUID/title)
+              const allEpisodes = new Map();
+              rssResults.forEach(result => {
+                result.episodes.forEach(ep => {
+                  const key = ep.guid || ep.title?.toLowerCase().trim();
+                  if (key && !allEpisodes.has(key)) {
+                    allEpisodes.set(key, ep);
+                  }
+                });
+              });
+              
+              rssEpisodes = Array.from(allEpisodes.values());
+              console.log(`📡 Merged ${rssEpisodes.length} unique episodes from ${rssResults.length} RSS feed(s)`);
+            }
+          } else if (rssFeeds.length > 0 && loadMore === 'true') {
+            // For "Load More", still try RSS but we'll prioritize APIs below
+            console.log(`📡 Trying RSS feeds (will also fetch from APIs for historical episodes)...`);
+            const rssFetchLimit = episodeOffset + maxEpisodesToImport + 50;
+            const rssResults = await fetchFromAllRSSFeeds(rssFeeds, rssFetchLimit);
+            
+            if (rssResults.length > 0) {
+              bestRssFeed = rssResults[0];
+              const allEpisodes = new Map();
+              rssResults.forEach(result => {
+                result.episodes.forEach(ep => {
+                  const key = ep.guid || ep.title?.toLowerCase().trim();
+                  if (key && !allEpisodes.has(key)) {
+                    allEpisodes.set(key, ep);
+                  }
+                });
+              });
+              rssEpisodes = Array.from(allEpisodes.values());
+              console.log(`📡 Found ${rssEpisodes.length} episodes from RSS feeds`);
+            }
+          } else {
+            console.log(`⚠️ No RSS feed URL in series, will try to discover from external sources...`);
+          }
+          
+          // For "Load More", prioritize fetching directly from APIs (better for historical episodes)
+          if (loadMore === 'true') {
+            console.log(`📚 Loading more episodes - fetching from APIs for historical episodes...`);
+            
+            // Fetch from Podcast Index API if we have the ID
+            if (podcastIndexId) {
+              try {
+                console.log(`📚 Fetching episodes from Podcast Index API...`);
+                const maxEpisodesToFetch = episodeOffset + maxEpisodesToImport + 50;
+                const piEpisodesResult = await podcastIndexService.getPodcastEpisodes(podcastIndexId, maxEpisodesToFetch);
+                if (piEpisodesResult.success && piEpisodesResult.episodes && piEpisodesResult.episodes.length > 0) {
+                  // Convert to RSS-like format for consistency
+                  const piPodcastResult = await podcastIndexService.getPodcastById(podcastIndexId);
+                  const podcastData = piPodcastResult.success ? piPodcastResult.podcast : null;
                   
-                  // Filter out episodes already imported (check by title and date, or GUID if available)
-                  const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
-                  const rssEpisodesToImport = rssEpisodes.filter(rssEp => {
-                    const titleMatch = rssEp.title && existingTitles.has(rssEp.title.toLowerCase().trim());
-                    return !titleMatch; // Only include if title doesn't match
+                  const convertedEpisodes = piEpisodesResult.episodes.map(ep => {
+                    const episodeData = podcastIndexService.convertEpisodeToOurFormat(ep, podcastData);
+                    return {
+                      title: episodeData.title,
+                      description: episodeData.description,
+                      guid: episodeData.guid,
+                      pubDate: episodeData.publishedAt,
+                      enclosure: {
+                        url: episodeData.audioUrl,
+                        type: episodeData.audioType,
+                        length: episodeData.audioSize
+                      },
+                      episodeNumber: episodeData.episodeNumber,
+                      seasonNumber: episodeData.seasonNumber,
+                      duration: episodeData.duration,
+                      explicit: episodeData.explicit,
+                      source: 'podcastindex_api'
+                    };
                   });
                   
-                  console.log(`📡 ${rssEpisodesToImport.length} new episodes from RSS (${rssEpisodes.length - rssEpisodesToImport.length} already exist)`);
+                  apiEpisodes.push(...convertedEpisodes);
+                  console.log(`✅ Fetched ${convertedEpisodes.length} episodes from Podcast Index API`);
+                }
+              } catch (error) {
+                console.error('Error fetching episodes from Podcast Index API:', error.message);
+              }
+            }
+            
+            // Fetch from Apple Podcasts API if we have the ID
+            if (iTunesId) {
+              try {
+                console.log(`📚 Fetching episodes from Apple Podcasts API...`);
+                const maxEpisodesToFetch = episodeOffset + maxEpisodesToImport + 50;
+                const appleEpisodesResult = await applePodcastsService.getPodcastEpisodes(iTunesId, maxEpisodesToFetch);
+                if (appleEpisodesResult.success && appleEpisodesResult.episodes && appleEpisodesResult.episodes.length > 0) {
+                  // Convert to RSS-like format for consistency
+                  const applePodcastResult = await applePodcastsService.getPodcastById(iTunesId);
+                  const podcastData = applePodcastResult.success ? applePodcastResult.podcast : null;
                   
-                  // Add RSS episodes to the import list
-                  episodesToImport.push(...rssEpisodesToImport);
-                } catch (rssError) {
-                  console.error(`⚠️ Failed to parse RSS feed: ${rssError.message}`);
+                  const convertedEpisodes = appleEpisodesResult.episodes.map(ep => {
+                    const episodeData = applePodcastsService.convertEpisodeToOurFormat(ep, podcastData);
+                    return {
+                      title: episodeData.title,
+                      description: episodeData.description,
+                      guid: episodeData.guid,
+                      pubDate: episodeData.publishedAt,
+                      enclosure: {
+                        url: episodeData.audioUrl,
+                        type: episodeData.audioType,
+                        length: episodeData.audioSize
+                      },
+                      episodeNumber: episodeData.episodeNumber,
+                      seasonNumber: episodeData.seasonNumber,
+                      duration: episodeData.duration,
+                      explicit: episodeData.explicit,
+                      source: 'apple_api'
+                    };
+                  });
+                  
+                  apiEpisodes.push(...convertedEpisodes);
+                  console.log(`✅ Fetched ${convertedEpisodes.length} episodes from Apple Podcasts API`);
                 }
-              } else {
-                console.log(`⚠️ Taddy API likely limited (returned ${returnedCount} episodes)`);
-                console.log(`⚠️ No RSS feed URL available to fetch remaining episodes`);
+              } catch (error) {
+                console.error('Error fetching episodes from Apple Podcasts API:', error.message);
+              }
+            }
+          }
+          
+          // Merge all episodes (RSS + API) and deduplicate
+          const allEpisodesMap = new Map();
+          
+          // Add RSS episodes
+          rssEpisodes.forEach(ep => {
+            const key = ep.guid || ep.title?.toLowerCase().trim();
+            if (key && !allEpisodesMap.has(key)) {
+              allEpisodesMap.set(key, ep);
+            }
+          });
+          
+          // Add API episodes (they take precedence for historical episodes)
+          apiEpisodes.forEach(ep => {
+            const key = ep.guid || ep.title?.toLowerCase().trim();
+            if (key) {
+              // API episodes override RSS episodes (they're more comprehensive)
+              allEpisodesMap.set(key, ep);
+            }
+          });
+          
+          const mergedEpisodes = Array.from(allEpisodesMap.values());
+          console.log(`📚 Merged ${mergedEpisodes.length} total episodes (${rssEpisodes.length} from RSS, ${apiEpisodes.length} from APIs)`);
+          
+          // Get existing episodes to check for duplicates
+          const existingEpisodes = await Media.find({
+            podcastSeries: seriesId,
+            contentType: { $in: ['spoken'] },
+            contentForm: { $in: ['podcastepisode'] }
+          }).select('title externalIds').lean();
+          
+          // Filter out episodes already imported (check by title and GUID)
+          const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+          const existingGuids = new Set();
+          existingEpisodes.forEach(ep => {
+            if (ep.externalIds && typeof ep.externalIds === 'object') {
+              const guid = ep.externalIds.rssGuid;
+              if (guid) existingGuids.add(guid);
+              // Also check Apple and Podcast Index IDs
+              if (ep.externalIds.apple) existingGuids.add(ep.externalIds.apple);
+              if (ep.externalIds.podcastIndex) existingGuids.add(ep.externalIds.podcastIndex);
+            }
+          });
+          
+          episodesToImport = mergedEpisodes.filter(ep => {
+            const titleMatch = ep.title && existingTitles.has(ep.title.toLowerCase().trim());
+            const guidMatch = ep.guid && existingGuids.has(ep.guid);
+            return !titleMatch && !guidMatch; // Only include if neither title nor GUID matches
+          });
+          
+          console.log(`📚 ${episodesToImport.length} new episodes to import (${mergedEpisodes.length - episodesToImport.length} already exist)`);
+          
+          // If no RSS feeds found, they returned no episodes, existing feed has very few episodes (< 50),
+          // OR user clicked "Load More Episodes" - try to discover additional/better RSS feeds from external sources
+          const shouldTryDiscovery = rssFeeds.length === 0 || 
+                                     episodesToImport.length === 0 ||
+                                     (bestRssFeed && bestRssFeed.count < 50) ||
+                                     loadMore === 'true'; // Always try discovery when loading more
+          
+          if (shouldTryDiscovery) {
+            const discoveredFeeds = [];
+            let needsSave = false;
+            
+            // Try Podcast Index (with ID or by searching)
+            if (podcastIndexId) {
+              try {
+                console.log(`🔍 Discovering RSS feed from Podcast Index (using stored ID)...`);
+                const piResult = await podcastIndexService.getPodcastById(podcastIndexId);
+                if (piResult.success && piResult.podcast?.url) {
+                  discoveredFeeds.push({
+                    source: 'podcastindex',
+                    url: piResult.podcast.url
+                  });
+                  console.log(`✅ Discovered RSS feed from Podcast Index`);
+                }
+              } catch (error) {
+                console.error('Error discovering RSS from Podcast Index:', error.message);
+              }
+            } else if (series.title) {
+              // Try to find Podcast Index ID by searching by title
+              try {
+                console.log(`🔍 Searching Podcast Index for: "${series.title}"`);
+                const searchResult = await podcastIndexService.searchPodcasts(series.title, 10);
+                if (searchResult.success && searchResult.podcasts && searchResult.podcasts.length > 0) {
+                  // Try to match by title similarity
+                  const match = searchResult.podcasts.find(p => {
+                    const pTitle = (p.title || '').toLowerCase();
+                    const sTitle = series.title.toLowerCase();
+                    // Check if titles are similar (one contains the other or vice versa)
+                    return pTitle.includes(sTitle) || sTitle.includes(pTitle) ||
+                           // Or if they share significant words
+                           pTitle.split(/\s+/).some(word => word.length > 3 && sTitle.includes(word));
+                  });
+                  
+                  if (match) {
+                    console.log(`✅ Found potential match in Podcast Index: "${match.title}"`);
+                    const piResult = await podcastIndexService.getPodcastById(match.id);
+                    if (piResult.success && piResult.podcast?.url) {
+                      discoveredFeeds.push({
+                        source: 'podcastindex',
+                        url: piResult.podcast.url
+                      });
+                      // Store the ID for future use
+                      if (series.externalIds instanceof Map) {
+                        series.externalIds.set('podcastIndex', match.id.toString());
+                      } else {
+                        series.externalIds = series.externalIds || {};
+                        series.externalIds.podcastIndex = match.id.toString();
+                      }
+                      needsSave = true;
+                      console.log(`✅ Discovered RSS feed from Podcast Index (searched by title, ID: ${match.id})`);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error searching Podcast Index:', error.message);
               }
             }
             
-            // If no episodes to import, log why
-            if (episodesToImport.length === 0) {
-              if (taddyResult.episodes.length > 0 || rssEpisodes.length > 0) {
-                const totalReturned = taddyResult.episodes.length + rssEpisodes.length;
-                console.log(`ℹ️ All ${totalReturned} episodes returned are already imported`);
-                if (taddyLikelyLimited && rssEpisodes.length === 0) {
-                  console.log(`ℹ️ Note: Taddy API appears limited (returned ${returnedCount} episodes). RSS feed may provide more episodes.`);
+            // Try Apple Podcasts (with ID or by searching)
+            if (iTunesId) {
+              try {
+                console.log(`🔍 Discovering RSS feed from Apple Podcasts (using stored ID)...`);
+                const appleResult = await applePodcastsService.getPodcastById(iTunesId);
+                if (appleResult.success && appleResult.podcast?.feedUrl) {
+                  discoveredFeeds.push({
+                    source: 'apple',
+                    url: appleResult.podcast.feedUrl
+                  });
+                  console.log(`✅ Discovered RSS feed from Apple Podcasts`);
                 }
-              } else {
-                console.log(`⚠️ No episodes returned from Taddy or RSS`);
+              } catch (error) {
+                console.error('Error discovering RSS from Apple:', error.message);
+              }
+            } else if (series.title) {
+              // Try to find Apple Podcasts ID by searching by title
+              try {
+                console.log(`🔍 Searching Apple Podcasts for: "${series.title}"`);
+                const searchResult = await applePodcastsService.searchPodcasts(series.title, 10);
+                if (searchResult.success && searchResult.podcasts && searchResult.podcasts.length > 0) {
+                  // Try to match by title similarity
+                  const match = searchResult.podcasts.find(p => {
+                    const pTitle = (p.collectionName || '').toLowerCase();
+                    const sTitle = series.title.toLowerCase();
+                    // Check if titles are similar
+                    return pTitle.includes(sTitle) || sTitle.includes(pTitle) ||
+                           // Or if they share significant words
+                           pTitle.split(/\s+/).some(word => word.length > 3 && sTitle.includes(word));
+                  });
+                  
+                  if (match && match.collectionId) {
+                    console.log(`✅ Found potential match in Apple Podcasts: "${match.collectionName}"`);
+                    const appleResult = await applePodcastsService.getPodcastById(match.collectionId);
+                    if (appleResult.success && appleResult.podcast?.feedUrl) {
+                      discoveredFeeds.push({
+                        source: 'apple',
+                        url: appleResult.podcast.feedUrl
+                      });
+                      // Store the ID for future use
+                      if (series.externalIds instanceof Map) {
+                        series.externalIds.set('iTunes', match.collectionId.toString());
+                      } else {
+                        series.externalIds = series.externalIds || {};
+                        series.externalIds.iTunes = match.collectionId.toString();
+                      }
+                      needsSave = true;
+                      console.log(`✅ Discovered RSS feed from Apple Podcasts (searched by title, ID: ${match.collectionId})`);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error searching Apple Podcasts:', error.message);
               }
             }
             
+            // Try Taddy to get RSS URL
+            if (taddyUuid && discoveredFeeds.length === 0) {
+              const maxEpisodesToFetch = loadMore === 'true' ? episodeOffset + maxEpisodesToImport + 10 : 200;
+              try {
+                taddyResult = await taddyService.getPodcastEpisodes(taddyUuid, maxEpisodesToFetch);
+              } catch (taddyError) {
+                console.error('Error fetching episodes from Taddy:', taddyError.message);
+                taddyResult = { success: false, episodes: [], error: taddyError.message };
+              }
+              
+              if (taddyResult.success && taddyResult.episodes && taddyResult.episodes.length > 0) {
+                const firstEpisode = taddyResult.episodes[0];
+                if (firstEpisode.podcastSeries?.rssUrl) {
+                  discoveredFeeds.push({
+                    source: 'taddy',
+                    url: firstEpisode.podcastSeries.rssUrl
+                  });
+                  console.log(`✅ Discovered RSS feed from Taddy`);
+                }
+              }
+            }
+            
+            // Store discovered feeds and try fetching from them
+            if (discoveredFeeds.length > 0) {
+              if (series.sources instanceof Map) {
+                discoveredFeeds.forEach(feed => {
+                  series.sources.set(`rss_${feed.source}`, feed.url);
+                  // Set as primary if not already set or if this feed has more episodes
+                  const currentPrimary = series.sources.get('rss');
+                  if (!currentPrimary) {
+                    series.sources.set('rss', feed.url);
+                  }
+                });
+              } else {
+                series.sources = series.sources || {};
+                discoveredFeeds.forEach(feed => {
+                  series.sources[`rss_${feed.source}`] = feed.url;
+                  if (!series.sources.rss) {
+                    series.sources.rss = feed.url;
+                  }
+                });
+              }
+              needsSave = true;
+            }
+            
+            // Save series if we discovered new feeds or IDs
+            if (needsSave) {
+              await series.save();
+              if (discoveredFeeds.length > 0) {
+                console.log(`💾 Stored ${discoveredFeeds.length} discovered RSS feed(s)`);
+              }
+            }
+            
+            // Try fetching from discovered feeds
+            if (discoveredFeeds.length > 0) {
+              
+              // Now try fetching from discovered feeds
+              const rssFetchLimit = loadMore === 'true' ? episodeOffset + maxEpisodesToImport + 10 : 200;
+              const rssResults = await fetchFromAllRSSFeeds(discoveredFeeds, rssFetchLimit);
+              
+              if (rssResults.length > 0) {
+                bestRssFeed = rssResults[0];
+                console.log(`📡 Using discovered ${bestRssFeed.source} RSS feed (${bestRssFeed.count} episodes)`);
+                
+                // Merge episodes from all discovered feeds
+                const allEpisodes = new Map();
+                rssResults.forEach(result => {
+                  result.episodes.forEach(ep => {
+                    const key = ep.guid || ep.title?.toLowerCase().trim();
+                    if (key && !allEpisodes.has(key)) {
+                      allEpisodes.set(key, ep);
+                    }
+                  });
+                });
+                
+                rssEpisodes = Array.from(allEpisodes.values());
+                
+                // Get existing episodes to check for duplicates
+                const existingEpisodes = await Media.find({
+                  podcastSeries: seriesId,
+                  contentType: { $in: ['spoken'] },
+                  contentForm: { $in: ['podcastepisode'] }
+                }).select('title externalIds').lean();
+                
+                const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+                const existingGuids = new Set();
+                existingEpisodes.forEach(ep => {
+                  if (ep.externalIds && typeof ep.externalIds === 'object') {
+                    const guid = ep.externalIds.rssGuid;
+                    if (guid) existingGuids.add(guid);
+                  }
+                });
+                
+                const rssEpisodesToImport = rssEpisodes.filter(rssEp => {
+                  const titleMatch = rssEp.title && existingTitles.has(rssEp.title.toLowerCase().trim());
+                  const guidMatch = rssEp.guid && existingGuids.has(rssEp.guid);
+                  return !titleMatch && !guidMatch;
+                });
+                
+                // Merge with existing episodesToImport instead of replacing
+                // Deduplicate by GUID/title
+                const existingImportKeys = new Set(episodesToImport.map(ep => 
+                  ep.guid || ep.title?.toLowerCase().trim()
+                ).filter(Boolean));
+                
+                const newRssEpisodes = rssEpisodesToImport.filter(ep => {
+                  const key = ep.guid || ep.title?.toLowerCase().trim();
+                  return key && !existingImportKeys.has(key);
+                });
+                
+                episodesToImport = [...episodesToImport, ...newRssEpisodes];
+                console.log(`📡 Added ${newRssEpisodes.length} new episodes from discovered RSS feed(s) (${episodesToImport.length} total episodes to import)`);
+                
+                // Sort by date (newest first) to ensure consistent ordering
+                episodesToImport.sort((a, b) => {
+                  const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+                  const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+                  return dateB - dateA;
+                });
+              }
+            }
+            
+            // If RSS still didn't work, use Taddy episodes as fallback
+            if (episodesToImport.length === 0 && taddyResult && taddyResult.success && taddyResult.episodes && taddyResult.episodes.length > 0) {
+              console.log(`📊 Using Taddy API as fallback (RSS unavailable or failed)`);
+              
+              // Get list of already imported episode UUIDs to skip duplicates
+              const existingEpisodes = await Media.find({
+                podcastSeries: seriesId,
+                'externalIds.taddy': { $exists: true, $ne: null }
+              }).select('externalIds title').lean();
+              
+              const existingUuids = new Set();
+              existingEpisodes.forEach(ep => {
+                if (ep.externalIds && typeof ep.externalIds === 'object') {
+                  const uuid = ep.externalIds.taddy;
+                  if (uuid) existingUuids.add(uuid);
+                }
+              });
+              
+              // Filter out already imported episodes
+              const taddyEpisodesToImport = taddyResult.episodes.filter(ep => {
+                const isNew = !existingUuids.has(ep.uuid);
+                return isNew;
+              });
+              
+              console.log(`📊 ${taddyEpisodesToImport.length} new episodes from Taddy (${taddyResult.episodes.length - taddyEpisodesToImport.length} already exist)`);
+              episodesToImport = taddyEpisodesToImport;
+            }
+          }
+          
+          // Process episodes if we have any to import
+          if (episodesToImport.length > 0) {
             // Apply pagination: if loadMore, start from offset and take limit
             let episodesToProcess;
             if (loadMore === 'true') {
@@ -1667,13 +2104,61 @@ router.get('/series/:seriesId', async (req, res) => {
               for (const episode of episodesToProcess) {
                 try {
                   let result;
+                  let source = 'rss'; // Default to RSS
                   
-                  // Determine source - if it has a Taddy UUID, it's from Taddy, otherwise it's from RSS
+                  // Determine source based on episode properties
                   if (episode.uuid) {
                     // Taddy episode
+                    source = 'taddy';
                     result = await podcastAdapter.importEpisodeWithSeries(
                       'taddy',
                       episode,
+                      seriesData,
+                      importUserId
+                    );
+                  } else if (episode.source === 'podcastindex_api') {
+                    // Podcast Index API episode - convert to Podcast Index format
+                    source = 'podcastIndex';
+                    const piEpisode = {
+                      title: episode.title,
+                      description: episode.description,
+                      guid: episode.guid,
+                      datePublished: episode.pubDate ? Math.floor(new Date(episode.pubDate).getTime() / 1000) : null,
+                      enclosureUrl: episode.enclosure?.url,
+                      enclosureType: episode.enclosure?.type,
+                      enclosureLength: episode.enclosure?.length,
+                      episodeNumber: episode.episodeNumber,
+                      seasonNumber: episode.seasonNumber,
+                      duration: episode.duration,
+                      explicit: episode.explicit ? 1 : 0,
+                      id: null, // Will be set by adapter if needed
+                      feedId: podcastIndexId
+                    };
+                    result = await podcastAdapter.importEpisodeWithSeries(
+                      'podcastIndex',
+                      piEpisode,
+                      seriesData,
+                      importUserId
+                    );
+                  } else if (episode.source === 'apple_api') {
+                    // Apple Podcasts API episode - convert to Apple format
+                    source = 'apple';
+                    const appleEpisode = {
+                      trackName: episode.title,
+                      description: episode.description,
+                      episodeGuid: episode.guid,
+                      releaseDate: episode.pubDate ? new Date(episode.pubDate).toISOString() : null,
+                      previewUrl: episode.enclosure?.url,
+                      episodeUrl: episode.enclosure?.url,
+                      trackTimeMillis: episode.duration ? episode.duration * 1000 : null,
+                      trackNumber: episode.episodeNumber,
+                      seasonNumber: episode.seasonNumber,
+                      trackExplicitness: episode.explicit ? 'explicit' : 'clean',
+                      collectionId: iTunesId
+                    };
+                    result = await podcastAdapter.importEpisodeWithSeries(
+                      'apple',
+                      appleEpisode,
                       seriesData,
                       importUserId
                     );
@@ -1882,7 +2367,10 @@ router.get('/series/:seriesId', async (req, res) => {
           .lean();
       }
       } // Close if (taddyUuid || podcastIndexId || iTunesId)
-    } // Close if (autoImport === 'true' && series.externalIds)
+    } else if (existingEpisodeCount > 0) {
+      // Episodes exist and we have enough, skip import
+      console.log(`✅ Using ${existingEpisodeCount} existing episodes (skipping import)`);
+    } // Close if (needsImport && series.externalIds)
 
     // Convert series to plain object for response
     const seriesObj = series.toObject ? series.toObject() : series;

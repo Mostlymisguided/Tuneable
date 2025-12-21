@@ -226,30 +226,7 @@ const Podcasts: React.FC = () => {
         console.error('Error searching local database:', error);
       }
 
-      // Step 2: Search Podcast Index (primary external source)
-      try {
-        const piParams = new URLSearchParams();
-        piParams.append('q', searchQuery);
-        piParams.append('max', '20');
-
-        const piResponse = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/podcastindex/search-episodes?${piParams}`
-        );
-
-        if (piResponse.ok) {
-          const piData = await piResponse.json();
-          // Store raw data for import
-          const episodesWithRaw = (piData.episodes || []).map((ep: any) => ({
-            ...ep,
-            rawData: ep // Store full episode data for import
-          }));
-          addResults(episodesWithRaw, 'podcastindex');
-        }
-      } catch (error) {
-        console.error('Error searching Podcast Index:', error);
-      }
-
-      // Step 3: Search Taddy (if configured, fallback)
+      // Step 2: Search Taddy (primary external source for discovery)
       try {
         const taddyParams = new URLSearchParams();
         taddyParams.append('q', searchQuery);
@@ -261,7 +238,7 @@ const Podcasts: React.FC = () => {
 
         if (taddyResponse.ok) {
           const taddyData = await taddyResponse.json();
-          // Store raw data for import
+          // Store raw data for import (includes RSS URLs in podcastSeries)
           const episodesWithRaw = (taddyData.episodes || []).map((ep: any) => ({
             ...ep,
             rawData: ep // Store full episode data for import
@@ -270,29 +247,6 @@ const Podcasts: React.FC = () => {
         }
       } catch (error) {
         console.error('Error searching Taddy:', error);
-      }
-
-      // Step 4: Search Apple (last resort fallback)
-      try {
-        const appleParams = new URLSearchParams();
-        appleParams.append('q', searchQuery);
-        appleParams.append('max', '20');
-
-        const appleResponse = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/apple/search-episodes?${appleParams}`
-        );
-
-        if (appleResponse.ok) {
-          const appleData = await appleResponse.json();
-          // Store raw data for import
-          const episodesWithRaw = (appleData.episodes || []).map((ep: any) => ({
-            ...ep,
-            rawData: ep // Store full episode data for import
-          }));
-          addResults(episodesWithRaw, 'apple');
-        }
-      } catch (error) {
-        console.error('Error searching Apple:', error);
       }
 
       setSearchResults(allResults);
@@ -609,11 +563,17 @@ const Podcasts: React.FC = () => {
           language: 'en'
         };
         
-        // Add external IDs based on source
-        if (episode.source === 'podcastindex' && episode.feedId) {
+        // Add external IDs and RSS URL based on source
+        if (episode.source === 'taddy') {
+          if ((episode as any).podcastSeriesUuid) {
+            seriesData.taddyUuid = (episode as any).podcastSeriesUuid;
+          }
+          // Get RSS URL from episode's rawData (from Taddy search)
+          if ((episode as any).rawData?.podcastSeries?.rssUrl) {
+            seriesData.rssUrl = (episode as any).rawData.podcastSeries.rssUrl;
+          }
+        } else if (episode.source === 'podcastindex' && episode.feedId) {
           seriesData.podcastIndexId = episode.feedId.toString();
-        } else if (episode.source === 'taddy' && (episode as any).podcastSeriesUuid) {
-          seriesData.taddyUuid = (episode as any).podcastSeriesUuid;
         } else if (episode.source === 'apple' && episode.collectionId) {
           seriesData.iTunesId = episode.collectionId;
         }

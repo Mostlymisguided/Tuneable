@@ -411,7 +411,7 @@ class PodcastAdapter {
   /**
    * Create or find podcast series as Media
    */
-  async createOrFindSeries(seriesData, addedBy) {
+  async createOrFindSeries(seriesData, addedBy, source = null) {
     // Check if series already exists
     const existing = await Media.findOne({
       $or: [
@@ -422,6 +422,26 @@ class PodcastAdapter {
     });
     
     if (existing) {
+      // Update RSS feed if we have a new one from a different source
+      if (seriesData.rssUrl && existing.sources) {
+        const rssKey = source ? `rss_${source}` : 'rss';
+        const sources = existing.sources instanceof Map ? existing.sources : new Map(Object.entries(existing.sources || {}));
+        
+        // Check if this RSS feed is already stored
+        const existingRss = sources.get(rssKey) || sources.get('rss');
+        if (existingRss !== seriesData.rssUrl) {
+          // Store with source-specific key
+          sources.set(rssKey, seriesData.rssUrl);
+          // Update primary RSS if not set or if this is a better source
+          if (!sources.get('rss') || (source && source !== 'primary')) {
+            sources.set('rss', seriesData.rssUrl);
+          }
+          
+          existing.sources = sources;
+          await existing.save();
+          console.log(`💾 Updated RSS feed for series: ${existing.title} (source: ${source || 'primary'})`);
+        }
+      }
       return existing;
     }
     
@@ -440,14 +460,32 @@ class PodcastAdapter {
       genres: seriesData.categories || [],
       language: seriesData.language || 'en',
       
-      sources: new Map(
-        [
-          ['rss', seriesData.rssUrl],
-          ['taddy', seriesData.taddyUuid ? `https://taddy.org/p/${seriesData.taddyUuid}` : null],
-          ['podcast_index', seriesData.podcastIndexId ? `https://podcastindex.org/podcast/${seriesData.podcastIndexId}` : null],
-          ['apple', seriesData.iTunesId ? `https://podcasts.apple.com/podcast/id${seriesData.iTunesId}` : null]
-        ].filter(([_, url]) => url)
-      ),
+      sources: (() => {
+        const sourceMap = new Map();
+        
+        // Store RSS feed
+        if (seriesData.rssUrl) {
+          // Store with source-specific key if source is provided
+          if (source) {
+            sourceMap.set(`rss_${source}`, seriesData.rssUrl);
+          }
+          // Always store as 'rss' for backwards compatibility
+          sourceMap.set('rss', seriesData.rssUrl);
+        }
+        
+        // Store other sources
+        if (seriesData.taddyUuid) {
+          sourceMap.set('taddy', `https://taddy.org/p/${seriesData.taddyUuid}`);
+        }
+        if (seriesData.podcastIndexId) {
+          sourceMap.set('podcast_index', `https://podcastindex.org/podcast/${seriesData.podcastIndexId}`);
+        }
+        if (seriesData.iTunesId) {
+          sourceMap.set('apple', `https://podcasts.apple.com/podcast/id${seriesData.iTunesId}`);
+        }
+        
+        return sourceMap;
+      })(),
       
       externalIds: new Map(
         [
@@ -469,8 +507,8 @@ class PodcastAdapter {
    * Import episode with series linkage
    */
   async importEpisodeWithSeries(source, episodeData, seriesData, addedBy) {
-    // Create or find the podcast series
-    const series = await this.createOrFindSeries(seriesData, addedBy);
+    // Create or find the podcast series (pass source to store RSS feed with source-specific key)
+    const series = await this.createOrFindSeries(seriesData, addedBy, source);
     
     // Import the episode
     const episode = await this.importEpisode(source, episodeData, addedBy);

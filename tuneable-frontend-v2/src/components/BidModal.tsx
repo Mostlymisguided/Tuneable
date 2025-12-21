@@ -71,12 +71,12 @@ const BidModal: React.FC<BidModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 border border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Place a Tip</h2>
+          <h2 className="text-xl font-semibold text-white">Place a Tip</h2>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-300 transition-colors"
             disabled={isLoading}
           >
             <X className="h-6 w-6" />
@@ -84,10 +84,10 @@ const BidModal: React.FC<BidModalProps> = ({
         </div>
 
         <div className="mb-4">
-          <h3 className="font-medium text-gray-900">{songTitle}</h3>
-          <p className="text-sm text-gray-600">{songArtist}</p>
-          <p className="text-sm text-gray-500 mt-1">
-            Current tip: <span className="font-medium">£{currentBid.toFixed(2)}</span>
+          <h3 className="font-medium text-white">{songTitle}</h3>
+          <p className="text-sm text-gray-300">{songArtist}</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Current tip: <span className="font-medium text-white">£{currentBid.toFixed(2)}</span>
           </p>
         </div>
 
@@ -96,7 +96,7 @@ const BidModal: React.FC<BidModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-300 mb-2">
               Your Tip Amount
             </label>
             <div className="flex items-center space-x-2">
@@ -104,9 +104,9 @@ const BidModal: React.FC<BidModalProps> = ({
                 type="button"
                 onClick={() => adjustBidAmount(-0.01)}
                 disabled={isLoading || parseFloat(bidAmount) <= minimumBid}
-                className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                className="px-3 py-2 border border-gray-600 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
-                <Minus className="h-4 w-4 text-gray-600" />
+                <Minus className="h-4 w-4 text-gray-300" />
               </button>
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -122,7 +122,7 @@ const BidModal: React.FC<BidModalProps> = ({
                     setBidAmount(e.target.value);
                     setError('');
                   }}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="block w-full pl-10 pr-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
                   placeholder="0.00"
                   disabled={isLoading}
                   autoFocus
@@ -132,13 +132,13 @@ const BidModal: React.FC<BidModalProps> = ({
                 type="button"
                 onClick={() => adjustBidAmount(0.01)}
                 disabled={isLoading || (userBalance > 0 && parseFloat(bidAmount) >= userBalance)}
-                className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                className="px-3 py-2 border border-gray-600 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
-                <Plus className="h-4 w-4 text-gray-600" />
+                <Plus className="h-4 w-4 text-gray-300" />
               </button>
             </div>
             {error && (
-              <div className="mt-2 flex items-center text-sm text-red-600">
+              <div className="mt-2 flex items-center text-sm text-red-400">
                 <AlertCircle className="h-4 w-4 mr-1" />
                 {error}
               </div>
@@ -149,14 +149,14 @@ const BidModal: React.FC<BidModalProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              className="flex-1 px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || !bidAmount}
             >
               {isLoading ? 'Placing Tip...' : 'Place Tip'}
