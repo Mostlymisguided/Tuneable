@@ -39,6 +39,7 @@ interface PodcastEpisode {
   playCount?: number;
   popularity?: number;
   releaseDate?: string;
+  publishedAt?: string | Date; // For Taddy and other external sources
   host?: Array<{ name: string }>;
   podcastSeries?: {
     _id: string;
@@ -545,9 +546,27 @@ const Podcasts: React.FC = () => {
     return `${minutes}:${seconds % 60}`;
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
+  const formatDate = (dateString?: string | Date | null, publishedAt?: string | Date | null) => {
+    // Prefer releaseDate, fallback to publishedAt
+    const dateValue = dateString || publishedAt;
+    
+    if (!dateValue) return 'Unknown';
+    
+    // Handle Date objects
+    let date: Date;
+    if (dateValue instanceof Date) {
+      date = dateValue;
+    } else if (typeof dateValue === 'string') {
+      date = new Date(dateValue);
+    } else {
+      return 'Unknown';
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Unknown';
+    }
+    
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
@@ -1131,7 +1150,7 @@ const Podcasts: React.FC = () => {
                       )}
                       <div className="flex items-center space-x-1 text-gray-400">
                         <Calendar className="h-4 w-4" />
-                        <span>{formatDate(episode.releaseDate)}</span>
+                        <span>{formatDate(episode.releaseDate, episode.publishedAt)}</span>
                       </div>
                     </div>
 

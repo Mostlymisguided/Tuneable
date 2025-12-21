@@ -121,7 +121,26 @@ class PodcastAdapter {
       ),
       
       // System
-      releaseDate: taddyEpisode.datePublished ? new Date(taddyEpisode.datePublished) : new Date(),
+      // Taddy returns datePublished as Unix timestamp (seconds) or ISO string
+      releaseDate: (() => {
+        if (!taddyEpisode.datePublished) return new Date();
+        
+        if (typeof taddyEpisode.datePublished === 'number') {
+          // If it's a number, check if it's in seconds (less than year 2000 in milliseconds)
+          if (taddyEpisode.datePublished < 946684800) {
+            // It's in seconds, convert to milliseconds
+            return new Date(taddyEpisode.datePublished * 1000);
+          } else {
+            // It's already in milliseconds
+            return new Date(taddyEpisode.datePublished);
+          }
+        } else if (typeof taddyEpisode.datePublished === 'string') {
+          // ISO string or other date string
+          const date = new Date(taddyEpisode.datePublished);
+          return isNaN(date.getTime()) ? new Date() : date;
+        }
+        return new Date();
+      })(),
       fileSize: taddyEpisode.audioLength || null
     };
   }

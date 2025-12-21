@@ -281,6 +281,30 @@ class TaddyService {
 
   // Convert Taddy episode to our format
   convertEpisodeToOurFormat(taddyEpisode) {
+    // Taddy returns datePublished as Unix timestamp (seconds) or ISO string
+    let datePublished = null;
+    if (taddyEpisode.datePublished) {
+      if (typeof taddyEpisode.datePublished === 'number') {
+        // If it's a number, check if it's in seconds (less than year 2000 in milliseconds)
+        // Unix timestamps before 2000 in seconds would be < 946684800000 in milliseconds
+        if (taddyEpisode.datePublished < 946684800) {
+          // It's in seconds, convert to milliseconds
+          datePublished = new Date(taddyEpisode.datePublished * 1000);
+        } else {
+          // It's already in milliseconds
+          datePublished = new Date(taddyEpisode.datePublished);
+        }
+      } else if (typeof taddyEpisode.datePublished === 'string') {
+        // ISO string or other date string
+        datePublished = new Date(taddyEpisode.datePublished);
+      }
+      
+      // Validate the date
+      if (datePublished && isNaN(datePublished.getTime())) {
+        datePublished = null;
+      }
+    }
+    
     return {
       title: taddyEpisode.name || 'Untitled Episode',
       description: taddyEpisode.description || '',
@@ -297,7 +321,8 @@ class TaddyService {
       audioUrl: taddyEpisode.audioUrl || '',
       audioType: 'audio/mpeg', // Default assumption
       audioSize: taddyEpisode.fileLength || null,
-      publishedAt: taddyEpisode.datePublished ? new Date(taddyEpisode.datePublished) : new Date(),
+      publishedAt: datePublished,
+      releaseDate: datePublished ? datePublished.toISOString() : null, // Also include as releaseDate for frontend compatibility
       guid: taddyEpisode.uuid,
       rssUrl: taddyEpisode.podcastSeries?.rssUrl || '',
       source: 'taddy',

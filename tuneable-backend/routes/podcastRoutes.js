@@ -1151,6 +1151,13 @@ router.get('/chart', async (req, res) => {
       .populate('addedBy', 'username')
       .populate('podcastSeries', 'title coverArt')
       .lean();
+    
+    // Ensure releaseDate is set - use createdAt as fallback if releaseDate is null
+    episodes.forEach(episode => {
+      if (!episode.releaseDate && episode.createdAt) {
+        episode.releaseDate = episode.createdAt;
+      }
+    });
 
     // Get available categories/genres/tags for filtering
     const [categories, genres, tags] = await Promise.all([
@@ -1372,6 +1379,13 @@ router.get('/search-episodes', async (req, res) => {
       .populate('addedBy', 'username')
       .populate('podcastSeries', 'title coverArt')
       .lean();
+    
+    // Ensure releaseDate is set - use createdAt as fallback if releaseDate is null
+    episodes.forEach(episode => {
+      if (!episode.releaseDate && episode.createdAt) {
+        episode.releaseDate = episode.createdAt;
+      }
+    });
     
     res.json({ 
       episodes, 
