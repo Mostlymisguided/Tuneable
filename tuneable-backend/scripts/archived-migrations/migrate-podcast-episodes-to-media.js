@@ -1,8 +1,13 @@
 /**
  * Migration Script: PodcastEpisode → Media Model
  * 
- * Migrates all PodcastEpisode documents to Media model format
+ * HISTORICAL SCRIPT - PodcastEpisode model has been removed
+ * This script was used to migrate PodcastEpisode documents to Media model format.
+ * All episodes are now stored in the Media model with contentForm: ['podcastepisode']
+ * 
  * Preserves all data and relationships (bids, parties, etc.)
+ * 
+ * NOTE: The PodcastEpisode model no longer exists. This script is kept for reference only.
  */
 
 require('dotenv').config();

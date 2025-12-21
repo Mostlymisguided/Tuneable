@@ -4,6 +4,7 @@ require('dotenv').config();
 
 // Import models
 const Song = require('../models/Song');
+const Media = require('../models/Media');
 const Party = require('../models/Party');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
@@ -109,9 +110,11 @@ async function migrateParties() {
       const attendee_uuids = attendeeUsers.map(user => user.uuid);
 
       // Update songs in party with UUIDs
+      // Note: PodcastEpisode model has been removed - episodes are now in Media model
       const updatedSongs = await Promise.all(party.songs.map(async (songEntry) => {
         const song = await Song.findById(songEntry.songId);
-        const episode = songEntry.episodeId ? await require('../models/PodcastEpisode').findById(songEntry.episodeId) : null;
+        // Look for episode in Media model (legacy episodeId references migrated episodes)
+        const episode = songEntry.episodeId ? await Media.findById(songEntry.episodeId) : null;
         const addedByUser = await User.findById(songEntry.addedBy);
         const vetoedByUser = songEntry.vetoedBy ? await User.findById(songEntry.vetoedBy) : null;
 
@@ -158,10 +161,12 @@ async function migrateBids() {
   for (const bid of bidsToMigrate) {
     try {
       // Get related UUIDs
+      // Note: PodcastEpisode model has been removed - episodes are now in Media model
       const user = await User.findById(bid.userId);
       const party = await Party.findById(bid.partyId);
       const song = bid.songId ? await Song.findById(bid.songId) : null;
-      const episode = bid.episodeId ? await require('../models/PodcastEpisode').findById(bid.episodeId) : null;
+      // Look for episode in Media model (legacy episodeId references migrated episodes)
+      const episode = bid.episodeId ? await Media.findById(bid.episodeId) : null;
 
       await Bid.findByIdAndUpdate(bid._id, {
         uuid: uuidv7(),
