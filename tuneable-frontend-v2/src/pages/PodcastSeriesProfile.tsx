@@ -72,9 +72,15 @@ const PodcastSeriesProfile: React.FC = () => {
   const [series, setSeries] = useState<PodcastSeries | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [stats, setStats] = useState<SeriesStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSeries, setIsLoadingSeries] = useState(true);
+  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Loading podcast series...');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [episodeCount, setEpisodeCount] = useState<number | null>(null);
+  const [loadingSource, setLoadingSource] = useState<string | null>(null);
+  const [loadingStage, setLoadingStage] = useState<string>('');
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,7 +100,11 @@ const PodcastSeriesProfile: React.FC = () => {
 
   useEffect(() => {
     if (seriesId) {
-      fetchSeriesData();
+      // First load series info (fast)
+      fetchSeriesInfo().then(() => {
+        // Then load episodes (slower, with import)
+        fetchEpisodes();
+      });
     }
   }, [seriesId]);
 
@@ -112,22 +122,12 @@ const PodcastSeriesProfile: React.FC = () => {
     setCurrentPage(1);
   }, [searchQuery, sortBy]);
 
-  const fetchSeriesData = async (refresh = false) => {
+  const fetchSeriesInfo = async () => {
     if (!seriesId) return;
     
-    if (refresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    
+    setIsLoadingSeries(true);
     try {
-      const params = new URLSearchParams();
-      if (refresh) {
-        params.append('refresh', 'true');
-      }
-      
-      const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}/info`;
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -141,29 +141,134 @@ const PodcastSeriesProfile: React.FC = () => {
 
       const data = await response.json();
       setSeries(data.series);
-      setEpisodes(data.episodes || []);
       setStats(data.stats || null);
+    } catch (error: any) {
+      console.error('Error fetching series info:', error);
+      toast.error('Failed to load podcast series');
+    } finally {
+      setIsLoadingSeries(false);
+    }
+  };
+
+  const fetchEpisodes = async (refresh = false) => {
+    if (!seriesId) return;
+    
+    setIsLoadingEpisodes(true);
+    setLoadingMessage('Searching for episodes from external sources...');
+    setLoadingStage('searching');
+    setLoadingSource(null);
+    setEpisodeCount(null);
+    setLoadingProgress(10);
+    
+    try {
+      const params = new URLSearchParams();
+      if (refresh) {
+        params.append('refresh', 'true');
+      }
+      
+      // Stage 1: Connecting
+      setLoadingMessage('Connecting to podcast database...');
+      setLoadingStage('connecting');
+      setLoadingProgress(15);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Stage 2: Checking existing episodes
+      setLoadingMessage('Checking existing episodes in database...');
+      setLoadingStage('checking');
+      setLoadingProgress(25);
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      // Stage 3: Fetching from Taddy
+      setLoadingMessage('Fetching episodes from Taddy API...');
+      setLoadingStage('fetching-taddy');
+      setLoadingSource('Taddy');
+      setLoadingProgress(35);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Stage 4: Processing Taddy results
+      setLoadingMessage('Processing episodes from Taddy...');
+      setLoadingStage('processing-taddy');
+      setLoadingProgress(45);
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch episodes');
+      }
+
+      // Stage 5: Processing response
+      setLoadingMessage('Processing episode data...');
+      setLoadingStage('processing');
+      setLoadingProgress(60);
+      
+      const data = await response.json();
+      
+      // Stage 6: Importing episodes
+      if (data.importInfo && data.importInfo.imported > 0) {
+        setEpisodeCount(data.importInfo.imported);
+        setLoadingMessage(`Importing ${data.importInfo.imported} new episode${data.importInfo.imported === 1 ? '' : 's'}...`);
+        setLoadingStage('importing');
+        setLoadingProgress(75);
+        
+        // Simulate progress during import
+        for (let i = 75; i < 95; i += 5) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          setLoadingProgress(i);
+        }
+      } else {
+        setLoadingMessage('Finalizing episode list...');
+        setLoadingStage('finalizing');
+        setLoadingProgress(80);
+      }
+      
+      // Show total episode count
+      if (data.episodes && data.episodes.length > 0) {
+        setEpisodeCount(data.episodes.length);
+      }
+      
+      setEpisodes(data.episodes || []);
+      if (data.stats) {
+        setStats(data.stats);
+      }
+      
+      // Stage 7: Complete
+      setLoadingMessage('Complete!');
+      setLoadingStage('complete');
+      setLoadingProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       if (data.importInfo && data.importInfo.imported > 0) {
         toast.success(`Imported ${data.importInfo.imported} new episode${data.importInfo.imported === 1 ? '' : 's'}`);
       }
     } catch (error: any) {
-      console.error('Error fetching series:', error);
-      toast.error('Failed to load podcast series');
+      console.error('Error fetching episodes:', error);
+      toast.error('Failed to load episodes');
+      setLoadingMessage('Error loading episodes');
+      setLoadingStage('error');
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      setIsLoadingEpisodes(false);
+      setLoadingProgress(0);
+      setEpisodeCount(null);
+      setLoadingSource(null);
+      setLoadingStage('');
     }
   };
   
   const handleRefresh = async () => {
-    await fetchSeriesData(true);
+    setIsRefreshing(true);
+    await fetchEpisodes(true);
+    setIsRefreshing(false);
   };
   
   const handleLoadMore = async () => {
     if (!seriesId || isLoadingMore) return;
     
     setIsLoadingMore(true);
+    setLoadingMessage('Loading more episodes...');
+    setLoadingProgress(30);
+    
     try {
       // Use current episode count as offset (how many we've already loaded)
       const params = new URLSearchParams({
@@ -172,6 +277,9 @@ const PodcastSeriesProfile: React.FC = () => {
         offset: episodes.length.toString() // Offset based on currently loaded episodes
       });
       
+      setLoadingMessage('Fetching episodes from external sources...');
+      setLoadingProgress(50);
+      
       const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}?${params.toString()}`;
       const response = await fetch(url);
 
@@ -179,6 +287,9 @@ const PodcastSeriesProfile: React.FC = () => {
         throw new Error('Failed to load more episodes');
       }
 
+      setLoadingMessage('Processing new episodes...');
+      setLoadingProgress(80);
+      
       const data = await response.json();
       
       // Append new episodes to existing list
@@ -194,6 +305,8 @@ const PodcastSeriesProfile: React.FC = () => {
         setStats(data.stats);
       }
       
+      setLoadingProgress(100);
+      
       if (data.importInfo && data.importInfo.imported > 0) {
         toast.success(`Loaded ${data.importInfo.imported} more episode${data.importInfo.imported === 1 ? '' : 's'}`);
       } else {
@@ -204,6 +317,7 @@ const PodcastSeriesProfile: React.FC = () => {
       toast.error('Failed to load more episodes');
     } finally {
       setIsLoadingMore(false);
+      setLoadingProgress(0);
     }
   };
   
@@ -283,7 +397,8 @@ const PodcastSeriesProfile: React.FC = () => {
       setSelectedEpisode(null);
       
       // Refresh series data
-      fetchSeriesData();
+      await fetchSeriesInfo();
+      await fetchEpisodes();
       
       // Refresh user balance
       window.location.reload();
@@ -377,15 +492,12 @@ const PodcastSeriesProfile: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoadingSeries) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col items-center justify-center h-64">
-            <RefreshCw className="h-12 w-12 animate-spin text-purple-500 mb-4" />
-            <p className="text-gray-300 text-lg">Loading podcast series...</p>
-            <p className="text-gray-500 text-sm mt-2">Importing latest episodes</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 flex items-center justify-center p-4">
+        <div className="text-center">
+          <RefreshCw className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
+          <p className="text-gray-300 text-lg">Loading podcast series...</p>
         </div>
       </div>
     );
@@ -628,13 +740,86 @@ const PodcastSeriesProfile: React.FC = () => {
           </div>
           
           {/* Search Results Count */}
-          {(searchQuery || getFilteredAndSortedEpisodes().length !== episodes.length) && (
+          {!isLoadingEpisodes && (searchQuery || getFilteredAndSortedEpisodes().length !== episodes.length) && (
             <p className="text-gray-400 text-sm mb-4">
               Showing {getFilteredAndSortedEpisodes().length} of {episodes.length} episodes
             </p>
           )}
           
-          {episodes.length === 0 ? (
+          {isLoadingEpisodes ? (
+            <div className="text-center py-12 bg-gray-800/50 rounded-lg">
+              <RefreshCw className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
+              
+              {/* Main Loading Message */}
+              <p className="text-gray-300 text-xl font-semibold mb-2">{loadingMessage}</p>
+              
+              {/* Episode Count Display */}
+              {episodeCount !== null && (
+                <div className="mb-4">
+                  <div className="inline-flex items-center space-x-2 bg-purple-600/20 px-4 py-2 rounded-lg border border-purple-500/30">
+                    <Music className="h-5 w-5 text-purple-400" />
+                    <span className="text-purple-300 font-bold text-lg">{episodeCount}</span>
+                    <span className="text-gray-400 text-sm">
+                      {episodeCount === 1 ? 'episode' : 'episodes'} {loadingStage === 'importing' ? 'imported' : 'found'}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Source Indicator */}
+              {loadingSource && (
+                <div className="mb-4">
+                  <span className="inline-flex items-center space-x-2 text-sm text-gray-400">
+                    <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
+                    <span>Fetching from {loadingSource}</span>
+                  </span>
+                </div>
+              )}
+              
+              {/* Stage Description */}
+              {loadingStage && (
+                <p className="text-gray-500 text-sm mb-4">
+                  {loadingStage === 'searching' && 'Searching external podcast databases...'}
+                  {loadingStage === 'connecting' && 'Establishing connection...'}
+                  {loadingStage === 'checking' && 'Checking for existing episodes...'}
+                  {loadingStage === 'fetching-taddy' && 'Requesting episodes from Taddy API...'}
+                  {loadingStage === 'processing-taddy' && 'Processing Taddy episode data...'}
+                  {loadingStage === 'processing' && 'Organizing episode information...'}
+                  {loadingStage === 'importing' && 'Adding episodes to database...'}
+                  {loadingStage === 'finalizing' && 'Preparing episode list...'}
+                  {loadingStage === 'complete' && 'Almost done!'}
+                </p>
+              )}
+              
+              {/* Progress Bar */}
+              <div className="w-full max-w-md mx-auto bg-gray-700 rounded-full h-3 mb-4 overflow-hidden shadow-inner">
+                <div 
+                  className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+              
+              {/* Progress Percentage */}
+              <div className="mb-4">
+                <span className="text-purple-400 font-semibold">{loadingProgress}%</span>
+                <span className="text-gray-500 text-sm ml-2">complete</span>
+              </div>
+              
+              {/* Loading Steps Indicator */}
+              <div className="flex justify-center space-x-2 mt-4 mb-4">
+                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${loadingProgress >= 15 ? 'bg-purple-400 scale-125' : 'bg-gray-600'}`} />
+                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${loadingProgress >= 35 ? 'bg-purple-400 scale-125' : 'bg-gray-600'}`} />
+                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${loadingProgress >= 60 ? 'bg-purple-400 scale-125' : 'bg-gray-600'}`} />
+                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${loadingProgress >= 80 ? 'bg-purple-400 scale-125' : 'bg-gray-600'}`} />
+                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${loadingProgress >= 100 ? 'bg-purple-400 scale-125' : 'bg-gray-600'}`} />
+              </div>
+              
+              {/* Helpful tip */}
+              <p className="text-gray-600 text-xs mt-6">
+                💡 Tip: Episodes are automatically imported from Taddy, RSS feeds, and other sources
+              </p>
+            </div>
+          ) : episodes.length === 0 ? (
             <div className="text-center py-12 bg-gray-800/50 rounded-lg">
               <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400">No episodes found for this podcast series</p>
@@ -779,7 +964,7 @@ const PodcastSeriesProfile: React.FC = () => {
             
             {/* Load More Episodes Button */}
             {!searchQuery && (
-              <div className="flex justify-center mt-6">
+              <div className="flex flex-col items-center mt-6 space-y-3">
                 <button
                   onClick={handleLoadMore}
                   disabled={isLoadingMore}
@@ -797,6 +982,16 @@ const PodcastSeriesProfile: React.FC = () => {
                     </>
                   )}
                 </button>
+                
+                {/* Progress indicator for load more */}
+                {isLoadingMore && (
+                  <div className="w-64 bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 h-1.5 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${loadingProgress}%` }}
+                    />
+                  </div>
+                )}
               </div>
             )}
             </>

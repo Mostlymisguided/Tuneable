@@ -1369,6 +1369,98 @@ router.post('/discovery/create-or-find-series', authMiddleware, async (req, res)
   }
 });
 
+// Get podcast series info only (without episodes - for fast initial load)
+router.get('/series/:seriesId/info', async (req, res) => {
+  try {
+    const { seriesId } = req.params;
+    
+    if (!isValidObjectId(seriesId)) {
+      return res.status(400).json({ error: 'Invalid series ID' });
+    }
+
+    // Get series only (no episodes, no import)
+    const series = await Media.findById(seriesId)
+      .populate('host.userId', 'username profilePic uuid')
+      .lean();
+
+    if (!series) {
+      return res.status(404).json({ error: 'Podcast series not found' });
+    }
+
+    // Verify it's a podcast series
+    if (!series.contentForm?.includes('podcastseries')) {
+      return res.status(400).json({ error: 'Media item is not a podcast series' });
+    }
+
+    // Get basic stats (count only, no full episode list)
+    const episodeCount = await Media.countDocuments({
+      podcastSeries: seriesId,
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    });
+
+    // Calculate basic stats
+    const statsResult = await Media.aggregate([
+      {
+        $match: {
+          podcastSeries: new mongoose.Types.ObjectId(seriesId),
+          contentType: { $in: ['spoken'] },
+          contentForm: { $in: ['podcastepisode'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalTips: { $sum: '$globalMediaAggregate' },
+          episodeCount: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const stats = statsResult[0] || { totalTips: 0, episodeCount: 0 };
+    const avgTip = stats.episodeCount > 0 ? stats.totalTips / stats.episodeCount : 0;
+
+    // Get top episode for stats
+    const topEpisode = await Media.findOne({
+      podcastSeries: seriesId,
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    })
+      .sort({ globalMediaAggregate: -1 })
+      .select('_id title globalMediaAggregate')
+      .lean();
+
+    res.json({
+      series: {
+        _id: series._id,
+        title: series.title,
+        description: series.description,
+        coverArt: series.coverArt,
+        host: series.host,
+        genres: series.genres,
+        tags: series.tags,
+        language: series.language,
+        externalIds: series.externalIds,
+        sources: series.sources,
+        addedBy: series.addedBy
+      },
+      stats: {
+        totalEpisodes: stats.episodeCount,
+        totalTips: stats.totalTips,
+        avgTip: avgTip,
+        topEpisode: topEpisode ? {
+          _id: topEpisode._id,
+          title: topEpisode.title,
+          globalMediaAggregate: topEpisode.globalMediaAggregate
+        } : undefined
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching series info:', error);
+    res.status(500).json({ error: 'Failed to fetch series info' });
+  }
+});
+
 // Get podcast series with episodes
 router.get('/series/:seriesId', async (req, res) => {
   try {
