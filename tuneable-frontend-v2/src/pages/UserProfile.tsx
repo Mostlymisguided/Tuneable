@@ -183,7 +183,7 @@ const UserProfile: React.FC = () => {
   const { user: currentUser, handleOAuthCallback } = useAuth();
   
   // Web player store for playing media
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -734,8 +734,9 @@ const UserProfile: React.FC = () => {
       totalBidValue: mediaData.totalAmountBid || 0,
     };
     
-    // Set the media in the webplayer and start playing
-    setCurrentMedia(cleanedMedia, 0, true); // true = autoplay
+    // Set the media in the webplayer and start playback
+    setCurrentMedia(cleanedMedia, 0, false); // Set media without autoplay
+    play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     
     toast.success(`Now playing: ${cleanedMedia.title}`);

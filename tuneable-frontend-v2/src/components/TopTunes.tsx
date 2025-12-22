@@ -33,7 +33,7 @@ interface TopTunesProps {
 
 const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) => {
   const navigate = useNavigate();
-  const { setCurrentMedia, setGlobalPlayerActive } = useWebPlayerStore();
+  const { setCurrentMedia, setGlobalPlayerActive, play } = useWebPlayerStore();
   
   const [songs, setSongs] = useState<TopTunesSong[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,8 +122,9 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       totalBidValue: song.globalMediaAggregate,
     };
     
-    // Set the media in the webplayer and start playing
-    setCurrentMedia(cleanedMedia, 0, true); // true = autoplay
+    // Set the media in the webplayer and start playback
+    setCurrentMedia(cleanedMedia, 0, false); // Set media without autoplay
+    play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     
     toast.success(`Now playing: ${cleanedMedia.title}`);

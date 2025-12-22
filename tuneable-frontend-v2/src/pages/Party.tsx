@@ -156,6 +156,7 @@ const Party: React.FC = () => {
     setGlobalPlayerActive,
     currentPartyId,
     currentMedia,
+    play,
   } = useWebPlayerStore();
 
   // Use Socket.IO for real-time party updates
@@ -371,13 +372,14 @@ const Party: React.FC = () => {
         setCurrentPartyId(partyId!);
         setGlobalPlayerActive(true);
         
-      // Only autoplay if web player is empty (no current media)
+      // Only set media if web player is empty (no current media)
       // This preserves playback across page loads/navigation
+      // No autoplay - user must manually start playback
       if (cleanedQueue.length > 0) {
         if (!currentMedia) {
-          // Web player is empty - safe to autoplay
+          // Web player is empty - set media but don't autoplay
           console.log('Web player is empty, setting current media to:', cleanedQueue[0].title);
-          setCurrentMedia(cleanedQueue[0], 0, true); // Auto-play for jukebox experience
+          setCurrentMedia(cleanedQueue[0], 0, false); // No autoplay - user starts manually
         } else {
           // Web player already has media - preserve it, don't interrupt
           console.log('Web player already has media, preserving playback:', currentMedia.title);
@@ -1857,8 +1859,9 @@ const Party: React.FC = () => {
       addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
     };
     
-    // Set the media in the webplayer and start playing
-    setCurrentMedia(cleanedMedia, index, true); // true = autoplay
+    // Set the media in the webplayer and start playback
+    setCurrentMedia(cleanedMedia, index, false); // Set media without autoplay
+    play(); // Explicitly start playback when user clicks play button
     
     toast.success(`Now playing: ${cleanedMedia.title}`);
   };

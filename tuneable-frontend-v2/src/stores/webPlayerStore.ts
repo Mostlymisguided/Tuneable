@@ -139,7 +139,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
         set({ 
           currentMedia: media, 
           currentMediaIndex: index,
-          isPlaying: autoPlay, // Auto-play if requested (for jukebox experience)
+          isPlaying: false, // Always start paused - user must manually play (autotransition handled in next())
           currentTime: 0, // Reset time when changing media
           duration: 0,
           topBidder: null // Clear top bidder when changing media
@@ -186,11 +186,11 @@ export const useWebPlayerStore = create<WebPlayerState>()(
             return;
           }
           
-          // Move to next media and auto-play for jukebox experience
+          // Move to next media and auto-play for smooth autotransition
           set({ 
             currentMedia: queue[nextIndex], 
             currentMediaIndex: nextIndex,
-            isPlaying: true // Auto-play next media for smooth jukebox experience
+            isPlaying: true // Autotransition: auto-play next media when current finishes
           });
           
           if (isHost && sendWebSocketMessage) {

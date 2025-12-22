@@ -411,39 +411,9 @@ const PersistentWebPlayer: React.FC = () => {
                 setDuration(dur);
                 setIsPlayerReady(true);
                 
-                // YouTube player is always rendered when active
-                
-                // Small delay to ensure state is synchronized
-                setTimeout(() => {
-                  const currentIsPlaying = useWebPlayerStore.getState().isPlaying;
-                  if (currentIsPlaying) {
-                    console.log('Auto-playing video...');
-                    try {
-                      event.target.playVideo();
-                      // Check if play actually started (important for iOS autoplay restrictions)
-                      setTimeout(() => {
-                        try {
-                          const playerState = event.target.getPlayerState();
-                          const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
-                          // YT.PlayerState.PLAYING = 1, YT.PlayerState.PAUSED = 2, YT.PlayerState.CUED = 5
-                          if (playerState !== window.YT.PlayerState.PLAYING && stillShouldBePlaying) {
-                            console.warn('Play failed (likely iOS autoplay restriction), resetting isPlaying state');
-                            // Play failed (likely iOS autoplay restriction), reset state
-                            useWebPlayerStore.getState().pause();
-                          }
-                        } catch (checkError) {
-                          console.error('Error checking player state:', checkError);
-                        }
-                      }, 500);
-                    } catch (error) {
-                      console.error('Error playing video:', error);
-                      // Reset playing state if play fails
-                      useWebPlayerStore.getState().pause();
-                    }
-                  } else {
-                    console.log('YouTube player ready but not playing - isPlaying is false');
-                  }
-                }, 100);
+                // Player is ready - no autoplay, user must manually start playback
+                // Autotransition will work via the isPlaying state change handler below
+                console.log('YouTube player ready - waiting for user to start playback or autotransition');
               },
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);

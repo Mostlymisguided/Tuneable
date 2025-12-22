@@ -280,7 +280,7 @@ const TuneProfile: React.FC = () => {
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
 
   // WebPlayer integration
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } = useWebPlayerStore();
 
   const parsedGlobalBidAmount = useMemo(() => {
     const parsed = parseFloat(globalBidInput);
@@ -1394,7 +1394,8 @@ const TuneProfile: React.FC = () => {
 
     // Clear any existing queue and set new media
     setQueue([formattedSong]);
-    setCurrentMedia(formattedSong, 0, true); // true = autoplay
+    setCurrentMedia(formattedSong, 0, false); // Set media without autoplay
+    play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     setCurrentPartyId(null); // Not in a party context
     
