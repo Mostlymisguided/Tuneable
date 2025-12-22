@@ -29,8 +29,12 @@ const QuotaWarningBanner: React.FC<QuotaWarningBannerProps> = ({ onDismiss, clas
         setIsLoading(true);
         const status = await searchAPI.getQuotaStatus();
         setQuotaStatus(status);
-      } catch (error) {
-        console.error('Error fetching quota status:', error);
+      } catch (error: any) {
+        // Silently fail for 401 (not logged in) - quota status is not critical
+        // For other errors, log but don't show to user
+        if (error?.response?.status !== 401) {
+          console.error('Error fetching quota status:', error);
+        }
       } finally {
         setIsLoading(false);
       }

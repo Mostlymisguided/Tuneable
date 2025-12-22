@@ -490,9 +490,17 @@ const Party: React.FC = () => {
       
       // Note: Media setting is now handled by the useEffect hook
       // to prevent interference with global player state
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching party details:', error);
-      toast.error('Failed to load party details');
+      // Check if it's an authentication error
+      if (error?.response?.status === 401) {
+        toast.error('Please log in to view party details', {
+          onClick: () => navigate('/login'),
+          style: { cursor: 'pointer' }
+        });
+      } else {
+        toast.error('Failed to load party details');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -510,9 +518,17 @@ const Party: React.FC = () => {
     try {
       const response = await partyAPI.getMediaSortedByTime(partyId, timePeriod);
       setSortedMedia(response.media || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching sorted media:', error);
-      toast.error('Failed to load sorted media');
+      // Check if it's an authentication error
+      if (error?.response?.status === 401) {
+        toast.error('Please log in to view sorted media', {
+          onClick: () => navigate('/login'),
+          style: { cursor: 'pointer' }
+        });
+      } else {
+        toast.error('Failed to load sorted media');
+      }
     } finally {
       setIsLoadingSortedMedia(false);
     }
@@ -535,9 +551,17 @@ const Party: React.FC = () => {
       }
       
       toast.success('Party data refreshed');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing party:', error);
-      toast.error('Failed to refresh party data');
+      // Check if it's an authentication error
+      if (error?.response?.status === 401) {
+        toast.error('Please log in to refresh party data', {
+          onClick: () => navigate('/login'),
+          style: { cursor: 'pointer' }
+        });
+      } else {
+        toast.error('Failed to refresh party data');
+      }
     } finally {
       setIsRefreshing(false);
     }
