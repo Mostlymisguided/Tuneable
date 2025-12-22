@@ -2297,14 +2297,16 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       // Don't fail the bid if escrow setup fails
     }
 
-    // Calculate and award TuneBytes for this bid (async, don't block response)
-    try {
-      const tuneBytesService = require('../services/tuneBytesService');
-      tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
-        console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
-      });
-    } catch (error) {
-      console.error('Error setting up TuneBytes calculation:', error);
+    // Award TuneBytes for this bid (async, skip ledger entry since it's already in TIP entry)
+    // Only update user balance and create TuneBytesTransaction record
+    if (tunebytesEarned > 0) {
+      try {
+        tuneBytesService.awardTuneBytesForBid(bid._id, true).catch(error => {
+          console.error('Failed to award TuneBytes for bid:', bid._id, error);
+        });
+      } catch (error) {
+        console.error('Error setting up TuneBytes award:', error);
+      }
     }
 
     // Invalidate and recalculate tag rankings for this user (async, don't block response)
@@ -2393,6 +2395,23 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     }).lean();
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
 
+    // Calculate tunebytes BEFORE updating media (need bid to be saved first, which is already done)
+    const tuneBytesService = require('../services/tuneBytesService');
+    let userTuneBytesPre = user.tuneBytes || 0;
+    let userTuneBytesPost = userTuneBytesPre;
+    let tunebytesEarned = 0;
+    
+    try {
+      const tunebytesCalculation = await tuneBytesService.calculateTuneBytesForBid(bid._id);
+      tunebytesEarned = tunebytesCalculation.tuneBytesEarned;
+      if (tunebytesEarned > 0) {
+        userTuneBytesPost = userTuneBytesPre + tunebytesEarned;
+      }
+    } catch (tunebytesError) {
+      console.error('⚠️ Failed to calculate tunebytes for ledger entry:', tunebytesError);
+      // Continue without tunebytes - they'll be calculated async later
+    }
+
     // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
     media.bids.push(bid._id);
@@ -2419,11 +2438,14 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         userBalancePre,
         userAggregatePre,
         mediaAggregatePre,
+        userTuneBytesPre: tunebytesEarned > 0 ? userTuneBytesPre : null,
+        userTuneBytesPost: tunebytesEarned > 0 ? userTuneBytesPost : null,
         referenceTransactionId: bid._id,
         metadata: {
           bidScope: 'global',
           isNewMedia: !partyMediaEntry,
-          platform: 'global-bid'
+          platform: 'global-bid',
+          tunebytesEarned: tunebytesEarned > 0 ? tunebytesEarned : undefined
         }
       });
       console.log(`✅ Ledger entry created for global bid ${bid._id}`);

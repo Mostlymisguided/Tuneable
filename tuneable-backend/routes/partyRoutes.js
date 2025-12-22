@@ -1923,15 +1923,8 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
           // Don't fail the bid if escrow setup fails
         }
 
-        // Calculate and award TuneBytes for this bid (async, don't block response)
-        try {
-          const tuneBytesService = require('../services/tuneBytesService');
-          tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
-            console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
-          });
-        } catch (error) {
-          console.error('Error setting up TuneBytes calculation:', error);
-        }
+        // TuneBytes will be calculated synchronously before ledger entry creation
+        // and awarded async after (with skipLedgerEntry flag)
 
         // Invalidate and recalculate tag rankings for this user (async, don't block response)
         try {
@@ -2077,6 +2070,23 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         }).lean();
         const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
         
+        // Calculate tunebytes BEFORE creating ledger entry (need bid to be saved first, which is already done)
+        const tuneBytesService = require('../services/tuneBytesService');
+        let userTuneBytesPre = user.tuneBytes || 0;
+        let userTuneBytesPost = userTuneBytesPre;
+        let tunebytesEarned = 0;
+        
+        try {
+          const tunebytesCalculation = await tuneBytesService.calculateTuneBytesForBid(bid._id);
+          tunebytesEarned = tunebytesCalculation.tuneBytesEarned;
+          if (tunebytesEarned > 0) {
+            userTuneBytesPost = userTuneBytesPre + tunebytesEarned;
+          }
+        } catch (tunebytesError) {
+          console.error('⚠️ Failed to calculate tunebytes for ledger entry:', tunebytesError);
+          // Continue without tunebytes - they'll be calculated async later
+        }
+        
         // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
         try {
           const tuneableLedgerService = require('../services/tuneableLedgerService');
@@ -2089,12 +2099,15 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             userBalancePre,
             userAggregatePre,
             mediaAggregatePre,
+            userTuneBytesPre: tunebytesEarned > 0 ? userTuneBytesPre : null,
+            userTuneBytesPost: tunebytesEarned > 0 ? userTuneBytesPost : null,
             referenceTransactionId: bid._id,
             metadata: {
               isNewMedia: isNewMediaEntry,
               queuePosition,
               queueSize,
-              platform: detectedPlatform
+              platform: detectedPlatform,
+              tunebytesEarned: tunebytesEarned > 0 ? tunebytesEarned : undefined
             }
           });
         } catch (error) {
@@ -2102,6 +2115,18 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
           console.error('Ledger error details:', error.message);
           console.error('Ledger error stack:', error.stack);
           // Don't fail the bid if ledger entry fails - log and continue
+        }
+        
+        // Award TuneBytes for this bid (async, skip ledger entry since it's already in TIP entry)
+        // Only update user balance and create TuneBytesTransaction record
+        if (tunebytesEarned > 0) {
+          try {
+            tuneBytesService.awardTuneBytesForBid(bid._id, true).catch(error => {
+              console.error('Failed to award TuneBytes for bid:', bid._id, error);
+            });
+          } catch (error) {
+            console.error('Error setting up TuneBytes award:', error);
+          }
         }
         
         // THEN update user balance (already in pence, no conversion needed)
@@ -2484,15 +2509,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
           // Don't fail the bid if escrow setup fails
         }
 
-        // Calculate and award TuneBytes for this bid (async, don't block response)
-        try {
-          const tuneBytesService = require('../services/tuneBytesService');
-          tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
-            console.error('Failed to calculate TuneBytes for bid:', bid._id, error);
-          });
-        } catch (error) {
-          console.error('Error setting up TuneBytes calculation:', error);
-        }
+        // TuneBytes will be calculated synchronously before ledger entry creation
+        // and awarded async after (with skipLedgerEntry flag)
 
         // Invalidate and recalculate tag rankings for this user (async, don't block response)
         try {
@@ -2667,6 +2685,23 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }).lean();
         const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
         
+        // Calculate tunebytes BEFORE creating ledger entry (need bid to be saved first, which is already done)
+        const tuneBytesService = require('../services/tuneBytesService');
+        let userTuneBytesPre = user.tuneBytes || 0;
+        let userTuneBytesPost = userTuneBytesPre;
+        let tunebytesEarned = 0;
+        
+        try {
+          const tunebytesCalculation = await tuneBytesService.calculateTuneBytesForBid(bid._id);
+          tunebytesEarned = tunebytesCalculation.tuneBytesEarned;
+          if (tunebytesEarned > 0) {
+            userTuneBytesPost = userTuneBytesPre + tunebytesEarned;
+          }
+        } catch (tunebytesError) {
+          console.error('⚠️ Failed to calculate tunebytes for ledger entry:', tunebytesError);
+          // Continue without tunebytes - they'll be calculated async later
+        }
+        
         // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
         try {
           const tuneableLedgerService = require('../services/tuneableLedgerService');
@@ -2679,11 +2714,14 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             userBalancePre,
             userAggregatePre,
             mediaAggregatePre,
+            userTuneBytesPre: tunebytesEarned > 0 ? userTuneBytesPre : null,
+            userTuneBytesPost: tunebytesEarned > 0 ? userTuneBytesPost : null,
             referenceTransactionId: bid._id,
             metadata: {
               queuePosition,
               queueSize,
-              platform: detectedPlatform
+              platform: detectedPlatform,
+              tunebytesEarned: tunebytesEarned > 0 ? tunebytesEarned : undefined
             }
           });
         } catch (error) {
@@ -2691,6 +2729,18 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
           console.error('Ledger error details:', error.message);
           console.error('Ledger error stack:', error.stack);
           // Don't fail the bid if ledger entry fails - log and continue
+        }
+        
+        // Award TuneBytes for this bid (async, skip ledger entry since it's already in TIP entry)
+        // Only update user balance and create TuneBytesTransaction record
+        if (tunebytesEarned > 0) {
+          try {
+            tuneBytesService.awardTuneBytesForBid(bid._id, true).catch(error => {
+              console.error('Failed to award TuneBytes for bid:', bid._id, error);
+            });
+          } catch (error) {
+            console.error('Error setting up TuneBytes award:', error);
+          }
         }
         
         // THEN update user balance (already in pence, no conversion needed)

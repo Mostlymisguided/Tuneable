@@ -21,6 +21,8 @@ class TuneableLedgerService {
    * @param {number} params.userBalancePre - User balance BEFORE transaction (in pence)
    * @param {number} params.userAggregatePre - User aggregate BEFORE transaction (in pence)
    * @param {number} params.mediaAggregatePre - Media aggregate BEFORE transaction (in pence)
+   * @param {number} params.userTuneBytesPre - User tunebytes BEFORE transaction (optional)
+   * @param {number} params.userTuneBytesPost - User tunebytes AFTER transaction (optional)
    * @param {ObjectId} params.referenceTransactionId - Bid ID
    * @param {Object} params.metadata - Additional metadata
    * @returns {Promise<Object>} Created ledger entry
@@ -34,6 +36,8 @@ class TuneableLedgerService {
     userBalancePre,
     userAggregatePre,
     mediaAggregatePre,
+    userTuneBytesPre = null,
+    userTuneBytesPost = null,
     referenceTransactionId = null,
     metadata = {}
   }) {
@@ -75,6 +79,8 @@ class TuneableLedgerService {
         amount,
         userBalancePre,
         userBalancePost,
+        userTuneBytesPre,
+        userTuneBytesPost,
         userAggregatePre,
         userAggregatePost,
         mediaAggregatePre,
@@ -86,7 +92,7 @@ class TuneableLedgerService {
         username,
         mediaTitle,
         partyName,
-        description: `Tip of £${(amount / 100).toFixed(2)} on "${mediaTitle}"`,
+        description: `Tip of £${(amount / 100).toFixed(2)} on "${mediaTitle}"${userTuneBytesPost !== null && userTuneBytesPre !== null ? ` (earned ${(userTuneBytesPost - userTuneBytesPre).toFixed(2)} tunebytes)` : ''}`,
         metadata
       });
       

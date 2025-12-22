@@ -118,9 +118,10 @@ class TuneBytesService {
   /**
    * Award TuneBytes to a user for a specific bid
    * @param {string} bidId - The bid ID
+   * @param {boolean} skipLedgerEntry - If true, skip creating a separate ledger entry (tunebytes will be recorded in TIP entry)
    * @returns {Promise<Object>} Transaction result
    */
-  async awardTuneBytesForBid(bidId) {
+  async awardTuneBytesForBid(bidId, skipLedgerEntry = false) {
     try {
       const bid = await Bid.findById(bidId).populate(['userId', 'mediaId']);
       if (!bid) {
@@ -185,35 +186,39 @@ class TuneBytesService {
         }
       });
 
-      // Log to ledger (optional - tunebytes earned from bids)
-      try {
-        const tuneableLedgerService = require('../services/tuneableLedgerService');
-        const Bid = require('../models/Bid');
-        
-        // Get user's current balance and aggregate for ledger
-        const updatedUser = await User.findById(user._id).lean();
-        const userBids = await Bid.find({ userId: user._id, status: 'active' });
-        const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
-        
-        await tuneableLedgerService.createTuneBytesTopUpEntry({
-          userId: user._id,
-          amount: calculation.tuneBytesEarned,
-          userTuneBytesPre: tunebytesBefore,
-          userBalancePre: updatedUser.balance || 0,
-          userAggregatePre: userAggregatePre,
-          metadata: {
-            source: 'bid_award',
-            bidId: bid._id.toString(),
-            mediaId: media._id.toString(),
-            mediaTitle: media.title,
-            discoveryRank: calculation.calculation.discoveryRank,
-            reason: calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth',
-            calculationSnapshot: calculation.calculation
-          }
-        });
-      } catch (ledgerError) {
-        console.error('⚠️ Failed to create ledger entry for tunebytes award:', ledgerError);
-        // Don't fail the transaction if ledger entry fails
+      // Log to ledger (only if not part of a tip transaction - tunebytes will be in TIP entry)
+      if (!skipLedgerEntry) {
+        try {
+          const tuneableLedgerService = require('../services/tuneableLedgerService');
+          const Bid = require('../models/Bid');
+          
+          // Get user's current balance and aggregate for ledger
+          const updatedUser = await User.findById(user._id).lean();
+          const userBids = await Bid.find({ userId: user._id, status: 'active' });
+          const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+          
+          await tuneableLedgerService.createTuneBytesTopUpEntry({
+            userId: user._id,
+            amount: calculation.tuneBytesEarned,
+            userTuneBytesPre: tunebytesBefore,
+            userBalancePre: updatedUser.balance || 0,
+            userAggregatePre: userAggregatePre,
+            metadata: {
+              source: 'bid_award',
+              bidId: bid._id.toString(),
+              mediaId: media._id.toString(),
+              mediaTitle: media.title,
+              discoveryRank: calculation.calculation.discoveryRank,
+              reason: calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth',
+              calculationSnapshot: calculation.calculation
+            }
+          });
+        } catch (ledgerError) {
+          console.error('⚠️ Failed to create ledger entry for tunebytes award:', ledgerError);
+          // Don't fail the transaction if ledger entry fails
+        }
+      } else {
+        console.log(`ℹ️ Skipping ledger entry for tunebytes (will be recorded in TIP entry): bid ${bidId}`);
       }
 
       // Send notification if TuneBytes earned is significant (> 0.1)
