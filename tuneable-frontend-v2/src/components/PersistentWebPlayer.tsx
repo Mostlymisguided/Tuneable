@@ -176,6 +176,11 @@ const PersistentWebPlayer: React.FC = () => {
       return;
     }
 
+    // Only handle keyboard shortcuts if there's current media
+    if (!currentMedia) {
+      return;
+    }
+
     if (event.code === 'Space' || event.key === ' ') {
       event.preventDefault();
       togglePlayPause();
@@ -186,7 +191,7 @@ const PersistentWebPlayer: React.FC = () => {
       event.preventDefault();
       previous();
     }
-  }, [togglePlayPause, next, previous]);
+  }, [togglePlayPause, next, previous, currentMedia]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleGlobalKeydown);
@@ -613,37 +618,8 @@ const PersistentWebPlayer: React.FC = () => {
     }
   }, [volume, isMuted, isPlayerReady, playerType]);
 
-  // Keyboard controls - spacebar for play/pause
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Only handle spacebar
-      if (e.code !== 'Space' && e.key !== ' ') return;
-      
-      // Don't interfere with typing in input fields, textareas, or contenteditable elements
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-      
-      // Prevent default spacebar behavior (page scroll)
-      e.preventDefault();
-      
-      // Toggle play/pause if there's current media
-      if (currentMedia) {
-        togglePlayPause();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyPress);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-    };
-  }, [currentMedia, togglePlayPause]);
+  // Keyboard controls are handled by handleGlobalKeydown above
+  // Removed duplicate handler to prevent double-toggling
 
   // Cleanup effect
   useEffect(() => {
