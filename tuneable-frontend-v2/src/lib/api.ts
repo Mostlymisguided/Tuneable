@@ -798,6 +798,7 @@ export const userAPI = {
     tune_bytes_earned?: boolean;
     email?: boolean;
     anonymousMode?: boolean;
+    defaultTip?: number;
   }) => {
     const response = await api.put('/users/notification-preferences', preferences);
     return response.data;

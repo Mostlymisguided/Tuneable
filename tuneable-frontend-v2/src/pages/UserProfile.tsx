@@ -246,7 +246,8 @@ const UserProfile: React.FC = () => {
     tune_bytes_earned: true,
     email: true,
     anonymousMode: false,
-    inApp: true // Always true
+    inApp: true, // Always true
+    defaultTip: 0.11 // Default tip amount in pounds
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
@@ -498,7 +499,8 @@ const UserProfile: React.FC = () => {
           tune_bytes_earned: notifPrefs.types?.tune_bytes_earned ?? true,
           email: notifPrefs.email ?? true,
           anonymousMode: prefs.anonymousMode ?? false,
-          inApp: true // Always true
+          inApp: true, // Always true
+          defaultTip: prefs.defaultTip ?? 0.11
         });
       }
       
@@ -2984,11 +2986,11 @@ const UserProfile: React.FC = () => {
                           <input
                             type="checkbox"
                             id={key}
-                            checked={notificationPrefs[key as keyof typeof notificationPrefs]}
+                            checked={notificationPrefs[key as keyof typeof notificationPrefs] as boolean}
                             onChange={(e) => setNotificationPrefs({
                               ...notificationPrefs,
                               [key]: e.target.checked
-                            })}
+                            } as typeof notificationPrefs)}
                             className="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500"
                           />
                           <label htmlFor={key} className="text-white font-medium cursor-pointer">
@@ -3066,6 +3068,33 @@ const UserProfile: React.FC = () => {
                         </p>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Default Tip Setting */}
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Tip Settings</h3>
+                  
+                  <div className="p-4 bg-black/20 rounded-lg">
+                    <label htmlFor="defaultTip" className="block text-white font-medium mb-2">
+                      Default Tip Amount (£)
+                    </label>
+                    <input
+                      type="number"
+                      id="defaultTip"
+                      step="0.01"
+                      min="0.01"
+                      value={notificationPrefs.defaultTip}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        defaultTip: parseFloat(e.target.value) || 0.11
+                      })}
+                      className="w-full max-w-xs px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="0.11"
+                    />
+                    <p className="text-sm text-gray-400 mt-2">
+                      Default tip amount when placing bids (minimum: £0.01). Currently set to £{notificationPrefs.defaultTip.toFixed(2)}.
+                    </p>
                   </div>
                 </div>
 

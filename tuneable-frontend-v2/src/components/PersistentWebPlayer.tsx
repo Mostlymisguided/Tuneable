@@ -425,15 +425,32 @@ const PersistentWebPlayer: React.FC = () => {
                       if (event.target && typeof event.target.playVideo === 'function') {
                         event.target.playVideo();
                         // Check if play actually started (important for iOS autoplay restrictions)
+                        // Wait longer to allow buffering to complete
                         setTimeout(() => {
                           try {
                             if (typeof event.target.getPlayerState === 'function') {
                               const playerState = event.target.getPlayerState();
                               const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
-                              // YT.PlayerState.PLAYING = 1, YT.PlayerState.PAUSED = 2, YT.PlayerState.CUED = 5
-                              if (playerState !== window.YT.PlayerState.PLAYING && stillShouldBePlaying) {
-                                console.warn('Play failed (likely iOS autoplay restriction or embedding error), resetting isPlaying state');
+                              // YT.PlayerState.PLAYING = 1, YT.PlayerState.PAUSED = 2, YT.PlayerState.CUED = 5, YT.PlayerState.BUFFERING = 3
+                              // Accept PLAYING or BUFFERING as valid states (player is trying to play)
+                              // Only reset if PAUSED or CUED (player is not trying to play)
+                              if (stillShouldBePlaying && 
+                                  playerState !== window.YT.PlayerState.PLAYING && 
+                                  playerState !== window.YT.PlayerState.BUFFERING) {
+                                console.warn('Play failed (likely iOS autoplay restriction or embedding error), resetting isPlaying state. Player state:', playerState);
                                 useWebPlayerStore.getState().pause();
+                              } else if (playerState === window.YT.PlayerState.BUFFERING) {
+                                // Still buffering, check again in a bit
+                                setTimeout(() => {
+                                  const finalState = event.target.getPlayerState();
+                                  const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
+                                  if (stillShouldBePlaying && 
+                                      finalState !== window.YT.PlayerState.PLAYING && 
+                                      finalState !== window.YT.PlayerState.BUFFERING) {
+                                    console.warn('Play failed after buffering, resetting isPlaying state. Final state:', finalState);
+                                    useWebPlayerStore.getState().pause();
+                                  }
+                                }, 1000);
                               }
                             }
                           } catch (checkError) {
@@ -444,7 +461,7 @@ const PersistentWebPlayer: React.FC = () => {
                               useWebPlayerStore.getState().pause();
                             }
                           }
-                        }, 500);
+                        }, 1500); // Increased delay to allow buffering
                       }
                     }, 100);
                   } catch (error) {
@@ -522,16 +539,34 @@ const PersistentWebPlayer: React.FC = () => {
           if (typeof youtubePlayerRef.current.playVideo === 'function') {
             youtubePlayerRef.current.playVideo();
             // Verify play actually started (important for iOS autoplay restrictions)
+            // Wait longer to allow buffering to complete
             setTimeout(() => {
               if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getPlayerState === 'function') {
                 try {
                   const playerState = youtubePlayerRef.current.getPlayerState();
                   const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
-                  // YT.PlayerState.PLAYING = 1
-                  if (playerState !== window.YT.PlayerState.PLAYING && stillShouldBePlaying) {
-                    console.warn('Play failed (likely iOS autoplay restriction or embedding error), resetting isPlaying state');
-                    // Play failed (likely iOS autoplay restriction or embedding error), reset state
+                  // YT.PlayerState.PLAYING = 1, YT.PlayerState.BUFFERING = 3
+                  // Accept PLAYING or BUFFERING as valid states (player is trying to play)
+                  // Only reset if PAUSED or CUED (player is not trying to play)
+                  if (stillShouldBePlaying && 
+                      playerState !== window.YT.PlayerState.PLAYING && 
+                      playerState !== window.YT.PlayerState.BUFFERING) {
+                    console.warn('Play failed (likely iOS autoplay restriction or embedding error), resetting isPlaying state. Player state:', playerState);
                     useWebPlayerStore.getState().pause();
+                  } else if (playerState === window.YT.PlayerState.BUFFERING) {
+                    // Still buffering, check again in a bit
+                    setTimeout(() => {
+                      if (youtubePlayerRef.current) {
+                        const finalState = youtubePlayerRef.current.getPlayerState();
+                        const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
+                        if (stillShouldBePlaying && 
+                            finalState !== window.YT.PlayerState.PLAYING && 
+                            finalState !== window.YT.PlayerState.BUFFERING) {
+                          console.warn('Play failed after buffering, resetting isPlaying state. Final state:', finalState);
+                          useWebPlayerStore.getState().pause();
+                        }
+                      }
+                    }, 1000);
                   }
                 } catch (error) {
                   console.error('Error checking player state:', error);
@@ -542,7 +577,7 @@ const PersistentWebPlayer: React.FC = () => {
                   }
                 }
               }
-            }, 500);
+            }, 1500); // Increased delay to allow buffering
           }
         } else {
           if (typeof youtubePlayerRef.current.pauseVideo === 'function') {

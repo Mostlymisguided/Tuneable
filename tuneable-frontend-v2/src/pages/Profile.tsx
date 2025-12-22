@@ -551,40 +551,6 @@ const Profile: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* Preferences Section */}
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-300">Preferences</h2>
-              
-              {isEditing ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">
-                      Default Tip Amount (£)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={editForm.defaultTip}
-                      onChange={(e) => setEditForm({...editForm, defaultTip: parseFloat(e.target.value) || 0.11})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="0.11"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Default tip amount when placing bids (minimum: £0.01)
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Default Tip:</span>
-                    <span className="text-white">£{((profile as any)?.preferences?.defaultTip || 0.11).toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
         </div>
