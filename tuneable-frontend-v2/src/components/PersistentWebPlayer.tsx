@@ -278,11 +278,15 @@ const PersistentWebPlayer: React.FC = () => {
     timePollingRef.current = setInterval(() => {
       try {
         if (playerType === 'youtube' && youtubePlayerRef.current) {
-          const current = youtubePlayerRef.current.getCurrentTime();
-          const dur = youtubePlayerRef.current.getDuration();
-          setCurrentTime(current);
-          if (dur && dur !== duration) {
-            setDuration(dur);
+          // Check if methods are available before calling
+          if (typeof youtubePlayerRef.current.getCurrentTime === 'function' && 
+              typeof youtubePlayerRef.current.getDuration === 'function') {
+            const current = youtubePlayerRef.current.getCurrentTime();
+            const dur = youtubePlayerRef.current.getDuration();
+            setCurrentTime(current);
+            if (dur && dur !== duration) {
+              setDuration(dur);
+            }
           }
         }
       } catch (error) {
@@ -411,9 +415,45 @@ const PersistentWebPlayer: React.FC = () => {
                 setDuration(dur);
                 setIsPlayerReady(true);
                 
-                // Player is ready - no autoplay, user must manually start playback
-                // Autotransition will work via the isPlaying state change handler below
-                console.log('YouTube player ready - waiting for user to start playback or autotransition');
+                // Check if playback should start (user clicked play or autotransition)
+                const currentIsPlaying = useWebPlayerStore.getState().isPlaying;
+                if (currentIsPlaying) {
+                  console.log('YouTube player ready - starting playback (isPlaying is true)');
+                  try {
+                    // Small delay to ensure player is fully initialized
+                    setTimeout(() => {
+                      if (event.target && typeof event.target.playVideo === 'function') {
+                        event.target.playVideo();
+                        // Check if play actually started (important for iOS autoplay restrictions)
+                        setTimeout(() => {
+                          try {
+                            if (typeof event.target.getPlayerState === 'function') {
+                              const playerState = event.target.getPlayerState();
+                              const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
+                              // YT.PlayerState.PLAYING = 1, YT.PlayerState.PAUSED = 2, YT.PlayerState.CUED = 5
+                              if (playerState !== window.YT.PlayerState.PLAYING && stillShouldBePlaying) {
+                                console.warn('Play failed (likely iOS autoplay restriction or embedding error), resetting isPlaying state');
+                                useWebPlayerStore.getState().pause();
+                              }
+                            }
+                          } catch (checkError) {
+                            console.error('Error checking player state:', checkError);
+                            // If we can't check state, assume play failed and reset
+                            const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
+                            if (stillShouldBePlaying) {
+                              useWebPlayerStore.getState().pause();
+                            }
+                          }
+                        }, 500);
+                      }
+                    }, 100);
+                  } catch (error) {
+                    console.error('Error playing video:', error);
+                    useWebPlayerStore.getState().pause();
+                  }
+                } else {
+                  console.log('YouTube player ready - waiting for user to start playback');
+                }
               },
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
@@ -437,6 +477,18 @@ const PersistentWebPlayer: React.FC = () => {
               },
               onError: (event: any) => {
                 console.error('YouTube player error:', event.data);
+                // Error 150/101: Video cannot be played in embedded players (embedding disabled)
+                if (event.data === 150 || event.data === 101) {
+                  console.error('Video cannot be played in embedded player - embedding may be disabled');
+                  // Don't reset playing state here - let the user see the error
+                  // The video will need to be played directly on YouTube
+                } else {
+                  // For other errors, reset playing state
+                  const currentIsPlaying = useWebPlayerStore.getState().isPlaying;
+                  if (currentIsPlaying) {
+                    useWebPlayerStore.getState().pause();
+                  }
+                }
               }
             }
           });
@@ -462,30 +514,38 @@ const PersistentWebPlayer: React.FC = () => {
 
   // Update player state when isPlaying changes - only for YouTube media
   useEffect(() => {
-    if (isPlayerReady && playerType === 'youtube') {
+    if (isPlayerReady && playerType === 'youtube' && youtubePlayerRef.current) {
       console.log('Updating YouTube player state, isPlaying:', isPlaying);
       try {
-        if (youtubePlayerRef.current) {
-          if (isPlaying && typeof youtubePlayerRef.current.playVideo === 'function') {
+        // Check if player methods are available before calling
+        if (isPlaying) {
+          if (typeof youtubePlayerRef.current.playVideo === 'function') {
             youtubePlayerRef.current.playVideo();
             // Verify play actually started (important for iOS autoplay restrictions)
             setTimeout(() => {
-              if (youtubePlayerRef.current) {
+              if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getPlayerState === 'function') {
                 try {
                   const playerState = youtubePlayerRef.current.getPlayerState();
                   const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
                   // YT.PlayerState.PLAYING = 1
                   if (playerState !== window.YT.PlayerState.PLAYING && stillShouldBePlaying) {
-                    console.warn('Play failed (likely iOS autoplay restriction), resetting isPlaying state');
-                    // Play failed (likely iOS autoplay restriction), reset state
+                    console.warn('Play failed (likely iOS autoplay restriction or embedding error), resetting isPlaying state');
+                    // Play failed (likely iOS autoplay restriction or embedding error), reset state
                     useWebPlayerStore.getState().pause();
                   }
                 } catch (error) {
                   console.error('Error checking player state:', error);
+                  // If we can't check state, assume play failed and reset
+                  const stillShouldBePlaying = useWebPlayerStore.getState().isPlaying;
+                  if (stillShouldBePlaying) {
+                    useWebPlayerStore.getState().pause();
+                  }
                 }
               }
             }, 500);
-          } else if (!isPlaying && typeof youtubePlayerRef.current.pauseVideo === 'function') {
+          }
+        } else {
+          if (typeof youtubePlayerRef.current.pauseVideo === 'function') {
             youtubePlayerRef.current.pauseVideo();
           }
         }
