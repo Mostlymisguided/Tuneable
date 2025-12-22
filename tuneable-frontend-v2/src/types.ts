@@ -75,6 +75,22 @@ export interface User {
     youtube?: string;
     twitter?: string;
   };
+  preferences?: {
+    theme?: string;
+    anonymousMode?: boolean;
+    defaultTip?: number; // Default tip amount in pounds (e.g., 0.11 for 11p)
+    notifications?: {
+      email?: boolean;
+      sms?: boolean;
+      types?: {
+        bid_received?: boolean;
+        bid_outbid?: boolean;
+        comment_reply?: boolean;
+        tune_bytes_earned?: boolean;
+        [key: string]: boolean | undefined;
+      };
+    };
+  };
   creatorProfile?: {
     artistName?: string;
     bio?: string;

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, PoundSterling, AlertCircle, Minus, Plus } from 'lucide-react';
 import BetaWarningBanner from './BetaWarningBanner';
+import { useAuth } from '../contexts/AuthContext';
 
 interface BidModalProps {
   isOpen: boolean;
@@ -27,6 +28,20 @@ const BidModal: React.FC<BidModalProps> = ({
 }) => {
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
+  const { user } = useAuth();
+
+  // Initialize bid amount when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+      const initialAmount = Math.max(minimumBid, userDefaultTip).toFixed(2);
+      setBidAmount(initialAmount);
+    } else {
+      // Reset when modal closes
+      setBidAmount('');
+      setError('');
+    }
+  }, [isOpen, minimumBid, user?.preferences?.defaultTip]);
 
   const adjustBidAmount = (delta: number) => {
     const current = parseFloat(bidAmount) || 0;

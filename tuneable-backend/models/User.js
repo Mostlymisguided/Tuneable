@@ -104,6 +104,11 @@ const userSchema = new mongoose.Schema({
   preferences: {
     theme: { type: String, default: 'light' },
     anonymousMode: { type: Boolean, default: false },
+    defaultTip: { 
+      type: Number, 
+      default: 0.11, // 11p default
+      min: [0.01, 'Default tip must be at least £0.01']
+    },
     notifications: {
       email: { type: Boolean, default: true },
       sms: { type: Boolean, default: false },

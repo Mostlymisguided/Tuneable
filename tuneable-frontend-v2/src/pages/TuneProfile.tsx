@@ -312,13 +312,15 @@ const TuneProfile: React.FC = () => {
           setMinimumBid(globalParty.minimumBid);
           if (!hasInitializedBidInput && media) {
             const avgBid = calculateGlobalMediaBidAvg(media);
-            const initialBid = Math.max(0.33, avgBid || 0, globalParty.minimumBid);
+            const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+            const initialBid = Math.max(globalParty.minimumBid, userDefaultTip, avgBid || 0);
             setGlobalBidInput(initialBid.toFixed(2));
             setHasInitializedBidInput(true);
           }
         } else if (!hasInitializedBidInput && media) {
           const avgBid = calculateGlobalMediaBidAvg(media);
-          const initialBid = Math.max(0.33, avgBid || 0);
+          const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+          const initialBid = Math.max(userDefaultTip, avgBid || 0);
           setGlobalBidInput(initialBid.toFixed(2));
           setHasInitializedBidInput(true);
         }
@@ -1180,7 +1182,8 @@ const TuneProfile: React.FC = () => {
     // Initialize tip amount with minimum bid or average bid
     const avgBid = media?.globalMediaAggregate ? (media.globalMediaAggregate / (media.bids?.length || 1)) / 100 : 0;
     const minBid = minimumBid;
-    const defaultBid = Math.max(0.33, avgBid || 0, minBid);
+    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    const defaultBid = Math.max(minBid, userDefaultTip, avgBid || 0);
     setAddToPartyTipAmount(defaultBid.toFixed(2));
   };
 

@@ -71,6 +71,14 @@ const Party: React.FC = () => {
   const getEffectiveMinimumBid = (media?: any): number => {
     return media?.minimumBid ?? party?.minimumBid ?? 0.01;
   };
+
+  // Helper function to get default bid amount (uses user's defaultTip preference, respects minimum)
+  const getDefaultBidAmount = (media?: any): number => {
+    const minBid = getEffectiveMinimumBid(media);
+    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    // Use the higher of minimum bid or user's default tip
+    return Math.max(minBid, userDefaultTip);
+  };
   
   // Bid modal state
   const [bidModalOpen, setBidModalOpen] = useState(false);
@@ -588,7 +596,7 @@ const Party: React.FC = () => {
         [...databaseResults, ...youtubeResults].forEach(media => {
           const avgBid = calculateAverageBid(media);
           const minBid = getEffectiveMinimumBid(media);
-          newBidAmounts[media._id || media.id] = Math.max(0.33, avgBid || 0, minBid).toFixed(2);
+          newBidAmounts[media._id || media.id] = Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
         });
         setNewMediaBidAmounts(newBidAmounts);
         
@@ -897,7 +905,7 @@ const Party: React.FC = () => {
         }
         
         // Calculate bid amount (UI presents this as a tip)
-        let bidAmount = 0.33;
+        let bidAmount = getDefaultBidAmount();
         const minBid = getEffectiveMinimumBid(safePendingMedia);
         
         try {
@@ -909,7 +917,7 @@ const Party: React.FC = () => {
             } else {
               // Calculate default
               const avgBid = calculateAverageBid(safePendingMedia);
-              bidAmount = Math.max(0.33, avgBid || 0, minBid);
+              bidAmount = Math.max(getDefaultBidAmount(media), avgBid || 0);
             }
           } else {
             // Calculate default
@@ -918,7 +926,7 @@ const Party: React.FC = () => {
           }
         } catch (e) {
           console.error('Error calculating bid amount:', e);
-          bidAmount = Math.max(0.33, minBid);
+            bidAmount = getDefaultBidAmount(media);
         }
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
@@ -978,7 +986,7 @@ const Party: React.FC = () => {
             const resetMinBid = getEffectiveMinimumBid(safePendingMedia);
             setQueueBidAmounts(prev => ({
               ...prev,
-              [mediaId]: Math.max(0.33, resetMinBid).toFixed(2)
+              [mediaId]: getDefaultBidAmount().toFixed(2)
             }));
           }
           
@@ -1372,13 +1380,13 @@ const Party: React.FC = () => {
     // Early return if modal shouldn't be shown or data is invalid
     if (!showBidConfirmationModal || !party) {
       const minBid = getEffectiveMinimumBid();
-      return Math.max(0.33, minBid);
+      return getDefaultBidAmount();
     }
     
     // If pendingMedia is null/undefined, return default
     if (!pendingMedia || typeof pendingMedia !== 'object') {
       const minBid = getEffectiveMinimumBid();
-      return Math.max(0.33, minBid);
+      return getDefaultBidAmount();
     }
     
     try {
@@ -1401,10 +1409,10 @@ const Party: React.FC = () => {
             return Math.max(0.33, avgBid || 0, minBid);
           } catch (e) {
             console.error('Error calculating average bid:', e);
-            return Math.max(0.33, minBid);
+            return getDefaultBidAmount();
           }
         }
-        return Math.max(0.33, minBid);
+        return getDefaultBidAmount();
       } else {
         // For new media, use newMediaBidAmounts
         const mediaId = pendingMedia?._id || pendingMedia?.id;

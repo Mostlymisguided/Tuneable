@@ -1890,6 +1890,24 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
     }
 
+    // Handle preferences.defaultTip separately if provided
+    if (req.body.preferences?.defaultTip !== undefined) {
+      if (!user.preferences) {
+        user.preferences = {};
+      }
+      const defaultTip = req.body.preferences.defaultTip;
+      
+      // Validate defaultTip is at least 0.01
+      if (defaultTip < 0.01) {
+        return res.status(400).json({ 
+          error: 'Default tip must be at least £0.01',
+          field: 'preferences.defaultTip'
+        });
+      }
+      
+      user.preferences.defaultTip = defaultTip;
+    }
+
     // Update other fields (excluding username which is already handled above)
     Object.assign(user, updatedFields);
     
@@ -1986,6 +2004,7 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
       tune_bytes_earned,
       email,
       anonymousMode,
+      defaultTip,
     } = req.body;
 
     // Initialize preferences if they don't exist
@@ -2011,12 +2030,24 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
     // Update privacy settings
     if (anonymousMode !== undefined) user.preferences.anonymousMode = anonymousMode;
 
+    // Update default tip
+    if (defaultTip !== undefined) {
+      if (defaultTip < 0.01) {
+        return res.status(400).json({ 
+          error: 'Default tip must be at least £0.01',
+          field: 'defaultTip'
+        });
+      }
+      user.preferences.defaultTip = defaultTip;
+    }
+
     await user.save();
 
     res.json({
       success: true,
       message: 'Notification preferences updated successfully',
       preferences: user.preferences.notifications,
+      defaultTip: user.preferences.defaultTip,
     });
   } catch (error) {
     console.error('Error updating notification preferences:', error);
