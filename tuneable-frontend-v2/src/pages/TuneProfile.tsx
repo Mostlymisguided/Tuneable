@@ -1394,7 +1394,7 @@ const TuneProfile: React.FC = () => {
 
     // Clear any existing queue and set new media
     setQueue([formattedSong]);
-    setCurrentMedia(formattedSong, 0, false); // Set media without autoplay
+    setCurrentMedia(formattedSong, 0); // Set media without autoplay
     play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     setCurrentPartyId(null); // Not in a party context

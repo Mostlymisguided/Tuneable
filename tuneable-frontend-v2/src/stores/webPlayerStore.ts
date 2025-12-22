@@ -50,7 +50,7 @@ interface WebPlayerState {
   setTopBidder: (bidder: TopBidder | null) => void;
   
   // Player actions
-  setCurrentMedia: (media: PlayerMedia | null, index?: number, autoPlay?: boolean) => void;
+  setCurrentMedia: (media: PlayerMedia | null, index?: number) => void;
   play: () => void;
   pause: () => void;
   togglePlayPause: () => void;
@@ -135,7 +135,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
         set({ topBidder: bidder });
       },
       
-      setCurrentMedia: (media, index = 0, autoPlay = false) => {
+      setCurrentMedia: (media, index = 0) => {
         set({ 
           currentMedia: media, 
           currentMediaIndex: index,

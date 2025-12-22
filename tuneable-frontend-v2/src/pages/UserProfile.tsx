@@ -735,7 +735,7 @@ const UserProfile: React.FC = () => {
     };
     
     // Set the media in the webplayer and start playback
-    setCurrentMedia(cleanedMedia, 0, false); // Set media without autoplay
+    setCurrentMedia(cleanedMedia, 0); // Set media without autoplay
     play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     
@@ -802,7 +802,7 @@ const UserProfile: React.FC = () => {
       // Set entire library as queue for auto-transition
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)
-      setCurrentMedia(allFormattedMedia[index], index, true);
+      setCurrentMedia(allFormattedMedia[index], index);
       setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
     } catch (error) {

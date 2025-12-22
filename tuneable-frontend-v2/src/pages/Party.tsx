@@ -379,7 +379,7 @@ const Party: React.FC = () => {
         if (!currentMedia) {
           // Web player is empty - set media but don't autoplay
           console.log('Web player is empty, setting current media to:', cleanedQueue[0].title);
-          setCurrentMedia(cleanedQueue[0], 0, false); // No autoplay - user starts manually
+          setCurrentMedia(cleanedQueue[0], 0); // No autoplay - user starts manually
         } else {
           // Web player already has media - preserve it, don't interrupt
           console.log('Web player already has media, preserving playback:', currentMedia.title);
@@ -464,7 +464,7 @@ const Party: React.FC = () => {
       
       // If there is media and no current media, set the first one
       if (cleanedQueue.length > 0 && !currentMedia) {
-        setCurrentMedia(cleanedQueue[0], 0, true);
+        setCurrentMedia(cleanedQueue[0], 0);
       }
     }
   }, [sortedMedia, selectedTimePeriod, party, setQueue, setCurrentMedia, currentMedia]);
@@ -1421,6 +1421,7 @@ const Party: React.FC = () => {
             }
           }
         }
+        const minBid = getEffectiveMinimumBid(pendingMedia);
         const defaultBid = Math.max(0.33, minBid);
         return defaultBid;
       }
@@ -1854,7 +1855,7 @@ const Party: React.FC = () => {
     };
     
     // Set the media in the webplayer and start playback
-    setCurrentMedia(cleanedMedia, index, false); // Set media without autoplay
+    setCurrentMedia(cleanedMedia, index); // Set media without autoplay
     play(); // Explicitly start playback when user clicks play button
     
     toast.success(`Now playing: ${cleanedMedia.title}`);

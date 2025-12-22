@@ -123,7 +123,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     };
     
     // Set the media in the webplayer and start playback
-    setCurrentMedia(cleanedMedia, 0, false); // Set media without autoplay
+    setCurrentMedia(cleanedMedia, 0); // Set media without autoplay
     play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     

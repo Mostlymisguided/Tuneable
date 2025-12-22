@@ -563,7 +563,7 @@ Join here: ${inviteLink}`.trim();
       // Set entire library as queue for auto-transition
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)
-      setCurrentMedia(allFormattedMedia[index], index, true);
+      setCurrentMedia(allFormattedMedia[index], index);
       setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
     } catch (error) {
