@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -2435,47 +2435,83 @@ Join here: ${inviteLink}`.trim();
                     </div>
                 </div>
                   <div 
-                    className="flex flex-col sm:flex-row sm:items-center gap-3"
+                    className="flex justify-center items-center space-x-1"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div>
-                      <div className="text-gray-400 text-xs mb-1">Bid Amount</div>
-                    <input
-                      type="number"
-                      min={minimumBid}
-                      step="0.01"
-                        value={addTuneBidAmounts[mediaId || ''] ?? ''}
-                      onChange={(e) => {
+                    <div className="flex items-center space-x-0 mr-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mediaIdKey = mediaId || '';
+                          const minBid = getEffectiveMinimumBid(result);
+                          const defaultBid = Math.max(0.33, minBid);
+                          const current = parseFloat(addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2));
+                          const newAmount = Math.max(minBid, current - 0.01);
+                          setAddTuneBidAmounts((prev) => ({
+                            ...prev,
+                            [mediaIdKey]: newAmount.toFixed(2)
+                          }));
+                        }}
+                        className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <input
+                        step="0.01"
+                        min={getEffectiveMinimumBid(result)}
+                        className="w-14 md:w-14 bg-gray-800 rounded px-2 py-1 text-center text-white text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        type="number"
+                        value={addTuneBidAmounts[mediaId || ''] ?? (() => {
+                          const minBid = getEffectiveMinimumBid(result);
+                          return Math.max(0.33, minBid).toFixed(2);
+                        })()}
+                        onChange={(e) => {
                           const value = e.target.value;
                           setAddTuneBidAmounts((prev) => ({
-                          ...prev,
+                            ...prev,
                             [mediaId || '']: value
-                        }));
-                      }}
-                        className="w-full sm:w-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
-                    />
-                  </div>
-                  <button
-                    disabled={isAddingTune}
+                          }));
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mediaIdKey = mediaId || '';
+                          const minBid = getEffectiveMinimumBid(result);
+                          const defaultBid = Math.max(0.33, minBid);
+                          const current = parseFloat(addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2));
+                          const newAmount = current + 0.01;
+                          setAddTuneBidAmounts((prev) => ({
+                            ...prev,
+                            [mediaIdKey]: newAmount.toFixed(2)
+                          }));
+                        }}
+                        className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <button
+                      disabled={isAddingTune}
                       onClick={(e) => {
                         e.stopPropagation();
                         startAddTune(result);
                       }}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                      className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
                     >
-                      <Play className="h-4 w-4" />
-                      <span>
-                        {(() => {
-                          const raw = addTuneBidAmounts[mediaId || ''] ?? '';
-                          const parsed = parseFloat(raw);
-                          if (!Number.isFinite(parsed)) {
-                            return 'Add';
-                          }
-                          return `Bid £${parsed.toFixed(2)}`;
-                        })()}
-                      </span>
-                  </button>
-                </div>
+                      {(() => {
+                        const mediaIdKey = mediaId || '';
+                        const minBid = getEffectiveMinimumBid(result);
+                        const defaultBid = Math.max(0.33, minBid);
+                        const raw = addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2);
+                        const parsed = parseFloat(raw);
+                        if (!Number.isFinite(parsed)) {
+                          return 'Tip';
+                        }
+                        return `Tip £${parsed.toFixed(2)}`;
+                      })()}
+                    </button>
+                  </div>
             </div>
               );
             })}
