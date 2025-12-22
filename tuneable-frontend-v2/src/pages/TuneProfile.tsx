@@ -1559,17 +1559,18 @@ const TuneProfile: React.FC = () => {
       
       const shareUrls: Record<string, string> = {
         twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
-        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedFacebookUrl}&quote=${encodedText}&hashtag=Tuneable`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedFacebookUrl}`,
         linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
         whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
       };
 
-      // Handle Instagram sharing (copy link to clipboard)
+      // Handle Instagram sharing (copy text + link to clipboard)
       if (platform === 'instagram') {
         try {
-          await navigator.clipboard.writeText(shareUrl);
+          const textToCopy = `${shareText}\n\n${shareUrl}`;
+          await navigator.clipboard.writeText(textToCopy);
           setCopySuccess(true);
-          toast.success('Link copied! Paste it in your Instagram Story or post.');
+          toast.success('Link and message copied! Paste it in your Instagram Story or post.');
           setTimeout(() => setCopySuccess(false), 2000);
           console.log('Instagram share tracked:', { mediaId: media?._id, url: shareUrl });
           return;
@@ -1577,6 +1578,35 @@ const TuneProfile: React.FC = () => {
           console.error('Failed to copy link:', err);
           toast.error('Failed to copy link. Please copy it manually.');
           return;
+        }
+      }
+
+      // Handle Facebook sharing (copy text + link to clipboard for better UX)
+      // Facebook's sharer.php doesn't support pre-filling text, so we copy to clipboard instead
+      if (platform === 'facebook') {
+        try {
+          const textToCopy = `${shareText}\n\n${facebookShareUrl}`;
+          await navigator.clipboard.writeText(textToCopy);
+          setCopySuccess(true);
+          toast.success('Message and link copied! Paste it into Facebook to share with the text included.');
+          setTimeout(() => setCopySuccess(false), 2000);
+          
+          // Also open Facebook share dialog as fallback (user can paste the text there)
+          const shareWindow = window.open(
+            shareUrls[platform], 
+            '_blank', 
+            'width=600,height=400,menubar=no,toolbar=no,resizable=yes,scrollbars=yes'
+          );
+          
+          if (!shareWindow || shareWindow.closed || typeof shareWindow.closed === 'undefined') {
+            // Popup blocked - that's okay, we already copied to clipboard
+          } else {
+            console.log('Facebook share tracked:', { mediaId: media?._id, url: shareUrl });
+          }
+          return;
+        } catch (err) {
+          console.error('Failed to copy:', err);
+          // Fall through to regular share dialog if clipboard fails
         }
       }
       
