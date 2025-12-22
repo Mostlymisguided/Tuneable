@@ -3066,6 +3066,7 @@ router.get('/share/:id', async (req, res) => {
     
     // Detect if this is Facebook's crawler (or other social media crawlers)
     const userAgent = req.headers['user-agent'] || '';
+    const referer = req.headers['referer'] || '';
     const requestUrl = req.url || '';
     
     // Facebook uses facebookexternalhit/1.1 or facebookexternalhit/2.0 or Facebot
@@ -3258,12 +3259,11 @@ router.get('/share/:id', async (req, res) => {
       isOtherSocialBot: isOtherSocialBot,
       hasFbclid: hasFbclid,
       hasFacebookHeader: hasFacebookHeader,
-      isFromFacebook: isFromFacebook,
       isShareRoute: isShareRoute,
       isCrawler: isCrawler,
       shouldServeMetaTags: shouldServeMetaTags,
       userAgent: userAgent.substring(0, 150), // First 150 chars of UA
-      referer: referer.substring(0, 100) // First 100 chars of referer
+      referer: referer ? referer.substring(0, 100) : '(none)' // First 100 chars of referer
     });
 
     // Serve HTML with proper meta tags
