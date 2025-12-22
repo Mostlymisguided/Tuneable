@@ -20,8 +20,7 @@ import {
   Facebook,
   Linkedin,
   Search,
-  RefreshCw,
-  Filter
+  RefreshCw
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
@@ -318,7 +317,7 @@ const PodcastSeriesProfile: React.FC = () => {
       const newEpisodes = data.episodes || [];
       setEpisodes(prev => {
         const existingIds = new Set(prev.map(ep => ep._id));
-        const uniqueNewEpisodes = newEpisodes.filter(ep => !existingIds.has(ep._id));
+        const uniqueNewEpisodes = newEpisodes.filter((ep: Episode) => !existingIds.has(ep._id));
         return [...prev, ...uniqueNewEpisodes];
       });
       
