@@ -1457,7 +1457,7 @@ const TuneProfile: React.FC = () => {
     ? `${window.location.origin}/tune/${media._id}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
-  const shareText = `Support your Favourite Tunes and Artists on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and contribute.`;
+  const shareText = `Support your Favourite Artists on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
 
   // Update Open Graph meta tags for better Facebook sharing
   useEffect(() => {
@@ -1608,9 +1608,11 @@ const TuneProfile: React.FC = () => {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      // Copy both the share text and URL so users can paste a complete message
+      const textToCopy = `${shareText}\n\n${shareUrl}`;
+      await navigator.clipboard.writeText(textToCopy);
       setCopySuccess(true);
-      toast.success('Link copied to clipboard!');
+      toast.success('Link and message copied to clipboard!');
       setTimeout(() => setCopySuccess(false), 2000);
       setShowShareDropdown(false);
     } catch (err) {

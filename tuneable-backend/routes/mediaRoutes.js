@@ -3235,7 +3235,7 @@ router.get('/share/:id', async (req, res) => {
     
     // Build title and description
     const ogTitle = escapeHtml(`${mediaTitle}${artistText} | Tuneable`);
-    const ogDescription = escapeHtml(`Support your Favourite Tunes and Artists on Tuneable! Check out "${mediaTitle}"${artistText} and join the community.`);
+    const ogDescription = escapeHtml(`Support your Favourite Artists on Tuneable! Check out "${mediaTitle}"${artistText} and show it some love.`);
     // Use _id for shorter URLs
     const ogUrl = `${frontendUrl}/tune/${media._id}`;
     const escapedTitle = escapeHtml(mediaTitle);
