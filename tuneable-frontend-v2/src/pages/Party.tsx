@@ -1883,6 +1883,69 @@ const Party: React.FC = () => {
     toast.success(`Now playing: ${cleanedMedia.title}`);
   };
 
+  // Handle playing the entire displayed queue from the top
+  const handlePlayQueue = () => {
+    const displayMedia = getDisplayMedia();
+    
+    if (displayMedia.length === 0) {
+      toast.error('No tracks to play');
+      return;
+    }
+    
+    // Format all displayed media into queue format
+    const cleanedQueue = displayMedia.map((item: any) => {
+      // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
+      const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+      
+      // Clean and format sources
+      let sources = {};
+      
+      if (mediaData.sources) {
+        if (Array.isArray(mediaData.sources)) {
+          for (const source of mediaData.sources) {
+            if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+              // Handle Mongoose metadata corruption
+              sources = source.url.sources;
+              break;
+            } else if (source && source.platform === 'youtube' && source.url) {
+              (sources as any).youtube = source.url;
+            } else if (source?.youtube) {
+              (sources as any).youtube = source.youtube;
+            }
+          }
+        } else if (typeof mediaData.sources === 'object') {
+          sources = mediaData.sources;
+        }
+      }
+      
+      return {
+        id: mediaData._id || mediaData.id || mediaData.uuid,
+        _id: mediaData._id || mediaData.id || mediaData.uuid,
+        title: mediaData.title,
+        artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
+        artists: Array.isArray(mediaData.artist) ? mediaData.artist : (mediaData.artists || []),
+        featuring: mediaData.featuring || [],
+        creatorDisplay: mediaData.creatorDisplay,
+        duration: mediaData.duration,
+        coverArt: mediaData.coverArt,
+        sources: sources,
+        globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
+        partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+        totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+        bids: item.partyBids || item.bids || mediaData.bids || [],
+        addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
+      };
+    });
+    
+    // Set the queue and start playing from the top
+    setQueue(cleanedQueue);
+    setCurrentMedia(cleanedQueue[0], 0);
+    setGlobalPlayerActive(true);
+    play(); // Start playback immediately
+    
+    toast.success(`Playing queue: ${cleanedQueue.length} track${cleanedQueue.length !== 1 ? 's' : ''}`);
+  };
+
   const formatDuration = (duration: number | string | undefined) => {
     if (!duration) return '3:00';
     
@@ -2874,6 +2937,19 @@ const Party: React.FC = () => {
                         </button>
                       ))}
                     </div>
+                    {/* Play Queue Button */}
+                    {getDisplayMedia().length > 0 && (
+                      <div className="flex justify-center mt-4">
+                        <button
+                          onClick={handlePlayQueue}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                          title={`Play ${getDisplayMedia().length} track${getDisplayMedia().length !== 1 ? 's' : ''} from the top`}
+                        >
+                          <Play className="h-4 w-4" />
+                          <span>Play {party?.name || 'Queue'}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
