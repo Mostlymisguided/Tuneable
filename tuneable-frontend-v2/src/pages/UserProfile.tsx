@@ -1285,10 +1285,9 @@ const UserProfile: React.FC = () => {
     await loadCollectiveMemberships();
   };
 
-  const handleLabelCreated = async () => {
-    // Refresh user profile to show updated data
-    await fetchUserProfile();
-    // Modal will close automatically via onClose
+  const handleLabelLinked = async () => {
+    // Refresh label affiliations after linking
+    await loadLabelAffiliations();
   };
 
   // Edit profile handlers
@@ -1611,7 +1610,7 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Add Label & Collective Buttons - Only for verified creators or admins viewing own profile */}
+              {/* Link Label & Collective Buttons - Only for verified creators or admins viewing own profile */}
               {isOwnProfile && currentUser && (currentUser.creatorProfile?.verificationStatus === 'verified' || currentUser.role?.includes('admin')) && (
                 <div className="mb-2 flex items-center space-x-2">
                   <button
@@ -1619,14 +1618,14 @@ const UserProfile: React.FC = () => {
                     className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
                   >
                     <Users className="w-4 h-4" />
-                    <span>Add Collective</span>
+                    <span>Link Collective</span>
                   </button>
                   <button
                     onClick={handleAddLabelClick}
                     className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
                   >
                     <Building className="w-4 h-4" />
-                    <span>Add Label</span>
+                    <span>Link Label</span>
                   </button>
                 </div>
               )}
@@ -4025,11 +4024,11 @@ const UserProfile: React.FC = () => {
         />
       )}
 
-      {/* Create Label Modal */}
-      <LabelCreateModal
+      {/* Link Label Modal */}
+      <LabelLinkModal
         isOpen={isLabelModalOpen}
         onClose={() => setIsLabelModalOpen(false)}
-        onSuccess={handleLabelCreated}
+        onSuccess={handleLabelLinked}
       />
       
       {/* Link Collective Modal */}
