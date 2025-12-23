@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants';
 import { 
   Music, 
   User, 
@@ -380,6 +380,216 @@ const TuneProfile: React.FC = () => {
     return canEditMedia(user, media);
   };
 
+  // Helper function to get country code from country name
+  const getCountryCode = (countryName: string): string => {
+    const countryMap: Record<string, string> = {
+      'United Kingdom': 'GB',
+      'Afghanistan': 'AF',
+      'Albania': 'AL',
+      'Algeria': 'DZ',
+      'Andorra': 'AD',
+      'Angola': 'AO',
+      'Antigua and Barbuda': 'AG',
+      'Argentina': 'AR',
+      'Armenia': 'AM',
+      'Australia': 'AU',
+      'Austria': 'AT',
+      'Azerbaijan': 'AZ',
+      'Bahamas': 'BS',
+      'Bahrain': 'BH',
+      'Bangladesh': 'BD',
+      'Barbados': 'BB',
+      'Belarus': 'BY',
+      'Belgium': 'BE',
+      'Belize': 'BZ',
+      'Benin': 'BJ',
+      'Bhutan': 'BT',
+      'Bolivia': 'BO',
+      'Bosnia and Herzegovina': 'BA',
+      'Botswana': 'BW',
+      'Brazil': 'BR',
+      'Brunei': 'BN',
+      'Bulgaria': 'BG',
+      'Burkina Faso': 'BF',
+      'Burundi': 'BI',
+      'Cambodia': 'KH',
+      'Cameroon': 'CM',
+      'Canada': 'CA',
+      'Cape Verde': 'CV',
+      'Central African Republic': 'CF',
+      'Chad': 'TD',
+      'Chile': 'CL',
+      'China': 'CN',
+      'Colombia': 'CO',
+      'Comoros': 'KM',
+      'Congo': 'CG',
+      'Costa Rica': 'CR',
+      'Croatia': 'HR',
+      'Cuba': 'CU',
+      'Cyprus': 'CY',
+      'Czech Republic': 'CZ',
+      'Democratic Republic of the Congo': 'CD',
+      'Denmark': 'DK',
+      'Djibouti': 'DJ',
+      'Dominica': 'DM',
+      'Dominican Republic': 'DO',
+      'East Timor': 'TL',
+      'Ecuador': 'EC',
+      'Egypt': 'EG',
+      'El Salvador': 'SV',
+      'England': 'GB-ENG',
+      'Equatorial Guinea': 'GQ',
+      'Eritrea': 'ER',
+      'Estonia': 'EE',
+      'Ethiopia': 'ET',
+      'Fiji': 'FJ',
+      'Finland': 'FI',
+      'France': 'FR',
+      'Gabon': 'GA',
+      'Gambia': 'GM',
+      'Georgia': 'GE',
+      'Germany': 'DE',
+      'Ghana': 'GH',
+      'Greece': 'GR',
+      'Grenada': 'GD',
+      'Guatemala': 'GT',
+      'Guinea': 'GN',
+      'Guinea-Bissau': 'GW',
+      'Guyana': 'GY',
+      'Haiti': 'HT',
+      'Honduras': 'HN',
+      'Hungary': 'HU',
+      'Iceland': 'IS',
+      'India': 'IN',
+      'Indonesia': 'ID',
+      'Iran': 'IR',
+      'Iraq': 'IQ',
+      'Ireland': 'IE',
+      'Israel': 'IL',
+      'Italy': 'IT',
+      'Ivory Coast': 'CI',
+      'Jamaica': 'JM',
+      'Japan': 'JP',
+      'Jordan': 'JO',
+      'Kazakhstan': 'KZ',
+      'Kenya': 'KE',
+      'Kiribati': 'KI',
+      'Kosovo': 'XK',
+      'Kuwait': 'KW',
+      'Kyrgyzstan': 'KG',
+      'Laos': 'LA',
+      'Latvia': 'LV',
+      'Lebanon': 'LB',
+      'Lesotho': 'LS',
+      'Liberia': 'LR',
+      'Libya': 'LY',
+      'Liechtenstein': 'LI',
+      'Lithuania': 'LT',
+      'Luxembourg': 'LU',
+      'Macau': 'MO',
+      'Madagascar': 'MG',
+      'Malawi': 'MW',
+      'Malaysia': 'MY',
+      'Maldives': 'MV',
+      'Mali': 'ML',
+      'Malta': 'MT',
+      'Marshall Islands': 'MH',
+      'Mauritania': 'MR',
+      'Mauritius': 'MU',
+      'Mexico': 'MX',
+      'Micronesia': 'FM',
+      'Moldova': 'MD',
+      'Monaco': 'MC',
+      'Mongolia': 'MN',
+      'Montenegro': 'ME',
+      'Morocco': 'MA',
+      'Mozambique': 'MZ',
+      'Myanmar': 'MM',
+      'Namibia': 'NA',
+      'Nauru': 'NR',
+      'Nepal': 'NP',
+      'Netherlands': 'NL',
+      'New Zealand': 'NZ',
+      'Nicaragua': 'NI',
+      'Niger': 'NE',
+      'Nigeria': 'NG',
+      'North Korea': 'KP',
+      'North Macedonia': 'MK',
+      'Norway': 'NO',
+      'Oman': 'OM',
+      'Pakistan': 'PK',
+      'Palau': 'PW',
+      'Palestine': 'PS',
+      'Panama': 'PA',
+      'Papua New Guinea': 'PG',
+      'Paraguay': 'PY',
+      'Peru': 'PE',
+      'Philippines': 'PH',
+      'Poland': 'PL',
+      'Portugal': 'PT',
+      'Qatar': 'QA',
+      'Republic of the Congo': 'CG',
+      'Romania': 'RO',
+      'Russia': 'RU',
+      'Rwanda': 'RW',
+      'Saint Kitts and Nevis': 'KN',
+      'Saint Lucia': 'LC',
+      'Saint Vincent and the Grenadines': 'VC',
+      'Samoa': 'WS',
+      'San Marino': 'SM',
+      'Sao Tome and Principe': 'ST',
+      'Saudi Arabia': 'SA',
+      'Scotland': 'GB-SCT',
+      'Senegal': 'SN',
+      'Serbia': 'RS',
+      'Seychelles': 'SC',
+      'Sierra Leone': 'SL',
+      'Singapore': 'SG',
+      'Slovakia': 'SK',
+      'Slovenia': 'SI',
+      'Solomon Islands': 'SB',
+      'Somalia': 'SO',
+      'South Africa': 'ZA',
+      'South Korea': 'KR',
+      'South Sudan': 'SS',
+      'Spain': 'ES',
+      'Sri Lanka': 'LK',
+      'Sudan': 'SD',
+      'Suriname': 'SR',
+      'Swaziland': 'SZ',
+      'Sweden': 'SE',
+      'Switzerland': 'CH',
+      'Syria': 'SY',
+      'Taiwan': 'TW',
+      'Tajikistan': 'TJ',
+      'Tanzania': 'TZ',
+      'Thailand': 'TH',
+      'Togo': 'TG',
+      'Tonga': 'TO',
+      'Trinidad and Tobago': 'TT',
+      'Tunisia': 'TN',
+      'Turkey': 'TR',
+      'Turkmenistan': 'TM',
+      'Tuvalu': 'TV',
+      'Uganda': 'UG',
+      'Ukraine': 'UA',
+      'United Arab Emirates': 'AE',
+      'United States': 'US',
+      'Uruguay': 'UY',
+      'Uzbekistan': 'UZ',
+      'Vanuatu': 'VU',
+      'Vatican City': 'VA',
+      'Venezuela': 'VE',
+      'Vietnam': 'VN',
+      'Wales': 'GB-WLS',
+      'Yemen': 'YE',
+      'Zambia': 'ZM',
+      'Zimbabwe': 'ZW',
+      'Other': 'XX'
+    };
+    return countryMap[countryName] || '';
+  };
+
   // Label search function with debounce
   const searchLabels = async (query: string) => {
     if (query.length < 2) {
@@ -575,8 +785,20 @@ const TuneProfile: React.FC = () => {
         elements: media.elements || [],
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
-        primaryLocation: (media as any).primaryLocation || null,
-        secondaryLocation: (media as any).secondaryLocation || null
+        primaryLocation: (() => {
+          const loc = (media as any).primaryLocation || null;
+          if (loc && loc.country && !loc.countryCode) {
+            return { ...loc, countryCode: getCountryCode(loc.country) };
+          }
+          return loc;
+        })(),
+        secondaryLocation: (() => {
+          const loc = (media as any).secondaryLocation || null;
+          if (loc && loc.country && !loc.countryCode) {
+            return { ...loc, countryCode: getCountryCode(loc.country) };
+          }
+          return loc;
+        })()
       });
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
@@ -756,19 +978,26 @@ const TuneProfile: React.FC = () => {
       }
       
       // Process location fields - send null if empty, otherwise send the object
-      const primaryLocation = editForm.primaryLocation && (
+      // Auto-populate countryCode if country is set but countryCode is missing
+      let primaryLocation = editForm.primaryLocation && (
         editForm.primaryLocation.city || 
         editForm.primaryLocation.region || 
-        editForm.primaryLocation.country || 
-        editForm.primaryLocation.countryCode
-      ) ? editForm.primaryLocation : null;
+        editForm.primaryLocation.country
+      ) ? { ...editForm.primaryLocation } : null;
       
-      const secondaryLocation = editForm.secondaryLocation && (
+      if (primaryLocation && primaryLocation.country && !primaryLocation.countryCode) {
+        primaryLocation.countryCode = getCountryCode(primaryLocation.country);
+      }
+      
+      let secondaryLocation = editForm.secondaryLocation && (
         editForm.secondaryLocation.city || 
         editForm.secondaryLocation.region || 
-        editForm.secondaryLocation.country || 
-        editForm.secondaryLocation.countryCode
-      ) ? editForm.secondaryLocation : null;
+        editForm.secondaryLocation.country
+      ) ? { ...editForm.secondaryLocation } : null;
+      
+      if (secondaryLocation && secondaryLocation.country && !secondaryLocation.countryCode) {
+        secondaryLocation.countryCode = getCountryCode(secondaryLocation.country);
+      }
       
       const updateData: any = {
         ...editForm,
@@ -3170,33 +3399,27 @@ const TuneProfile: React.FC = () => {
                         className="input"
                         placeholder="Region/State"
                       />
-                      <input
-                        type="text"
+                      <select
                         value={editForm.primaryLocation?.country || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          primaryLocation: { 
-                            ...(editForm.primaryLocation || {}), 
-                            country: e.target.value 
-                          } 
-                        })}
+                        onChange={(e) => {
+                          const country = e.target.value;
+                          const countryCode = getCountryCode(country);
+                          setEditForm({ 
+                            ...editForm, 
+                            primaryLocation: { 
+                              ...(editForm.primaryLocation || {}), 
+                              country: country,
+                              countryCode: countryCode
+                            } 
+                          });
+                        }}
                         className="input"
-                        placeholder="Country"
-                      />
-                      <input
-                        type="text"
-                        value={editForm.primaryLocation?.countryCode || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          primaryLocation: { 
-                            ...(editForm.primaryLocation || {}), 
-                            countryCode: e.target.value.toUpperCase() 
-                          } 
-                        })}
-                        className="input"
-                        placeholder="Country Code (e.g., US, GB)"
-                        maxLength={2}
-                      />
+                      >
+                        <option value="">Select Country</option>
+                        {COUNTRIES.map(country => (
+                          <option key={country} value={country}>{country}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   
@@ -3229,33 +3452,27 @@ const TuneProfile: React.FC = () => {
                         className="input"
                         placeholder="Region/State"
                       />
-                      <input
-                        type="text"
+                      <select
                         value={editForm.secondaryLocation?.country || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { 
-                            ...(editForm.secondaryLocation || {}), 
-                            country: e.target.value 
-                          } 
-                        })}
+                        onChange={(e) => {
+                          const country = e.target.value;
+                          const countryCode = getCountryCode(country);
+                          setEditForm({ 
+                            ...editForm, 
+                            secondaryLocation: { 
+                              ...(editForm.secondaryLocation || {}), 
+                              country: country,
+                              countryCode: countryCode
+                            } 
+                          });
+                        }}
                         className="input"
-                        placeholder="Country"
-                      />
-                      <input
-                        type="text"
-                        value={editForm.secondaryLocation?.countryCode || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { 
-                            ...(editForm.secondaryLocation || {}), 
-                            countryCode: e.target.value.toUpperCase() 
-                          } 
-                        })}
-                        className="input"
-                        placeholder="Country Code (e.g., US, GB)"
-                        maxLength={2}
-                      />
+                      >
+                        <option value="">Select Country</option>
+                        {COUNTRIES.map(country => (
+                          <option key={country} value={country}>{country}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
