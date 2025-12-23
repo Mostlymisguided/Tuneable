@@ -2185,7 +2185,7 @@ router.get('/:userId/profile', async (req, res) => {
       .populate({
         path: 'mediaId',
         model: 'Media',
-        select: 'title artist coverArt duration globalMediaAggregate uuid _id contentType contentForm', // Updated to schema grammar
+        select: 'title artist coverArt duration globalMediaAggregate uuid _id contentType contentForm tags', // Updated to schema grammar - added tags
       })
       .populate({
         path: 'partyId',

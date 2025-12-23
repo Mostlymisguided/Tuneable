@@ -862,7 +862,8 @@ const UserProfile: React.FC = () => {
     setIsAddingTune(true);
 
     try {
-      // Prepare external media data if needed
+      // Prepare external media data if needed (only for new media)
+      // For existing media, externalMedia should be undefined
       const externalMedia = !isExistingMedia
         ? {
             title: media.title,
@@ -870,12 +871,10 @@ const UserProfile: React.FC = () => {
             coverArt: media.coverArt,
             duration: media.duration,
             category: media.category || 'Music',
-            tags: tags,
+            tags: tags.length > 0 ? tags : undefined,
             sources: externalSources
           }
-        : tags.length > 0
-          ? { tags: tags }
-          : undefined;
+        : undefined;
 
       await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia);
       toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} tip!`);
@@ -2229,7 +2228,7 @@ const UserProfile: React.FC = () => {
                         </span>
                       </div>
                       {/* Tags Display - Immediately below duration and tips */}
-                      {mediaData.media?.tags && mediaData.media.tags.length > 0 && (
+                      {mediaData.media?.tags && Array.isArray(mediaData.media.tags) && mediaData.media.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1.5">
                           {mediaData.media.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
                             <span 

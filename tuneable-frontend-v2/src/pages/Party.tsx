@@ -22,6 +22,7 @@ import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
 import { isLocationMatch, formatLocation } from '../utils/locationHelpers';
+import { getCanonicalTag } from '../utils/tagNormalizer';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -1230,24 +1231,20 @@ const Party: React.FC = () => {
     const out: any[] = [];
     const media = getPartyMedia().filter((it: any) => it.status === 'active');
     
-    // Normalize tag function (matching queue filtering logic)
-    const normalizeTag = (tag: string) => {
-      return tag.toLowerCase()
-        .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
-        .replace(/[^\w]/g, ''); // Remove any other non-word characters
-    };
-    
     for (const item of media) {
       const m = item.mediaId || item;
+      // Get canonical forms of tags for matching (handles aliases like D&b -> dnb)
       const tags: string[] = Array.isArray(m.tags) 
-        ? m.tags.map((t: string) => normalizeTag(t || ''))
+        ? m.tags.map((t: string) => t && typeof t === 'string' ? getCanonicalTag(t) : '').filter((t: string) => t)
         : [];
       
       if (selectedTagFilters.length > 0) {
         // Use OR logic (.some()) to match queue filtering behavior
         // Media should be included if it has ANY of the selected tags
-        const normalizedSelectedTags = selectedTagFilters.map(t => normalizeTag(t));
-        const ok = normalizedSelectedTags.some((selectedTag) => 
+        const canonicalSelectedTags = selectedTagFilters
+          .map(t => t && typeof t === 'string' ? getCanonicalTag(t) : '')
+          .filter(t => t);
+        const ok = canonicalSelectedTags.some((selectedTag) => 
           tags.some((tag) => tag === selectedTag)
         );
         if (!ok) continue;
@@ -1311,21 +1308,14 @@ const Party: React.FC = () => {
                  category.includes(lowerTerm);
         });
         
-        // Check if ANY tag search term matches tags (case-insensitive with fuzzy matching)
+        // Check if ANY tag search term matches tags (using canonical tag matching)
         const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
-          // Normalize search term
-          const normalizeTag = (tag: string) => {
-            return tag.toLowerCase()
-              .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
-              .replace(/[^\w]/g, ''); // Remove any other non-word characters
-          };
-          
-          const normalizedSearchTag = normalizeTag(tagTerm);
+          const canonicalSearchTag = getCanonicalTag(tagTerm);
           const tags = Array.isArray(mediaItem.tags) 
-            ? mediaItem.tags.map((tag: any) => normalizeTag(tag))
+            ? mediaItem.tags.map((tag: any) => tag && typeof tag === 'string' ? getCanonicalTag(tag) : '').filter((t: string) => t)
             : [];
           
-          return tags.some((tag: string) => tag === normalizedSearchTag);
+          return tags.some((tag: string) => tag === canonicalSearchTag);
         });
         
         // Both regular search and tag search must match (if they exist)

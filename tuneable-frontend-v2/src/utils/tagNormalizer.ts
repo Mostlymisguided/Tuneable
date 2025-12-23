@@ -1,15 +1,16 @@
 /**
  * Tag normalization and fuzzy matching utilities
  * Handles variations like: D&b -> Dnb, hip-hop -> hiphop, etc.
+ * This matches the backend logic in tuneable-backend/utils/tagNormalizer.js
  */
 
 /**
  * Normalize tag for fuzzy matching
  * Handles: D&b -> dnb, hip-hop -> hiphop, etc.
- * @param {string} tag - The tag to normalize
- * @returns {string} - Normalized tag (lowercase, no special chars, no spaces)
+ * @param tag - The tag to normalize
+ * @returns Normalized tag (lowercase, no special chars, no spaces)
  */
-function normalizeTagForMatching(tag) {
+function normalizeTagForMatching(tag: string): string {
   if (!tag || typeof tag !== 'string') return '';
   
   return tag
@@ -27,8 +28,9 @@ function normalizeTagForMatching(tag) {
 /**
  * Tag aliases mapping - maps variations to canonical forms
  * This handles complex cases that normalization can't catch
+ * The value after the colon is the canonical tag
  */
-const TAG_ALIASES = {
+const TAG_ALIASES: Record<string, string> = {
   // Drum & Bass variations
   'dnb': 'DnB',
   'd&b': 'DnB',
@@ -37,11 +39,13 @@ const TAG_ALIASES = {
   'drum n bass': 'DnB',
   'drum and bass': 'DnB',
   'drumnbass': 'DnB',
+  'drumand bass': 'DnB',
   'db': 'DnB', // Normalized form of D&b (after removing &)
   
   // Hip Hop variations
   'hiphop': 'hip hop',
   'hip-hop': 'hip hop',
+  'hip hop': 'hip hop',
   
   // Electronic variations
   'edm': 'electronic',
@@ -54,7 +58,7 @@ const TAG_ALIASES = {
   
   // Techno variations
   'techno': 'techno',
-  'techno music': 'techno', // Common abbreviation
+  'tech': 'techno', // Common abbreviation
   
   // R&B variations
   'r&b': 'R&B',
@@ -69,50 +73,39 @@ const TAG_ALIASES = {
 /**
  * Get canonical tag form for matching
  * Returns the normalized + aliased version
- * @param {string} tag - The tag to get canonical form for
- * @returns {string} - Canonical tag form
+ * @param tag - The tag to get canonical form for
+ * @returns Canonical tag form
  */
-function getCanonicalTag(tag) {
+export function getCanonicalTag(tag: string): string {
   const normalized = normalizeTagForMatching(tag);
   return TAG_ALIASES[normalized] || normalized;
 }
 
 /**
  * Check if two tags match (fuzzy)
- * @param {string} tag1 - First tag
- * @param {string} tag2 - Second tag
- * @returns {boolean} - True if tags match canonically
+ * @param tag1 - First tag
+ * @param tag2 - Second tag
+ * @returns True if tags match canonically
  */
-function tagsMatch(tag1, tag2) {
+export function tagsMatch(tag1: string, tag2: string): boolean {
   return getCanonicalTag(tag1) === getCanonicalTag(tag2);
 }
 
 /**
  * Find all tags that match a given tag (fuzzy)
- * @param {string} tag - The tag to find matches for
- * @param {Array<string>} tagList - List of tags to search
- * @returns {Array<string>} - Array of matching tags
+ * @param tag - The tag to find matches for
+ * @param tagList - List of tags to search
+ * @returns Array of matching tags
  */
-function findMatchingTags(tag, tagList) {
+export function findMatchingTags(tag: string, tagList: string[]): string[] {
   if (!tag || !Array.isArray(tagList)) return [];
   
   const canonicalTag = getCanonicalTag(tag);
   return tagList.filter(t => getCanonicalTag(t) === canonicalTag);
 }
 
-module.exports = {
-  normalizeTagForMatching,
-  getCanonicalTag,
-  tagsMatch,
-  findMatchingTags,
-  TAG_ALIASES
-};
-
-
-
-
-
-
-
-
+/**
+ * Normalize tag for matching (exported for direct use if needed)
+ */
+export { normalizeTagForMatching };
 

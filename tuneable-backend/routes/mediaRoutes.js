@@ -16,6 +16,7 @@ const { parseArtistString, formatCreatorDisplay } = require('../utils/artistPars
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const MetadataExtractor = require('../utils/metadataExtractor');
 const { canUploadMedia, canEditMedia } = require('../utils/permissionHelpers');
+const { getCanonicalTag } = require('../utils/tagNormalizer');
 
 /**
  * Capitalize the first letter of each word in a tag (title case)
@@ -992,24 +993,21 @@ router.get('/top-tunes', async (req, res) => {
     if (tags && Array.isArray(tags) && tags.length > 0) {
       console.log('🔍 Tag filtering - tags received:', tags);
       
-      // Create fuzzy matching function to normalize tags
-      const normalizeTag = (tag) => {
-        return tag.toLowerCase()
-          .replace(/[\s\-_\.]+/g, '') // Remove spaces, hyphens, underscores, dots
-          .replace(/[^\w]/g, ''); // Remove any other non-word characters
-      };
+      // Get canonical forms of search tags (handles aliases like D&b -> drumandbass)
+      const canonicalSearchTags = tags
+        .map(tag => tag && typeof tag === 'string' ? getCanonicalTag(tag.trim()) : '')
+        .filter(tag => tag); // Remove empty strings
       
-      // Normalize search tags
-      const normalizedSearchTags = tags.map(tag => normalizeTag(tag.trim()));
-      console.log('🔍 Normalized search tags:', normalizedSearchTags);
+      console.log('🔍 Canonical search tags:', canonicalSearchTags);
       
-      // Filter media items that have matching tags
+      // Filter media items that have matching tags (using canonical matching)
       media = media.filter(item => {
         if (!item.tags || !Array.isArray(item.tags)) return false;
         
         return item.tags.some(storedTag => {
-          const normalizedStoredTag = normalizeTag(storedTag);
-          return normalizedSearchTags.includes(normalizedStoredTag);
+          if (!storedTag || typeof storedTag !== 'string') return false;
+          const canonicalStoredTag = getCanonicalTag(storedTag);
+          return canonicalSearchTags.includes(canonicalStoredTag);
         });
       }).slice(0, limitNum); // Limit to requested count
       
