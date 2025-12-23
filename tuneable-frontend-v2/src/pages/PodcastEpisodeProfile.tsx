@@ -18,7 +18,6 @@ import {
   Mic,
   Disc,
   Headphones,
-  Volume2,
   Award,
   X,
   Save,
@@ -71,7 +70,6 @@ interface Media {
   album?: string;
   EP?: string;
   genre?: string;
-  genres?: string[];
   releaseDate?: string;
   duration?: number;
   coverArt?: string;
@@ -795,10 +793,10 @@ const PodcastEpisodeProfile: React.FC = () => {
         explicit: media.explicit || false,
         isrc: media.isrc || '',
         upc: media.upc || '',
-        bpm: media.bpm || 0,
-        key: media.key || '',
+        bpm: (media as any).bpm || 0,
+        key: (media as any).key || '',
         tags: media.tags || [],
-        lyrics: media.lyrics || '',
+        lyrics: (media as any).lyrics || '',
         description: (media as any).description || '',
         // Enhanced metadata fields
         composer: (media as any).composer?.[0]?.name || (media as any).composer || '',
@@ -807,9 +805,9 @@ const PodcastEpisodeProfile: React.FC = () => {
         language: (media as any).language || '',
         bitrate: media.bitrate || 0,
         sampleRate: media.sampleRate || 0,
-        pitch: media.pitch || 440,
-        timeSignature: media.timeSignature || '',
-        elements: media.elements || [],
+        pitch: (media as any).pitch || 440,
+        timeSignature: (media as any).timeSignature || '',
+        elements: (media as any).elements || [],
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
         primaryLocation: (() => {
@@ -830,7 +828,7 @@ const PodcastEpisodeProfile: React.FC = () => {
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
       // Set other comma-separated inputs
-      setElementsInput((media.elements || []).join(', ') || '');
+      setElementsInput(((media as any).elements || []).join(', ') || '');
       setFeaturingInput(featuringNames.join(', ') || '');
       
       // Set selected label if label has labelId
@@ -1135,7 +1133,8 @@ const PodcastEpisodeProfile: React.FC = () => {
   };
 
   // Get available external links
-  const getExternalLinks = () => {
+  // @ts-ignore - unused but kept for future use
+  const _getExternalLinks = () => {
     const links: Array<{
       platform: string;
       url: string;
@@ -1184,7 +1183,8 @@ const PodcastEpisodeProfile: React.FC = () => {
   };
 
   // Get platforms that can be added
-  const getMissingPlatforms = () => {
+  // @ts-ignore - unused but kept for future use
+  const _getMissingPlatforms = () => {
     if (!canEditTune()) return [];
     
     const existingSources = media?.sources || {};
@@ -1256,7 +1256,8 @@ const PodcastEpisodeProfile: React.FC = () => {
   };
 
   // Handle adding a new link
-  const handleAddLink = (platform: string) => {
+  // @ts-ignore - unused but kept for future use
+  const _handleAddLink = (platform: string) => {
     setSelectedPlatform(platform);
     setShowAddLinkModal(true);
   };
@@ -1763,7 +1764,10 @@ const PodcastEpisodeProfile: React.FC = () => {
     };
 
     const ogImage = getAbsoluteImageUrl(media.coverArt);
-    const ogTitle = `${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`;
+    const artistDisplay = Array.isArray(media.artist) 
+      ? media.artist.map((a: any) => a.name || a).join(', ')
+      : media.artist || '';
+    const ogTitle = `${media.title}${artistDisplay ? ` by ${artistDisplay}` : ''} | Tuneable`;
     const ogDescription = shareText; // Already includes the new caption
     const ogUrl = media?._id 
       ? `${window.location.origin}/podcasts/${media._id}`
@@ -4169,7 +4173,9 @@ const PodcastEpisodeProfile: React.FC = () => {
         onConfirm={handleConfirmGlobalBid}
         bidAmount={parsedGlobalBidAmount}
         mediaTitle={media?.title || 'Unknown'}
-        mediaArtist={media?.artist}
+        mediaArtist={Array.isArray(media?.artist) 
+          ? media.artist.map((a: any) => a.name || a).join(', ')
+          : (media?.artist as string) || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
       />
@@ -4273,7 +4279,11 @@ const PodcastEpisodeProfile: React.FC = () => {
                     )}
                     <div>
                       <p className="text-white font-medium">{media.title}</p>
-                      <p className="text-gray-400 text-sm">{media.artist}</p>
+                      <p className="text-gray-400 text-sm">
+                        {Array.isArray(media.artist) 
+                          ? media.artist.map((a: any) => a.name || a).join(', ')
+                          : media.artist || 'Unknown Artist'}
+                      </p>
                     </div>
                   </div>
                 </div>

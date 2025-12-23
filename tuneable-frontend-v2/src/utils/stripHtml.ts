@@ -29,8 +29,8 @@ export function stripHtml(html: string | null | undefined): string {
     .replace(/&#8221;/g, '"');
   
   // Decode numeric entities (&#123; or &#x1a;)
-  text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
-  text = text.replace(/&#x([a-f\d]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+  text = text.replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(dec));
+  text = text.replace(/&#x([a-f\d]+);/gi, (_match, hex) => String.fromCharCode(parseInt(hex, 16)));
   
   // Clean up multiple spaces and newlines
   text = text.replace(/\s+/g, ' ').trim();
