@@ -206,7 +206,7 @@ function capitalizeTag(tag: string): string {
       
       if (isKnownAcronym) {
         // Known acronym: make uppercase (handles both "uk" -> "UK" and "r&b" -> "R&B")
-        return wordLower.split('').map((char, i) => {
+        return wordLower.split('').map((char) => {
           if (/[&\/\-]/.test(char)) return char; // Preserve special chars
           return char.toUpperCase();
         }).join('');
