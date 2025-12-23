@@ -46,6 +46,8 @@ interface LedgerEntry {
   userBalancePost: number;
   userAggregatePre: number;
   userAggregatePost: number;
+  userTuneBytesPre?: number | null;
+  userTuneBytesPost?: number | null;
   mediaAggregatePre?: number;
   mediaAggregatePost?: number;
   transactionHash: string;
@@ -748,6 +750,15 @@ const LedgerAdmin: React.FC = () => {
                       <div>Post: {penceToPounds(selectedEntry.userAggregatePost)}</div>
                     </div>
                   </div>
+                  {selectedEntry.userTuneBytesPre !== undefined && selectedEntry.userTuneBytesPre !== null && (
+                    <div>
+                      <label className="text-xs text-gray-400">User TuneBytes</label>
+                      <div className="text-sm text-white">
+                        <div>Pre: {selectedEntry.userTuneBytesPre.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                        <div>Post: {selectedEntry.userTuneBytesPost !== null && selectedEntry.userTuneBytesPost !== undefined ? selectedEntry.userTuneBytesPost.toLocaleString(undefined, { maximumFractionDigits: 2 }) : 'N/A'}</div>
+                      </div>
+                    </div>
+                  )}
                   {selectedEntry.mediaAggregatePre !== undefined && (
                     <>
                       <div>
