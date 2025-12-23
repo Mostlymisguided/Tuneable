@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import DOMPurify from 'dompurify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants';
 import { 
   Music, 
@@ -172,6 +173,23 @@ const PodcastEpisodeProfile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+
+  // Sanitize HTML description for safe rendering
+  const sanitizeDescription = (html: string): string => {
+    if (!html) return '';
+    
+    // Configure DOMPurify to allow common HTML elements but remove inline styles
+    const clean = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+      ALLOWED_ATTR: ['href', 'target', 'rel'],
+      ALLOW_DATA_ATTR: false,
+      // Remove all inline styles
+      FORBID_ATTR: ['style', 'class'],
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
+    });
+    
+    return clean;
+  };
   
   const [media, setMedia] = useState<Media | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2244,14 +2262,22 @@ const PodcastEpisodeProfile: React.FC = () => {
                 <div className="px-2 md:px-0 mt-4 mb-4">
                   <div 
                     className="text-gray-300 text-sm md:text-base leading-relaxed prose prose-invert prose-sm max-w-none
-                      [&_p]:mb-3 [&_p:last-child]:mb-0
-                      [&_a]:text-purple-400 [&_a]:hover:text-purple-300 [&_a]:underline
+                      [&_p]:mb-3 [&_p:last-child]:mb-0 [&_p:first-child]:mt-0
+                      [&_a]:text-purple-400 [&_a]:hover:text-purple-300 [&_a]:underline [&_a]:break-words
                       [&_strong]:text-white [&_strong]:font-semibold
+                      [&_em]:italic
                       [&_u]:underline
-                      [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3
-                      [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3
-                      [&_li]:mb-1"
-                    dangerouslySetInnerHTML={{ __html: media.description }}
+                      [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:mt-2
+                      [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:mt-2
+                      [&_li]:mb-1 [&_li]:leading-relaxed
+                      [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-white
+                      [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-white
+                      [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-white
+                      [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3
+                      [&_code]:bg-gray-800 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono
+                      [&_pre]:bg-gray-800 [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-3 [&_pre]:text-sm [&_pre]:font-mono
+                      [&_br]:block [&_br]:content-[''] [&_br]:mt-2"
+                    dangerouslySetInnerHTML={{ __html: sanitizeDescription(media.description) }}
                   />
                 </div>
               )}
