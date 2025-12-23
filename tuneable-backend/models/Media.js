@@ -228,6 +228,29 @@ const mediaSchema = new mongoose.Schema({
   genres: { type: [String], default: [] }, // Multiple genres (was singular 'genre')
   category: { type: String, default: null }, // YouTube category name (mapped from categoryId)
   
+  // Location fields (similar to User model)
+  primaryLocation: {
+    city: { type: String },
+    region: { type: String }, // State, province, or region
+    country: { type: String },
+    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    detectedFromIP: { type: Boolean, default: false } // Track if auto-detected from IP
+  },
+  secondaryLocation: {
+    city: { type: String },
+    region: { type: String },
+    country: { type: String },
+    countryCode: { type: String },
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number },
+    }
+  },
+  
   // Minimum bid/tip amount (media-level override, falls back to party minimumBid if not set)
   minimumBid: {
     type: Number,

@@ -238,7 +238,22 @@ const TuneProfile: React.FC = () => {
     timeSignature: '',
     elements: [] as string[],
     coverArt: '',
-    minimumBid: null as number | null
+    minimumBid: null as number | null,
+    primaryLocation: null as {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      coordinates?: { lat?: number; lng?: number };
+      detectedFromIP?: boolean;
+    } | null,
+    secondaryLocation: null as {
+      city?: string;
+      region?: string;
+      country?: string;
+      countryCode?: string;
+      coordinates?: { lat?: number; lng?: number };
+    } | null
   });
   const [useMultipleArtists, setUseMultipleArtists] = useState(false);
   const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>([]);
@@ -559,7 +574,9 @@ const TuneProfile: React.FC = () => {
         timeSignature: media.timeSignature || '',
         elements: media.elements || [],
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
-        minimumBid: (media as any).minimumBid ?? null
+        minimumBid: (media as any).minimumBid ?? null,
+        primaryLocation: (media as any).primaryLocation || null,
+        secondaryLocation: (media as any).secondaryLocation || null
       });
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
@@ -738,6 +755,21 @@ const TuneProfile: React.FC = () => {
         releaseYearValue = null; // Let backend extract from date
       }
       
+      // Process location fields - send null if empty, otherwise send the object
+      const primaryLocation = editForm.primaryLocation && (
+        editForm.primaryLocation.city || 
+        editForm.primaryLocation.region || 
+        editForm.primaryLocation.country || 
+        editForm.primaryLocation.countryCode
+      ) ? editForm.primaryLocation : null;
+      
+      const secondaryLocation = editForm.secondaryLocation && (
+        editForm.secondaryLocation.city || 
+        editForm.secondaryLocation.region || 
+        editForm.secondaryLocation.country || 
+        editForm.secondaryLocation.countryCode
+      ) ? editForm.secondaryLocation : null;
+      
       const updateData: any = {
         ...editForm,
         duration: durationInSeconds,
@@ -747,7 +779,9 @@ const TuneProfile: React.FC = () => {
         featuring,
         labelId: selectedLabel?._id || null, // Send labelId if selected
         releaseDate: releaseDateValue,
-        releaseYear: releaseYearValue
+        releaseYear: releaseYearValue,
+        primaryLocation,
+        secondaryLocation
       };
       
       // Add collectiveId for artist if collective is selected
@@ -3104,6 +3138,127 @@ const TuneProfile: React.FC = () => {
                   <Music className="h-5 w-5 mr-2 text-purple-400" />
                   Enhanced Metadata
                 </h3>
+
+                {/* Location Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Primary Location</label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editForm.primaryLocation?.city || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          primaryLocation: { 
+                            ...(editForm.primaryLocation || {}), 
+                            city: e.target.value 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="City"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.primaryLocation?.region || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          primaryLocation: { 
+                            ...(editForm.primaryLocation || {}), 
+                            region: e.target.value 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="Region/State"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.primaryLocation?.country || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          primaryLocation: { 
+                            ...(editForm.primaryLocation || {}), 
+                            country: e.target.value 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="Country"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.primaryLocation?.countryCode || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          primaryLocation: { 
+                            ...(editForm.primaryLocation || {}), 
+                            countryCode: e.target.value.toUpperCase() 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="Country Code (e.g., US, GB)"
+                        maxLength={2}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-white font-medium mb-2">Secondary Location</label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editForm.secondaryLocation?.city || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { 
+                            ...(editForm.secondaryLocation || {}), 
+                            city: e.target.value 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="City"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.secondaryLocation?.region || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { 
+                            ...(editForm.secondaryLocation || {}), 
+                            region: e.target.value 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="Region/State"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.secondaryLocation?.country || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { 
+                            ...(editForm.secondaryLocation || {}), 
+                            country: e.target.value 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="Country"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.secondaryLocation?.countryCode || ''}
+                        onChange={(e) => setEditForm({ 
+                          ...editForm, 
+                          secondaryLocation: { 
+                            ...(editForm.secondaryLocation || {}), 
+                            countryCode: e.target.value.toUpperCase() 
+                          } 
+                        })}
+                        className="input"
+                        placeholder="Country Code (e.g., US, GB)"
+                        maxLength={2}
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {/* Creator Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

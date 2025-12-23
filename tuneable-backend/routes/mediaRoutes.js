@@ -563,6 +563,14 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       releaseDate: finalReleaseDate,
       releaseYear: finalReleaseYear,
       
+      // Location fields - auto-populate from user's locations if present
+      primaryLocation: user.homeLocation && Object.keys(user.homeLocation).length > 0 
+        ? { ...user.homeLocation } 
+        : undefined,
+      secondaryLocation: user.secondaryLocation && Object.keys(user.secondaryLocation).length > 0 
+        ? { ...user.secondaryLocation } 
+        : undefined,
+      
       // Creators (parsed from artist string or use extracted metadata)
       artist: artistArray.length > 0 ? artistArray : (mappedMetadata.artist || toCreatorSubdocs([{
         name: finalArtistName,
@@ -1767,6 +1775,74 @@ router.put('/:id', authMiddleware, async (req, res) => {
             newValue: media.label.length > 0 ? media.label[0] : null
           });
         }
+      }
+    }
+    
+    // Special handling for location fields
+    if (req.body.primaryLocation !== undefined) {
+      const oldPrimaryLocation = media.primaryLocation || {};
+      let newPrimaryLocation = null;
+      
+      if (req.body.primaryLocation && typeof req.body.primaryLocation === 'object') {
+        // If it's an object with data, use it
+        if (Object.keys(req.body.primaryLocation).length > 0) {
+          newPrimaryLocation = {
+            city: req.body.primaryLocation.city || null,
+            region: req.body.primaryLocation.region || null,
+            country: req.body.primaryLocation.country || null,
+            countryCode: req.body.primaryLocation.countryCode || null,
+            coordinates: req.body.primaryLocation.coordinates ? {
+              lat: req.body.primaryLocation.coordinates.lat || null,
+              lng: req.body.primaryLocation.coordinates.lng || null
+            } : null,
+            detectedFromIP: req.body.primaryLocation.detectedFromIP || false
+          };
+        }
+      } else if (req.body.primaryLocation === null || req.body.primaryLocation === '') {
+        // Clear location if null or empty string
+        newPrimaryLocation = null;
+      }
+      
+      if (JSON.stringify(oldPrimaryLocation) !== JSON.stringify(newPrimaryLocation)) {
+        changes.push({
+          field: 'primaryLocation',
+          oldValue: oldPrimaryLocation,
+          newValue: newPrimaryLocation
+        });
+        media.primaryLocation = newPrimaryLocation;
+      }
+    }
+    
+    if (req.body.secondaryLocation !== undefined) {
+      const oldSecondaryLocation = media.secondaryLocation || {};
+      let newSecondaryLocation = null;
+      
+      if (req.body.secondaryLocation && typeof req.body.secondaryLocation === 'object') {
+        // If it's an object with data, use it
+        if (Object.keys(req.body.secondaryLocation).length > 0) {
+          newSecondaryLocation = {
+            city: req.body.secondaryLocation.city || null,
+            region: req.body.secondaryLocation.region || null,
+            country: req.body.secondaryLocation.country || null,
+            countryCode: req.body.secondaryLocation.countryCode || null,
+            coordinates: req.body.secondaryLocation.coordinates ? {
+              lat: req.body.secondaryLocation.coordinates.lat || null,
+              lng: req.body.secondaryLocation.coordinates.lng || null
+            } : null
+          };
+        }
+      } else if (req.body.secondaryLocation === null || req.body.secondaryLocation === '') {
+        // Clear location if null or empty string
+        newSecondaryLocation = null;
+      }
+      
+      if (JSON.stringify(oldSecondaryLocation) !== JSON.stringify(newSecondaryLocation)) {
+        changes.push({
+          field: 'secondaryLocation',
+          oldValue: oldSecondaryLocation,
+          newValue: newSecondaryLocation
+        });
+        media.secondaryLocation = newSecondaryLocation;
       }
     }
     
