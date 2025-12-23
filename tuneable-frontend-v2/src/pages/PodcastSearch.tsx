@@ -199,10 +199,130 @@ const PodcastSearch: React.FC = () => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const handleEpisodeClick = (episode: PodcastEpisode) => {
+  const handleEpisodeClick = async (episode: PodcastEpisode) => {
     const episodeId = episode._id || episode.id;
-    if (episodeId) {
-      navigate(`/podcasts/${episodeId}`);
+    if (!episodeId) {
+      toast.error('Episode ID not found');
+      return;
+    }
+
+    // Check if user is logged in
+    if (!user) {
+      toast.info('Please log in to view podcast episodes');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // First, verify the episode exists by trying to fetch it
+      const checkResponse = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/media/${episodeId}/profile`
+      );
+
+      if (checkResponse.ok) {
+        // Episode exists, navigate directly
+        navigate(`/podcasts/${episodeId}`);
+        return;
+      }
+
+      // Episode doesn't exist in database - this shouldn't happen for search results
+      // but if it does, try to import it if we have external data
+      const episodeAny = episode as any;
+      
+      // Check if we have external source data to import from
+      if (episodeAny.source && (episodeAny.taddyData || episodeAny.appleData || episodeAny.podcastIndexData || episodeAny.rawData)) {
+        setIsLoading(true);
+        toast.info('Importing episode...');
+        
+        const token = localStorage.getItem('token');
+        let episodeData: any = null;
+        let seriesData: any = null;
+        let source = episodeAny.source;
+
+        // Extract episode data based on source
+        if (episodeAny.taddyData) {
+          source = 'taddy';
+          episodeData = episodeAny.taddyData;
+          if (episodeAny.podcastTitle || episodeAny.rawData?.podcastSeries) {
+            seriesData = {
+              title: episodeAny.podcastTitle || episodeAny.rawData?.podcastSeries?.name || '',
+              description: episodeAny.rawData?.podcastSeries?.description || '',
+              author: episodeAny.podcastAuthor || episodeAny.rawData?.podcastSeries?.publisherName || '',
+              image: episodeAny.podcastImage || episode.coverArt || episodeAny.rawData?.podcastSeries?.imageUrl || null,
+              categories: episode.genres || [],
+              language: 'en',
+              taddyUuid: episodeAny.podcastSeriesUuid || episodeAny.rawData?.podcastSeries?.uuid
+            };
+          }
+        } else if (episodeAny.appleData) {
+          source = 'apple';
+          episodeData = episodeAny.appleData;
+          if (episodeAny.podcastTitle) {
+            seriesData = {
+              title: episodeAny.podcastTitle,
+              description: '',
+              author: episodeAny.podcastAuthor || '',
+              image: episodeAny.podcastImage || episode.coverArt || null,
+              categories: episode.genres || [],
+              language: 'en',
+              iTunesId: episodeAny.collectionId
+            };
+          }
+        } else if (episodeAny.podcastIndexData) {
+          source = 'podcastindex';
+          episodeData = episodeAny.podcastIndexData;
+          if (episodeAny.podcastTitle) {
+            seriesData = {
+              title: episodeAny.podcastTitle,
+              description: '',
+              author: episodeAny.podcastAuthor || '',
+              image: episodeAny.podcastImage || episode.coverArt || null,
+              categories: episode.genres || [],
+              language: 'en',
+              podcastIndexId: episodeAny.feedId?.toString()
+            };
+          }
+        }
+
+        if (episodeData) {
+          // Import the episode
+          const importResponse = await fetch(
+            `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/import-single-episode`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                source,
+                episodeData,
+                seriesData
+              })
+            }
+          );
+
+          if (importResponse.ok) {
+            const importResult = await importResponse.json();
+            toast.success(`Imported: ${importResult.episode.title}`);
+            navigate(`/podcasts/${importResult.episode._id}`);
+          } else {
+            const error = await importResponse.json();
+            throw new Error(error.error || 'Failed to import episode');
+          }
+        } else {
+          // No external data available
+          toast.error('Episode not found. Please try clicking the series title to import episodes first.');
+        }
+      } else {
+        // Episode doesn't exist and we don't have data to import
+        toast.error('Episode not found. Please try clicking the series title to import episodes first.');
+      }
+    } catch (error: any) {
+      console.error('Error handling episode click:', error);
+      toast.error(error.message || 'Failed to load episode');
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -1400,6 +1400,45 @@ router.post('/discovery/import-single-episode', authMiddleware, async (req, res)
   }
 });
 
+// Get or import episode by ID
+// This endpoint checks if an episode exists, and if not, attempts to import it
+router.get('/episodes/:episodeId/get-or-import', authMiddleware, async (req, res) => {
+  try {
+    const { episodeId } = req.params;
+    const userId = req.user._id;
+    
+    if (!isValidObjectId(episodeId)) {
+      return res.status(400).json({ error: 'Invalid episode ID' });
+    }
+    
+    // First, try to find the episode in the database
+    const existingEpisode = await Media.findById(episodeId)
+      .populate('host.userId', 'username profilePic uuid')
+      .populate('podcastSeries', 'title coverArt')
+      .lean();
+    
+    if (existingEpisode) {
+      // Episode exists, return it
+      return res.json({
+        success: true,
+        episode: existingEpisode,
+        wasImported: false
+      });
+    }
+    
+    // Episode doesn't exist - we can't import it without external data
+    // This endpoint is mainly for checking existence
+    // The frontend should handle importing with the import-single-episode endpoint
+    return res.status(404).json({ 
+      error: 'Episode not found',
+      needsImport: true
+    });
+  } catch (error) {
+    console.error('Error getting or importing episode:', error);
+    res.status(500).json({ error: 'Failed to get episode', details: error.message });
+  }
+});
+
 // Create or find podcast series
 router.post('/discovery/create-or-find-series', authMiddleware, async (req, res) => {
   try {
