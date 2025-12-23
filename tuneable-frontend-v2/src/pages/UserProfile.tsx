@@ -31,13 +31,17 @@ import {
   Award,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Plus,
+  Minus
 } from 'lucide-react';
-import { userAPI, authAPI, creatorAPI, mediaAPI } from '../lib/api';
-import LabelCreateModal from '../components/LabelCreateModal';
-import CollectiveCreateModal from '../components/CollectiveCreateModal';
+import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI } from '../lib/api';
+import LabelLinkModal from '../components/LabelLinkModal';
+import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
 import BetaWarningBanner from '../components/BetaWarningBanner';
+import QuotaWarningBanner from '../components/QuotaWarningBanner';
+import TagInputModal from '../components/TagInputModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
@@ -222,6 +226,18 @@ const UserProfile: React.FC = () => {
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [librarySortField, setLibrarySortField] = useState<string>('lastBidAt');
   const [librarySortDirection, setLibrarySortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // Add Tune search state
+  const [addTuneSearchQuery, setAddTuneSearchQuery] = useState('');
+  const [addTuneResults, setAddTuneResults] = useState<{
+    database: any[];
+    youtube: any[];
+  }>({ database: [], youtube: [] });
+  const [isSearchingTune, setIsSearchingTune] = useState(false);
+  const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, string>>({});
+  const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
+  const [pendingAddTuneResult, setPendingAddTuneResult] = useState<any>(null);
+  const [isAddingTune, setIsAddingTune] = useState(false);
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
@@ -507,6 +523,14 @@ const UserProfile: React.FC = () => {
     }
   }, [user, isOwnProfile, isBetaMode]);
 
+  // Clear search results when query is cleared
+  useEffect(() => {
+    if (!addTuneSearchQuery.trim()) {
+      setAddTuneResults({ database: [], youtube: [] });
+      setAddTuneBidAmounts({});
+    }
+  }, [addTuneSearchQuery]);
+
   // Save notification preferences
   const handleSaveNotificationPrefs = async () => {
     try {
@@ -684,6 +708,209 @@ const UserProfile: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Helper functions for add tune feature
+  const isYouTubeUrl = (query: string) => {
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    return youtubeRegex.test(query);
+  };
+
+  const getEffectiveMinimumBid = (media?: any): number => {
+    return media?.minimumBid ?? 0.01;
+  };
+
+  const getDefaultBidAmount = (media?: any): number => {
+    const minBid = getEffectiveMinimumBid(media);
+    const userDefaultTip = currentUser?.preferences?.defaultTip || 0.11;
+    return Math.max(minBid, userDefaultTip);
+  };
+
+  const calculateAverageBid = (media: any): number => {
+    if (!media || !media.globalMediaAggregateAvg) return 0;
+    return media.globalMediaAggregateAvg / 100; // Convert from pence to pounds
+  };
+
+  // Add tune search handler
+  const handleAddTuneSearch = async () => {
+    if (!addTuneSearchQuery.trim()) return;
+    
+    if (!currentUser) {
+      toast.info('Please sign up to search for tunes');
+      navigate('/register');
+      return;
+    }
+
+    setIsSearchingTune(true);
+    try {
+      let response;
+      
+      // Check if it's a YouTube URL
+      if (isYouTubeUrl(addTuneSearchQuery)) {
+        response = await searchAPI.searchByYouTubeUrl(addTuneSearchQuery);
+        
+        let databaseResults = [];
+        let youtubeResults = [];
+        
+        if (response.source === 'local' && response.videos) {
+          databaseResults = response.videos;
+        } else if (response.source === 'external' && response.videos) {
+          youtubeResults = response.videos;
+        }
+        
+        setAddTuneResults({
+          database: databaseResults,
+          youtube: youtubeResults
+        });
+        
+        // Initialize bid amounts
+        const newBidAmounts: Record<string, string> = {};
+        [...databaseResults, ...youtubeResults].forEach(media => {
+          const avgBid = calculateAverageBid(media);
+          newBidAmounts[media._id || media.id] = Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
+        });
+        setAddTuneBidAmounts(newBidAmounts);
+      } else {
+        // Regular search
+        response = await searchAPI.search(addTuneSearchQuery, 'youtube');
+        
+        let databaseResults = [];
+        let youtubeResults = [];
+        
+        if (response.source === 'local' && response.videos) {
+          databaseResults = response.videos;
+        } else if (response.source === 'external' && response.videos) {
+          youtubeResults = response.videos;
+        }
+        
+        // If we got local results but want to show YouTube too, fetch YouTube
+        if (databaseResults.length > 0 && response.hasMoreExternal) {
+          const youtubeResponse = await searchAPI.search(addTuneSearchQuery, 'youtube', undefined, undefined, true);
+          if (youtubeResponse.videos) {
+            youtubeResults = youtubeResponse.videos;
+          }
+        }
+        
+        setAddTuneResults({ database: databaseResults, youtube: youtubeResults });
+        
+        // Initialize bid amounts
+        const newBidAmounts: Record<string, string> = {};
+        [...databaseResults, ...youtubeResults].forEach(media => {
+          const avgBid = calculateAverageBid(media);
+          newBidAmounts[media._id || media.id] = Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
+        });
+        setAddTuneBidAmounts(newBidAmounts);
+      }
+    } catch (error: any) {
+      console.error('Search error:', error);
+      if (error?.response?.status === 429) {
+        toast.error('YouTube search is temporarily disabled due to quota limits');
+      } else {
+        toast.error(error.response?.data?.error || 'Search failed');
+      }
+    } finally {
+      setIsSearchingTune(false);
+    }
+  };
+
+  // Add tune handler
+  const handleAddTune = async (media: any, tags: string[] = []) => {
+    if (!currentUser) {
+      toast.info('Please log in to add tunes');
+      return;
+    }
+
+    const mediaKey = media._id || media.id || '';
+    const rawAmount = addTuneBidAmounts[mediaKey] ?? '';
+    const parsedAmount = parseFloat(rawAmount);
+    const bidAmount = Number.isFinite(parsedAmount) ? parsedAmount : getDefaultBidAmount(media);
+    const minBid = getEffectiveMinimumBid(media);
+
+    if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
+      toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
+      return;
+    }
+
+    // Check balance
+    if ((currentUser as any)?.balance < bidAmount) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
+    const isExistingMedia = Boolean(media._id);
+    const targetMediaId = isExistingMedia ? (media._id || media.id || '') : 'external';
+
+    if (!targetMediaId) {
+      toast.error('Invalid media ID');
+      return;
+    }
+
+    // Prepare external sources
+    const externalSources = !isExistingMedia
+      ? (media.sources && Object.keys(media.sources).length > 0
+          ? media.sources
+          : media.url
+            ? { youtube: media.url }
+            : media.id
+              ? { youtube: `https://www.youtube.com/watch?v=${media.id}` }
+              : {})
+      : {};
+
+    if (!isExistingMedia && Object.keys(externalSources).length === 0) {
+      toast.error('Unable to add this tune because no source URL was provided.');
+      return;
+    }
+
+    setIsAddingTune(true);
+
+    try {
+      // Prepare external media data if needed
+      const externalMedia = !isExistingMedia
+        ? {
+            title: media.title,
+            artist: media.artist,
+            coverArt: media.coverArt,
+            duration: media.duration,
+            category: media.category || 'Music',
+            tags: tags,
+            sources: externalSources
+          }
+        : tags.length > 0
+          ? { tags: tags }
+          : undefined;
+
+      await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia);
+      toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} tip!`);
+      
+      // Clear search
+      setAddTuneSearchQuery('');
+      setAddTuneResults({ database: [], youtube: [] });
+      setAddTuneBidAmounts({});
+      
+      // Reload library and top tunes to show new tune
+      if (isOwnProfile) {
+        await loadTuneLibrary();
+        // Reload profile data to refresh top tunes
+        const profileData = await userAPI.getProfile(userId || '');
+        if (profileData.user) {
+          setUser(profileData.user);
+          setMediaWithBids(profileData.mediaWithBids || []);
+        }
+      }
+      
+      setPendingAddTuneResult(null);
+      setShowAddTuneTagModal(false);
+    } catch (error: any) {
+      console.error('Error adding tune:', error);
+      toast.error(error.response?.data?.error || 'Failed to add tune');
+    } finally {
+      setIsAddingTune(false);
+    }
+  };
+
+  const startAddTune = async (media: any) => {
+    setPendingAddTuneResult(media);
+    setShowAddTuneTagModal(true);
+  };
+
   const getRoleDisplay = (roles: string[]) => {
     if (roles.includes('admin')) return 'Admin';
     if (roles.includes('moderator')) return 'Moderator';
@@ -742,6 +969,53 @@ const UserProfile: React.FC = () => {
     setGlobalPlayerActive(true);
     
     toast.success(`Now playing: ${cleanedMedia.title}`);
+  };
+
+  // Handle playing all top tunes
+  const handlePlayTopTunes = () => {
+    if (!mediaWithBids || mediaWithBids.length === 0) {
+      toast.error('No tunes available to play');
+      return;
+    }
+
+    // Format all media items for the queue
+    const formattedQueue = mediaWithBids.map((mediaData) => {
+      const media = mediaData.media as any; // Use any to access all properties
+      const mediaId = media._id || media.uuid;
+      
+      // Clean and format sources
+      let sources: any = {};
+      if (media.sources) {
+        sources = media.sources;
+      } else {
+        if (media.youtubeId) sources = { ...sources, youtube: media.youtubeId };
+        if (media.uploadUrl) sources = { ...sources, upload: media.uploadUrl };
+      }
+      
+      return {
+        id: mediaId,
+        _id: media._id,
+        title: media.title,
+        artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
+        artists: Array.isArray(media.artist) ? media.artist : (media.artists || []),
+        featuring: media.featuring || [],
+        duration: media.duration || 0, // Default to 0 if undefined
+        coverArt: media.coverArt,
+        sources: sources,
+        globalMediaAggregate: media.globalMediaAggregate || 0,
+        bids: mediaData.bids || [],
+        addedBy: media.addedBy || null,
+        totalBidValue: mediaData.totalAmount || 0,
+      };
+    });
+
+    // Set the queue and start playing from the first item
+    setQueue(formattedQueue as any);
+    setCurrentMedia(formattedQueue[0] as any, 0);
+    play();
+    setGlobalPlayerActive(true);
+    
+    toast.success(`Playing ${formattedQueue.length} top tune${formattedQueue.length !== 1 ? 's' : ''}`);
   };
 
   // Load tune library
@@ -1004,6 +1278,11 @@ const UserProfile: React.FC = () => {
   // Label creation handlers
   const handleAddLabelClick = () => {
     setIsLabelModalOpen(true);
+  };
+
+  const handleCollectiveLinked = async () => {
+    // Refresh collective memberships after linking
+    await loadCollectiveMemberships();
   };
 
   const handleLabelCreated = async () => {
@@ -1582,10 +1861,309 @@ const UserProfile: React.FC = () => {
           </div>
         )}
 
+        {/* Add Tune Search Section - Only show for own profile */}
+        {isOwnProfile && (
+          <div className="mb-8">
+            <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
+                
+              {/* Quota Warning Banner */}
+              <QuotaWarningBanner className="mb-4" />
+                
+              {/* Search Input */}
+              <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
+                <input
+                  type="text"
+                  value={addTuneSearchQuery}
+                  onChange={(e) => setAddTuneSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTuneSearch();
+                    }
+                  }}
+                  placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
+                  className="flex-1 bg-gray-900 hover:shadow-2xl rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
+                />
+              </div>
+              <div className="flex justify-center">
+                <button
+                  onClick={handleAddTuneSearch}
+                  disabled={isSearchingTune || !addTuneSearchQuery.trim()}
+                  className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                >
+                  {isSearchingTune ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    'Search'
+                  )}
+                </button>
+              </div>
+
+              {/* Database Results */}
+              {addTuneResults.database.length > 0 && (
+                <div className="mb-4 mt-4">
+                  <div className="flex items-center mb-2">
+                    <Music className="h-4 w-4 text-green-400 mr-2" />
+                    <h4 className="text-sm font-semibold text-green-300">From Tuneable Library ({addTuneResults.database.length})</h4>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {addTuneResults.database.map((mediaItem: any) => {
+                      const media = {
+                        ...mediaItem,
+                        artists: Array.isArray(mediaItem.artists) ? mediaItem.artists : 
+                                (Array.isArray(mediaItem.artist) ? mediaItem.artist : []),
+                        artist: mediaItem.artist,
+                        featuring: mediaItem.featuring || [],
+                        creatorDisplay: mediaItem.creatorDisplay
+                      };
+                      return (
+                        <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <img
+                              src={media.coverArt || DEFAULT_COVER_ART}
+                              alt={media.title}
+                              className="h-12 w-12 md:h-12 md:w-12 rounded object-cover flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p 
+                                className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors text-sm md:text-base"
+                                onClick={() => navigate(`/tune/${media._id || media.id}`)}
+                                title="View tune profile"
+                              >
+                                {media.title}
+                              </p>
+                              <p className="text-gray-400 text-xs md:text-sm truncate">
+                                <ClickableArtistDisplay media={media} />
+                              </p>
+                              {media.duration && (
+                                <div className="flex justify-center items-center space-x-1 mt-1">
+                                  <Clock className="h-3 w-3 text-gray-500" />
+                                  <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-center space-x-0 md:flex-shrink-0">
+                            <div className="flex items-center space-x-0 mr-4">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const mediaId = media._id || media.id;
+                                  const avgBid = calculateAverageBid(media);
+                                  const minBid = getEffectiveMinimumBid(media);
+                                  const defaultBid = Math.max(getDefaultBidAmount(media), avgBid || 0);
+                                  const current = parseFloat(addTuneBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                  const newAmount = Math.max(minBid, current - 0.01);
+                                  setAddTuneBidAmounts(prev => ({
+                                    ...prev,
+                                    [mediaId]: newAmount.toFixed(2)
+                                  }));
+                                }}
+                                className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={getEffectiveMinimumBid(media)}
+                                value={addTuneBidAmounts[media._id || media.id] ?? (() => {
+                                  const avgBid = calculateAverageBid(media);
+                                  return Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
+                                })()}
+                                onChange={(e) => setAddTuneBidAmounts(prev => ({
+                                  ...prev,
+                                  [media._id || media.id]: e.target.value
+                                }))}
+                                className="w-14 md:w-14 bg-gray-800 rounded px-2 py-1 text-gray text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const mediaId = media._id || media.id;
+                                  const avgBid = calculateAverageBid(media);
+                                  const defaultBid = Math.max(getDefaultBidAmount(media), avgBid || 0);
+                                  const current = parseFloat(addTuneBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                  const newAmount = current + 0.01;
+                                  setAddTuneBidAmounts(prev => ({
+                                    ...prev,
+                                    [mediaId]: newAmount.toFixed(2)
+                                  }));
+                                }}
+                                className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => startAddTune(media)}
+                              disabled={isAddingTune}
+                              className="z-999 px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                            >
+                              {isAddingTune ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin inline mr-2" />
+                                  Adding...
+                                </>
+                              ) : (
+                                (() => {
+                                  const defaultBid = getDefaultBidAmount(media);
+                                  const raw = addTuneBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
+                                  const parsed = parseFloat(raw);
+                                  if (!Number.isFinite(parsed)) {
+                                    return 'Add';
+                                  }
+                                  return `Add £${parsed.toFixed(2)}`;
+                                })()
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* YouTube Results */}
+              {addTuneResults.youtube.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center mb-2">
+                    <Youtube className="h-4 w-4 text-red-400 mr-2" />
+                    <h4 className="text-sm font-semibold text-red-300">From YouTube ({addTuneResults.youtube.length})</h4>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {addTuneResults.youtube.map((mediaItem: any) => {
+                      const media = {
+                        ...mediaItem,
+                        artists: Array.isArray(mediaItem.artists) ? mediaItem.artists : 
+                                (Array.isArray(mediaItem.artist) ? mediaItem.artist : []),
+                        artist: mediaItem.artist,
+                        featuring: mediaItem.featuring || [],
+                        creatorDisplay: mediaItem.creatorDisplay
+                      };
+                      return (
+                        <div key={media._id || media.id} className="bg-gray-900 rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <img
+                              src={media.coverArt || DEFAULT_COVER_ART}
+                              alt={media.title}
+                              className="h-12 w-12 md:h-12 md:w-12 rounded object-cover flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium truncate text-sm md:text-base">{media.title}</p>
+                              <p className="text-gray-400 text-xs md:text-sm truncate">
+                                <ClickableArtistDisplay media={media} />
+                              </p>
+                              {media.duration && (
+                                <div className="flex justify-center items-center space-x-1 mt-1">
+                                  <Clock className="h-3 w-3 text-gray-500" />
+                                  <span className="text-gray-500 text-xs">{formatDuration(media.duration)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-center space-x-0 md:flex-shrink-0">
+                            <div className="flex items-center space-x-0 mr-4">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const mediaId = media._id || media.id;
+                                  const avgBid = calculateAverageBid(media);
+                                  const minBid = getEffectiveMinimumBid(media);
+                                  const defaultBid = Math.max(getDefaultBidAmount(media), avgBid || 0);
+                                  const current = parseFloat(addTuneBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                  const newAmount = Math.max(minBid, current - 0.01);
+                                  setAddTuneBidAmounts(prev => ({
+                                    ...prev,
+                                    [mediaId]: newAmount.toFixed(2)
+                                  }));
+                                }}
+                                className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={getEffectiveMinimumBid(media)}
+                                value={addTuneBidAmounts[media._id || media.id] ?? (() => {
+                                  const avgBid = calculateAverageBid(media);
+                                  return Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
+                                })()}
+                                onChange={(e) => setAddTuneBidAmounts(prev => ({
+                                  ...prev,
+                                  [media._id || media.id]: e.target.value
+                                }))}
+                                className="w-14 md:w-14 bg-gray-800 rounded px-2 py-1 text-gray text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const mediaId = media._id || media.id;
+                                  const avgBid = calculateAverageBid(media);
+                                  const defaultBid = Math.max(getDefaultBidAmount(media), avgBid || 0);
+                                  const current = parseFloat(addTuneBidAmounts[mediaId] ?? defaultBid.toFixed(2));
+                                  const newAmount = current + 0.01;
+                                  setAddTuneBidAmounts(prev => ({
+                                    ...prev,
+                                    [mediaId]: newAmount.toFixed(2)
+                                  }));
+                                }}
+                                className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => startAddTune(media)}
+                              disabled={isAddingTune}
+                              className="z-999 px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                            >
+                              {isAddingTune ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin inline mr-2" />
+                                  Adding...
+                                </>
+                              ) : (
+                                (() => {
+                                  const defaultBid = getDefaultBidAmount(media);
+                                  const raw = addTuneBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
+                                  const parsed = parseFloat(raw);
+                                  if (!Number.isFinite(parsed)) {
+                                    return 'Add';
+                                  }
+                                  return `Add £${parsed.toFixed(2)}`;
+                                })()
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Songs with Bids */}
         {mediaWithBids.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl text-center font-bold text-white mb-4">Top Tunes</h2>
+            <div className="flex flex-col items-center mb-4">
+              <h2 className="text-2xl text-center font-bold text-white mb-3">Top Tunes</h2>
+              <button
+                onClick={handlePlayTopTunes}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+              >
+                <Play className="h-4 w-4" fill="currentColor" />
+                <span>Play Top Tunes</span>
+              </button>
+            </div>
             <div className="md:bg-black/20 rounded-lg p-0 md:p-6">
               <div className="space-y-4">
                 {(showAllTunes ? mediaWithBids : mediaWithBids.slice(0, 10)).map((mediaData, index) => (
@@ -1651,9 +2229,9 @@ const UserProfile: React.FC = () => {
                           {mediaData.bidCount || 0} Tip{(mediaData.bidCount || 0) !== 1 ? 's' : ''}
                         </span>
                       </div>
-                      {/* Tags Display */}
+                      {/* Tags Display - Immediately below duration and tips */}
                       {mediaData.media?.tags && mediaData.media.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-1.5">
                           {mediaData.media.tags.slice(0, 5).map((tag: string, tagIndex: number) => (
                             <span 
                               key={tagIndex}
@@ -3454,11 +4032,26 @@ const UserProfile: React.FC = () => {
         onSuccess={handleLabelCreated}
       />
       
-      {/* Create Collective Modal */}
-      <CollectiveCreateModal
+      {/* Link Collective Modal */}
+      <CollectiveLinkModal
         isOpen={isCollectiveModalOpen}
         onClose={() => setIsCollectiveModalOpen(false)}
-        onSuccess={handleLabelCreated} // Reuse same handler for now
+        onSuccess={handleCollectiveLinked}
+      />
+      {/* Tag Input Modal for Add Tune */}
+      <TagInputModal
+        isOpen={showAddTuneTagModal}
+        onClose={() => {
+          setShowAddTuneTagModal(false);
+          setPendingAddTuneResult(null);
+        }}
+        onSubmit={(tags) => {
+          if (pendingAddTuneResult) {
+            void handleAddTune(pendingAddTuneResult, tags);
+          }
+        }}
+        mediaTitle={pendingAddTuneResult?.title}
+        mediaArtist={pendingAddTuneResult?.artist}
       />
     </div>
   );
