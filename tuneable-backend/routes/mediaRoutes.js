@@ -1144,6 +1144,11 @@ router.get('/:mediaId/profile', async (req, res) => {
         path: 'featuring.collectiveId',
         model: 'Collective',
         select: 'name slug profilePicture verificationStatus'
+      })
+      .populate({
+        path: 'podcastSeries',
+        model: 'Media',
+        select: '_id title coverArt description frequency'
       });
 
     // Fetch recent comments

@@ -201,28 +201,99 @@ const PodcastSeriesProfile: React.FC = () => {
           toast.success(`Imported ${data.importInfo.imported} new episode${data.importInfo.imported === 1 ? '' : 's'}`);
         }
       } else {
-        // No episodes exist, trigger import
+        // No episodes exist, trigger import with limit=10
         setLoadingMessage('Importing episodes from external sources...');
         setLoadingStage('importing');
         setLoadingProgress(60);
         
-        // Re-fetch with auto-import enabled
+        // Re-fetch with auto-import enabled and limit=10
         const importParams = new URLSearchParams();
         importParams.append('autoImport', 'true');
+        importParams.append('limit', '10'); // Reduce initial import to 10
         const importUrl = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}?${importParams.toString()}`;
-        const importResponse = await fetch(importUrl);
         
-        if (importResponse.ok) {
-          const importData = await importResponse.json();
-          setEpisodes(importData.episodes || []);
-          if (importData.stats) {
-            setStats(importData.stats);
+        // Start the import (don't await yet)
+        const importPromise = fetch(importUrl);
+        
+        // Start polling for progress
+        let pollInterval: NodeJS.Timeout | null = null;
+        let pollAttempts = 0;
+        const maxPollAttempts = 120; // Poll for up to 2 minutes (120 * 1s)
+        
+        const pollProgress = async () => {
+          try {
+            const progressUrl = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}/import-progress`;
+            const progressResponse = await fetch(progressUrl);
+            
+            if (progressResponse.ok) {
+              const progressData = await progressResponse.json();
+              
+              if (progressData.status === 'importing' && progressData.total > 0) {
+                // Update UI with real progress
+                const progressPercent = Math.min(60 + (progressData.current / progressData.total) * 35, 95); // 60% to 95%
+                setLoadingProgress(progressPercent);
+                setEpisodeCount(progressData.current);
+                setLoadingMessage(`Processing episode ${progressData.current} of ${progressData.total}...`);
+                
+                // Continue polling
+                pollAttempts++;
+                if (pollAttempts < maxPollAttempts) {
+                  pollInterval = setTimeout(pollProgress, 1000); // Poll every second
+                }
+              } else if (progressData.status === 'complete') {
+                // Import complete, stop polling
+                if (pollInterval) {
+                  clearTimeout(pollInterval);
+                }
+                setLoadingProgress(95);
+                setLoadingMessage('Finalizing...');
+              } else if (progressData.status === 'not_started') {
+                // Import hasn't started yet, keep polling
+                pollAttempts++;
+                if (pollAttempts < maxPollAttempts) {
+                  pollInterval = setTimeout(pollProgress, 1000);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error polling progress:', error);
+            // Continue polling on error (might be transient)
+            pollAttempts++;
+            if (pollAttempts < maxPollAttempts && pollInterval) {
+              pollInterval = setTimeout(pollProgress, 1000);
+            }
           }
-          if (importData.importInfo && importData.importInfo.imported > 0) {
-            toast.success(`Imported ${importData.importInfo.imported} new episode${importData.importInfo.imported === 1 ? '' : 's'}`);
+        };
+        
+        // Start polling immediately
+        pollProgress();
+        
+        try {
+          const importResponse = await importPromise;
+          
+          // Stop polling once we get the response
+          if (pollInterval) {
+            clearTimeout(pollInterval);
           }
+          
+          if (importResponse.ok) {
+            const importData = await importResponse.json();
+            setEpisodes(importData.episodes || []);
+            if (importData.stats) {
+              setStats(importData.stats);
+            }
+            if (importData.importInfo && importData.importInfo.imported > 0) {
+              toast.success(`Imported ${importData.importInfo.imported} new episode${importData.importInfo.imported === 1 ? '' : 's'}`);
+            }
+          }
+          setLoadingProgress(100);
+        } catch (error) {
+          // Stop polling on error
+          if (pollInterval) {
+            clearTimeout(pollInterval);
+          }
+          throw error;
         }
-        setLoadingProgress(100);
       }
     } catch (error: any) {
       console.error('Error fetching episodes:', error);
@@ -458,7 +529,7 @@ const PodcastSeriesProfile: React.FC = () => {
   };
 
   const handleEpisodeClick = (episode: Episode) => {
-    navigate(`/tune/${episode._id}`);
+    navigate(`/podcasts/${episode._id}`);
   };
 
   // Share functionality
@@ -816,7 +887,11 @@ const PodcastSeriesProfile: React.FC = () => {
                   {loadingStage === 'fetching-taddy' && 'Requesting episodes from Taddy API...'}
                   {loadingStage === 'processing-taddy' && 'Processing Taddy episode data...'}
                   {loadingStage === 'processing' && 'Organizing episode information...'}
-                  {loadingStage === 'importing' && 'Adding episodes to database...'}
+                  {loadingStage === 'importing' && (
+                    episodeCount !== null ? 
+                      `Processing episode ${episodeCount}...` : 
+                      'Adding episodes to database...'
+                  )}
                   {loadingStage === 'finalizing' && 'Preparing episode list...'}
                   {loadingStage === 'complete' && 'Almost done!'}
                 </p>

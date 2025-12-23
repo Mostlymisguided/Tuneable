@@ -278,6 +278,11 @@ const mediaSchema = new mongoose.Schema({
   episodeNumber: { type: Number, default: null },
   seasonNumber: { type: Number, default: null },
   podcastSeries: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', default: null }, // Reference to podcast series Media item
+  frequency: { 
+    type: String, 
+    enum: ['daily', 'weekly', 'biweekly', 'monthly', 'bimonthly', 'quarterly', 'irregular', null],
+    default: null 
+  }, // How often episodes are released (typically for podcast series)
   
   // Platform sources (flexible map)
   sources: {

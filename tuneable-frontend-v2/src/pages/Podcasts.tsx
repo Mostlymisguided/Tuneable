@@ -528,7 +528,7 @@ const Podcasts: React.FC = () => {
   const handleEpisodeClick = (episode: PodcastEpisode) => {
     const episodeId = episode._id || episode.id;
     if (episodeId) {
-      navigate(`/tune/${episodeId}`);
+      navigate(`/podcasts/${episodeId}`);
     }
   };
 

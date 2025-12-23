@@ -16,6 +16,22 @@ const taddyService = require('../services/taddyService');
 const podcastAdapter = require('../services/podcastAdapter');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
 
+const router = express.Router();
+
+// In-memory store for import progress tracking
+// Format: { seriesId: { current: 0, total: 10, status: 'importing' | 'complete' | 'error', startedAt: Date } }
+const importProgress = new Map();
+
+// Clean up old progress entries (older than 5 minutes)
+setInterval(() => {
+  const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+  for (const [seriesId, progress] of importProgress.entries()) {
+    if (progress.startedAt && progress.startedAt < fiveMinutesAgo) {
+      importProgress.delete(seriesId);
+    }
+  }
+}, 60000); // Run cleanup every minute
+
 // RSS Feed Parser
 async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
   try {
@@ -153,8 +169,6 @@ function parseDuration(durationStr) {
   const seconds = parseInt(durationStr);
   return isNaN(seconds) ? 0 : seconds;
 }
-
-const router = express.Router();
 
 // ============================================================================
 // CORE PODCAST FUNCTIONALITY
@@ -1508,6 +1522,37 @@ router.get('/series/:seriesId/info', async (req, res) => {
   }
 });
 
+// Get import progress for a series
+router.get('/series/:seriesId/import-progress', async (req, res) => {
+  try {
+    const { seriesId } = req.params;
+    
+    if (!isValidObjectId(seriesId)) {
+      return res.status(400).json({ error: 'Invalid series ID' });
+    }
+    
+    const progress = importProgress.get(seriesId);
+    
+    if (!progress) {
+      return res.json({
+        status: 'not_started',
+        current: 0,
+        total: 0
+      });
+    }
+    
+    res.json({
+      status: progress.status,
+      current: progress.current,
+      total: progress.total,
+      startedAt: progress.startedAt
+    });
+  } catch (error) {
+    console.error('Error getting import progress:', error);
+    res.status(500).json({ error: 'Failed to get import progress' });
+  }
+});
+
 // Get podcast series with episodes
 router.get('/series/:seriesId', async (req, res) => {
   try {
@@ -1550,7 +1595,7 @@ router.get('/series/:seriesId', async (req, res) => {
     // Auto-import episodes from external source if series has external IDs
     let importedCount = 0;
     let importErrors = [];
-    const maxEpisodesToImport = parseInt(limit, 10) || 20; // Import episodes (default 20 for initial load)
+    const maxEpisodesToImport = parseInt(limit, 10) || 10; // Import episodes (default 10 for initial load)
     const episodeOffset = parseInt(offset, 10) || 0; // Offset for pagination
     const shouldImport = autoImport === 'true' || loadMore === 'true';
     
@@ -2088,6 +2133,14 @@ router.get('/series/:seriesId', async (req, res) => {
             }
             
             if (episodesToProcess.length > 0) {
+              // Initialize progress tracking
+              importProgress.set(seriesId, {
+                current: 0,
+                total: episodesToProcess.length,
+                status: 'importing',
+                startedAt: new Date()
+              });
+              
               // Prepare series data for linking
               const seriesData = {
                 title: series.title,
@@ -2101,7 +2154,16 @@ router.get('/series/:seriesId', async (req, res) => {
               };
               
               // Import episodes (deduplication handled by importEpisode, but we've pre-filtered)
-              for (const episode of episodesToProcess) {
+              for (let i = 0; i < episodesToProcess.length; i++) {
+                const episode = episodesToProcess[i];
+                
+                // Update progress
+                importProgress.set(seriesId, {
+                  current: i + 1,
+                  total: episodesToProcess.length,
+                  status: 'importing',
+                  startedAt: importProgress.get(seriesId)?.startedAt || new Date()
+                });
                 try {
                   let result;
                   let source = 'rss'; // Default to RSS
@@ -2227,6 +2289,28 @@ router.get('/series/:seriesId', async (req, res) => {
                 console.log(`📡 ${rssEpisodesToImport.length} new episodes from RSS (${rssEpisodes.length - rssEpisodesToImport.length} already exist)`);
                 
                 if (rssEpisodesToImport.length > 0) {
+                  // Initialize or update progress tracking
+                  const existingProgress = importProgress.get(seriesId);
+                  const episodesToProcessCount = loadMore === 'true' 
+                    ? Math.min(maxEpisodesToImport, rssEpisodesToImport.length - episodeOffset)
+                    : Math.min(maxEpisodesToImport, rssEpisodesToImport.length);
+                  
+                  if (!existingProgress) {
+                    importProgress.set(seriesId, {
+                      current: 0,
+                      total: episodesToProcessCount,
+                      status: 'importing',
+                      startedAt: new Date()
+                    });
+                  } else {
+                    importProgress.set(seriesId, {
+                      current: existingProgress.current,
+                      total: existingProgress.total + episodesToProcessCount,
+                      status: 'importing',
+                      startedAt: existingProgress.startedAt
+                    });
+                  }
+                  
                   const seriesData = {
                     title: series.title,
                     description: series.description || '',
@@ -2246,7 +2330,17 @@ router.get('/series/:seriesId', async (req, res) => {
                     episodesToProcess = rssEpisodesToImport.slice(0, maxEpisodesToImport);
                   }
                   
-                  for (const episode of episodesToProcess) {
+                  for (let i = 0; i < episodesToProcess.length; i++) {
+                    const episode = episodesToProcess[i];
+                    
+                    // Update progress
+                    const currentProgress = importProgress.get(seriesId);
+                    importProgress.set(seriesId, {
+                      current: (currentProgress?.current || 0) + 1,
+                      total: currentProgress?.total || episodesToProcess.length,
+                      status: 'importing',
+                      startedAt: currentProgress?.startedAt || new Date()
+                    });
                     try {
                       const result = await podcastAdapter.importEpisodeWithSeries(
                         'rss',
@@ -2263,6 +2357,18 @@ router.get('/series/:seriesId', async (req, res) => {
                       importErrors.push({ title: episodeTitle, error: epError.message });
                     }
                   }
+                  
+                  // Mark as complete
+                  const finalProgress = importProgress.get(seriesId);
+                  if (finalProgress) {
+                    importProgress.set(seriesId, {
+                      current: finalProgress.current,
+                      total: finalProgress.total,
+                      status: 'complete',
+                      startedAt: finalProgress.startedAt
+                    });
+                  }
+                  
                   console.log(`✅ Imported ${importedCount} episodes from RSS feed`);
                 }
               } catch (rssError) {
@@ -2275,6 +2381,14 @@ router.get('/series/:seriesId', async (req, res) => {
           const piResult = await podcastIndexService.getPodcastEpisodes(podcastIndexId, maxEpisodesToImport);
           
           if (piResult.success && piResult.episodes && piResult.episodes.length > 0) {
+            // Initialize progress tracking
+            importProgress.set(seriesId, {
+              current: 0,
+              total: piResult.episodes.length,
+              status: 'importing',
+              startedAt: new Date()
+            });
+            
             // Get podcast data for series info
             const podcastResult = await podcastIndexService.getPodcastById(podcastIndexId);
             const podcastData = podcastResult.success ? podcastResult.podcast : null;
@@ -2290,7 +2404,16 @@ router.get('/series/:seriesId', async (req, res) => {
               podcastIndexId: podcastIndexId
             };
             
-            for (const piEpisode of piResult.episodes) {
+            for (let i = 0; i < piResult.episodes.length; i++) {
+              const piEpisode = piResult.episodes[i];
+              
+              // Update progress
+              importProgress.set(seriesId, {
+                current: i + 1,
+                total: piResult.episodes.length,
+                status: 'importing',
+                startedAt: importProgress.get(seriesId)?.startedAt || new Date()
+              });
               try {
                 const episodeData = podcastIndexService.convertEpisodeToOurFormat(piEpisode, podcastData);
                 const result = await podcastAdapter.importEpisodeWithSeries(
@@ -2307,6 +2430,15 @@ router.get('/series/:seriesId', async (req, res) => {
                 importErrors.push({ title: piEpisode.title || 'Unknown', error: epError.message });
               }
             }
+            
+            // Mark as complete
+            importProgress.set(seriesId, {
+              current: piResult.episodes.length,
+              total: piResult.episodes.length,
+              status: 'complete',
+              startedAt: importProgress.get(seriesId)?.startedAt || new Date()
+            });
+            
             console.log(`✅ Imported ${importedCount} episodes from Podcast Index`);
           }
         } else if (iTunesId) {
@@ -2314,6 +2446,14 @@ router.get('/series/:seriesId', async (req, res) => {
           const appleResult = await applePodcastsService.getPodcastEpisodes(iTunesId, maxEpisodesToImport);
           
           if (appleResult.success && appleResult.episodes && appleResult.episodes.length > 0) {
+            // Initialize progress tracking
+            importProgress.set(seriesId, {
+              current: 0,
+              total: appleResult.episodes.length,
+              status: 'importing',
+              startedAt: new Date()
+            });
+            
             // Get podcast data for series info
             const podcastResult = await applePodcastsService.getPodcastById(iTunesId);
             const podcastData = podcastResult.success ? podcastResult.podcast : null;
@@ -2329,7 +2469,16 @@ router.get('/series/:seriesId', async (req, res) => {
               iTunesId: iTunesId
             };
             
-            for (const appleEpisode of appleResult.episodes) {
+            for (let i = 0; i < appleResult.episodes.length; i++) {
+              const appleEpisode = appleResult.episodes[i];
+              
+              // Update progress
+              importProgress.set(seriesId, {
+                current: i + 1,
+                total: appleResult.episodes.length,
+                status: 'importing',
+                startedAt: importProgress.get(seriesId)?.startedAt || new Date()
+              });
               try {
                 const episodeData = applePodcastsService.convertEpisodeToOurFormat(appleEpisode, podcastData);
                 const result = await podcastAdapter.importEpisodeWithSeries(
@@ -2346,11 +2495,28 @@ router.get('/series/:seriesId', async (req, res) => {
                 importErrors.push({ title: appleEpisode.trackName || 'Unknown', error: epError.message });
               }
             }
+            
+            // Mark as complete
+            importProgress.set(seriesId, {
+              current: appleResult.episodes.length,
+              total: appleResult.episodes.length,
+              status: 'complete',
+              startedAt: importProgress.get(seriesId)?.startedAt || new Date()
+            });
+            
             console.log(`✅ Imported ${importedCount} episodes from Apple Podcasts`);
           }
         }
       } catch (importError) {
         console.error('Error auto-importing episodes:', importError);
+        // Mark as error
+        const currentProgress = importProgress.get(seriesId);
+        if (currentProgress) {
+          importProgress.set(seriesId, {
+            ...currentProgress,
+            status: 'error'
+          });
+        }
         // Don't fail the request, just log the error
       }
       
@@ -2396,6 +2562,11 @@ router.get('/series/:seriesId', async (req, res) => {
       }
       return episode;
     });
+
+    // Clean up progress after a delay (to allow final poll)
+    setTimeout(() => {
+      importProgress.delete(seriesId);
+    }, 10000); // Clean up after 10 seconds
 
     res.json({
       series: seriesObj,

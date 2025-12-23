@@ -30,6 +30,7 @@ import Wallet from './pages/Wallet';
 import Podcasts from './pages/Podcasts';
 import PodcastSearch from './pages/PodcastSearch';
 import TuneProfile from './pages/TuneProfile';
+import PodcastEpisodeProfile from './pages/PodcastEpisodeProfile';
 import PodcastSeriesProfile from './pages/PodcastSeriesProfile';
 import UserProfile from './pages/UserProfile';
 import LabelProfile from './pages/LabelProfile';
@@ -240,6 +241,10 @@ const AppContent = () => {
             <Route 
               path="/tune/:mediaId" 
               element={<TuneProfile />} 
+            />
+            <Route 
+              path="/podcasts/:mediaId" 
+              element={<PodcastEpisodeProfile />} 
             />
             <Route 
               path="/podcast/:seriesId" 

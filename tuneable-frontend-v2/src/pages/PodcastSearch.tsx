@@ -127,7 +127,7 @@ const PodcastSearch: React.FC = () => {
       
       if (data.type === 'episode' && data.episode) {
         toast.success(`Imported episode: ${data.episode.title}`);
-        navigate(`/tune/${data.episode._id || data.episode.id}`);
+        navigate(`/podcasts/${data.episode._id || data.episode.id}`);
       } else if (data.type === 'series' && data.series) {
         toast.success(`Imported series: ${data.series.title}`);
         // Could navigate to series page if we create one
@@ -160,7 +160,7 @@ const PodcastSearch: React.FC = () => {
   const handleEpisodeClick = (episode: PodcastEpisode) => {
     const episodeId = episode._id || episode.id;
     if (episodeId) {
-      navigate(`/tune/${episodeId}`);
+      navigate(`/podcasts/${episodeId}`);
     }
   };
 
