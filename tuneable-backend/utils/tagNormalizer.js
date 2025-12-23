@@ -37,24 +37,57 @@ const TAG_ALIASES = {
   'drum n bass': 'DnB',
   'drum and bass': 'DnB',
   'drumnbass': 'DnB',
+  'drum n bass music': 'DnB',
   'db': 'DnB', // Normalized form of D&b (after removing &)
   
   // Hip Hop variations
-  'hiphop': 'hip hop',
-  'hip-hop': 'hip hop',
+  'hiphop': 'Hip Hop',
+  'hip-hop': 'Hip Hop',
+  'hip hop': 'Hip Hop',
+  
+  // UK Hip Hop variations (preserve UK as acronym)
+  'ukhiphop': 'UK Hip Hop',
+  'uk hip hop': 'UK Hip Hop',
+  'uk hip-hop': 'UK Hip Hop',
+  
+  // UK R&B variations
+  'ukrb': 'UK R&B',
+  'uk r&b': 'UK R&B',
+  'uk r and b': 'UK R&B',
+  
+  // UK Rap variations
+  'ukrap': 'UK Rap',
+  'uk rap': 'UK Rap',
+  'Uk rap': 'UK Rap',
   
   // Electronic variations
-  'edm': 'electronic',
-  'electronic': 'electronic',
-  'electronica': 'electronic',
+  'edm': 'Electronic',
+  'electronic': 'Electronic',
   
   // House variations
-  'house': 'house',
-  'house music': 'house',
+  'house': 'House',
+  'house music': 'House',
+  'deephouse': 'Deep House', // Normalized form (no space)
+  'deep house': 'Deep House',
+  'techhouse': 'Tech House', // Normalized form (no space)
+  'tech house': 'Tech House',
+  'progressivehouse': 'Progressive House', // Normalized form (no space)
+  'progressive house': 'Progressive House',
+  'melodichouse': 'Melodic House', // Normalized form (no space)
+  'melodic house': 'Melodic House',
+  'afrohouse': 'Afro House', // Normalized form (no space)
+  'afro house': 'Afro House',
+  
+  // Singer Songwriter variations
+  'singersongwriter': 'Singer Songwriter', // Normalized form (no space)
+  'singer songwriter': 'Singer Songwriter',
+  'singer-songwriter': 'Singer Songwriter',
   
   // Techno variations
-  'techno': 'techno',
-  'techno music': 'techno', // Common abbreviation
+  'techno': 'Techno',
+  'techno music': 'Techno',
+  'melodictechno': 'Melodic Techno', // Normalized form (no space)
+  'melodic techno': 'Melodic Techno',
   
   // R&B variations
   'r&b': 'R&B',
@@ -79,16 +112,34 @@ function getCanonicalTag(tag) {
 
 /**
  * Check if two tags match (fuzzy)
+ * Compares normalized versions (no spaces) for matching, but uses canonical forms
  * @param {string} tag1 - First tag
  * @param {string} tag2 - Second tag
  * @returns {boolean} - True if tags match canonically
  */
 function tagsMatch(tag1, tag2) {
-  return getCanonicalTag(tag1) === getCanonicalTag(tag2);
+  // Normalize both tags (remove spaces, lowercase)
+  const norm1 = normalizeTagForMatching(tag1);
+  const norm2 = normalizeTagForMatching(tag2);
+  
+  // If normalized versions match exactly, they're the same
+  if (norm1 === norm2) return true;
+  
+  // Get canonical forms for both
+  const canon1 = TAG_ALIASES[norm1] || norm1;
+  const canon2 = TAG_ALIASES[norm2] || norm2;
+  
+  // Normalize canonical forms for comparison (to handle space differences)
+  const canonNorm1 = normalizeTagForMatching(canon1);
+  const canonNorm2 = normalizeTagForMatching(canon2);
+  
+  // Match if canonical normalized forms are the same
+  return canonNorm1 === canonNorm2;
 }
 
 /**
  * Find all tags that match a given tag (fuzzy)
+ * Uses tagsMatch() to compare normalized versions
  * @param {string} tag - The tag to find matches for
  * @param {Array<string>} tagList - List of tags to search
  * @returns {Array<string>} - Array of matching tags
@@ -96,8 +147,7 @@ function tagsMatch(tag1, tag2) {
 function findMatchingTags(tag, tagList) {
   if (!tag || !Array.isArray(tagList)) return [];
   
-  const canonicalTag = getCanonicalTag(tag);
-  return tagList.filter(t => getCanonicalTag(t) === canonicalTag);
+  return tagList.filter(t => tagsMatch(tag, t));
 }
 
 module.exports = {

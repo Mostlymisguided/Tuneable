@@ -5,6 +5,7 @@ import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/
 import { partyAPI } from '../lib/api';
 import type { Party } from '../types';
 import type { User } from '../contexts/AuthContext';
+import { normalizeTagForStorage } from '../utils/tagNormalizer';
 
 interface BidConfirmationModalProps {
   isOpen: boolean;
@@ -62,16 +63,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     }
   }, [isLocationMismatch, user?.homeLocation]);
 
-  // Capitalize tag: first letter of each word (title case)
-  const capitalizeTag = (tag: string): string => {
-    if (!tag || typeof tag !== 'string') return tag;
-    return tag
-      .trim()
-      .split(/\s+/)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
-  };
-
   const handleAddTag = () => {
     const input = tagInput.trim();
     if (!input) return;
@@ -83,7 +74,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
       .split(',')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0) // Filter empty strings from multiple/trailing commas
-      .map(tag => capitalizeTag(tag))
+      .map(tag => normalizeTagForStorage(tag)) // Use same normalization logic as backend
       .filter(tag => {
         // Check if tag already exists (case-insensitive comparison)
         const tagLower = tag.toLowerCase();

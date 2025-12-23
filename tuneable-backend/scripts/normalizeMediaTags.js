@@ -15,7 +15,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Media = require('../models/Media');
-const { getCanonicalTag } = require('../utils/tagNormalizer');
+const { getCanonicalTag, normalizeTagForMatching, TAG_ALIASES } = require('../utils/tagNormalizer');
 const { capitalizeTag } = require('../services/tagPartyService');
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -28,22 +28,22 @@ const DRY_RUN = process.argv.includes('--dry-run');
 function normalizeTagForStorage(tag) {
   if (!tag || typeof tag !== 'string') return tag;
   
-  // Get canonical form (e.g., "r&b" -> "R&B" or "rnb" -> "R&B")
-  const canonical = getCanonicalTag(tag);
+  // Normalize the tag for matching (removes spaces, special chars)
+  const normalized = normalizeTagForMatching(tag);
   
-  // If canonical already looks like a display format (has mixed case or special chars),
-  // use it as-is. Otherwise capitalize it.
-  // Check if it has special characters or mixed case (likely already formatted)
-  const hasSpecialChars = /[&\/\-\s]/.test(canonical);
-  const hasMixedCase = canonical !== canonical.toLowerCase() && canonical !== canonical.toUpperCase();
+  // Check if this normalized form is in our aliases
+  const canonical = TAG_ALIASES[normalized];
   
-  if (hasSpecialChars || hasMixedCase) {
-    // Already in display format, use as-is
+  // If it's in aliases, use the canonical form (already in display format with spaces)
+  // This handles tags like "Hip Hop", "Deep House", "R&B", "DnB", "Singer Songwriter"
+  if (canonical && /^[A-Z]/.test(canonical)) {
     return canonical;
   }
   
-  // Capitalize for display (e.g., "rnb" -> "Rnb", "electronic" -> "Electronic")
-  return capitalizeTag(canonical);
+  // If not in aliases, preserve the original tag's structure (spaces)
+  // but capitalize it properly (e.g., "Indie Folk" -> "Indie Folk", not "Indiefolk")
+  // This handles tags like "Indie Folk", "Ballroom Folk" that aren't in aliases
+  return capitalizeTag(tag);
 }
 
 async function normalizeMediaTags() {
