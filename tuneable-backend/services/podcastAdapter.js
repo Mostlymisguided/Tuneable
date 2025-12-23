@@ -11,24 +11,25 @@ class PodcastAdapter {
    * @param {string} source - 'taddy', 'podcastIndex', 'rss', or 'apple'
    * @param {Object} episodeData - Episode data from the source
    * @param {ObjectId} addedBy - User who is adding the episode
+   * @param {Object} seriesData - Optional series data for better tag population
    * @returns {Promise<Media>} Created or existing Media document
    */
-  async importEpisode(source, episodeData, addedBy) {
+  async importEpisode(source, episodeData, addedBy, seriesData = null) {
     let mediaData;
     
     switch(source.toLowerCase()) {
       case 'taddy':
-        mediaData = this.fromTaddy(episodeData);
+        mediaData = this.fromTaddy(episodeData, seriesData);
         break;
       case 'podcastindex':
       case 'podcast_index':
-        mediaData = this.fromPodcastIndex(episodeData);
+        mediaData = this.fromPodcastIndex(episodeData, seriesData);
         break;
       case 'rss':
-        mediaData = this.fromRSS(episodeData);
+        mediaData = this.fromRSS(episodeData, seriesData);
         break;
       case 'apple':
-        mediaData = this.fromApple(episodeData);
+        mediaData = this.fromApple(episodeData, seriesData);
         break;
       default:
         throw new Error(`Unknown podcast source: ${source}`);
@@ -128,9 +129,45 @@ class PodcastAdapter {
   }
   
   /**
+   * Build tags array from primaryGenreName, genres, and categories
+   */
+  buildTags(primaryGenreName, genres, categories) {
+    const tags = new Set();
+    
+    // Add primaryGenreName if available
+    if (primaryGenreName && typeof primaryGenreName === 'string') {
+      tags.add(primaryGenreName);
+    }
+    
+    // Add genres
+    if (Array.isArray(genres)) {
+      genres.forEach(genre => {
+        if (genre && typeof genre === 'string') {
+          tags.add(genre);
+        }
+      });
+    } else if (genres && typeof genres === 'string') {
+      tags.add(genres);
+    }
+    
+    // Add categories
+    if (Array.isArray(categories)) {
+      categories.forEach(category => {
+        if (category && typeof category === 'string') {
+          tags.add(category);
+        }
+      });
+    } else if (categories && typeof categories === 'string') {
+      tags.add(categories);
+    }
+    
+    return Array.from(tags);
+  }
+
+  /**
    * Convert Taddy episode to Media format
    */
-  fromTaddy(taddyEpisode) {
+  fromTaddy(taddyEpisode, seriesData = null) {
     // Debug: log the episode data to see what we're receiving
     if (!taddyEpisode.name && !taddyEpisode.title) {
       console.log('⚠️ Taddy episode missing name/title:', {
@@ -148,6 +185,11 @@ class PodcastAdapter {
       datePublishedType: typeof taddyEpisode.datePublished,
       datePublishedValue: taddyEpisode.datePublished
     });
+    
+    // Get genres and categories from episode series or seriesData
+    const genres = taddyEpisode.podcastSeries?.categories || seriesData?.categories || [];
+    const categories = taddyEpisode.podcastSeries?.categories || seriesData?.categories || [];
+    const primaryGenreName = seriesData?.primaryGenreName || null;
     
     return {
       title: taddyEpisode.name || taddyEpisode.title || 'Untitled Episode',
@@ -170,7 +212,8 @@ class PodcastAdapter {
       coverArt: taddyEpisode.podcastSeries?.imageUrl || null,
       
       // Categorization
-      genres: taddyEpisode.podcastSeries?.categories || [],
+      genres: genres,
+      tags: this.buildTags(primaryGenreName, genres, categories),
       language: taddyEpisode.podcastSeries?.language || 'en',
       
       // Sources
@@ -241,7 +284,11 @@ class PodcastAdapter {
   /**
    * Convert Podcast Index episode to Media format
    */
-  fromPodcastIndex(piEpisode) {
+  fromPodcastIndex(piEpisode, seriesData = null) {
+    const categories = piEpisode.categories ? Object.values(piEpisode.categories) : [];
+    const genres = categories; // PodcastIndex uses categories as genres
+    const primaryGenreName = categories.length > 0 ? categories[0] : null;
+    
     return {
       title: piEpisode.title || 'Untitled Episode',
       contentType: ['spoken'],
@@ -263,8 +310,8 @@ class PodcastAdapter {
       coverArt: piEpisode.feedImage || piEpisode.image || null,
       
       // Categorization
-      genres: piEpisode.categories ? Object.values(piEpisode.categories) : [],
-      tags: piEpisode.categories ? Object.values(piEpisode.categories) : [],
+      genres: genres,
+      tags: this.buildTags(primaryGenreName, genres, categories),
       language: piEpisode.feedLanguage || 'en',
       
       // Sources
@@ -294,7 +341,11 @@ class PodcastAdapter {
   /**
    * Convert RSS feed item to Media format
    */
-  fromRSS(rssItem) {
+  fromRSS(rssItem, seriesData = null) {
+    const categories = rssItem.categories || [];
+    const genres = categories; // RSS uses categories as genres
+    const primaryGenreName = seriesData?.primaryGenreName || (categories.length > 0 ? categories[0] : null);
+    
     return {
       title: rssItem.title || 'Untitled Episode',
       contentType: ['spoken'],
@@ -316,7 +367,8 @@ class PodcastAdapter {
       coverArt: rssItem.image?.url || rssItem.itunes?.image || null,
       
       // Categorization
-      genres: rssItem.categories || [],
+      genres: genres,
+      tags: this.buildTags(primaryGenreName, genres, categories),
       language: rssItem.language || 'en',
       
       // Sources
@@ -346,7 +398,11 @@ class PodcastAdapter {
   /**
    * Convert Apple Podcasts episode to Media format
    */
-  fromApple(appleEpisode) {
+  fromApple(appleEpisode, seriesData = null) {
+    const genres = appleEpisode.genres || [];
+    const primaryGenreName = appleEpisode.primaryGenreName || seriesData?.primaryGenreName || null;
+    const categories = genres; // Apple uses genres as categories
+    
     return {
       title: appleEpisode.trackName || 'Untitled Episode',
       contentType: ['spoken'],
@@ -366,7 +422,8 @@ class PodcastAdapter {
       coverArt: appleEpisode.artworkUrl600 || appleEpisode.artworkUrl100 || null,
       
       // Categorization
-      genres: appleEpisode.genres || [],
+      genres: genres,
+      tags: this.buildTags(primaryGenreName, genres, categories),
       
       // Sources
       sources: new Map(
@@ -510,8 +567,8 @@ class PodcastAdapter {
     // Create or find the podcast series (pass source to store RSS feed with source-specific key)
     const series = await this.createOrFindSeries(seriesData, addedBy, source);
     
-    // Import the episode
-    const episode = await this.importEpisode(source, episodeData, addedBy);
+    // Import the episode (pass seriesData for better tag population)
+    const episode = await this.importEpisode(source, episodeData, addedBy, seriesData);
     
     // Link episode to series
     if (!episode.podcastSeries) {

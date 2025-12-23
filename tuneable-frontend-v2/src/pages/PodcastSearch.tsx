@@ -45,6 +45,7 @@ const PodcastSearch: React.FC = () => {
   const [linkUrl, setLinkUrl] = useState('');
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [filters, setFilters] = useState({
     category: '',
@@ -52,6 +53,9 @@ const PodcastSearch: React.FC = () => {
     tag: ''
   });
   const [hasSearched, setHasSearched] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -61,6 +65,7 @@ const PodcastSearch: React.FC = () => {
 
     setIsLoading(true);
     setHasSearched(true);
+    setOffset(0);
     try {
       const params = new URLSearchParams();
       params.append('q', searchQuery);
@@ -68,6 +73,7 @@ const PodcastSearch: React.FC = () => {
       if (filters.genre) params.append('genre', filters.genre);
       if (filters.tag) params.append('tag', filters.tag);
       params.append('limit', '50');
+      params.append('offset', '0');
 
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
@@ -79,6 +85,8 @@ const PodcastSearch: React.FC = () => {
 
       const data = await response.json();
       setEpisodes(data.episodes || []);
+      setHasMore(data.hasMore || false);
+      setTotalCount(data.total || null);
       
       if (data.episodes && data.episodes.length === 0) {
         toast.info('No episodes found. Try a different search term.');
@@ -88,6 +96,40 @@ const PodcastSearch: React.FC = () => {
       toast.error('Failed to search podcast episodes');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!searchQuery.trim() || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const nextOffset = offset + 50;
+      const params = new URLSearchParams();
+      params.append('q', searchQuery);
+      if (filters.category) params.append('category', filters.category);
+      if (filters.genre) params.append('genre', filters.genre);
+      if (filters.tag) params.append('tag', filters.tag);
+      params.append('limit', '50');
+      params.append('offset', nextOffset.toString());
+
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load more episodes');
+      }
+
+      const data = await response.json();
+      setEpisodes(prev => [...prev, ...(data.episodes || [])]);
+      setHasMore(data.hasMore || false);
+      setOffset(nextOffset);
+    } catch (error: any) {
+      console.error('Error loading more:', error);
+      toast.error('Failed to load more episodes');
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -303,7 +345,10 @@ const PodcastSearch: React.FC = () => {
         ) : episodes.length > 0 ? (
           <div className="space-y-4">
             <div className="text-gray-400 text-sm mb-4">
-              Found {episodes.length} episode{episodes.length !== 1 ? 's' : ''}
+              {totalCount !== null 
+                ? `Showing ${episodes.length} of ${totalCount} episode${totalCount !== 1 ? 's' : ''}`
+                : `Found ${episodes.length} episode${episodes.length !== 1 ? 's' : ''}`
+              }
             </div>
             {episodes.map((episode) => (
               <div
@@ -385,6 +430,28 @@ const PodcastSearch: React.FC = () => {
                 </div>
               </div>
             ))}
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader className="h-5 w-5 animate-spin" />
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Load More</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

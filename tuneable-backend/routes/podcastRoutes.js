@@ -2603,8 +2603,9 @@ router.get('/series/:seriesId', async (req, res) => {
 // Separate podcast search (using Media model)
 router.get('/search-episodes', async (req, res) => {
   try {
-    const { q, limit = 50, category, genre, tag } = req.query;
+    const { q, limit = 50, offset = 0, category, genre, tag } = req.query;
     const limitNum = Math.min(parseInt(limit), 200);
+    const offsetNum = Math.max(0, parseInt(offset));
     
     if (!q || q.trim().length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
@@ -2633,8 +2634,12 @@ router.get('/search-episodes', async (req, res) => {
       searchQuery.tags = { $in: [new RegExp(tag, 'i')] };
     }
     
+    // Get total count for pagination
+    const totalCount = await Media.countDocuments(searchQuery);
+    
     const episodes = await Media.find(searchQuery)
       .sort({ globalMediaAggregate: -1, popularity: -1, releaseDate: -1 })
+      .skip(offsetNum)
       .limit(limitNum)
       .populate('addedBy', 'username')
       .populate('podcastSeries', 'title coverArt')
@@ -2647,9 +2652,14 @@ router.get('/search-episodes', async (req, res) => {
       }
     });
     
+    const hasMore = offsetNum + episodes.length < totalCount;
+    
     res.json({ 
       episodes, 
       count: episodes.length,
+      total: totalCount,
+      offset: offsetNum,
+      hasMore,
       query: q,
       filters: { category, genre, tag }
     });

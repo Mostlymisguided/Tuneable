@@ -94,6 +94,9 @@ interface Media {
   description?: string;
   tags?: string[];
   category?: string;
+  genres?: string[];
+  language?: string;
+  fileSize?: number;
   bitrate?: number;
   sampleRate?: number;
   playCount?: number;
@@ -1976,15 +1979,64 @@ const PodcastEpisodeProfile: React.FC = () => {
     return frequencyMap[freq] || freq.charAt(0).toUpperCase() + freq.slice(1);
   };
 
+  // Format file size for display
+  const formatFileSize = (bytes: number | null | undefined): string | null => {
+    if (!bytes || bytes === 0) return null;
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(2)} GB`;
+    }
+    return `${mb.toFixed(2)} MB`;
+  };
+
+  // Format language code for display
+  const formatLanguage = (lang: string | null | undefined): string | null => {
+    if (!lang) return null;
+    const languageMap: Record<string, string> = {
+      'en': 'English',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'ru': 'Russian',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'zh': 'Chinese',
+      'ar': 'Arabic',
+      'hi': 'Hindi',
+      'nl': 'Dutch',
+      'sv': 'Swedish',
+      'no': 'Norwegian',
+      'da': 'Danish',
+      'fi': 'Finnish',
+      'pl': 'Polish',
+      'tr': 'Turkish'
+    };
+    return languageMap[lang.toLowerCase()] || lang.toUpperCase();
+  };
+
   const mediaFields = [
     { label: 'Title', value: media.title, icon: Music },
     { label: 'Podcast Series', value: typeof media.podcastSeries === 'object' ? media.podcastSeries?.title : null, icon: Mic },
     { label: 'Episode Number', value: media.episodeNumber, icon: Calendar },
-    { label: 'Season Number', value: media.seasonNumber, icon: Calendar },
+    { label: 'Season Number', value: media.seasonNumber ?? null, icon: Calendar },
     { label: 'Host', value: Array.isArray(media.host) ? media.host.map((h: any) => h.name).join(', ') : null, icon: Mic },
     { label: 'Guest', value: Array.isArray(media.guest) ? media.guest.map((g: any) => g.name).join(', ') : null, icon: User },
     { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
-    { label: 'Tags', value: media.tags, icon: Tag },
+    { label: 'File Size', value: formatFileSize(media.fileSize), icon: Disc },
+    { label: 'Language', value: formatLanguage(media.language), icon: Globe },
+    { label: 'Tags', value: (() => {
+      // Combine tags and genres (genres are already in tags, but include any additional genres)
+      const allTags = new Set<string>();
+      if (Array.isArray(media.tags)) {
+        media.tags.forEach(tag => allTags.add(tag));
+      }
+      if (Array.isArray(media.genres)) {
+        media.genres.forEach(genre => allTags.add(genre));
+      }
+      return Array.from(allTags).length > 0 ? Array.from(allTags).join(', ') : null;
+    })(), icon: Tag },
     { 
       label: 'Release Date', 
       value: media.releaseDate 
@@ -2010,7 +2062,15 @@ const PodcastEpisodeProfile: React.FC = () => {
     { label: 'Sample Rate', value: media.sampleRate ? `${media.sampleRate} Hz` : null, icon: Headphones },
   ];
 
-  const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
+  // Filter out fields with null values to avoid showing "Not specified"
+  const filteredFields = mediaFields.filter(field => {
+    // Allow fields with explicit null check - don't show "Not specified" for optional fields
+    if (field.value === null || field.value === undefined) return false;
+    if (Array.isArray(field.value) && field.value.length === 0) return false;
+    return true;
+  });
+  
+  const visibleFields = showAllFields ? filteredFields : filteredFields.slice(0, 8);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -2073,42 +2133,110 @@ const PodcastEpisodeProfile: React.FC = () => {
           </div>
           
           <div className="card p-4 md:p-6 flex flex-col md:flex-row items-start relative">
-            {/* Album Art with Play Button Overlay */}
-            <div className="w-full md:w-auto flex justify-center md:justify-start mb-2 md:mr-6 relative group">
-              <img
-                src={media.coverArt || DEFAULT_COVER_ART}
-                alt={`${media.title} cover`}
-                className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
-              />
-              {/* Play Button Overlay */}
-              <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                onClick={handlePlaySong}
-              >
-                <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
-                  <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
+            {/* Cover Art and Links Container */}
+            <div className="w-full md:w-auto flex flex-col items-center md:items-start mb-2 md:mr-6">
+              {/* Album Art with Play Button Overlay */}
+              <div className="relative group mb-3">
+                <img
+                  src={media.coverArt || DEFAULT_COVER_ART}
+                  alt={`${media.title} cover`}
+                  className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
+                />
+                {/* Play Button Overlay */}
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  onClick={handlePlaySong}
+                >
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                    <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
+                  </div>
                 </div>
               </div>
+              
+              {/* Audio Direct and RSS Links - Below Cover Art */}
+              {(() => {
+                const audioDirectLink = media?.sources?.audio_direct;
+                const rssLink = media?.sources?.rss;
+                const links = [];
+                
+                if (audioDirectLink) {
+                  const { icon, color } = getPlatformIcon('audio_direct');
+                  links.push({
+                    platform: 'audio_direct',
+                    url: audioDirectLink,
+                    icon,
+                    color,
+                    displayName: 'Audio Direct'
+                  });
+                }
+                
+                if (rssLink) {
+                  const { icon, color } = getPlatformIcon('rss');
+                  links.push({
+                    platform: 'rss',
+                    url: rssLink,
+                    icon,
+                    color,
+                    displayName: 'RSS Feed'
+                  });
+                }
+                
+                return links.length > 0 ? (
+                  <div className="w-full flex flex-col gap-2">
+                    {links.map((link) => (
+                      <a
+                        key={link.platform}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center justify-center space-x-2 px-3 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all hover:bg-black/30 ${link.color}`}
+                      >
+                        <link.icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{link.displayName}</span>
+                      </a>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </div>
             
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
-              <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
-              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
-                {media.podcastSeries ? (
-                  typeof media.podcastSeries === 'object' && media.podcastSeries._id ? (
-                    <a
-                      href={`/podcast/${media.podcastSeries._id}`}
-                      className="hover:text-purple-200 hover:underline transition-colors"
-                    >
-                      {media.podcastSeries.title}
-                    </a>
-                  ) : (
-                    <span>{typeof media.podcastSeries === 'object' ? media.podcastSeries.title : 'Unknown Series'}</span>
-                  )
-                ) : (
-                  <span>No Series</span>
-                )}
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 md:gap-4">
+                <div className="flex-1">
+                  <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
+                  <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
+                    {media.podcastSeries ? (
+                      typeof media.podcastSeries === 'object' && media.podcastSeries._id ? (
+                        <a
+                          href={`/podcast/${media.podcastSeries._id}`}
+                          className="hover:text-purple-200 hover:underline transition-colors"
+                        >
+                          {media.podcastSeries.title}
+                        </a>
+                      ) : (
+                        <span>{typeof media.podcastSeries === 'object' ? media.podcastSeries.title : 'Unknown Series'}</span>
+                      )
+                    ) : (
+                      <span>No Series</span>
+                    )}
+                  </div>
+                </div>
+                {/* Release Date and Duration */}
+                <div className="flex flex-col items-center md:items-end gap-1 md:gap-2 px-2 text-sm md:text-base text-gray-300">
+                  {media.releaseDate && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>{new Date(media.releaseDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {media.duration && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      <span>{formatDuration(media.duration)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               
               {/* Episode Description */}
@@ -2125,26 +2253,6 @@ const PodcastEpisodeProfile: React.FC = () => {
                       [&_li]:mb-1"
                     dangerouslySetInnerHTML={{ __html: media.description }}
                   />
-                </div>
-              )}
-
-              {/* External Source Links - Desktop only */}
-              {getExternalLinks().length > 0 && (
-                <div className="hidden md:block my-4">
-                  <div className="flex flex-wrap gap-2">
-                    {getExternalLinks().map((link) => (
-                      <a
-                        key={link.platform}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center space-x-2 px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all ${link.color}`}
-                      >
-                        <link.icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{link.displayName}</span>
-                      </a>
-                    ))}
-                  </div>
                 </div>
               )}
 
