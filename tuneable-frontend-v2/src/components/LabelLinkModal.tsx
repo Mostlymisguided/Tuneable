@@ -11,7 +11,7 @@ interface LabelLinkModalProps {
   onSuccess?: () => void; // Callback when label is linked
 }
 
-const LabelLinkModal: React.FC<LabelLinkModalProps> = ({ isOpen, onClose, onSuccess: _onSuccess }) => {
+const LabelLinkModal: React.FC<LabelLinkModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAffiliations, setIsLoadingAffiliations] = useState(false);

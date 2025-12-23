@@ -11,7 +11,7 @@ interface CollectiveLinkModalProps {
   onSuccess?: () => void; // Callback when collective is linked/created
 }
 
-const CollectiveLinkModal: React.FC<CollectiveLinkModalProps> = ({ isOpen, onClose, onSuccess: _onSuccess }) => {
+const CollectiveLinkModal: React.FC<CollectiveLinkModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMemberships, setIsLoadingMemberships] = useState(false);

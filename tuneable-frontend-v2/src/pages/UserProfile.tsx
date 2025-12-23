@@ -866,12 +866,12 @@ const UserProfile: React.FC = () => {
       // For existing media, externalMedia should be undefined
       const externalMedia = !isExistingMedia
         ? {
-            title: media.title,
-            artist: media.artist,
+            title: media.title || '',
+            artist: media.artist || '',
             coverArt: media.coverArt,
             duration: media.duration,
             category: media.category || 'Music',
-            tags: tags.length > 0 ? tags : undefined,
+            ...(tags.length > 0 && { tags }),
             sources: externalSources
           }
         : undefined;
