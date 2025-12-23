@@ -181,7 +181,6 @@ const TuneProfile: React.FC = () => {
   const isEditMode = searchParams.get('edit') === 'true';
   const editTab = (searchParams.get('tab') as 'info' | 'edit' | 'ownership') || 'info';
   const [tagInput, setTagInput] = useState(''); // Separate state for tag input
-  const [genresInput, setGenresInput] = useState(''); // Separate state for genres input
   const [elementsInput, setElementsInput] = useState(''); // Separate state for elements input
   const [featuringInput, setFeaturingInput] = useState(''); // Separate state for featuring input
   const [selectedLabel, setSelectedLabel] = useState<{ _id: string; name: string; slug?: string } | null>(null);
@@ -803,7 +802,6 @@ const TuneProfile: React.FC = () => {
       // Set tag input as comma-separated string
       setTagInput(media.tags?.join(', ') || '');
       // Set other comma-separated inputs
-      setGenresInput(genresArray.join(', ') || '');
       setElementsInput((media.elements || []).join(', ') || '');
       setFeaturingInput(featuringNames.join(', ') || '');
       
@@ -949,10 +947,6 @@ const TuneProfile: React.FC = () => {
         .split(',')
         .map(t => t.trim())
         .filter(t => t.length > 0); // Explicitly filter empty strings
-      const genres = genresInput
-        .split(',')
-        .map(g => g.trim())
-        .filter(g => g.length > 0);
       const elements = elementsInput
         .split(',')
         .map(el => el.trim())
@@ -1003,7 +997,6 @@ const TuneProfile: React.FC = () => {
         ...editForm,
         duration: durationInSeconds,
         tags,
-        genres,
         elements,
         featuring,
         labelId: selectedLabel?._id || null, // Send labelId if selected
@@ -1012,6 +1005,10 @@ const TuneProfile: React.FC = () => {
         primaryLocation,
         secondaryLocation
       };
+      
+      // Remove genres from updateData since it's no longer editable
+      delete updateData.genres;
+      delete updateData.genre;
       
       // Add collectiveId for artist if collective is selected
       if (collectiveSearchField === 'artist' && selectedCollective) {
@@ -1083,11 +1080,6 @@ const TuneProfile: React.FC = () => {
     }
   };
 
-  // Process genres from input string
-  const handleGenresInputBlur = () => {
-    const genres = genresInput.split(',').map(g => g.trim()).filter(g => g.length > 0);
-    setEditForm({ ...editForm, genres });
-  };
 
   // Process elements from input string
   const handleElementsInputBlur = () => {
@@ -3244,28 +3236,8 @@ const TuneProfile: React.FC = () => {
                 </p>
               </div>
 
-              {/* Genres and Release Date */}
+              {/* Release Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
-                  <input
-                    type="text"
-                        value={genresInput}
-                        onChange={(e) => setGenresInput(e.target.value)}
-                        onBlur={handleGenresInputBlur}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleGenresInputBlur();
-                          }
-                        }}
-                    className="input"
-                    placeholder="pop, indie, rock, electronic"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                        Enter multiple genres separated by commas. Press Enter or click away to save.
-                  </p>
-                </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-white font-medium">Release Date</label>
@@ -3384,7 +3356,7 @@ const TuneProfile: React.FC = () => {
                           } 
                         })}
                         className="input"
-                        placeholder="City"
+                        placeholder="Town/City/Village"
                       />
                       <input
                         type="text"
@@ -3437,7 +3409,7 @@ const TuneProfile: React.FC = () => {
                           } 
                         })}
                         className="input"
-                        placeholder="City"
+                        placeholder="Town/City/Village"
                       />
                       <input
                         type="text"
