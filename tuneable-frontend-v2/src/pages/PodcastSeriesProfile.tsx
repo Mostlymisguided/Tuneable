@@ -653,6 +653,9 @@ const PodcastSeriesProfile: React.FC = () => {
                     Host: {series.host.map(h => h.name).join(', ')}
                   </p>
                 )}
+                {series.description && (
+                  <p className="text-gray-300 mt-3 text-base leading-relaxed">{stripHtml(series.description)}</p>
+                )}
               </div>
               
               {/* Share Button */}
@@ -718,10 +721,6 @@ const PodcastSeriesProfile: React.FC = () => {
                 )}
               </div>
             </div>
-
-            {series.description && (
-              <p className="text-gray-300 mb-4">{stripHtml(series.description)}</p>
-            )}
 
             {/* Genres/Tags */}
             {(series.genres && series.genres.length > 0) || (series.tags && series.tags.length > 0) ? (
