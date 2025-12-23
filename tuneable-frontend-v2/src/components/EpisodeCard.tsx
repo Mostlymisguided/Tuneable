@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Play, Pause, Heart, DollarSign, Clock, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
+import { stripHtml } from '../utils/stripHtml';
 
 interface Episode {
   id: string;
@@ -203,7 +204,7 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
         {episode.description && (
           <div className="mt-4">
             <p className="text-sm text-gray-700 line-clamp-3">
-              {episode.description}
+              {stripHtml(episode.description)}
             </p>
           </div>
         )}

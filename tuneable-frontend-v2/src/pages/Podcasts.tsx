@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
+import { stripHtml } from '../utils/stripHtml';
 
 interface PodcastEpisode {
   _id?: string;
@@ -1087,7 +1088,7 @@ const Podcasts: React.FC = () => {
                     </div>
 
                     {episode.description && (
-                      <p className="text-gray-400 text-sm line-clamp-2 mb-3">{episode.description}</p>
+                      <p className="text-gray-400 text-sm line-clamp-2 mb-3">{stripHtml(episode.description)}</p>
                     )}
 
                     {/* Stats */}

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { stripHtml } from '../utils/stripHtml';
 
 interface PodcastSeries {
   _id: string;
@@ -648,7 +649,7 @@ const PodcastSeriesProfile: React.FC = () => {
             </div>
 
             {series.description && (
-              <p className="text-gray-300 mb-4">{series.description}</p>
+              <p className="text-gray-300 mb-4">{stripHtml(series.description)}</p>
             )}
 
             {/* Genres/Tags */}
@@ -910,7 +911,7 @@ const PodcastSeriesProfile: React.FC = () => {
                       </div>
 
                       {episode.description && (
-                        <p className="text-gray-400 text-sm line-clamp-2 mb-3">{episode.description}</p>
+                        <p className="text-gray-400 text-sm line-clamp-2 mb-3">{stripHtml(episode.description)}</p>
                       )}
 
                       {/* Stats */}
