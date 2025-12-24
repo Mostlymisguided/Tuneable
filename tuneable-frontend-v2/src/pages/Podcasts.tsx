@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI } from '../lib/api';
 import BidModal from '../components/BidModal';
+import TopSupporters from '../components/TopSupporters';
 import { 
   TrendingUp, 
   Filter, 
@@ -23,11 +24,13 @@ import {
   Facebook,
   Linkedin,
   Coins,
-  Users
+  Users,
+  Tag
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 import { stripHtml } from '../utils/stripHtml';
+import { getCanonicalTag } from '../utils/tagNormalizer';
 
 interface PodcastEpisode {
   _id?: string;
@@ -65,6 +68,18 @@ interface PodcastEpisode {
   collectionId?: string;
   // Raw data for import
   rawData?: any;
+  // Bids for top supporters
+  bids?: Array<{
+    _id?: string;
+    userId: {
+      username: string;
+      profilePic?: string;
+      uuid: string;
+    };
+    amount: number;
+    createdAt: string;
+    status?: string;
+  }>;
 }
 
 const Podcasts: React.FC = () => {
@@ -85,6 +100,9 @@ const Podcasts: React.FC = () => {
     tags: [] as string[]
   });
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Tag filtering state (for top tags click functionality)
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   
   // Search/Import state
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,6 +131,23 @@ const Podcasts: React.FC = () => {
   useEffect(() => {
     fetchChart();
   }, [filters]);
+
+  // Sync selectedTags with filters.tag
+  useEffect(() => {
+    if (filters.tag) {
+      // Add the filter tag to selectedTags if not already present
+      setSelectedTags(prev => {
+        const tagLower = filters.tag.toLowerCase();
+        if (!prev.some(t => t.toLowerCase() === tagLower)) {
+          return [...prev, filters.tag];
+        }
+        return prev;
+      });
+    } else {
+      // Clear selectedTags when filter is cleared
+      setSelectedTags([]);
+    }
+  }, [filters.tag]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -687,6 +722,70 @@ const Podcasts: React.FC = () => {
 
   const displayEpisodes = showSearchResults && searchResults.length > 0 ? searchResults : episodes;
 
+  // Top Tags cloud (similar to Party page)
+  const topTags = useMemo(() => {
+    if (displayEpisodes.length === 0) return [] as Array<{ tag: string; total: number; count: number }>;
+    const counts: Record<string, { total: number; count: number }> = {};
+
+    for (const episode of displayEpisodes) {
+      const tags: string[] = Array.isArray(episode.tags) ? episode.tags : [];
+      const value = typeof episode.globalMediaAggregate === 'number' ? episode.globalMediaAggregate : 0;
+
+      for (const raw of tags) {
+        const t = (raw || '').trim().toLowerCase();
+        if (!t) continue;
+        if (!counts[t]) counts[t] = { total: 0, count: 0 };
+        counts[t].total += value;
+        counts[t].count += 1;
+      }
+    }
+
+    return Object.entries(counts)
+      .map(([tag, v]) => ({ tag, total: v.total, count: v.count }))
+      .sort((a, b) => b.total - a.total || b.count - a.count)
+      .slice(0, 15);
+  }, [displayEpisodes]);
+
+  // Selected tag filters (canonical form for matching)
+  const selectedTagFilters = useMemo(() => {
+    return selectedTags
+      .map(t => t && typeof t === 'string' ? getCanonicalTag(t) : '')
+      .filter(t => t);
+  }, [selectedTags]);
+
+  // Aggregate bids across episodes filtered by selected tags
+  const topSupporterBids = useMemo(() => {
+    if (displayEpisodes.length === 0) return [] as any[];
+    const out: any[] = [];
+    
+    for (const episode of displayEpisodes) {
+      // Get canonical forms of tags for matching (handles aliases like D&b -> dnb)
+      const tags: string[] = Array.isArray(episode.tags) 
+        ? episode.tags.map((t: string) => t && typeof t === 'string' ? getCanonicalTag(t) : '').filter((t: string) => t)
+        : [];
+      
+      if (selectedTagFilters.length > 0) {
+        // Use OR logic (.some()) to match filtering behavior
+        // Episode should be included if it has ANY of the selected tags
+        const ok = selectedTagFilters.some((selectedTag) => 
+          tags.some((tag) => tag === selectedTag)
+        );
+        if (!ok) continue;
+      }
+      
+      // Add all bids from this episode
+      if (episode.bids && Array.isArray(episode.bids)) {
+        episode.bids.forEach((b: any) => {
+          // Only include active bids
+          if (!b.status || b.status === 'active') {
+            out.push(b);
+          }
+        });
+      }
+    }
+    return out;
+  }, [displayEpisodes, selectedTagFilters]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 text-white">
       {/* Header */}
@@ -1002,6 +1101,82 @@ const Podcasts: React.FC = () => {
                   <X className="h-4 w-4" />
                   <span>Clear All</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top Tags + Top Supporters (two columns on desktop) */}
+        {!showSearchResults && (
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Top Tags Cloud */}
+            {topTags.length > 0 && (
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 md:p-6 border border-purple-500/30">
+                <div className="flex items-center justify-between mb-1 md:mb-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center">
+                    <Tag className="h-4 w-4 mr-2 text-purple-400" />
+                    Top Tags
+                  </h3>
+                  {selectedTags.length > 0 && (
+                    <button
+                      onClick={() => setSelectedTags([])}
+                      className="text-sm text-purple-300 hover:text-white"
+                    >
+                      Clear tags
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {topTags.map(({ tag, total }) => {
+                    const hash = `#${tag}`;
+                    const selected = selectedTags.some((t) => t.toLowerCase() === tag.toLowerCase());
+                    const weight = Math.max(0.75, Math.min(1.25, total / 50));
+                    const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
+
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          if (selected) {
+                            setSelectedTags(prev => prev.filter(t => t.toLowerCase() !== tag.toLowerCase()));
+                            // Clear tag filter if this was the only selected tag
+                            if (filters.tag === tag) {
+                              setFilters({ ...filters, tag: '' });
+                            }
+                          } else {
+                            setSelectedTags(prev => [...prev, tag]);
+                            // Update filter to show only episodes with this tag
+                            setFilters({ ...filters, tag: tag });
+                          }
+                        }}
+                        className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
+                          selected
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
+                        }`}
+                        title={`${penceToPounds(total)} total across episodes`}
+                      >
+                        #{tag}
+                        <span className="ml-2 text-[10px] opacity-70">{penceToPounds(total)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Top Supporters */}
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 md:p-6 border border-purple-500/30">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3">
+                <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
+                {selectedTagFilters.length > 0 ? (
+                  <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
+                ) : (
+                  <span className="text-xs text-gray-400">Showing global support</span>
+                )}
+              </div>
+              <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
+                <TopSupporters bids={topSupporterBids} maxDisplay={10} />
               </div>
             </div>
           </div>

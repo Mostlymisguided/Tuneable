@@ -1301,6 +1301,15 @@ router.get('/chart', async (req, res) => {
       .limit(limitNum)
       .populate('addedBy', 'username')
       .populate('podcastSeries', 'title coverArt')
+      .populate({
+        path: 'bids',
+        model: 'Bid',
+        match: { status: 'active' }, // Only populate active bids
+        populate: {
+          path: 'userId',
+          select: 'username profilePic uuid'
+        }
+      })
       .lean();
     
     // Ensure releaseDate is set - use createdAt as fallback if releaseDate is null
