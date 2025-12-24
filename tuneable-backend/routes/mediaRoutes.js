@@ -2364,6 +2364,23 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
 
     await bid.save();
 
+    // Calculate tunebytes BEFORE updating media (need bid to be saved first, which is already done)
+    const tuneBytesService = require('../services/tuneBytesService');
+    let userTuneBytesPre = user.tuneBytes || 0;
+    let userTuneBytesPost = userTuneBytesPre;
+    let tunebytesEarned = 0;
+    
+    try {
+      const tunebytesCalculation = await tuneBytesService.calculateTuneBytesForBid(bid._id);
+      tunebytesEarned = tunebytesCalculation.tuneBytesEarned;
+      if (tunebytesEarned > 0) {
+        userTuneBytesPost = userTuneBytesPre + tunebytesEarned;
+      }
+    } catch (tunebytesError) {
+      console.error('⚠️ Failed to calculate tunebytes for ledger entry:', tunebytesError);
+      // Continue without tunebytes - they'll be calculated async later
+    }
+
     // Allocate artist escrow for this bid (async, don't block response)
     try {
       const artistEscrowService = require('../services/artistEscrowService');
@@ -2473,23 +2490,6 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       status: 'active'
     }).lean();
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
-
-    // Calculate tunebytes BEFORE updating media (need bid to be saved first, which is already done)
-    const tuneBytesService = require('../services/tuneBytesService');
-    let userTuneBytesPre = user.tuneBytes || 0;
-    let userTuneBytesPost = userTuneBytesPre;
-    let tunebytesEarned = 0;
-    
-    try {
-      const tunebytesCalculation = await tuneBytesService.calculateTuneBytesForBid(bid._id);
-      tunebytesEarned = tunebytesCalculation.tuneBytesEarned;
-      if (tunebytesEarned > 0) {
-        userTuneBytesPost = userTuneBytesPre + tunebytesEarned;
-      }
-    } catch (tunebytesError) {
-      console.error('⚠️ Failed to calculate tunebytes for ledger entry:', tunebytesError);
-      // Continue without tunebytes - they'll be calculated async later
-    }
 
     // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
