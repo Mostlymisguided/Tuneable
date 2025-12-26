@@ -229,9 +229,30 @@ async function autoJoinLocationParties(user) {
  * Auto-join user to tag parties based on media tags
  * Called after user places a bid on tagged media
  * Uses fuzzy matching and threshold checks
+ * Only processes music media (excludes podcasts)
  */
 async function autoJoinTagParties(user, media) {
     if (!user || !media || !media.tags || !Array.isArray(media.tags) || media.tags.length === 0) {
+        return [];
+    }
+    
+    // Only create/join tag parties for music content, not podcasts
+    const isMusic = media.contentType && (
+        Array.isArray(media.contentType) 
+            ? media.contentType.includes('music')
+            : media.contentType === 'music'
+    );
+    
+    // Podcast-related content forms to exclude
+    const podcastForms = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+    const isPodcast = media.contentForm && (
+        Array.isArray(media.contentForm)
+            ? media.contentForm.some(form => podcastForms.includes(form))
+            : podcastForms.includes(media.contentForm)
+    );
+    
+    // Skip if not music or if it's a podcast
+    if (!isMusic || isPodcast) {
         return [];
     }
 

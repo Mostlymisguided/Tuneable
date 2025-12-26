@@ -90,6 +90,7 @@ const generateSlug = (tag) => {
 /**
  * Check if a tag party should be created based on threshold
  * Uses fuzzy matching to count all variations of the tag
+   * Only counts music media (excludes podcasts and other non-music content)
  * @param {string} tag - The tag to check (will be normalized)
  * @returns {Promise<boolean>} - True if threshold is met
  */
@@ -98,15 +99,38 @@ const shouldCreateTagParty = async (tag) => {
   
   const canonicalTag = getCanonicalTag(tag);
   
-  // Count all media with tags that match canonically
+  // Podcast-related content forms to exclude
+  const podcastForms = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+  
+  // Count only music media with tags that match canonically
   // This handles variations like D&b, Dnb, Drum and Bass, etc.
+  // Only includes media where contentType includes 'music' and contentForm does not include podcast forms
+  // Note: contentType and contentForm are arrays, so we use $in for matching and $nin for exclusion
   const allMedia = await Media.find({
     tags: { $exists: true, $ne: [] },
-    status: { $ne: 'vetoed' }
-  }).select('tags').lean();
+    status: { $ne: 'vetoed' },
+    contentType: 'music', // MongoDB matches if 'music' is in the array
+    contentForm: { $nin: podcastForms } // Exclude any media where contentForm array contains podcast forms
+  }).select('tags contentType contentForm').lean();
   
   let count = 0;
   for (const media of allMedia) {
+    // Double-check: ensure contentType includes 'music' and contentForm doesn't include podcast forms
+    // This is defensive programming in case the query doesn't fully filter
+    const isMusic = media.contentType && (
+      Array.isArray(media.contentType) 
+        ? media.contentType.includes('music')
+        : media.contentType === 'music'
+    );
+    const isPodcast = media.contentForm && (
+      Array.isArray(media.contentForm)
+        ? media.contentForm.some(form => podcastForms.includes(form))
+        : podcastForms.includes(media.contentForm)
+    );
+    
+    // Skip if not music or if it's a podcast
+    if (!isMusic || isPodcast) continue;
+    
     if (media.tags && Array.isArray(media.tags)) {
       for (const mediaTag of media.tags) {
         if (getCanonicalTag(mediaTag) === canonicalTag) {

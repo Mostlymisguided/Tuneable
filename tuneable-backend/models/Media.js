@@ -457,10 +457,31 @@ mediaSchema.pre('save', function (next) {
 
 // Post-save hook: Check and create tag parties when media is saved
 // Note: This hook is intentionally NOT async to avoid blocking the save operation
+// Only creates tag parties for music media (excludes podcasts)
 mediaSchema.post('save', function(doc) {
   try {
     // Only process if media has tags
     if (!doc || !doc.tags || !Array.isArray(doc.tags) || doc.tags.length === 0) {
+      return;
+    }
+    
+    // Only create tag parties for music content, not podcasts
+    const isMusic = doc.contentType && (
+      Array.isArray(doc.contentType) 
+        ? doc.contentType.includes('music')
+        : doc.contentType === 'music'
+    );
+    
+    // Podcast-related content forms to exclude
+    const podcastForms = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+    const isPodcast = doc.contentForm && (
+      Array.isArray(doc.contentForm)
+        ? doc.contentForm.some(form => podcastForms.includes(form))
+        : podcastForms.includes(doc.contentForm)
+    );
+    
+    // Skip if not music or if it's a podcast
+    if (!isMusic || isPodcast) {
       return;
     }
     
