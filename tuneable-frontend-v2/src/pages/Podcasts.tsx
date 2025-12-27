@@ -1135,7 +1135,6 @@ const Podcasts: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {topTags.map(({ tag, total }) => {
-                    const hash = `#${tag}`;
                     const selected = selectedTags.some((t) => t.toLowerCase() === tag.toLowerCase());
                     const weight = Math.max(0.75, Math.min(1.25, total / 50));
                     const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
