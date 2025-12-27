@@ -1215,7 +1215,7 @@ const Party: React.FC = () => {
     return Object.entries(counts)
       .map(([tag, v]) => ({ tag, total: v.total, count: v.count }))
       .sort((a, b) => b.total - a.total || b.count - a.count)
-      .slice(0, 15);
+      .slice(0, 30);
   }, [party]);
 
   // Selected tag filters derived from queueSearchTerms

@@ -111,6 +111,7 @@ const Podcasts: React.FC = () => {
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showImportSection, setShowImportSection] = useState(false);
 
   // Tipping state
   const [bidModalOpen, setBidModalOpen] = useState(false);
@@ -917,42 +918,8 @@ const Podcasts: React.FC = () => {
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 mb-6 border border-purple-500/30">
           <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Podcast Episodes</h3>
           
-          {/* Link Import */}
-          <div className="mb-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <LinkIcon className="h-5 w-5 text-purple-400" />
-              <h4 className="text-sm font-medium text-gray-300">Import from URL</h4>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
-                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
-              />
-              <button
-                onClick={handleImportLink}
-                disabled={isImportingLink || !linkUrl.trim()}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
-              >
-                {isImportingLink ? (
-                  <>
-                    <Loader className="h-5 w-5 animate-spin" />
-                    <span>Importing...</span>
-                  </>
-                ) : (
-                  <>
-                    <LinkIcon className="h-5 w-5" />
-                    <span>Import</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
           {/* Search */}
-          <div>
+          <div className="mb-4">
             <div className="flex items-center space-x-2 mb-3">
               <Search className="h-5 w-5 text-purple-400" />
               <h4 className="text-sm font-medium text-gray-300">Search Episodes</h4>
@@ -986,8 +953,48 @@ const Podcasts: React.FC = () => {
                   </>
                 )}
               </button>
+              <button
+                onClick={() => setShowImportSection(!showImportSection)}
+                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                <LinkIcon className="h-5 w-5 text-purple-400" />
+                <span className="text-sm font-medium text-white">Import from URL/RSS Feed</span>
+                <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showImportSection ? 'rotate-180' : ''}`} />
+              </button>
             </div>
           </div>
+
+          {/* Link Import - Collapsible */}
+          {showImportSection && (
+            <div className="mt-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
+                  className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                />
+                <button
+                  onClick={handleImportLink}
+                  disabled={isImportingLink || !linkUrl.trim()}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                >
+                  {isImportingLink ? (
+                    <>
+                      <Loader className="h-5 w-5 animate-spin" />
+                      <span>Importing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="h-5 w-5" />
+                      <span>Import</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           {showSearchResults && searchResults.length > 0 && (
             <button
