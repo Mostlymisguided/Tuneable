@@ -129,9 +129,30 @@ const Podcasts: React.FC = () => {
   const [totalTips, setTotalTips] = useState(0);
   const [avgTip, setAvgTip] = useState(0);
 
+  // Top Podcast Episodes
+  const [topPodcastEpisodes, setTopPodcastEpisodes] = useState<PodcastEpisode[]>([]);
+  const [isLoadingTopEpisodes, setIsLoadingTopEpisodes] = useState(true);
+
+  // Top Podcast Series
+  const [topPodcastSeries, setTopPodcastSeries] = useState<Array<{
+    _id: string;
+    title: string;
+    coverArt?: string;
+    description?: string;
+    genres?: string[];
+    totalGlobalMediaAggregate: number;
+    episodeCount: number;
+  }>>([]);
+  const [isLoadingTopSeries, setIsLoadingTopSeries] = useState(true);
+
   useEffect(() => {
     fetchChart();
   }, [filters]);
+
+  useEffect(() => {
+    fetchTopEpisodes();
+    fetchTopSeries();
+  }, []);
 
   // Sync selectedTags with filters.tag
   useEffect(() => {
@@ -205,6 +226,48 @@ const Podcasts: React.FC = () => {
       toast.error('Failed to load podcast chart');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchTopEpisodes = async () => {
+    setIsLoadingTopEpisodes(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/top-episodes?limit=10`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch top podcast episodes');
+      }
+
+      const data = await response.json();
+      setTopPodcastEpisodes(data.episodes || []);
+    } catch (error: any) {
+      console.error('Error fetching top podcast episodes:', error);
+      // Don't show toast error for this - it's not critical
+    } finally {
+      setIsLoadingTopEpisodes(false);
+    }
+  };
+
+  const fetchTopSeries = async () => {
+    setIsLoadingTopSeries(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/top-series?limit=10`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch top podcast series');
+      }
+
+      const data = await response.json();
+      setTopPodcastSeries(data.series || []);
+    } catch (error: any) {
+      console.error('Error fetching top podcast series:', error);
+      // Don't show toast error for this - it's not critical
+    } finally {
+      setIsLoadingTopSeries(false);
     }
   };
 
@@ -911,6 +974,114 @@ const Podcasts: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Top Podcast Episodes */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 flex items-center">
+          <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
+          Top Podcast Episodes
+        </h2>
+        
+        {isLoadingTopEpisodes ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          </div>
+        ) : topPodcastEpisodes.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-400">No episodes found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {topPodcastEpisodes.map((episode, index) => (
+              <div
+                key={episode._id || episode.id}
+                onClick={() => handleEpisodeClick(episode)}
+                className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50 cursor-pointer"
+              >
+                {/* Rank */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-purple-400 font-bold text-lg">#{index + 1}</span>
+                  <span className="text-purple-300 text-sm font-semibold">
+                    {penceToPounds(episode.globalMediaAggregate || 0)}
+                  </span>
+                </div>
+                
+                {/* Cover Art */}
+                <img
+                  src={episode.coverArt || episode.podcastSeries?.coverArt || episode.podcastImage || DEFAULT_COVER_ART}
+                  alt={episode.title}
+                  className="w-full aspect-square rounded-lg object-cover mb-3"
+                />
+                
+                {/* Title */}
+                <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2">
+                  {episode.title}
+                </h3>
+                
+                {/* Podcast Series Title */}
+                {(episode.podcastSeries || episode.podcastTitle) && (
+                  <p className="text-purple-300 text-xs line-clamp-1">
+                    {episode.podcastSeries?.title || episode.podcastTitle}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Top Podcast Series */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 flex items-center">
+          <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
+          Top Podcast Series
+        </h2>
+        
+        {isLoadingTopSeries ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          </div>
+        ) : topPodcastSeries.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-400">No podcast series found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {topPodcastSeries.map((series, index) => (
+              <div
+                key={series._id}
+                onClick={() => navigate(`/podcast/${series._id}`)}
+                className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50 cursor-pointer"
+              >
+                {/* Rank */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-purple-400 font-bold text-lg">#{index + 1}</span>
+                  <span className="text-purple-300 text-sm font-semibold">
+                    {penceToPounds(series.totalGlobalMediaAggregate)}
+                  </span>
+                </div>
+                
+                {/* Cover Art */}
+                <img
+                  src={series.coverArt || DEFAULT_COVER_ART}
+                  alt={series.title}
+                  className="w-full aspect-square rounded-lg object-cover mb-3"
+                />
+                
+                {/* Title */}
+                <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2">
+                  {series.title}
+                </h3>
+                
+                {/* Episode Count */}
+                <p className="text-gray-400 text-xs">
+                  {series.episodeCount} {series.episodeCount === 1 ? 'episode' : 'episodes'}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">

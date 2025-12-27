@@ -1365,6 +1365,120 @@ router.get('/chart', async (req, res) => {
   }
 });
 
+// Get top podcast episodes by globalMediaAggregate
+router.get('/top-episodes', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const limitNum = Math.min(parseInt(limit), 50);
+
+    const topEpisodes = await Media.find({
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] },
+      globalMediaAggregate: { $gt: 0 }
+    })
+      .sort({ globalMediaAggregate: -1 })
+      .limit(limitNum)
+      .populate('podcastSeries', 'title coverArt')
+      .select('_id title coverArt description genres globalMediaAggregate podcastSeries')
+      .lean();
+
+    res.json({
+      episodes: topEpisodes,
+      count: topEpisodes.length
+    });
+  } catch (error) {
+    console.error('Error getting top podcast episodes:', error);
+    res.status(500).json({ error: 'Failed to get top podcast episodes', details: error.message });
+  }
+});
+
+// Get top podcast series by globalMediaAggregate
+router.get('/top-series', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const limitNum = Math.min(parseInt(limit), 50);
+
+    // First, check if we have episodes with podcastSeries
+    const episodesWithSeries = await Media.countDocuments({
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] },
+      podcastSeries: { $ne: null, $exists: true },
+      globalMediaAggregate: { $gt: 0 }
+    });
+
+    console.log(`📊 Found ${episodesWithSeries} episodes with series and tips`);
+
+    // Aggregate episodes by podcastSeries, summing globalMediaAggregate
+    const topSeries = await Media.aggregate([
+      {
+        $match: {
+          contentType: { $in: ['spoken'] },
+          contentForm: { $in: ['podcastepisode'] },
+          podcastSeries: { $ne: null, $exists: true } // Only episodes with a series
+        }
+      },
+      {
+        $group: {
+          _id: '$podcastSeries',
+          totalGlobalMediaAggregate: { $sum: { $ifNull: ['$globalMediaAggregate', 0] } },
+          episodeCount: { $sum: 1 }
+        }
+      },
+      {
+        $match: {
+          totalGlobalMediaAggregate: { $gt: 0 } // Only series with tips
+        }
+      },
+      {
+        $sort: { totalGlobalMediaAggregate: -1 }
+      },
+      {
+        $limit: limitNum
+      },
+      {
+        $lookup: {
+          from: 'media',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'series'
+        }
+      },
+      {
+        $unwind: {
+          path: '$series',
+          preserveNullAndEmptyArrays: false // Only keep series that exist
+        }
+      },
+      {
+        $match: {
+          'series.contentForm': { $in: ['podcastseries'] } // contentForm is an array, $in works for arrays
+        }
+      },
+      {
+        $project: {
+          _id: '$series._id',
+          title: '$series.title',
+          coverArt: '$series.coverArt',
+          description: '$series.description',
+          genres: '$series.genres',
+          totalGlobalMediaAggregate: 1,
+          episodeCount: 1
+        }
+      }
+    ]);
+
+    console.log(`✅ Returning ${topSeries.length} top podcast series`);
+
+    res.json({
+      series: topSeries,
+      count: topSeries.length
+    });
+  } catch (error) {
+    console.error('Error getting top podcast series:', error);
+    res.status(500).json({ error: 'Failed to get top podcast series', details: error.message });
+  }
+});
+
 // Import single episode from external source (for Import & Tip flow)
 router.post('/discovery/import-single-episode', authMiddleware, async (req, res) => {
   try {
