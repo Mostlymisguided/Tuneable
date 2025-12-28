@@ -30,12 +30,17 @@ interface PodcastSeries {
   _id: string;
   title: string;
   description?: string;
+  summary?: string;
   coverArt?: string;
   host?: Array<{ name: string; userId?: any }>;
+  author?: Array<{ name: string; userId?: any }>;
+  label?: Array<{ name: string; labelId?: any }>;
   genres?: string[];
   tags?: string[];
   language?: string;
+  explicit?: boolean;
   externalIds?: Record<string, string>;
+  sources?: Record<string, string>;
 }
 
 interface Episode {
@@ -653,9 +658,6 @@ const PodcastSeriesProfile: React.FC = () => {
                     Host: {series.host.map(h => h.name).join(', ')}
                   </p>
                 )}
-                {series.description && (
-                  <p className="text-gray-300 mt-3 text-base leading-relaxed">{stripHtml(series.description)}</p>
-                )}
               </div>
               
               {/* Share Button */}
@@ -743,6 +745,19 @@ const PodcastSeriesProfile: React.FC = () => {
                 ))}
               </div>
             ) : null}
+
+            {/* About Section - Below title, to the right of artwork */}
+            {(series.description || series.summary) && (
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-white mb-2">About</h2>
+                <div 
+                  className="text-gray-300 leading-relaxed text-sm"
+                  dangerouslySetInnerHTML={{ 
+                    __html: (series.description || series.summary || '')
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -792,6 +807,140 @@ const PodcastSeriesProfile: React.FC = () => {
                   <div className="text-xs text-gray-400">Ranked</div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Additional Series Information */}
+        {(series.language || series.sources || series.externalIds || series.author || series.label || series.genres || series.tags || series.explicit !== undefined) && (
+          <div className="mb-8 bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 border border-purple-500/30">
+            <h2 className="text-xl font-bold text-white mb-4">Series Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {series.language && (
+                <div>
+                  <span className="text-gray-400 text-sm">Language:</span>
+                  <span className="text-white ml-2">{series.language.toUpperCase()}</span>
+                </div>
+              )}
+              {series.explicit !== undefined && (
+                <div>
+                  <span className="text-gray-400 text-sm">Rating:</span>
+                  <span className="text-white ml-2">
+                    {series.explicit ? 'Explicit' : 'Clean'}
+                  </span>
+                </div>
+              )}
+              {series.author && series.author.length > 0 && (
+                <div>
+                  <span className="text-gray-400 text-sm">Author:</span>
+                  <span className="text-white ml-2">
+                    {series.author.map(a => a.name).join(', ')}
+                  </span>
+                </div>
+              )}
+              {series.label && series.label.length > 0 && (
+                <div>
+                  <span className="text-gray-400 text-sm">Owner/Publisher:</span>
+                  <span className="text-white ml-2">
+                    {series.label.map(l => l.name).join(', ')}
+                  </span>
+                </div>
+              )}
+              {series.genres && series.genres.length > 0 && (
+                <div>
+                  <span className="text-gray-400 text-sm">iTunes Categories:</span>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {series.genres.map((genre, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full"
+                      >
+                        {genre}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {series.tags && series.tags.length > 0 && (
+                <div>
+                  <span className="text-gray-400 text-sm">Keywords:</span>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {series.tags.slice(0, 10).map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {series.tags.length > 10 && (
+                      <span className="text-gray-500 text-xs">+{series.tags.length - 10} more</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {series.sources && (() => {
+                const rssUrl = series.sources.rss || 
+                  Object.values(series.sources).find((v): v is string => 
+                    typeof v === 'string' && (v.includes('http') || v.includes('rss'))
+                  );
+                return rssUrl ? (
+                  <div>
+                    <span className="text-gray-400 text-sm">RSS Feed:</span>
+                    <a 
+                      href={rssUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-purple-400 hover:text-purple-300 ml-2 underline break-all"
+                    >
+                      View RSS Feed
+                    </a>
+                  </div>
+                ) : null;
+              })()}
+              {series.externalIds && (
+                <>
+                  {series.externalIds.taddy && (
+                    <div>
+                      <span className="text-gray-400 text-sm">Taddy:</span>
+                      <a 
+                        href={`https://taddy.org/p/${series.externalIds.taddy}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-400 hover:text-purple-300 ml-2 underline"
+                      >
+                        View on Taddy
+                      </a>
+                    </div>
+                  )}
+                  {series.externalIds.iTunes && (
+                    <div>
+                      <span className="text-gray-400 text-sm">Apple Podcasts:</span>
+                      <a 
+                        href={`https://podcasts.apple.com/podcast/id${series.externalIds.iTunes}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-400 hover:text-purple-300 ml-2 underline"
+                      >
+                        View on Apple
+                      </a>
+                    </div>
+                  )}
+                  {series.externalIds.podcastIndex && (
+                    <div>
+                      <span className="text-gray-400 text-sm">Podcast Index:</span>
+                      <a 
+                        href={`https://podcastindex.org/podcast/${series.externalIds.podcastIndex}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-400 hover:text-purple-300 ml-2 underline"
+                      >
+                        View on Podcast Index
+                      </a>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

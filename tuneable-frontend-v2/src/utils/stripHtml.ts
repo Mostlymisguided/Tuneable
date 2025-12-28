@@ -26,7 +26,18 @@ export function stripHtml(html: string | null | undefined): string {
     .replace(/&#x2F;/g, '/')
     .replace(/&#8217;/g, "'")
     .replace(/&#8220;/g, '"')
-    .replace(/&#8221;/g, '"');
+    .replace(/&#8221;/g, '"')
+    // Named entities
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&hellip;/g, '…')
+    .replace(/&copy;/g, '©')
+    .replace(/&reg;/g, '®')
+    .replace(/&trade;/g, '™');
   
   // Decode numeric entities (&#123; or &#x1a;)
   text = text.replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(dec));

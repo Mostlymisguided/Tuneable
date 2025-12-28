@@ -10,7 +10,7 @@ import { normalizeTagForStorage } from '../utils/tagNormalizer';
 interface BidConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (tags: string[]) => void;
+  onConfirm: (tags: string[], setProgress?: (step: string | null) => void) => void;
   bidAmount: number;
   mediaTitle: string;
   mediaArtist?: string;
@@ -35,6 +35,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
+  const [progressStep, setProgressStep] = useState<'placing' | 'processing' | 'updating' | null>(null);
   const navigate = useNavigate();
   
   // Check if location mismatch and fetch user's location party
@@ -62,6 +63,13 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
       setUserLocationParty(null);
     }
   }, [isLocationMismatch, user?.homeLocation]);
+
+  // Reset progress step when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setProgressStep(null);
+    }
+  }, [isOpen]);
 
   const handleAddTag = () => {
     const input = tagInput.trim();
@@ -105,7 +113,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   };
 
   const handleSubmit = () => {
-    onConfirm(tags);
+    onConfirm(tags, setProgressStep);
     setTags([]);
     setTagInput('');
   };
@@ -113,6 +121,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const handleClose = () => {
     setTags([]);
     setTagInput('');
+    setProgressStep(null);
     onClose();
   };
 
@@ -271,7 +280,12 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Placing Tip...</span>
+                <span>
+                  {progressStep === 'placing' && 'Placing tip...'}
+                  {progressStep === 'processing' && 'Processing transaction...'}
+                  {progressStep === 'updating' && 'Updating party...'}
+                  {!progressStep && 'Processing...'}
+                </span>
               </>
             ) : (
               'Confirm Tip'

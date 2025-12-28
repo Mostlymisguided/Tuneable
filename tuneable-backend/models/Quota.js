@@ -4,9 +4,8 @@ const quotaSchema = new mongoose.Schema({
   date: { 
     type: String, 
     required: true, 
-    unique: true,
-    index: true 
-  }, // YYYY-MM-DD format
+    unique: true
+  }, // YYYY-MM-DD format (unique automatically creates index)
   usage: { 
     type: Number, 
     default: 0,
@@ -25,8 +24,7 @@ const quotaSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for fast lookups
-quotaSchema.index({ date: 1 });
+// Note: date field already has unique: true which automatically creates an index
 
 module.exports = mongoose.models.Quota || mongoose.model('Quota', quotaSchema);
 

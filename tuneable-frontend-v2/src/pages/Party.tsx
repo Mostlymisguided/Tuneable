@@ -864,7 +864,7 @@ const Party: React.FC = () => {
     setValidationDuration(0);
   };
 
-  const handleBidConfirmation = async (tags: string[]) => {
+  const handleBidConfirmation = async (tags: string[], setProgress?: (step: string | null) => void) => {
     // ✅ Early return if already bidding - prevent double-clicks
     if (isBidding) {
       console.log('Already processing a tip, please wait...');
@@ -873,6 +873,7 @@ const Party: React.FC = () => {
     
     // ✅ Set loading state IMMEDIATELY to disable button
     setIsBidding(true);
+    setProgress?.('placing');
     
     // Check if user is logged in
     if (!user) {
@@ -965,46 +966,63 @@ const Party: React.FC = () => {
         }
         
         try {
-          await partyAPI.placeBid(partyId, queueItemId, bidAmount, tags);
+          setProgress?.('processing');
+          const response = await partyAPI.placeBid(partyId, queueItemId, bidAmount, tags);
           const mediaTitle = safePendingMedia?.title || 'media';
-          // Check if location mismatch and show redirect option
+          
+          // Optimistically update user balance from response
+          if (response.updatedBalance !== undefined && updateBalance) {
+            updateBalance(response.updatedBalance);
+          }
+          
+          // Optimistically update party state if response includes updated media
+          if (response.media) {
+            setParty((prev: any) => {
+              if (!prev) return prev;
+              // Update the specific media item's aggregate
+              return {
+                ...prev,
+                media: prev.media.map((item: any) => {
+                  const itemMediaId = item.mediaId?._id || item.mediaId?.id || item.mediaId;
+                  const responseMediaId = response.media._id || response.media.id;
+                  if (itemMediaId && responseMediaId && itemMediaId.toString() === responseMediaId.toString()) {
+                    return {
+                      ...item,
+                      partyMediaAggregate: response.media.globalMediaAggregate || item.partyMediaAggregate
+                    };
+                  }
+                  return item;
+                })
+              };
+            });
+          }
+          
+          // Show success message immediately
+          toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
+          
+          // Check location mismatch in background (non-blocking)
           if (party?.type === 'location' && 
               party?.locationFilter && 
               user?.homeLocation && 
               !isLocationMatch(party.locationFilter, user.homeLocation)) {
-            const userLocationParty = await partyAPI.findLocationParty(
+            // Don't await - do in background
+            partyAPI.findLocationParty(
               user.homeLocation.countryCode!,
               user.homeLocation.city
-            );
-            
-            if (userLocationParty.party) {
-              toast.success(
-                <div>
-                  <p>Tip placed successfully! 🎉</p>
-                  <p className="text-sm mt-1">
-                    Your tip appears in the {formatLocation(user.homeLocation)} party.
-                  </p>
-                  <button
-                    onClick={() => navigate(`/party/${userLocationParty.party!.id || userLocationParty.party!._id}`)}
-                    className="mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm text-white"
-                  >
-                    View {formatLocation(user.homeLocation)} Party
-                  </button>
-                </div>,
-                { autoClose: 5000 }
-              );
-            } else {
-              toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
-            }
-          } else {
-            toast.success(`Tip £${bidAmount.toFixed(2)} sent for ${mediaTitle}!`);
+            ).then(({ party: userLocationParty }) => {
+              if (userLocationParty) {
+                toast.success(`Tip placed! View it in your ${formatLocation(user.homeLocation)} party.`);
+              }
+            }).catch(() => {
+              // Silently fail - not critical
+            });
           }
           
-          // Wait a bit for BidMetricsEngine to update partyMediaAggregate via post-save hook
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Refresh party to show updated bid values
-          await fetchPartyDetails();
+          // Refresh party in background (don't block UI)
+          setProgress?.('updating');
+          fetchPartyDetails().catch(error => {
+            console.error('Background party refresh error:', error);
+          });
           
           // Reset bid amount for this media back to minimum
           if (mediaId) {
@@ -1018,12 +1036,15 @@ const Party: React.FC = () => {
           console.error('Bid error:', error);
           const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send tip';
           toast.error(errorMessage);
+          // On error, refresh to get correct state
+          fetchPartyDetails().catch(console.error);
         } finally {
           setIsBidding(false);
           setIsInlineBid(false);
           isInlineBidRef.current = false;
           setPendingMedia(null);
           pendingMediaRef.current = null;
+          setProgress?.(null);
           // Close modal after operation completes
           setShowBidConfirmationModal(false);
         }
@@ -1045,6 +1066,7 @@ const Party: React.FC = () => {
         }
         
         try {
+          setProgress?.('processing');
           // Get the appropriate URL based on media source
           const mediaSource = currentParty?.mediaSource || 'youtube';
           let url = '';
@@ -1056,7 +1078,7 @@ const Party: React.FC = () => {
             url = Object.values(safePendingMedia.sources)[0] as string;
           }
           
-          await partyAPI.addMediaToParty(partyId, {
+          const response = await partyAPI.addMediaToParty(partyId, {
             url,
             title: safePendingMedia.title,
             artist: safePendingMedia.artist,
@@ -1067,54 +1089,52 @@ const Party: React.FC = () => {
             category: safePendingMedia.category || 'Music'
           });
           
-          // Check if location mismatch and show redirect option
+          // Optimistically update user balance from response
+          if (response.updatedBalance !== undefined && updateBalance) {
+            updateBalance(response.updatedBalance);
+          }
+          
+          // Show success message immediately
+          toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
+          
+          // Check location mismatch in background (non-blocking)
           if (party?.type === 'location' && 
               party?.locationFilter && 
               user?.homeLocation && 
               !isLocationMatch(party.locationFilter, user.homeLocation)) {
-            const userLocationParty = await partyAPI.findLocationParty(
+            // Don't await - do in background
+            partyAPI.findLocationParty(
               user.homeLocation.countryCode!,
               user.homeLocation.city
-            );
-            
-            if (userLocationParty.party) {
-              toast.success(
-                <div>
-                  <p>Tip placed successfully! 🎉</p>
-                  <p className="text-sm mt-1">
-                    Your tip appears in the {formatLocation(user.homeLocation)} party.
-                  </p>
-                  <button
-                    onClick={() => navigate(`/party/${userLocationParty.party!.id || userLocationParty.party!._id}`)}
-                    className="mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm text-white"
-                  >
-                    View {formatLocation(user.homeLocation)} Party
-                  </button>
-                </div>,
-                { autoClose: 5000 }
-              );
-            } else {
-              toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
-            }
-          } else {
-            toast.success(`Added ${safePendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
+            ).then(({ party: userLocationParty }) => {
+              if (userLocationParty) {
+                toast.success(`Tip placed! View it in your ${formatLocation(user.homeLocation)} party.`);
+              }
+            }).catch(() => {
+              // Silently fail - not critical
+            });
           }
           
-          // Wait a bit for BidMetricsEngine to update partyMediaAggregate via post-save hook
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Clear search and refresh party
+          // Clear search immediately
           setAddMediaSearchQuery('');
           setAddMediaResults({ database: [], youtube: [] });
-          await fetchPartyDetails();
+          
+          // Refresh party in background (don't block UI)
+          setProgress?.('updating');
+          fetchPartyDetails().catch(error => {
+            console.error('Background party refresh error:', error);
+          });
           
         } catch (error: any) {
           console.error('Error adding media:', error);
           toast.error(error.response?.data?.error || 'Failed to add media to party');
+          // On error, refresh to get correct state
+          fetchPartyDetails().catch(console.error);
         } finally {
           setIsBidding(false); // Reset bidding state
           setPendingMedia(null);
           pendingMediaRef.current = null;
+          setProgress?.(null);
           // Close modal after operation completes
           setShowBidConfirmationModal(false);
         }
@@ -1127,6 +1147,7 @@ const Party: React.FC = () => {
       isInlineBidRef.current = false;
       setPendingMedia(null);
       pendingMediaRef.current = null;
+      setProgress?.(null);
       // Close modal on error
       setShowBidConfirmationModal(false);
     }
@@ -3617,12 +3638,13 @@ const Party: React.FC = () => {
               console.error('Error closing modal:', e);
             }
           }}
-          onConfirm={(tags) => {
+          onConfirm={(tags, setProgress) => {
             try {
-              handleBidConfirmation(tags);
+              handleBidConfirmation(tags, setProgress);
             } catch (e) {
               console.error('Error in onConfirm:', e);
               toast.error('An error occurred. Please try again.');
+              setProgress?.(null);
               setShowBidConfirmationModal(false);
               setPendingMedia(null);
               pendingMediaRef.current = null;

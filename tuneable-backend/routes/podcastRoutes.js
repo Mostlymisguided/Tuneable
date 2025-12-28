@@ -32,7 +32,7 @@ setInterval(() => {
   }
 }, 60000); // Run cleanup every minute
 
-// RSS Feed Parser
+// RSS Feed Parser - Enhanced to return channel metadata
 async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
   try {
     console.log(`📡 Fetching RSS feed: ${rssUrl}`);
@@ -52,6 +52,48 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
     const result = await parser.parseStringPromise(response.data);
     const channel = result.channel || result;
     const items = Array.isArray(channel.item) ? channel.item : (channel.item ? [channel.item] : []);
+    
+    // Extract channel-level metadata (for podcast series)
+    // Parse iTunes keywords (can be string or array)
+    let keywords = [];
+    if (channel['itunes:keywords']) {
+      if (typeof channel['itunes:keywords'] === 'string') {
+        keywords = channel['itunes:keywords'].split(',').map(k => k.trim()).filter(k => k);
+      } else if (Array.isArray(channel['itunes:keywords'])) {
+        keywords = channel['itunes:keywords'].map(k => typeof k === 'string' ? k.trim() : String(k).trim()).filter(k => k);
+      }
+    }
+    
+    // Parse explicit flag (can be 'yes', 'true', 'explicit', 'clean', 'no', 'false', boolean)
+    const explicitValue = channel['itunes:explicit'];
+    let isExplicit = false;
+    if (explicitValue !== undefined && explicitValue !== null) {
+      if (typeof explicitValue === 'boolean') {
+        isExplicit = explicitValue;
+      } else if (typeof explicitValue === 'string') {
+        const lowerVal = explicitValue.toLowerCase();
+        isExplicit = lowerVal === 'yes' || lowerVal === 'true' || lowerVal === 'explicit';
+      }
+    }
+    
+    const channelMetadata = {
+      title: channel.title || '',
+      description: channel.description || channel['itunes:summary'] || channel['itunes:description'] || '',
+      summary: channel['itunes:summary'] || channel.description || '',
+      author: channel['itunes:author'] || channel.managingEditor || channel.author || '',
+      language: channel.language || channel['itunes:language'] || 'en',
+      link: channel.link || '',
+      image: channel['itunes:image']?.href || channel['itunes:image'] || (channel.image?.url || channel.image || null),
+      categories: channel['itunes:category'] ? 
+        (Array.isArray(channel['itunes:category']) ? 
+          channel['itunes:category'].map(cat => typeof cat === 'object' ? (cat._ || cat.text || cat) : cat) : 
+          [typeof channel['itunes:category'] === 'object' ? (channel['itunes:category']._ || channel['itunes:category'].text || channel['itunes:category']) : channel['itunes:category']]
+        ) : [],
+      keywords: keywords,
+      explicit: isExplicit,
+      copyright: channel.copyright || '',
+      pubDate: channel.pubDate || null
+    };
     
     const episodes = items.slice(0, maxEpisodes).map(item => {
       const enclosure = item.enclosure || {};
@@ -98,7 +140,10 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
     });
     
     console.log(`📡 Parsed ${episodes.length} episodes from RSS feed`);
-    return episodes;
+    return {
+      episodes,
+      channel: channelMetadata
+    };
   } catch (error) {
     console.error(`❌ Error parsing RSS feed ${rssUrl}:`, error.message);
     throw error;
@@ -133,11 +178,13 @@ async function fetchFromAllRSSFeeds(rssFeeds, maxEpisodes = 100) {
   for (const feed of rssFeeds) {
     try {
       console.log(`📡 Trying RSS feed from ${feed.source}: ${feed.url}`);
-      const episodes = await parseRSSFeed(feed.url, maxEpisodes);
+      const rssResult = await parseRSSFeed(feed.url, maxEpisodes);
+      const episodes = rssResult.episodes || [];
       results.push({
         source: feed.source,
         url: feed.url,
         episodes: episodes,
+        channel: rssResult.channel || null,
         count: episodes.length
       });
       console.log(`✅ ${feed.source} RSS feed returned ${episodes.length} episodes`);
@@ -1653,19 +1700,143 @@ router.get('/series/:seriesId/info', async (req, res) => {
       .select('_id title globalMediaAggregate')
       .lean();
 
+    // Try to fetch and update metadata from RSS feed if available
+    // This ensures we have the latest metadata (categories, keywords, author, etc.)
+    let updatedSeries = series;
+    try {
+      const sources = series.sources instanceof Map 
+        ? Object.fromEntries(series.sources) 
+        : (series.sources || {});
+      const rssUrl = sources.rss || Object.values(sources).find(v => 
+        typeof v === 'string' && (v.includes('http') || v.includes('rss'))
+      );
+      
+      if (rssUrl && typeof rssUrl === 'string') {
+        console.log(`📡 Fetching RSS feed metadata for series: ${series.title}`);
+        const rssResult = await parseRSSFeed(rssUrl, 1); // Only need 1 episode to get channel metadata
+        const rssChannel = rssResult.channel;
+        
+        if (rssChannel) {
+          // Get the series document (not lean) to update it
+          const seriesDoc = await Media.findById(seriesId)
+            .populate('host.userId', 'username profilePic uuid');
+          
+          if (seriesDoc) {
+              let updated = false;
+              const description = rssChannel.description || rssChannel.summary || '';
+              if (description && description.trim() && !seriesDoc.description) {
+                seriesDoc.description = description;
+                updated = true;
+              }
+              
+              // Update other metadata if missing
+              if (rssChannel.language && !seriesDoc.language) {
+                seriesDoc.language = rssChannel.language;
+                updated = true;
+              }
+              if (rssChannel.image && !seriesDoc.coverArt) {
+                seriesDoc.coverArt = rssChannel.image;
+                updated = true;
+              }
+              // Update explicit rating - always update if RSS has it (RSS is authoritative)
+              if (rssChannel.explicit !== undefined) {
+                seriesDoc.explicit = rssChannel.explicit;
+                updated = true;
+              }
+              // Store copyright as label (owner/publisher) if missing
+              if (rssChannel.copyright && (!seriesDoc.label || seriesDoc.label.length === 0)) {
+                seriesDoc.label = [{ name: rssChannel.copyright, verified: false }];
+                updated = true;
+              }
+              // Store author if missing
+              if (rssChannel.author && (!seriesDoc.author || seriesDoc.author.length === 0)) {
+                seriesDoc.author = [{ name: rssChannel.author, verified: false }];
+                updated = true;
+              }
+              // Update genres (iTunes categories) if missing
+              if (rssChannel.categories && rssChannel.categories.length > 0 && 
+                  (!seriesDoc.genres || seriesDoc.genres.length === 0)) {
+                seriesDoc.genres = rssChannel.categories;
+                updated = true;
+              }
+              // Update tags (keywords) if missing - merge with existing tags
+              if (rssChannel.keywords && rssChannel.keywords.length > 0) {
+                const existingTags = new Set((seriesDoc.tags || []).map(t => t.toLowerCase()));
+                const newKeywords = rssChannel.keywords.filter(k => 
+                  k && !existingTags.has(k.toLowerCase())
+                );
+                if (newKeywords.length > 0) {
+                  seriesDoc.tags = [...(seriesDoc.tags || []), ...newKeywords];
+                  updated = true;
+                }
+              }
+              
+              if (updated) {
+                await seriesDoc.save();
+                console.log(`💾 Updated series metadata from RSS feed`);
+                
+                // Reload the series to get all populated fields
+                const refreshedSeries = await Media.findById(seriesId)
+                  .populate('host.userId', 'username profilePic uuid')
+                  .lean();
+                
+                if (refreshedSeries) {
+                  updatedSeries = refreshedSeries;
+                } else {
+                  // Fallback to manual update if reload fails
+                  updatedSeries = {
+                    ...series,
+                    description: seriesDoc.description || series.description,
+                    language: seriesDoc.language || series.language,
+                    coverArt: seriesDoc.coverArt || series.coverArt,
+                    explicit: seriesDoc.explicit,
+                    author: seriesDoc.author,
+                    label: seriesDoc.label,
+                    genres: seriesDoc.genres || series.genres,
+                    tags: seriesDoc.tags || series.tags
+                  };
+                }
+              } else {
+                // Even if not updated, ensure we have the latest data
+                const refreshedSeries = await Media.findById(seriesId)
+                  .populate('host.userId', 'username profilePic uuid')
+                  .lean();
+                if (refreshedSeries) {
+                  updatedSeries = refreshedSeries;
+                }
+              }
+            }
+          }
+        }
+    } catch (error) {
+      console.error('Error fetching RSS metadata for series:', error.message);
+      // Don't fail the request if RSS fetch fails
+    }
+
+    // Convert Map to object for JSON serialization
+    const sourcesObj = updatedSeries.sources instanceof Map 
+      ? Object.fromEntries(updatedSeries.sources) 
+      : (updatedSeries.sources || {});
+    const externalIdsObj = updatedSeries.externalIds instanceof Map 
+      ? Object.fromEntries(updatedSeries.externalIds) 
+      : (updatedSeries.externalIds || {});
+
     res.json({
       series: {
-        _id: series._id,
-        title: series.title,
-        description: series.description,
-        coverArt: series.coverArt,
-        host: series.host,
-        genres: series.genres,
-        tags: series.tags,
-        language: series.language,
-        externalIds: series.externalIds,
-        sources: series.sources,
-        addedBy: series.addedBy
+        _id: updatedSeries._id,
+        title: updatedSeries.title,
+        description: updatedSeries.description || null,
+        coverArt: updatedSeries.coverArt || null,
+        host: updatedSeries.host || [],
+        author: updatedSeries.author || [],
+        label: updatedSeries.label || [],
+        genres: updatedSeries.genres || [],
+        tags: updatedSeries.tags || [],
+        language: updatedSeries.language || 'en',
+        explicit: updatedSeries.explicit !== undefined ? updatedSeries.explicit : false,
+        externalIds: externalIdsObj,
+        sources: sourcesObj,
+        addedBy: updatedSeries.addedBy
       },
       stats: {
         totalEpisodes: stats.episodeCount,
@@ -2435,7 +2606,9 @@ router.get('/series/:seriesId', async (req, res) => {
             
             if (rssUrl) {
               try {
-                const rssEpisodes = await parseRSSFeed(rssUrl, 100);
+                const rssResult = await parseRSSFeed(rssUrl, 100);
+                const rssEpisodes = rssResult.episodes || [];
+                const rssChannel = rssResult.channel || null;
                 console.log(`📡 Retrieved ${rssEpisodes.length} episodes from RSS feed`);
                 
                 // Get existing episodes to filter duplicates
@@ -2473,16 +2646,82 @@ router.get('/series/:seriesId', async (req, res) => {
                     });
                   }
                   
+                  // Use channel metadata if available, otherwise fall back to existing series data
                   const seriesData = {
-                    title: series.title,
-                    description: series.description || '',
-                    author: series.host && series.host.length > 0 ? series.host[0].name : '',
-                    image: series.coverArt || null,
-                    categories: series.genres || [],
-                    language: series.language || 'en',
+                    title: rssChannel?.title || series.title,
+                    description: rssChannel?.description || rssChannel?.summary || series.description || '',
+                    author: rssChannel?.author || (series.host && series.host.length > 0 ? series.host[0].name : ''),
+                    copyright: rssChannel?.copyright || '',
+                    image: rssChannel?.image || series.coverArt || null,
+                    categories: rssChannel?.categories || series.genres || [],
+                    keywords: rssChannel?.keywords || [],
+                    language: rssChannel?.language || series.language || 'en',
+                    explicit: rssChannel?.explicit !== undefined ? rssChannel.explicit : (series.explicit !== undefined ? series.explicit : false),
                     rssUrl: rssUrl,
                     taddyUuid: taddyUuid
                   };
+                  
+                  // Update series metadata if we have channel data
+                  if (rssChannel) {
+                    try {
+                      const seriesDoc = await Media.findById(seriesId);
+                      if (seriesDoc) {
+                        let updated = false;
+                        
+                        if (rssChannel.description && !seriesDoc.description) {
+                          seriesDoc.description = rssChannel.description;
+                          updated = true;
+                        }
+                        if (rssChannel.summary && !seriesDoc.description) {
+                          seriesDoc.description = rssChannel.summary;
+                          updated = true;
+                        }
+                        if (rssChannel.language && !seriesDoc.language) {
+                          seriesDoc.language = rssChannel.language;
+                          updated = true;
+                        }
+                        // Update explicit rating - always update if RSS has it (RSS is authoritative)
+                        if (rssChannel.explicit !== undefined) {
+                          seriesDoc.explicit = rssChannel.explicit;
+                          updated = true;
+                        }
+                        // Store copyright as label (owner/publisher)
+                        if (rssChannel.copyright && (!seriesDoc.label || seriesDoc.label.length === 0)) {
+                          seriesDoc.label = [{ name: rssChannel.copyright, verified: false }];
+                          updated = true;
+                        }
+                        // Store author if not already set
+                        if (rssChannel.author && (!seriesDoc.author || seriesDoc.author.length === 0)) {
+                          seriesDoc.author = [{ name: rssChannel.author, verified: false }];
+                          updated = true;
+                        }
+                        // Update genres (iTunes categories) if missing
+                        if (rssChannel.categories && rssChannel.categories.length > 0 && 
+                            (!seriesDoc.genres || seriesDoc.genres.length === 0)) {
+                          seriesDoc.genres = rssChannel.categories;
+                          updated = true;
+                        }
+                        // Update tags (keywords) if missing - merge with existing tags
+                        if (rssChannel.keywords && rssChannel.keywords.length > 0) {
+                          const existingTags = new Set((seriesDoc.tags || []).map(t => t.toLowerCase()));
+                          const newKeywords = rssChannel.keywords.filter(k => 
+                            k && !existingTags.has(k.toLowerCase())
+                          );
+                          if (newKeywords.length > 0) {
+                            seriesDoc.tags = [...(seriesDoc.tags || []), ...newKeywords];
+                            updated = true;
+                          }
+                        }
+                        
+                        if (updated) {
+                          await seriesDoc.save();
+                          console.log(`💾 Updated series metadata from RSS feed`);
+                        }
+                      }
+                    } catch (updateError) {
+                      console.error('Error updating series metadata:', updateError);
+                    }
+                  }
                   
                   // Apply pagination for RSS episodes too
                   let episodesToProcess;

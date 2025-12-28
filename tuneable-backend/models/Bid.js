@@ -150,8 +150,7 @@ const bidSchema = new mongoose.Schema({
     // SECURITY & VERIFICATION
     // ========================================
     transactionHash: { 
-        type: String, 
-        index: true 
+        type: String
     }, // SHA-256 hash for tamper detection
 }, {
     timestamps: true

@@ -139,8 +139,7 @@ const collectiveSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-collectiveSchema.index({ name: 1 });
-collectiveSchema.index({ slug: 1 });
+// Note: name and slug fields already have unique: true which automatically creates indexes
 collectiveSchema.index({ email: 1 });
 collectiveSchema.index({ type: 1 });
 collectiveSchema.index({ 'stats.globalCollectiveAggregate': -1 });

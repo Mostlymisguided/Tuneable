@@ -123,8 +123,7 @@ const labelSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-labelSchema.index({ name: 1 });
-labelSchema.index({ slug: 1 });
+// Note: name and slug fields already have unique: true which automatically creates indexes
 labelSchema.index({ email: 1 });
 labelSchema.index({ 'stats.globalLabelAggregate': -1 });
 labelSchema.index({ 'stats.globalRank': 1 });

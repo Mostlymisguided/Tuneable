@@ -18,9 +18,8 @@ const tuneableLedgerSchema = new mongoose.Schema({
   // ========================================
   sequence: {
     type: Number,
-    unique: true,
-    index: true
-  }, // Auto-incrementing sequence number for ordering
+    unique: true
+  }, // Auto-incrementing sequence number for ordering (unique automatically creates index)
   
   // ========================================
   // REFERENCES (ObjectIds)
@@ -159,8 +158,7 @@ const tuneableLedgerSchema = new mongoose.Schema({
   // VERIFICATION
   // ========================================
   transactionHash: {
-    type: String,
-    index: true
+    type: String
   }, // SHA-256 hash for tamper detection (includes sequence)
   
   // ========================================
@@ -169,8 +167,7 @@ const tuneableLedgerSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['confirmed', 'pending'],
-    default: 'confirmed',
-    index: true
+    default: 'confirmed'
   },
   
   // ========================================
@@ -212,9 +209,9 @@ tuneableLedgerSchema.index({ userId: 1, timestamp: -1 }); // User's transaction 
 tuneableLedgerSchema.index({ mediaId: 1, timestamp: -1 }); // Media's transaction history
 tuneableLedgerSchema.index({ partyId: 1, timestamp: -1 }); // Party's transaction history
 tuneableLedgerSchema.index({ transactionType: 1, timestamp: -1 }); // Filter by type
-tuneableLedgerSchema.index({ sequence: 1 }); // Sequence ordering
+// Note: sequence field already has unique: true which automatically creates an index
 tuneableLedgerSchema.index({ transactionHash: 1 }); // Hash lookup for verification
-tuneableLedgerSchema.index({ status: 1, timestamp: -1 }); // Status filtering
+tuneableLedgerSchema.index({ status: 1, timestamp: -1 }); // Status filtering (compound index)
 
 // ========================================
 // HASH GENERATION

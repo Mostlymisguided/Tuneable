@@ -221,7 +221,7 @@ PartySchema.index({ 'media.partyMediaBidTop': -1 });
 PartySchema.index({ 'media.partyMediaAggregateTop': -1 });
 PartySchema.index({ type: 1 }); // Index for Global Party lookup
 PartySchema.index({ tags: 1 }); // Index for tag-based filtering
-PartySchema.index({ slug: 1 }); // Index for slug-based lookup
+// Note: slug field already has unique: true which automatically creates an index
 PartySchema.index({ 'locationFilter.countryCode': 1, 'locationFilter.city': 1 }); // Index for location-based filtering
 
 module.exports = mongoose.model('Party', PartySchema);

@@ -512,10 +512,18 @@ class PodcastAdapter {
       host: seriesData.author ? 
         [{ name: seriesData.author, userId: null, verified: false }] : [],
       
+      author: seriesData.author ? 
+        [{ name: seriesData.author, userId: null, verified: false }] : [],
+      
+      label: seriesData.copyright ? 
+        [{ name: seriesData.copyright, verified: false }] : [],
+      
       description: seriesData.description,
       coverArt: seriesData.image,
       genres: seriesData.categories || [],
+      tags: seriesData.keywords || [],
       language: seriesData.language || 'en',
+      explicit: seriesData.explicit || false,
       
       sources: (() => {
         const sourceMap = new Map();
