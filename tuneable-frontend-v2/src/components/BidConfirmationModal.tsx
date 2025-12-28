@@ -7,10 +7,12 @@ import type { Party } from '../types';
 import type { User } from '../contexts/AuthContext';
 import { normalizeTagForStorage } from '../utils/tagNormalizer';
 
+type ProgressStep = 'placing' | 'processing' | 'updating' | null;
+
 interface BidConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (tags: string[], setProgress?: (step: string | null) => void) => void;
+  onConfirm: (tags: string[], setProgress?: (step: ProgressStep) => void) => void;
   bidAmount: number;
   mediaTitle: string;
   mediaArtist?: string;
@@ -35,7 +37,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
-  const [progressStep, setProgressStep] = useState<'placing' | 'processing' | 'updating' | null>(null);
+  const [progressStep, setProgressStep] = useState<ProgressStep>(null);
   const navigate = useNavigate();
   
   // Check if location mismatch and fetch user's location party

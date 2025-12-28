@@ -864,7 +864,7 @@ const Party: React.FC = () => {
     setValidationDuration(0);
   };
 
-  const handleBidConfirmation = async (tags: string[], setProgress?: (step: string | null) => void) => {
+  const handleBidConfirmation = async (tags: string[], setProgress?: (step: 'placing' | 'processing' | 'updating' | null) => void) => {
     // ✅ Early return if already bidding - prevent double-clicks
     if (isBidding) {
       console.log('Already processing a tip, please wait...');
