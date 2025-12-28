@@ -73,6 +73,11 @@ const Dashboard: React.FC = () => {
   const getEffectiveMinimumBid = (media?: any): number => {
     return media?.minimumBid ?? minimumBid ?? 0.01;
   };
+  
+  // Helper function to get user's default tip amount
+  const getUserDefaultTip = (): number => {
+    return user?.preferences?.defaultTip || 0.11;
+  };
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
   
@@ -634,11 +639,11 @@ Join here: ${inviteLink}`.trim();
         
         setAddTuneResults(results);
         
-        // Initialize bid amounts (default to 0.33 to encourage higher bids)
-        const defaultBid = 0.33;
+        // Initialize bid amounts using user's default tip preference
+        const userDefaultTip = getUserDefaultTip();
         const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, getEffectiveMinimumBid(media)).toFixed(2);
+          newBidAmounts[media._id || media.id || ''] = Math.max(userDefaultTip, getEffectiveMinimumBid(media)).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       } else {
@@ -655,11 +660,11 @@ Join here: ${inviteLink}`.trim();
         
         setAddTuneResults(results);
         
-        // Initialize bid amounts (default to 0.33 to encourage higher bids)
-        const defaultBid = 0.33;
+        // Initialize bid amounts using user's default tip preference
+        const userDefaultTip = getUserDefaultTip();
         const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(defaultBid, getEffectiveMinimumBid(media)).toFixed(2);
+          newBidAmounts[media._id || media.id || ''] = Math.max(userDefaultTip, getEffectiveMinimumBid(media)).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       }
@@ -2444,7 +2449,8 @@ Join here: ${inviteLink}`.trim();
                         onClick={() => {
                           const mediaIdKey = mediaId || '';
                           const minBid = getEffectiveMinimumBid(result);
-                          const defaultBid = Math.max(0.33, minBid);
+                          const userDefaultTip = getUserDefaultTip();
+                          const defaultBid = Math.max(userDefaultTip, minBid);
                           const current = parseFloat(addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2));
                           const newAmount = Math.max(minBid, current - 0.01);
                           setAddTuneBidAmounts((prev) => ({
@@ -2463,7 +2469,8 @@ Join here: ${inviteLink}`.trim();
                         type="number"
                         value={addTuneBidAmounts[mediaId || ''] ?? (() => {
                           const minBid = getEffectiveMinimumBid(result);
-                          return Math.max(0.33, minBid).toFixed(2);
+                          const userDefaultTip = getUserDefaultTip();
+                          return Math.max(userDefaultTip, minBid).toFixed(2);
                         })()}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -2478,7 +2485,8 @@ Join here: ${inviteLink}`.trim();
                         onClick={() => {
                           const mediaIdKey = mediaId || '';
                           const minBid = getEffectiveMinimumBid(result);
-                          const defaultBid = Math.max(0.33, minBid);
+                          const userDefaultTip = getUserDefaultTip();
+                          const defaultBid = Math.max(userDefaultTip, minBid);
                           const current = parseFloat(addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2));
                           const newAmount = current + 0.01;
                           setAddTuneBidAmounts((prev) => ({
@@ -2502,7 +2510,8 @@ Join here: ${inviteLink}`.trim();
                       {(() => {
                         const mediaIdKey = mediaId || '';
                         const minBid = getEffectiveMinimumBid(result);
-                        const defaultBid = Math.max(0.33, minBid);
+                        const userDefaultTip = getUserDefaultTip();
+                        const defaultBid = Math.max(userDefaultTip, minBid);
                         const raw = addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2);
                         const parsed = parseFloat(raw);
                         if (!Number.isFinite(parsed)) {
