@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, PartyPopper, Music, Home, LogOut } from 'lucide-react';
+import { User as UserIcon, Headphones, Music, Home, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
@@ -64,14 +64,14 @@ const Navbar: React.FC = () => {
                   </Link>
                 )}
                 <Link
-                  to="/parties"
+                  to="/podcasts"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  <PartyPopper className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Parties</span>
+                  <Headphones className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Podcasts</span>
                 </Link>
                 <Link
                   to="/party/global"
