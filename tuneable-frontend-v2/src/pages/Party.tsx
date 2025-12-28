@@ -420,55 +420,74 @@ const Party: React.FC = () => {
     }
   }, [addMediaSearchQuery]);
 
-  // Update WebPlayer queue when sorting changes
+  // Update WebPlayer queue when sorting or tag filtering changes
   useEffect(() => {
-    if (party && selectedTimePeriod !== 'all-time' && sortedMedia.length > 0) {
-      // Update the global player queue with sorted media
-      const queuedSortedMedia = sortedMedia.filter((media: any) => media.status === 'active');
-      console.log('Updating WebPlayer queue with sorted media:', queuedSortedMedia.length);
+    if (party) {
+      // Use getDisplayMedia() to respect both time sorting AND tag filtering
+      const displayMedia = getDisplayMedia();
       
-      // Clean and set the queue in global store
-      const cleanedQueue = queuedSortedMedia.map((item: any) => {
-        let sources = {};
+      if (displayMedia.length > 0) {
+        console.log('Updating WebPlayer queue with filtered display media:', displayMedia.length);
         
-        if (item.sources) {
-          if (Array.isArray(item.sources)) {
-            for (const source of item.sources) {
-              if (source && source.platform === 'youtube' && source.url) {
-                (sources as any).youtube = source.url;
+        // Clean and set the queue in global store
+        const cleanedQueue = displayMedia.map((item: any) => {
+          // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
+          const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+          
+          // Clean and format sources
+          let sources = {};
+          
+          if (mediaData.sources) {
+            if (Array.isArray(mediaData.sources)) {
+              for (const source of mediaData.sources) {
+                if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+                  // Handle Mongoose metadata corruption
+                  sources = source.url.sources;
+                  break;
+                } else if (source && source.platform === 'youtube' && source.url) {
+                  (sources as any).youtube = source.url;
+                } else if (source?.youtube) {
+                  (sources as any).youtube = source.youtube;
+                }
               }
+            } else if (typeof mediaData.sources === 'object') {
+              sources = mediaData.sources;
             }
-          } else if (typeof item.sources === 'object') {
-            sources = item.sources;
           }
-        }
+          
+          return {
+            id: mediaData._id || mediaData.id || mediaData.uuid,
+            _id: mediaData._id || mediaData.id || mediaData.uuid,
+            title: mediaData.title,
+            artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
+            artists: Array.isArray(mediaData.artist) ? mediaData.artist : (mediaData.artists || []),
+            featuring: mediaData.featuring || [],
+            creatorDisplay: mediaData.creatorDisplay,
+            duration: mediaData.duration,
+            coverArt: mediaData.coverArt,
+            sources: sources,
+            globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
+            partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+            totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+            bids: item.partyBids || item.bids || mediaData.bids || [],
+            addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
+          };
+        });
         
-        return {
-          id: item._id || item.id || item.uuid, // Prefer ObjectId first
-          title: item.title,
-          artist: Array.isArray(item.artist) ? item.artist[0]?.name || 'Unknown Artist' : item.artist,
-          artists: Array.isArray(item.artist) ? item.artist : (item.artists || []), // Preserve full artist array with userIds
-          featuring: item.featuring || [],
-          creatorDisplay: item.creatorDisplay,
-          duration: item.duration,
-          coverArt: item.coverArt,
-          sources: sources,
-          globalMediaAggregate: typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0,
-          partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-          totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
-          bids: item.partyBids || item.bids || [], // Use party-specific bids (PartyUserMediaAggregate) if available, fallback to processed bids
-          addedBy: typeof item.addedBy === 'object' ? item.addedBy?.username || 'Unknown' : item.addedBy
-        };
-      });
-      
-      setQueue(cleanedQueue);
-      
-      // If there is media and no current media, set the first one
-      if (cleanedQueue.length > 0 && !currentMedia) {
-        setCurrentMedia(cleanedQueue[0], 0);
+        setQueue(cleanedQueue);
+        
+        // If there is media and no current media, set the first one
+        if (cleanedQueue.length > 0 && !currentMedia) {
+          setCurrentMedia(cleanedQueue[0], 0);
+        }
+      } else {
+        // If no display media, clear queue only if web player is empty
+        if (!currentMedia) {
+          setQueue([]);
+        }
       }
     }
-  }, [sortedMedia, selectedTimePeriod, party, setQueue, setCurrentMedia, currentMedia]);
+  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, setQueue, setCurrentMedia, currentMedia]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -1850,48 +1869,73 @@ const Party: React.FC = () => {
 
   // Handle clicking play button on media in the queue
   const handlePlayMedia = (item: any, index: number) => {
-    const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+    // Get the filtered display media to set as the queue
+    const displayMedia = getDisplayMedia();
     
-    // Clean and format the media for the webplayer
-    let sources = {};
-    
-    if (mediaData.sources) {
-      if (Array.isArray(mediaData.sources)) {
-        for (const source of mediaData.sources) {
-          if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-            // Handle Mongoose metadata corruption
-            sources = source.url.sources;
-            break;
-          } else if (source && source.platform === 'youtube' && source.url) {
-            (sources as any).youtube = source.url;
-          } else if (source?.youtube) {
-            (sources as any).youtube = source.youtube;
-          }
-        }
-      } else if (typeof mediaData.sources === 'object') {
-        sources = mediaData.sources;
-      }
+    if (displayMedia.length === 0) {
+      toast.error('No tracks to play');
+      return;
     }
     
-    const cleanedMedia = {
-      id: mediaData._id || mediaData.id || mediaData.uuid,
-      title: mediaData.title,
-      artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
-      duration: mediaData.duration,
-      coverArt: mediaData.coverArt,
-      sources: sources,
-      globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
-      partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-      totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-      bids: mediaData.bids,
-      addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
-    };
+    // Format all displayed media into queue format (same as handlePlayQueue)
+    const cleanedQueue = displayMedia.map((displayItem: any) => {
+      // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
+      const mediaData = selectedTimePeriod === 'all-time' ? (displayItem.mediaId || displayItem) : displayItem;
+      
+      // Clean and format sources
+      let sources = {};
+      
+      if (mediaData.sources) {
+        if (Array.isArray(mediaData.sources)) {
+          for (const source of mediaData.sources) {
+            if (source && source.platform === '$__parent' && source.url && source.url.sources) {
+              // Handle Mongoose metadata corruption
+              sources = source.url.sources;
+              break;
+            } else if (source && source.platform === 'youtube' && source.url) {
+              (sources as any).youtube = source.url;
+            } else if (source?.youtube) {
+              (sources as any).youtube = source.youtube;
+            }
+          }
+        } else if (typeof mediaData.sources === 'object') {
+          sources = mediaData.sources;
+        }
+      }
+      
+      return {
+        id: mediaData._id || mediaData.id || mediaData.uuid,
+        _id: mediaData._id || mediaData.id || mediaData.uuid,
+        title: mediaData.title,
+        artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
+        artists: Array.isArray(mediaData.artist) ? mediaData.artist : (mediaData.artists || []),
+        featuring: mediaData.featuring || [],
+        creatorDisplay: mediaData.creatorDisplay,
+        duration: mediaData.duration,
+        coverArt: mediaData.coverArt,
+        sources: sources,
+        globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
+        partyMediaAggregate: typeof displayItem.partyMediaAggregate === 'number' ? displayItem.partyMediaAggregate : 0,
+        totalBidValue: typeof displayItem.partyMediaAggregate === 'number' ? displayItem.partyMediaAggregate : 0,
+        bids: displayItem.partyBids || displayItem.bids || mediaData.bids || [],
+        addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
+      };
+    });
+    
+    // Set the queue to the filtered display media
+    setQueue(cleanedQueue);
+    
+    // Find the correct index in the cleaned queue for the clicked item
+    const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+    const itemId = mediaData._id || mediaData.id || mediaData.uuid;
+    const queueIndex = cleanedQueue.findIndex((q: any) => (q.id || q._id) === itemId);
+    const finalIndex = queueIndex !== -1 ? queueIndex : index;
     
     // Set the media in the webplayer and start playback
-    setCurrentMedia(cleanedMedia, index); // Set media without autoplay
+    setCurrentMedia(cleanedQueue[finalIndex], finalIndex);
     play(); // Explicitly start playback when user clicks play button
     
-    toast.success(`Now playing: ${cleanedMedia.title}`);
+    toast.success(`Now playing: ${cleanedQueue[finalIndex].title}`);
   };
 
   // Handle playing the entire displayed queue from the top
