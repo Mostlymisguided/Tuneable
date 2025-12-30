@@ -1043,6 +1043,13 @@ const Party: React.FC = () => {
             console.error('Background party refresh error:', error);
           });
           
+          // If viewing a time-filtered period, also refresh sorted media
+          if (selectedTimePeriod !== 'all-time') {
+            fetchSortedMedia(selectedTimePeriod).catch(error => {
+              console.error('Background sorted media refresh error:', error);
+            });
+          }
+          
           // Reset bid amount for this media back to minimum
           if (mediaId) {
             setQueueBidAmounts(prev => ({
@@ -1057,6 +1064,10 @@ const Party: React.FC = () => {
           toast.error(errorMessage);
           // On error, refresh to get correct state
           fetchPartyDetails().catch(console.error);
+          // Also refresh sorted media if viewing time-filtered period
+          if (selectedTimePeriod !== 'all-time') {
+            fetchSortedMedia(selectedTimePeriod).catch(console.error);
+          }
         } finally {
           setIsBidding(false);
           setIsInlineBid(false);
@@ -1144,11 +1155,22 @@ const Party: React.FC = () => {
             console.error('Background party refresh error:', error);
           });
           
+          // If viewing a time-filtered period, also refresh sorted media
+          if (selectedTimePeriod !== 'all-time') {
+            fetchSortedMedia(selectedTimePeriod).catch(error => {
+              console.error('Background sorted media refresh error:', error);
+            });
+          }
+          
         } catch (error: any) {
           console.error('Error adding media:', error);
           toast.error(error.response?.data?.error || 'Failed to add media to party');
           // On error, refresh to get correct state
           fetchPartyDetails().catch(console.error);
+          // Also refresh sorted media if viewing time-filtered period
+          if (selectedTimePeriod !== 'all-time') {
+            fetchSortedMedia(selectedTimePeriod).catch(console.error);
+          }
         } finally {
           setIsBidding(false); // Reset bidding state
           setPendingMedia(null);
