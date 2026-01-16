@@ -2527,7 +2527,7 @@ const Party: React.FC = () => {
                                     <div className="flex flex-row md:contents items-start gap-2 mb-1 md:mb-0">
                                       {/* Media Thumbnail with Overlays */}
                                       <div 
-                                        className="relative w-32 h-32 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
+                                        className="relative w-32 h-32 cursor-pointer group flex-shrink-0"
                                         onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                                       >
                                         <img
@@ -3106,16 +3106,18 @@ const Party: React.FC = () => {
                               </button>
                             )}
                             
-                            {/* Queue Number Badge - Centered at top on mobile, Left Gutter on desktop */}
-                            <div className="absolute left-1/2 -translate-x-1/2 md:-left-12 md:translate-x-0 md:-left-12 top-2 md:top-1/2 md:-translate-y-1/2 w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg z-10">
-                              <span className="text-white font-bold text-[10px] md:text-sm">{index + 1}</span>
+                            {/* Queue Number Badge - Centered at top on mobile, Left of artwork on desktop */}
+                            <div className="flex items-center justify-center md:items-center md:justify-start w-full md:w-auto md:mr-3 mb-1 md:mb-0 order-first">
+                              <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg">
+                                <span className="text-white font-bold text-[10px] md:text-sm">{index + 1}</span>
+                              </div>
                             </div>
                             
                             {/* Mobile-only wrapper for thumbnail + details side by side */}
                             <div className="flex flex-row md:contents items-start gap-2 mb-1 md:mb-0">
                               {/* Media Thumbnail with Overlays */}
                               <div 
-                                className="relative w-32 h-32 md:w-48 md:h-48 cursor-pointer group flex-shrink-0"
+                                className="relative w-32 h-32 cursor-pointer group flex-shrink-0"
                                 onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                               >
                                 <img
