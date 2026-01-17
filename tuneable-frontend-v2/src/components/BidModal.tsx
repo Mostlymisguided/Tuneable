@@ -82,13 +82,29 @@ const BidModal: React.FC<BidModalProps> = ({
     onClose();
   };
 
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && !isLoading) {
+      handleClose();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 10000 }}>
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 border border-gray-700">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" 
+      style={{ zIndex: 10000, pointerEvents: 'auto' }}
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="bid-modal-title"
+    >
+      <div 
+        className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 border border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Place a Tip</h2>
+          <h2 id="bid-modal-title" className="text-xl font-semibold text-white">Place a Tip</h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-300 transition-colors"

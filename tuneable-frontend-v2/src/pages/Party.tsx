@@ -2507,7 +2507,7 @@ const Party: React.FC = () => {
                                 return (
                                   <div
                                     key={`queue-search-${mediaData.id || mediaData._id}-${index}`}
-                                    className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 pt-8 md:pt-4"
+                                    className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 md:pt-4"
                                   >
                                     {/* Action Button - Top Right (opens modal with available actions) */}
                                     {(isHost || isAdmin || getUserBid(item)) && (
@@ -3090,7 +3090,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex flex-col md:flex-row md:items-center hover:shadow-2xl relative p-1.5 md:p-4 pt-8"
+                            className="card flex flex-col md:flex-row md:items-center hover:shadow-2xl relative p-1.5 md:p-4"
                           >
                             {/* Action Button - Top Right (opens modal with available actions) */}
                             {(isHost || isAdmin || getUserBid(item)) && (
