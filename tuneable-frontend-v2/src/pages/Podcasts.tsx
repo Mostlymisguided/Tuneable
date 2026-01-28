@@ -684,6 +684,8 @@ const Podcasts: React.FC = () => {
     }
   };
 
+  const [fetchingPlayId, setFetchingPlayId] = useState<string | null>(null);
+
   const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
@@ -710,6 +712,43 @@ const Podcasts: React.FC = () => {
     setCurrentEpisode(ep);
     play();
     toast.success(`Now playing: ${episode.title}`);
+  };
+
+  const handlePlayTopEpisode = async (episode: PodcastEpisode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please log in to play podcast episodes');
+      navigate('/login');
+      return;
+    }
+    const id = episode._id || episode.id;
+    if (!id) return;
+    setFetchingPlayId(id);
+    const toastId = toast.loading('Loading episode...');
+    try {
+      const { media } = await mediaAPI.getProfile(id);
+      const ep = {
+        _id: media._id,
+        id: media.uuid,
+        title: media.title,
+        duration: media.duration,
+        coverArt: media.coverArt,
+        podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
+        sources: media.sources,
+      };
+      if (!getEpisodeAudioUrl(ep)) {
+        toast.error('No playable audio for this episode');
+        return;
+      }
+      setCurrentEpisode(ep);
+      play();
+      toast.success(`Now playing: ${media.title}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to load episode');
+    } finally {
+      setFetchingPlayId(null);
+      toast.dismiss(toastId);
+    }
   };
 
   const handleSeriesClick = async (episode: PodcastEpisode, e: React.MouseEvent) => {
@@ -1088,12 +1127,33 @@ const Podcasts: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* Cover Art */}
-                <img
-                  src={episode.coverArt || episode.podcastSeries?.coverArt || episode.podcastImage || DEFAULT_COVER_ART}
-                  alt={episode.title}
-                  className="w-full aspect-square rounded-lg object-cover mb-3"
-                />
+                {/* Cover Art with Play overlay */}
+                <div className="relative group mb-3">
+                  <img
+                    src={episode.coverArt || episode.podcastSeries?.coverArt || episode.podcastImage || DEFAULT_COVER_ART}
+                    alt={episode.title}
+                    className="w-full aspect-square rounded-lg object-cover"
+                  />
+                  {user && (
+                    <button
+                      type="button"
+                      onClick={(e) => handlePlayTopEpisode(episode, e)}
+                      disabled={!!fetchingPlayId}
+                      className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto disabled:opacity-70"
+                      aria-label="Play episode"
+                    >
+                      {fetchingPlayId === (episode._id || episode.id) ? (
+                        <div className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center">
+                          <Loader className="w-6 h-6 text-gray-900 animate-spin" />
+                        </div>
+                      ) : (
+                        <span className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center shadow-lg">
+                          <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
                 
                 {/* Title */}
                 <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2">
