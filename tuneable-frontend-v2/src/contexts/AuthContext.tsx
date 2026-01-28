@@ -213,6 +213,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useWebPlayerStore.getState().setCurrentMedia(null);
     useWebPlayerStore.getState().setGlobalPlayerActive(false);
     useWebPlayerStore.getState().setQueue([]);
+    // Clear podcast player state on logout
+    const { usePodcastPlayerStore } = require('../stores/podcastPlayerStore');
+    usePodcastPlayerStore.getState().clear();
   };
 
   const handleOAuthCallback = async (token: string) => {

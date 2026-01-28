@@ -46,7 +46,7 @@ import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
-import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
@@ -319,8 +319,8 @@ const PodcastEpisodeProfile: React.FC = () => {
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
 
-  // WebPlayer integration
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } = useWebPlayerStore();
+  // Podcast player integration (separate from music web player)
+  const { setCurrentEpisode, play } = usePodcastPlayerStore();
 
   const parsedGlobalBidAmount = useMemo(() => {
     const parsed = parseFloat(globalBidInput);
@@ -1630,59 +1630,25 @@ const PodcastEpisodeProfile: React.FC = () => {
     }
   };
 
-  // Handle play button click
+  // Handle play button click – use podcast player (not music web player)
   const handlePlaySong = () => {
     if (!media) return;
 
-    console.log('🎵 Raw media object:', media);
-    console.log('🎵 Raw sources:', media.sources, typeof media.sources);
-
-    // Clean and format sources (same logic as Party page)
-    let sources = {};
-    
-    if (media.sources) {
-      if (Array.isArray(media.sources)) {
-        for (const source of media.sources) {
-          if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-            // Handle Mongoose metadata corruption
-            sources = source.url.sources;
-            break;
-        } else if (source && source.platform === 'youtube' && source.url) {
-          (sources as any).youtube = source.url;
-        } else if (source?.youtube) {
-          (sources as any).youtube = source.youtube;
-        }
-        }
-      } else if (typeof media.sources === 'object') {
-        // Preserve the original sources object
-        sources = media.sources;
-      }
-    }
-
-    // Format media for webplayer
-    const formattedSong = {
-      id: media._id || media.uuid,
+    const episode = {
+      _id: media._id,
+      id: media.uuid,
       title: media.title,
-      artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
       duration: media.duration,
       coverArt: media.coverArt,
-      sources: sources, // Use cleaned sources
-      globalMediaAggregate: media.globalMediaAggregate || 0,
-      bids: media.bids || [],
-      addedBy: media.addedBy?.username || 'Unknown',
-      totalBidValue: media.globalMediaAggregate || 0
-    } as any;
-
-    console.log('🎵 Playing from TuneProfile:', formattedSong);
-    console.log('Sources:', sources);
-
-    // Clear any existing queue and set new media
-    setQueue([formattedSong]);
-    setCurrentMedia(formattedSong, 0); // Set media without autoplay
-    play(); // Explicitly start playback when user clicks play button
-    setGlobalPlayerActive(true);
-    setCurrentPartyId(null); // Not in a party context
-    
+      podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
+      sources: media.sources,
+    };
+    if (!getEpisodeAudioUrl(episode)) {
+      toast.error('No playable audio for this episode');
+      return;
+    }
+    setCurrentEpisode(episode);
+    play();
     toast.success(`Now playing: ${media.title}`);
   };
 

@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 import { stripHtml } from '../utils/stripHtml';
+import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 
 interface PodcastEpisode {
   _id: string;
@@ -36,6 +37,9 @@ interface PodcastEpisode {
   genres?: string[];
   tags?: string[];
   category?: string;
+  sources?: Record<string, string> | { get?(k: string): string };
+  audioUrl?: string;
+  enclosure?: { url?: string };
 }
 
 const PodcastSearch: React.FC = () => {
@@ -197,6 +201,35 @@ const PodcastSearch: React.FC = () => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const { setCurrentEpisode, play } = usePodcastPlayerStore();
+
+  const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please log in to play podcast episodes');
+      navigate('/login');
+      return;
+    }
+    const ep = {
+      _id: episode._id,
+      id: episode.id,
+      title: episode.title,
+      duration: episode.duration,
+      coverArt: episode.coverArt || episode.podcastSeries?.coverArt,
+      podcastSeries: episode.podcastSeries,
+      sources: episode.sources,
+      audioUrl: episode.audioUrl,
+      enclosure: episode.enclosure,
+    };
+    if (!getEpisodeAudioUrl(ep)) {
+      toast.error('No playable audio for this episode');
+      return;
+    }
+    setCurrentEpisode(ep);
+    play();
+    toast.success(`Now playing: ${episode.title}`);
   };
 
   const handleEpisodeClick = async (episode: PodcastEpisode) => {
@@ -470,20 +503,41 @@ const PodcastSearch: React.FC = () => {
                 : `Found ${episodes.length} episode${episodes.length !== 1 ? 's' : ''}`
               }
             </div>
-            {episodes.map((episode) => (
+            {episodes.map((episode) => {
+              const hasPlayable = user && getEpisodeAudioUrl({
+                title: episode.title,
+                _id: episode._id,
+                id: episode.id,
+                sources: episode.sources,
+                audioUrl: episode.audioUrl,
+                enclosure: episode.enclosure,
+              });
+              return (
               <div
                 key={episode._id || episode.id}
                 onClick={() => handleEpisodeClick(episode)}
                 className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 hover:bg-gray-800/70 transition-all cursor-pointer border border-gray-700 hover:border-purple-500/50"
               >
                 <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Cover Art */}
-                  <div className="flex-shrink-0">
+                  {/* Cover Art with Play overlay */}
+                  <div className="relative flex-shrink-0 group">
                     <img
                       src={episode.coverArt || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART}
                       alt={episode.title}
                       className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
                     />
+                    {hasPlayable && (
+                      <button
+                        type="button"
+                        onClick={(e) => handlePlayEpisode(episode, e)}
+                        className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto"
+                        aria-label="Play episode"
+                      >
+                        <span className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center shadow-lg">
+                          <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Episode Info */}
@@ -546,10 +600,22 @@ const PodcastSearch: React.FC = () => {
                         ))}
                       </div>
                     ) : null}
+
+                    {/* Play button */}
+                    {hasPlayable && (
+                      <button
+                        type="button"
+                        onClick={(e) => handlePlayEpisode(episode, e)}
+                        className="mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-gray-900 font-semibold rounded-lg transition-all flex items-center gap-2 w-fit"
+                      >
+                        <Play className="h-4 w-4" fill="currentColor" />
+                        <span>Play</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+            ); })}
             
             {/* Load More Button */}
             {hasMore && (

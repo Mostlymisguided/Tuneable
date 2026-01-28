@@ -1540,28 +1540,33 @@ router.post('/discovery/import-single-episode', authMiddleware, async (req, res)
       return res.status(400).json({ error: 'Invalid source. Must be taddy, podcastindex, or apple' });
     }
 
-    let importedEpisode;
-    
+    let episodeDoc;
     if (seriesData) {
-      // Import with series linkage
-      importedEpisode = await podcastAdapter.importEpisodeWithSeries(
+      // Import with series linkage (series created/found first, then episode linked)
+      const result = await podcastAdapter.importEpisodeWithSeries(
         source,
         episodeData,
         seriesData,
         userId
       );
+      episodeDoc = result.episode;
     } else {
-      // Import episode only
-      importedEpisode = await podcastAdapter.importEpisode(
+      // Import episode only (no series)
+      episodeDoc = await podcastAdapter.importEpisode(
         source,
         episodeData,
         userId
       );
     }
 
+    // Re-fetch with podcastSeries populated so frontend gets artwork and series info
+    const populated = await Media.findById(episodeDoc._id)
+      .populate('podcastSeries', 'title coverArt')
+      .lean();
+
     res.json({
       success: true,
-      episode: importedEpisode,
+      episode: populated,
       message: 'Episode imported successfully'
     });
   } catch (error) {

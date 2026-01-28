@@ -7,9 +7,11 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useWebPlayerStore } from './stores/webPlayerStore';
+import { usePodcastPlayerStore } from './stores/podcastPlayerStore';
 import Navbar from './components/Navbar';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import MP3Player from './components/MP3Player';
+import PersistentPodcastPlayer from './components/PersistentPodcastPlayer';
 import Home from './pages/Home';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
@@ -57,11 +59,17 @@ const Fade = cssTransition({
 // Component to handle simple conditional player rendering
 const PlayerRenderer = () => {
   const { currentMedia } = useWebPlayerStore();
-  
+  const { currentEpisode } = usePodcastPlayerStore();
+
+  // When podcast player has an episode, show only the podcast player (don't touch web player)
+  if (currentEpisode) {
+    return <PersistentPodcastPlayer />;
+  }
+
   // Helper function to detect media type
   const detectMediaType = (media: any): 'youtube' | 'audio' | null => {
     if (!media?.sources) return null;
-    
+
     if (Array.isArray(media.sources)) {
       for (const source of media.sources) {
         if (source?.platform === 'youtube' && source.url) return 'youtube';
@@ -71,7 +79,7 @@ const PlayerRenderer = () => {
       if (media.sources.youtube) return 'youtube';
       if (media.sources.upload) return 'audio';
     }
-    
+
     return null;
   };
 

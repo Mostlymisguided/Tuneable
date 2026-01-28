@@ -20,11 +20,13 @@ import {
   Facebook,
   Linkedin,
   Search,
-  RefreshCw
+  RefreshCw,
+  Play
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { stripHtml } from '../utils/stripHtml';
+import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 
 interface PodcastSeries {
   _id: string;
@@ -56,6 +58,9 @@ interface Episode {
   host?: Array<{ name: string }>;
   tags?: string[];
   genres?: string[];
+  sources?: Record<string, string> | { get?(k: string): string };
+  audioUrl?: string;
+  enclosure?: { url?: string };
 }
 
 interface SeriesStats {
@@ -535,6 +540,34 @@ const PodcastSeriesProfile: React.FC = () => {
 
   const handleEpisodeClick = (episode: Episode) => {
     navigate(`/podcasts/${episode._id}`);
+  };
+
+  const { setCurrentEpisode, play } = usePodcastPlayerStore();
+
+  const handlePlayEpisode = (episode: Episode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please log in to play podcast episodes');
+      navigate('/login');
+      return;
+    }
+    const ep = {
+      _id: episode._id,
+      title: episode.title,
+      duration: episode.duration,
+      coverArt: episode.coverArt || series?.coverArt,
+      podcastSeries: series ? { _id: series._id, title: series.title, coverArt: series.coverArt } : undefined,
+      sources: episode.sources,
+      audioUrl: episode.audioUrl,
+      enclosure: episode.enclosure,
+    };
+    if (!getEpisodeAudioUrl(ep)) {
+      toast.error('No playable audio for this episode');
+      return;
+    }
+    setCurrentEpisode(ep);
+    play();
+    toast.success(`Now playing: ${episode.title}`);
   };
 
   // Share functionality
@@ -1093,22 +1126,42 @@ const PodcastSeriesProfile: React.FC = () => {
           ) : (
             <>
             <div className="space-y-4">
-              {paginatedEpisodes().map((episode, index) => (
+              {paginatedEpisodes().map((episode, index) => {
+                const hasPlayable = user && getEpisodeAudioUrl({
+                  title: episode.title,
+                  _id: episode._id,
+                  sources: episode.sources,
+                  audioUrl: episode.audioUrl,
+                  enclosure: episode.enclosure,
+                });
+                return (
                 <div
                   key={episode._id}
                   className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50"
                 >
                   <div className="flex flex-col sm:flex-row gap-4">
-                    {/* Cover Art */}
+                    {/* Cover Art with Play overlay */}
                     <div 
-                      className="flex-shrink-0 cursor-pointer"
+                      className="relative flex-shrink-0 cursor-pointer group"
                       onClick={() => handleEpisodeClick(episode)}
                     >
                       <img
-                        src={episode.coverArt || series.coverArt || DEFAULT_COVER_ART}
+                        src={episode.coverArt || series?.coverArt || DEFAULT_COVER_ART}
                         alt={episode.title}
                         className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
                       />
+                      {hasPlayable && (
+                        <button
+                          type="button"
+                          onClick={(e) => handlePlayEpisode(episode, e)}
+                          className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto"
+                          aria-label="Play episode"
+                        >
+                          <span className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center shadow-lg">
+                            <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
+                          </span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Episode Info */}
@@ -1177,20 +1230,33 @@ const PodcastSeriesProfile: React.FC = () => {
                         </div>
                       ) : null}
 
-                      {/* Tip Button */}
-                      {user && (
-                        <button
-                          onClick={(e) => handleTipClick(episode, e)}
-                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
-                        >
-                          <Coins className="h-4 w-4" />
-                          <span>Tip Episode</span>
-                        </button>
-                      )}
+                      {/* Play & Tip buttons */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {hasPlayable && (
+                          <button
+                            type="button"
+                            onClick={(e) => handlePlayEpisode(episode, e)}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-gray-900 font-semibold rounded-lg transition-all flex items-center gap-2"
+                          >
+                            <Play className="h-4 w-4" fill="currentColor" />
+                            <span>Play</span>
+                          </button>
+                        )}
+                        {user && (
+                          <button
+                            onClick={(e) => handleTipClick(episode, e)}
+                            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+                          >
+                            <Coins className="h-4 w-4" />
+                            <span>Tip Episode</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* Pagination */}
