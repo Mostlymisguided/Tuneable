@@ -30,6 +30,7 @@ import {
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 import { stripHtml } from '../utils/stripHtml';
+import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 
 interface PodcastEpisode {
@@ -68,6 +69,10 @@ interface PodcastEpisode {
   collectionId?: string;
   // Raw data for import
   rawData?: any;
+  // Audio source (chart/media), or external
+  sources?: Record<string, string> | { get?(k: string): string };
+  audioUrl?: string;
+  enclosure?: { url?: string };
   // Bids for top supporters
   bids?: Array<{
     _id?: string;
@@ -219,7 +224,8 @@ const Podcasts: React.FC = () => {
       setTotalEpisodes(episodesList.length);
       const total = episodesList.reduce((sum: number, ep: PodcastEpisode) => sum + (ep.globalMediaAggregate || 0), 0);
       setTotalTips(total);
-      const avg = episodesList.length > 0 ? total / episodesList.length : 0;
+      const tipCount = episodesList.reduce((sum: number, ep: PodcastEpisode) => sum + (ep.bids?.length || 0), 0);
+      const avg = tipCount > 0 ? total / tipCount : 0;
       setAvgTip(avg);
     } catch (error: any) {
       console.error('Error fetching chart:', error);
@@ -439,62 +445,103 @@ const Podcasts: React.FC = () => {
     setIsPlacingBid(true);
     try {
       const token = localStorage.getItem('token');
-      
-      // Prepare episode data based on source - use rawData if available
-      let episodeData: any = episode.rawData || {};
+      const raw = episode.rawData as any;
+
+      // Build episodeData + seriesData per source. Backend expects series-first flow:
+      // create/find series, then import episode and link it (artwork + series info come from series).
+      let episodeData: any;
       let seriesData: any = null;
 
-      // If no rawData, construct from episode fields
-      if (!episode.rawData) {
-        if (episode.source === 'podcastindex') {
-          episodeData = {
-            title: episode.title,
-            description: episode.description,
-            feedTitle: episode.podcastTitle,
-            feedId: episode.feedId,
-            feedImage: episode.podcastImage,
-            feedAuthor: episode.podcastAuthor,
-            duration: episode.duration || 0,
-            enclosureUrl: (episode as any).audioUrl || '',
-            datePublished: episode.releaseDate ? Math.floor(new Date(episode.releaseDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
-            id: episode.podcastIndexId,
-            guid: (episode as any).guid || ''
-          };
-        } else if (episode.source === 'taddy') {
-          episodeData = {
-            uuid: episode.taddyUuid,
-            name: episode.title,
-            description: episode.description,
-            podcastSeriesUuid: (episode as any).podcastSeriesUuid
-          };
-        } else if (episode.source === 'apple') {
-          episodeData = {
-            trackName: episode.title,
-            description: episode.description,
-            collectionName: episode.podcastTitle,
-            collectionId: episode.collectionId,
-            artworkUrl600: episode.podcastImage,
-            artistName: episode.podcastAuthor,
-            trackTimeMillis: (episode.duration || 0) * 1000,
-            trackId: episode.appleId,
-            releaseDate: episode.releaseDate || new Date().toISOString()
-          };
+      if (episode.source === 'taddy') {
+        // Taddy search returns converted format (title, podcastTitle, podcastImage, etc.).
+        // Adapter expects raw-Taddy shape (uuid, name, podcastSeries: { uuid, name, imageUrl, rssUrl }).
+        const podcastTitle = raw?.podcastTitle ?? episode.podcastTitle ?? '';
+        const podcastImage = raw?.podcastImage ?? episode.podcastImage ?? null;
+        const podcastSeriesUuid = raw?.podcastSeriesUuid ?? (episode as any).podcastSeriesUuid;
+        const rssUrl = raw?.rssUrl ?? (episode as any).rssUrl ?? '';
+        const publishedAt = raw?.publishedAt ?? raw?.releaseDate ?? episode.releaseDate ?? episode.publishedAt;
+        let datePublishedSec = Math.floor(Date.now() / 1000);
+        if (publishedAt) {
+          const d = publishedAt instanceof Date ? publishedAt : new Date(publishedAt);
+          if (!isNaN(d.getTime())) datePublishedSec = Math.floor(d.getTime() / 1000);
         }
-      }
-
-      // Prepare series data if available
-      if (episode.podcastTitle && (episode.source === 'podcastindex' || episode.source === 'apple')) {
-        seriesData = {
-          title: episode.podcastTitle,
-          description: '',
-          author: episode.podcastAuthor || '',
-          image: episode.podcastImage || null,
-          categories: episode.genres || [],
-          language: 'en'
+        episodeData = {
+          uuid: raw?.taddyUuid ?? episode.taddyUuid,
+          name: raw?.title ?? episode.title,
+          description: raw?.description ?? episode.description ?? '',
+          duration: raw?.duration ?? episode.duration ?? 0,
+          episodeNumber: raw?.episodeNumber ?? (episode as any).episodeNumber ?? null,
+          seasonNumber: raw?.seasonNumber ?? (episode as any).seasonNumber ?? null,
+          audioUrl: raw?.audioUrl ?? (episode as any).audioUrl ?? '',
+          fileLength: raw?.audioSize ?? null,
+          datePublished: datePublishedSec,
+          podcastSeries: {
+            uuid: podcastSeriesUuid,
+            name: podcastTitle,
+            imageUrl: podcastImage,
+            rssUrl
+          }
         };
-        if (episode.source === 'podcastindex') {
-          seriesData.podcastIndexId = episode.feedId?.toString();
+        // Series must be created/found first so episode gets correct artwork and series link.
+        if (podcastTitle) {
+          seriesData = {
+            title: podcastTitle,
+            image: podcastImage,
+            taddyUuid: podcastSeriesUuid || undefined,
+            rssUrl: rssUrl || undefined,
+            language: raw?.language ?? 'en'
+          };
         }
+      } else if (episode.source === 'podcastindex') {
+        episodeData = {
+          title: episode.title,
+          description: episode.description,
+          feedTitle: episode.podcastTitle,
+          feedId: episode.feedId,
+          feedImage: episode.podcastImage,
+          feedAuthor: episode.podcastAuthor,
+          duration: episode.duration || 0,
+          enclosureUrl: (episode as any).audioUrl || '',
+          datePublished: episode.releaseDate ? Math.floor(new Date(episode.releaseDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          id: episode.podcastIndexId,
+          guid: (episode as any).guid || ''
+        };
+        if (episode.podcastTitle) {
+          seriesData = {
+            title: episode.podcastTitle,
+            description: '',
+            author: episode.podcastAuthor || '',
+            image: episode.podcastImage || null,
+            categories: episode.genres || [],
+            language: 'en',
+            podcastIndexId: episode.feedId?.toString()
+          };
+        }
+      } else if (episode.source === 'apple') {
+        episodeData = {
+          trackName: episode.title,
+          description: episode.description,
+          collectionName: episode.podcastTitle,
+          collectionId: episode.collectionId,
+          artworkUrl600: episode.podcastImage,
+          artistName: episode.podcastAuthor,
+          trackTimeMillis: (episode.duration || 0) * 1000,
+          trackId: episode.appleId,
+          releaseDate: episode.releaseDate || new Date().toISOString()
+        };
+        if (episode.podcastTitle) {
+          seriesData = {
+            title: episode.podcastTitle,
+            description: '',
+            author: episode.podcastAuthor || '',
+            image: episode.podcastImage || null,
+            categories: episode.genres || [],
+            language: 'en',
+            iTunesId: episode.collectionId
+          };
+        }
+      } else {
+        episodeData = raw || {};
       }
 
       const response = await fetch(
@@ -519,27 +566,31 @@ const Podcasts: React.FC = () => {
       }
 
       const data = await response.json();
-      const importedEpisode = data.episode;
+      const imported = data.episode;
 
-      toast.success(`Imported: ${importedEpisode.title}`);
-      
-      // Update the episode in search results
+      toast.success(`Imported: ${imported.title}`);
+
+      // Use API response for artwork and series (populated when series was created/found)
+      const coverArt = imported.coverArt ?? imported.podcastSeries?.coverArt ?? episode.podcastImage ?? episode.coverArt;
+      const podcastSeries = imported.podcastSeries ?? (episode.podcastTitle ? { _id: '', title: episode.podcastTitle, coverArt: episode.podcastImage } : undefined);
+
       const updatedEpisode: PodcastEpisode = {
         ...episode,
-        _id: importedEpisode._id,
+        _id: imported._id,
         isExternal: false,
         source: 'local',
-        globalMediaAggregate: importedEpisode.globalMediaAggregate || 0
+        globalMediaAggregate: imported.globalMediaAggregate ?? 0,
+        coverArt: coverArt || undefined,
+        podcastSeries: podcastSeries ? { _id: podcastSeries._id, title: podcastSeries.title, coverArt: podcastSeries.coverArt } : undefined,
+        podcastTitle: podcastSeries?.title ?? episode.podcastTitle
       };
-      
-      // Update search results
-      setSearchResults(prev => prev.map(ep => 
+
+      setSearchResults(prev => prev.map(ep =>
         ep.title === episode.title && ep.podcastTitle === episode.podcastTitle
           ? updatedEpisode
           : ep
       ));
 
-      // Open tip modal with imported episode
       setSelectedEpisode(updatedEpisode);
       setBidModalOpen(true);
     } catch (error: any) {
@@ -624,11 +675,41 @@ const Podcasts: React.FC = () => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const { setCurrentEpisode, play } = usePodcastPlayerStore();
+
   const handleEpisodeClick = (episode: PodcastEpisode) => {
     const episodeId = episode._id || episode.id;
     if (episodeId) {
       navigate(`/podcasts/${episodeId}`);
     }
+  };
+
+  const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please log in to play podcast episodes');
+      navigate('/login');
+      return;
+    }
+    const ep = {
+      _id: episode._id,
+      id: episode.id,
+      title: episode.title,
+      duration: episode.duration,
+      coverArt: episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt,
+      podcastSeries: episode.podcastSeries,
+      podcastTitle: episode.podcastTitle,
+      sources: episode.sources,
+      audioUrl: episode.audioUrl,
+      enclosure: episode.enclosure,
+    };
+    if (!getEpisodeAudioUrl(ep)) {
+      toast.error('No playable audio for this episode');
+      return;
+    }
+    setCurrentEpisode(ep);
+    play();
+    toast.success(`Now playing: ${episode.title}`);
   };
 
   const handleSeriesClick = async (episode: PodcastEpisode, e: React.MouseEvent) => {
@@ -1382,9 +1463,9 @@ const Podcasts: React.FC = () => {
                 className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50"
               >
                 <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Cover Art */}
+                  {/* Cover Art with Play overlay */}
                   <div 
-                    className="flex-shrink-0 cursor-pointer"
+                    className="relative flex-shrink-0 cursor-pointer group"
                     onClick={() => handleEpisodeClick(episode)}
                   >
                     <img
@@ -1392,6 +1473,25 @@ const Podcasts: React.FC = () => {
                       alt={episode.title}
                       className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
                     />
+                    {user && getEpisodeAudioUrl({
+                      title: episode.title,
+                      _id: episode._id,
+                      id: episode.id,
+                      sources: episode.sources,
+                      audioUrl: episode.audioUrl,
+                      enclosure: episode.enclosure,
+                    }) && (
+                      <button
+                        type="button"
+                        onClick={(e) => handlePlayEpisode(episode, e)}
+                        className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Play episode"
+                      >
+                        <span className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center shadow-lg">
+                          <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Episode Info */}
@@ -1489,26 +1589,45 @@ const Podcasts: React.FC = () => {
                       </div>
                     ) : null}
 
-                    {/* Tip/Import & Tip Button */}
-                    {user && (
-                      <button
-                        onClick={(e) => episode.isExternal ? handleImportAndTip(episode, e) : handleTipClick(episode, e)}
-                        disabled={isPlacingBid}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2"
-                      >
-                        {isPlacingBid ? (
-                          <>
-                            <Loader className="h-4 w-4 animate-spin" />
-                            <span>Adding...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Coins className="h-4 w-4" />
-                            <span>{episode.isExternal ? 'Add & Tip' : 'Tip Episode'}</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                    {/* Play & Tip buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {user && getEpisodeAudioUrl({
+                        title: episode.title,
+                        _id: episode._id,
+                        id: episode.id,
+                        sources: episode.sources,
+                        audioUrl: episode.audioUrl,
+                        enclosure: episode.enclosure,
+                      }) && (
+                        <button
+                          type="button"
+                          onClick={(e) => handlePlayEpisode(episode, e)}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-gray-900 font-semibold rounded-lg transition-all flex items-center gap-2"
+                        >
+                          <Play className="h-4 w-4" fill="currentColor" />
+                          <span>Play</span>
+                        </button>
+                      )}
+                      {user && (
+                        <button
+                          onClick={(e) => episode.isExternal ? handleImportAndTip(episode, e) : handleTipClick(episode, e)}
+                          disabled={isPlacingBid}
+                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+                        >
+                          {isPlacingBid ? (
+                            <>
+                              <Loader className="h-4 w-4 animate-spin" />
+                              <span>Adding...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Coins className="h-4 w-4" />
+                              <span>{episode.isExternal ? 'Add & Tip' : 'Tip Episode'}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1526,7 +1645,7 @@ const Podcasts: React.FC = () => {
         }}
         onConfirm={handlePlaceBid}
         songTitle={selectedEpisode?.title || ''}
-        songArtist={selectedEpisode?.creatorDisplay || selectedEpisode?.podcastSeries?.title || 'Unknown'}
+        songArtist={selectedEpisode?.creatorDisplay || selectedEpisode?.podcastSeries?.title || selectedEpisode?.podcastTitle || 'Unknown'}
         currentBid={selectedEpisode ? penceToPoundsNumber(selectedEpisode.globalMediaAggregate) : 0}
         minimumBid={(selectedEpisode as any)?.minimumBid ?? 0.01}
         userBalance={user ? penceToPoundsNumber((user as any).balance) : 0}
