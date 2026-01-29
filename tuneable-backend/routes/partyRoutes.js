@@ -3802,7 +3802,8 @@ router.post('/:partyId/unkick/:userId', authMiddleware, resolvePartyId(), async 
 });
 
 // Get media sorted by bid values within specific time periods
-router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(), async (req, res) => {
+// Optional auth: guests can access sorted media for global party only; other parties require login
+router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
@@ -3816,6 +3817,10 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(
         // Check if this is the Global Party
         const isGlobalParty = await Party.getGlobalParty();
         const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
+
+        if (!isRequestingGlobalParty && !req.user) {
+            return res.status(401).json({ error: 'Please log in to view sorted media' });
+        }
 
         let party;
 
