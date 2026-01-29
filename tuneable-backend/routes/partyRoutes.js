@@ -50,6 +50,13 @@ const capitalizeTag = (tag) => {
     .join(' ');
 };
 
+// Global Party: only show tunes (contentType: music, contentForm: tune). Exclude podcast episodes/series.
+// Spread this into Media.find() wherever Global Party aggregates media. Later we may add a filterable global feed.
+const GLOBAL_PARTY_TUNES_FILTER = {
+  contentType: { $in: ['music'] },
+  contentForm: { $in: ['tune'] }
+};
+
 /**
  * Merge tags and ensure they're capitalized (title case)
  * @param {Array} existingTags - Existing tags array
@@ -712,7 +719,9 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             
             // Query all media with bids, but only populate ACTIVE bids
             // This ensures we only count active bids in the aggregate calculation
+            // Global Party shows tunes only (exclude podcast episodes/series)
             const allMediaWithBids = await Media.find({
+                ...GLOBAL_PARTY_TUNES_FILTER,
                 bids: { $exists: true, $ne: [] },
                 status: { $ne: 'vetoed' } // Exclude globally vetoed media
             })
@@ -1561,11 +1570,12 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
         const isTagParty = party && party.type === 'tag';
         
         if (isRequestingGlobalParty) {
-            // For Global Party, search through ALL media with ANY bids
-            console.log('🌍 Searching Global Party - searching all media with bids...');
+            // For Global Party, search through ALL media with ANY bids (tunes only)
+            console.log('🌍 Searching Global Party - searching all media with bids (tunes only)...');
             
             const Media = require('../models/Media');
             const allMediaWithBids = await Media.find({
+                ...GLOBAL_PARTY_TUNES_FILTER,
                 bids: { $exists: true, $ne: [] },
                 status: { $ne: 'vetoed' } // Exclude globally vetoed media
             }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm');
@@ -2199,6 +2209,18 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
                 return res.status(404).json({ error: 'Media not found' });
             }
 
+            // Global Party only accepts tunes (music + tune form). Reject bids on podcast episodes/series.
+            const ct = populatedMedia.contentType;
+            const cf = populatedMedia.contentForm;
+            const isMusic = Array.isArray(ct) ? ct.includes('music') : ct === 'music';
+            const isTune = Array.isArray(cf) ? cf.includes('tune') : cf === 'tune';
+            if (!isMusic || !isTune) {
+                return res.status(400).json({
+                    error: 'Global Party only accepts tunes. This item is not a tune (e.g. podcast episode/series).',
+                    mediaId: actualMediaId
+                });
+            }
+
             // Get active bids for this media to calculate accurate aggregate
             const activeBids = await Bid.find({
                 mediaId: populatedMedia._id,
@@ -2361,9 +2383,9 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         let queuedMedia, queueSize, queuePosition;
         
         if (isRequestingGlobalParty) {
-            // For Global Party, all media is considered "active" and we get it from Media collection
+            // For Global Party, all media is considered "active" and we get it from Media collection (tunes only)
             const Media = require('../models/Media');
-            queuedMedia = await Media.find({ bids: { $exists: true, $ne: [] } });
+            queuedMedia = await Media.find({ ...GLOBAL_PARTY_TUNES_FILTER, bids: { $exists: true, $ne: [] } });
             queueSize = queuedMedia.length;
             queuePosition = queuedMedia.findIndex(m => m._id.toString() === actualMediaId.toString()) + 1;
         } else if (isTagParty) {
@@ -3890,9 +3912,10 @@ router.get('/:partyId/media/sorted/:timePeriod', authMiddleware, resolvePartyId(
 
             bids = await Bid.find(bidQuery).select('mediaId amount createdAt partyId');
             
-            // Get all media that has bids within the time period
+            // Get all media that has bids within the time period (tunes only for Global Party)
             const Media = require('../models/Media');
             allMediaWithBids = await Media.find({
+                ...GLOBAL_PARTY_TUNES_FILTER,
                 bids: { $exists: true, $ne: [] }
             })
             .populate({
