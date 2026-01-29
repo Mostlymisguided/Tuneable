@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -61,12 +61,18 @@ interface PartyUpdateMessage {
   kickedBy?: string;
 }
 
+const VALID_TIME_PERIODS = ['all-time', 'today', 'this-week', 'this-month', 'this-year'] as const;
+
 const Party: React.FC = () => {
   const { partyId } = useParams<{ partyId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
   const [party, setParty] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const periodParam = searchParams.get('period');
+  const initialPeriod = periodParam && VALID_TIME_PERIODS.includes(periodParam as any) ? periodParam : 'today';
   
   // Helper function to get effective minimum bid (media-level override takes precedence)
   const getEffectiveMinimumBid = (media?: any): number => {
@@ -90,9 +96,8 @@ const Party: React.FC = () => {
   const [endPartyModalOpen, setEndPartyModalOpen] = useState(false);
   const [isEndingParty, setIsEndingParty] = useState(false);
 
-  // Sorting state
-  // Default to "today" so the queue initially shows tracks ranked by last-24h bids
-  const [selectedTimePeriod, setSelectedTimePeriod] = useState('today');
+  // Sorting state: default from ?period= query, else "today"
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState(initialPeriod);
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -306,9 +311,20 @@ const Party: React.FC = () => {
   useEffect(() => {
     if (partyId) {
       fetchPartyDetails();
-      fetchSortedMedia(selectedTimePeriod);
+      if (selectedTimePeriod !== 'all-time') {
+        fetchSortedMedia(selectedTimePeriod);
+      }
     }
   }, [partyId]);
+
+  // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
+  useEffect(() => {
+    const p = searchParams.get('period');
+    if (p && VALID_TIME_PERIODS.includes(p as any) && p !== selectedTimePeriod) {
+      setSelectedTimePeriod(p);
+      if (p !== 'all-time' && partyId) fetchSortedMedia(p);
+    }
+  }, [searchParams]);
 
   // Manual refresh only for remote parties (no automatic polling)
   // Remote parties will refresh on user actions (bids, adds, skips) and manual refresh button
@@ -556,7 +572,10 @@ const Party: React.FC = () => {
 
   const handleTimePeriodChange = (timePeriod: string) => {
     setSelectedTimePeriod(timePeriod);
-    fetchSortedMedia(timePeriod);
+    setSearchParams({ period: timePeriod });
+    if (timePeriod !== 'all-time') {
+      fetchSortedMedia(timePeriod);
+    }
   };
 
   const handleRefresh = async () => {

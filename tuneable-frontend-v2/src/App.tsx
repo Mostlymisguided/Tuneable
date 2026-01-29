@@ -158,6 +158,7 @@ const AppContent = () => {
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/help" element={<Help />} />
             <Route path="/join-us" element={<JoinUs />} />
+            <Route path="/explore" element={<Navigate to="/party/global?period=all-time" replace />} />
             <Route 
               path="/dashboard" 
               element={
