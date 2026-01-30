@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Headphones, Music, Home, LogOut, Compass } from 'lucide-react';
+import { User as UserIcon, Headphones, Music, Home, LogOut, Compass, Podcast } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
@@ -154,8 +154,26 @@ const Navbar: React.FC = () => {
                   }}
                 >
                   <Compass className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Explore</span>
+                  <span className="hidden sm:inline">Explore Music</span>
                 </Link>
+                <a
+                  href="https://tuneable.stream/podcasts/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
+                    (e.target as HTMLElement).style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                    (e.target as HTMLElement).style.color = '#D1D5DB';
+                  }}
+                >
+                  <Podcast className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Explore Podcasts</span>
+                </a>
                 <Link
                   to="/login"
                   className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors"
