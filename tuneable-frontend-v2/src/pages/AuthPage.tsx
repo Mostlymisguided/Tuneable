@@ -17,6 +17,9 @@ import axios from 'axios';
 import { userAPI } from '../lib/api';
 import { COUNTRIES } from '../constants';
 
+// Default invite code for register page; set VITE_DEFAULT_INVITE_CODE to empty to require a code again
+const DEFAULT_INVITE_CODE = ((import.meta.env.VITE_DEFAULT_INVITE_CODE ?? 'PE856').trim() || null) as string | null;
+
 const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -103,12 +106,18 @@ const AuthPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const inviteParam = params.get('invite');
-    
-    if (inviteParam && isRegisterPage) {
-      setFormData(prev => ({ ...prev, parentInviteCode: inviteParam.toUpperCase() }));
-      validateInviteCode(inviteParam.toUpperCase());
+
+    if (isRegisterPage) {
+      if (inviteParam) {
+        const code = inviteParam.toUpperCase();
+        setFormData(prev => ({ ...prev, parentInviteCode: code }));
+        validateInviteCode(code);
+      } else if (DEFAULT_INVITE_CODE) {
+        setFormData(prev => ({ ...prev, parentInviteCode: DEFAULT_INVITE_CODE }));
+        validateInviteCode(DEFAULT_INVITE_CODE);
+      }
     }
-    
+
     // Handle OAuth errors from URL parameters
     const errorParam = params.get('error');
     const errorDetails = params.get('details');
