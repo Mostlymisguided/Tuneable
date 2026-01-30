@@ -197,7 +197,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
   
-  // Claim tune modals
+  // Claim podcast modals
   const [showCreatorSignupModal, setShowCreatorSignupModal] = useState(false);
   const [showClaimVerificationModal, setShowClaimVerificationModal] = useState(false);
   const [claimProofText, setClaimProofText] = useState('');
@@ -1375,10 +1375,10 @@ const PodcastEpisodeProfile: React.FC = () => {
     return value.toString();
   };
 
-  // Handle claim tune button click
-  const handleClaimTune = () => {
+  // Handle claim podcast button click
+  const handleClaimPodcast = () => {
     if (!user) {
-      toast.info('Please log in to claim this tune');
+      toast.info('Please log in to claim this podcast');
       navigate('/login');
       return;
     }
@@ -2085,14 +2085,14 @@ const PodcastEpisodeProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
-              {/* Claim Tune Button - show only when user cannot edit */}
+              {/* Claim Podcast Button - show only when user cannot edit */}
               {!canEditTune() && (
                 <button
-                  onClick={handleClaimTune}
+                  onClick={handleClaimPodcast}
                   className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
                 >
                   <Award className="h-4 w-4" />
-                  <span className="hidden sm:inline">Claim Tune</span>
+                  <span className="hidden sm:inline">Claim Podcast</span>
                   <span className="sm:hidden">Claim</span>
                 </button>
               )}
@@ -4063,7 +4063,7 @@ const PodcastEpisodeProfile: React.FC = () => {
             </div>
             
             <p className="text-gray-300 mb-4">
-              To verify you're a creator of this tune, please provide proof of ownership:
+              To verify you're a creator of this podcast, please provide proof of ownership:
             </p>
             
             <div className="mb-4">
