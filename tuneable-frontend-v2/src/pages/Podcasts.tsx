@@ -117,6 +117,12 @@ const Podcasts: React.FC = () => {
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showImportSection, setShowImportSection] = useState(false);
+  
+  // Search pagination state
+  const [searchOffset, setSearchOffset] = useState(0);
+  const [hasMoreLocal, setHasMoreLocal] = useState(false);
+  const [totalLocal, setTotalLocal] = useState<number | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Tipping state
   const [bidModalOpen, setBidModalOpen] = useState(false);
@@ -285,6 +291,7 @@ const Podcasts: React.FC = () => {
 
     setIsSearching(true);
     setShowSearchResults(true);
+    setSearchOffset(0); // Reset pagination
     const allResults: PodcastEpisode[] = [];
     const seenGuids = new Set<string>();
 
@@ -314,6 +321,7 @@ const Podcasts: React.FC = () => {
         if (filters.genre) params.append('genre', filters.genre);
         if (filters.tag) params.append('tag', filters.tag);
         params.append('limit', '50');
+        params.append('offset', '0');
 
         const localResponse = await fetch(
           `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
@@ -327,6 +335,11 @@ const Podcasts: React.FC = () => {
             isExternal: false
           }));
           addResults(localEpisodes, 'local');
+          
+          // Store pagination info for "Load more"
+          setHasMoreLocal(localData.hasMore || false);
+          setTotalLocal(localData.total || null);
+          setSearchOffset(50); // Next offset
         }
       } catch (error) {
         console.error('Error searching local database:', error);
@@ -336,7 +349,7 @@ const Podcasts: React.FC = () => {
       try {
         const taddyParams = new URLSearchParams();
         taddyParams.append('q', searchQuery);
-        taddyParams.append('max', '20');
+        taddyParams.append('max', '50'); // Increased from 20 to 50
 
         const taddyResponse = await fetch(
           `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/taddy/search-episodes?${taddyParams}`
@@ -372,6 +385,65 @@ const Podcasts: React.FC = () => {
       toast.error('Failed to search podcast episodes');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleLoadMoreSearch = async () => {
+    if (!searchQuery.trim() || isLoadingMore || !hasMoreLocal) return;
+
+    setIsLoadingMore(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('q', searchQuery);
+      if (filters.category) params.append('category', filters.category);
+      if (filters.genre) params.append('genre', filters.genre);
+      if (filters.tag) params.append('tag', filters.tag);
+      params.append('limit', '50');
+      params.append('offset', searchOffset.toString());
+
+      const localResponse = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
+      );
+
+      if (localResponse.ok) {
+        const localData = await localResponse.json();
+        const localEpisodes = (localData.episodes || []).map((ep: PodcastEpisode) => ({
+          ...ep,
+          source: 'local' as const,
+          isExternal: false
+        }));
+
+        // Deduplicate and append to existing results
+        const seenKeys = new Set(
+          searchResults.map(ep => 
+            `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase()
+          )
+        );
+        
+        const newUniqueEpisodes = localEpisodes.filter((ep: PodcastEpisode) => {
+          const key = `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase();
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            return true;
+          }
+          return false;
+        });
+
+        setSearchResults(prev => [...prev, ...newUniqueEpisodes]);
+        setHasMoreLocal(localData.hasMore || false);
+        setSearchOffset(searchOffset + 50);
+        
+        if (newUniqueEpisodes.length > 0) {
+          toast.success(`Loaded ${newUniqueEpisodes.length} more episodes`);
+        } else {
+          toast.info('No more unique episodes found');
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading more search results:', error);
+      toast.error('Failed to load more results');
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -1692,6 +1764,42 @@ const Podcasts: React.FC = () => {
                 </div>
               </div>
             ))}
+            
+            {/* Search Results Counter and Load More Button */}
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="mt-6 flex flex-col items-center space-y-4">
+                {/* Results counter */}
+                {totalLocal !== null && (
+                  <p className="text-sm text-gray-400">
+                    Showing {searchResults.filter(ep => ep.source === 'local').length} of {totalLocal} local results
+                    {searchResults.some(ep => ep.source === 'taddy') && 
+                      ` + ${searchResults.filter(ep => ep.source === 'taddy').length} from Taddy`
+                    }
+                  </p>
+                )}
+                
+                {/* Load More button */}
+                {hasMoreLocal && (
+                  <button
+                    onClick={handleLoadMoreSearch}
+                    disabled={isLoadingMore}
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader className="h-5 w-5 animate-spin" />
+                        <span>Loading more...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-5 w-5" />
+                        <span>Load More Search Results</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
