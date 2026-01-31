@@ -220,12 +220,22 @@ const Home: React.FC = () => {
             >
               Become a Creator
             </Link>
-            <Link
-              to="/parties"
+            <a
+              href="https://tuneable.stream/explore"
+              target="_blank"
+              rel="noopener noreferrer"
               className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors"
             >
               Explore Music
-            </Link>
+            </a>
+            <a
+              href="https://tuneable.stream/podcasts/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors"
+            >
+              Explore Podcasts
+            </a>
           </div>
         </div>
       </section>
