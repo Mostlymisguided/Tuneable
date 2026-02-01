@@ -760,11 +760,6 @@ const Podcasts: React.FC = () => {
 
   const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) {
-      toast.info('Please log in to play podcast episodes');
-      navigate('/login');
-      return;
-    }
     const ep = {
       _id: episode._id,
       id: episode.id,
@@ -788,11 +783,6 @@ const Podcasts: React.FC = () => {
 
   const handlePlayTopEpisode = async (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) {
-      toast.info('Please log in to play podcast episodes');
-      navigate('/login');
-      return;
-    }
     const id = episode._id || episode.id;
     if (!id) return;
     setFetchingPlayId(id);

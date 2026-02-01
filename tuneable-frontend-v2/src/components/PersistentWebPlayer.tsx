@@ -72,13 +72,7 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 };
 
 const PersistentWebPlayer: React.FC = () => {
-  const { user } = useAuth(); // Check if user is authenticated
-  
-  // Early return if user is not authenticated - prevents hooks from running
-  if (!user) {
-    return null;
-  }
-  
+  const { user } = useAuth();
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -199,14 +193,6 @@ const PersistentWebPlayer: React.FC = () => {
       window.removeEventListener('keydown', handleGlobalKeydown);
     };
   }, [handleGlobalKeydown]);
-
-  // Clear player state if user is not authenticated
-  useEffect(() => {
-    if (!user) {
-      setCurrentMedia(null);
-      setGlobalPlayerActive(false);
-    }
-  }, [user, setCurrentMedia, setGlobalPlayerActive]);
 
   // Simple approach - PersistentWebPlayer only handles YouTube media
 
@@ -667,12 +653,6 @@ const PersistentWebPlayer: React.FC = () => {
     const newTime = parseFloat(e.target.value);
     handleSeek(newTime);
   };
-
-
-  // Don't render if user is not authenticated
-  if (!user) {
-    return null;
-  }
 
   // Don't render if player is not globally active
   if (!isGlobalPlayerActive) {

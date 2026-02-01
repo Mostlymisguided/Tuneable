@@ -546,11 +546,6 @@ const PodcastSeriesProfile: React.FC = () => {
 
   const handlePlayEpisode = (episode: Episode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) {
-      toast.info('Please log in to play podcast episodes');
-      navigate('/login');
-      return;
-    }
     const ep = {
       _id: episode._id,
       title: episode.title,

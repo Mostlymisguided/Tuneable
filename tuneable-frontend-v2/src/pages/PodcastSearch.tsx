@@ -207,11 +207,6 @@ const PodcastSearch: React.FC = () => {
 
   const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) {
-      toast.info('Please log in to play podcast episodes');
-      navigate('/login');
-      return;
-    }
     const ep = {
       _id: episode._id,
       id: episode.id,

@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
 import { Play, Pause, Volume2, VolumeX, X } from 'lucide-react';
 
 const PersistentPodcastPlayer: React.FC = () => {
-  const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
 
@@ -146,7 +144,7 @@ const PersistentPodcastPlayer: React.FC = () => {
   const cover = currentEpisode?.coverArt ?? currentEpisode?.podcastSeries?.coverArt ?? DEFAULT_COVER_ART;
   const showTitle = currentEpisode?.podcastSeries?.title ?? currentEpisode?.podcastTitle ?? '';
 
-  if (!user || !currentEpisode) return null;
+  if (!currentEpisode) return null;
 
   return (
     <>

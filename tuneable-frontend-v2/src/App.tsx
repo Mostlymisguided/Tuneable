@@ -197,11 +197,7 @@ const AppContent = () => {
             />
             <Route 
               path="/podcasts/search" 
-              element={
-                <ProtectedRoute>
-                  <PodcastSearch />
-                </ProtectedRoute>
-              } 
+              element={<PodcastSearch />} 
             />
             <Route 
               path="/profile" 
