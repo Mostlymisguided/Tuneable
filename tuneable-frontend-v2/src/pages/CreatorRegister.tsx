@@ -242,7 +242,7 @@ const CreatorRegister: React.FC = () => {
   ];
 
   const availableRoles = [
-    'artist', 'producer', 'songwriter', 'composer', 'DJ', 'vocalist', 'instrumentalist',
+    'artist', 'producer', 'songwriter', 'composer', 'DJ', 'vocalist', 'instrumentalist', 'podcaster',
     /*'host', 'narrator', 'director', 'editor', 'author'*/
   ];
 
