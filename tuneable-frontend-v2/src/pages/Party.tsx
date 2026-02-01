@@ -63,6 +63,20 @@ interface PartyUpdateMessage {
 
 const VALID_TIME_PERIODS = ['all-time', 'today', 'this-week', 'this-month', 'this-year'] as const;
 
+/** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
+function getTagTermsFromSearchParams(params: URLSearchParams, isGlobal: boolean): string[] {
+  if (!isGlobal) return [];
+  const tag = params.get('tag');
+  const tagsParam = params.get('tags');
+  const list: string[] = [];
+  if (tag) list.push(tag.trim());
+  if (tagsParam) tagsParam.split(',').forEach((t: string) => { const x = t.trim(); if (x) list.push(x); });
+  return [...new Set(list)]
+    .map((t: string) => getCanonicalTag(t))
+    .filter((c: string) => c)
+    .map((c: string) => '#' + c);
+}
+
 const Party: React.FC = () => {
   const { partyId } = useParams<{ partyId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,6 +87,7 @@ const Party: React.FC = () => {
 
   const periodParam = searchParams.get('period');
   const initialPeriod = periodParam && VALID_TIME_PERIODS.includes(periodParam as any) ? periodParam : 'today';
+  const isGlobalParty = partyId === 'global';
   
   // Helper function to get effective minimum bid (media-level override takes precedence)
   const getEffectiveMinimumBid = (media?: any): number => {
@@ -102,8 +117,10 @@ const Party: React.FC = () => {
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Search state
-  const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>([]);
+  // Search state (initial tag terms from URL for global party: ?tag= or ?tags=)
+  const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
+    getTagTermsFromSearchParams(searchParams, partyId === 'global')
+  );
   
   // Inline add media search state
   // const [showAddMediaPanel, setShowAddMediaPanel] = useState(false); // Removed - search panel now always visible
@@ -325,6 +342,39 @@ const Party: React.FC = () => {
       if (p !== 'all-time' && partyId) fetchSortedMedia(p);
     }
   }, [searchParams]);
+
+  // Sync tag param(s) from URL when it changes (global party: back/forward or shared link)
+  useEffect(() => {
+    if (!isGlobalParty) return;
+    const tagTermsFromUrl = getTagTermsFromSearchParams(searchParams, true);
+    setQueueSearchTerms((prev) => {
+      const currentTagTerms = prev.filter((t) => t.startsWith('#'));
+      const same = currentTagTerms.length === tagTermsFromUrl.length &&
+        currentTagTerms.every((t, i) => t.toLowerCase() === tagTermsFromUrl[i].toLowerCase());
+      if (same) return prev;
+      const nonTagTerms = prev.filter((t) => !t.startsWith('#'));
+      return [...tagTermsFromUrl, ...nonTagTerms];
+    });
+  }, [searchParams, isGlobalParty]);
+
+  // Sync tag filters to URL when user toggles tags (global party only; preserve period)
+  useEffect(() => {
+    if (!isGlobalParty) return;
+    const tagTerms = queueSearchTerms.filter((t) => t.startsWith('#')).map((t) => t.slice(1).toLowerCase());
+    const currentTag = searchParams.get('tag');
+    const currentTags = searchParams.get('tags');
+    const currentTagTerms = currentTag ? [currentTag.toLowerCase()] : (currentTags ? currentTags.split(',').map((t: string) => t.trim().toLowerCase()).filter(Boolean) : []);
+    const same = tagTerms.length === currentTagTerms.length && tagTerms.every((t, i) => t === currentTagTerms[i]);
+    if (same) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('tag');
+      next.delete('tags');
+      if (tagTerms.length === 1) next.set('tag', tagTerms[0]);
+      else if (tagTerms.length > 1) next.set('tags', tagTerms.join(','));
+      return next;
+    }, { replace: true });
+  }, [isGlobalParty, queueSearchTerms, searchParams]);
 
   // Manual refresh only for remote parties (no automatic polling)
   // Remote parties will refresh on user actions (bids, adds, skips) and manual refresh button
