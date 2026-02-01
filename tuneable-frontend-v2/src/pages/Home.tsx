@@ -63,14 +63,24 @@ const Home: React.FC = () => {
             Tip Your Favourite Tunes - Support Your Favourite Artists - Influence Global Charts
             </p>
             
-            {/* CTA Button */}
-            <div className="flex justify-center">
-              <Link
-                to="/register"
-                className="text-white rounded-lg p-4 m-6 border-2 border-white font-semibold hover:bg-gray-100 transition-colors text-lg"
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row justify-center gap-4 m-6">
+              <a
+                href="https://tuneable.stream/explore"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white rounded-lg p-4 border-2 border-white font-semibold hover:bg-gray-100 hover:text-gray-900 transition-colors text-lg text-center"
               >
-                Get Started
-              </Link>
+                Explore Music
+              </a>
+              <a
+                href="https://tuneable.stream/podcasts/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white rounded-lg p-4 border-2 border-white font-semibold hover:bg-gray-100 hover:text-gray-900 transition-colors text-lg text-center"
+              >
+                Explore Podcasts
+              </a>
             </div>
           </div>
         </div>
@@ -220,22 +230,6 @@ const Home: React.FC = () => {
             >
               Become a Creator
             </Link>
-            <a
-              href="https://tuneable.stream/explore"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors"
-            >
-              Explore Music
-            </a>
-            <a
-              href="https://tuneable.stream/podcasts/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors"
-            >
-              Explore Podcasts
-            </a>
           </div>
         </div>
       </section>
