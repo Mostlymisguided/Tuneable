@@ -150,8 +150,6 @@ const PersistentWebPlayer: React.FC = () => {
     setCurrentTime,
     setDuration,
     setQueue,
-    setCurrentMedia,
-    setGlobalPlayerActive,
   } = useWebPlayerStore();
 
   const handleGlobalKeydown = useCallback((event: KeyboardEvent) => {
