@@ -79,6 +79,9 @@ Our long-term goal is to transition Tuneable into a **self-governing DAO (Decent
 - **React Router** for navigation
 - **Socket.io Client** for real-time updates
 
+### iOS app
+- **Swift / SwiftUI** (native), same REST API as web; see `tuneable-ios/README.md`
+
 ## 📦 Getting Started
 
 ### Prerequisites
@@ -164,6 +167,10 @@ TuneableLocal/
 │   │   ├── types/             # TypeScript type definitions
 │   │   └── utils/             # Frontend utilities
 │   └── public/                # Static assets
+│
+├── tuneable-ios/              # Native iOS app (Swift/SwiftUI)
+│   ├── Tuneable.xcodeproj/     # Xcode project
+│   └── Tuneable/               # App source (see tuneable-ios/README.md)
 │
 └── docs/                      # Documentation files
 ```

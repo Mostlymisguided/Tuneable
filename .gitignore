@@ -52,3 +52,10 @@ tuneable-backend/scripts/find-orphaned-bids.js
 *.old
 *.bak
 *~
+
+# Xcode (tuneable-ios)
+*.xcuserstate
+tuneable-ios/Tuneable.xcodeproj/project.xcworkspace/xcuserdata/
+tuneable-ios/Tuneable.xcodeproj/xcuserdata/
+tuneable-ios/DerivedData/
+tuneable-ios/build/
