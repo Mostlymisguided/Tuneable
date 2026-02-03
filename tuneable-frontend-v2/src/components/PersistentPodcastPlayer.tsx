@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
-import { Play, Pause, Volume2, VolumeX, X } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, X, SkipBack, SkipForward } from 'lucide-react';
 
 const PersistentPodcastPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -15,11 +15,13 @@ const PersistentPodcastPlayer: React.FC = () => {
     duration,
     volume,
     isMuted,
+    playbackRate,
     togglePlayPause,
     setCurrentTime,
     setDuration,
     setVolume,
     toggleMute,
+    cyclePlaybackRate,
     clear,
   } = usePodcastPlayerStore();
 
@@ -55,6 +57,7 @@ const PersistentPodcastPlayer: React.FC = () => {
     el.src = fullUrl;
     el.volume = volume / 100;
     el.muted = isMuted;
+    el.playbackRate = usePodcastPlayerStore.getState().playbackRate;
 
     el.onloadedmetadata = () => {
       if (el.duration && isFinite(el.duration)) {
@@ -98,6 +101,11 @@ const PersistentPodcastPlayer: React.FC = () => {
   }, [volume, isMuted]);
 
   useEffect(() => {
+    if (!audioRef.current) return;
+    audioRef.current.playbackRate = playbackRate;
+  }, [playbackRate]);
+
+  useEffect(() => {
     if (!audioRef.current || !isPlayerReady || isSeekingRef.current) return;
     const t = setInterval(() => {
       if (audioRef.current && !isSeekingRef.current) {
@@ -128,6 +136,9 @@ const PersistentPodcastPlayer: React.FC = () => {
     audioRef.current.currentTime = t;
     setTimeout(() => { isSeekingRef.current = false; }, 100);
   };
+
+  const skipBack = () => handleSeek(Math.max(0, currentTime - 15));
+  const skipForward = () => handleSeek(Math.min(duration || 0, currentTime + 15));
 
   const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleSeek(parseFloat(e.target.value));
@@ -222,6 +233,15 @@ const PersistentPodcastPlayer: React.FC = () => {
 
             <div className="flex items-center gap-2">
               <button
+                onClick={skipBack}
+                disabled={!isPlayerReady}
+                className="w-9 h-9 rounded-full bg-gray-700/80 hover:bg-gray-600 flex items-center justify-center text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Back 15 seconds"
+              >
+                <SkipBack className="w-4 h-4" />
+              </button>
+
+              <button
                 onClick={togglePlayPause}
                 disabled={!isPlayerReady || isLoading}
                 className="w-10 h-10 rounded-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-900 transition-colors"
@@ -234,6 +254,24 @@ const PersistentPodcastPlayer: React.FC = () => {
                 ) : (
                   <Play className="w-5 h-5 ml-0.5" />
                 )}
+              </button>
+
+              <button
+                onClick={skipForward}
+                disabled={!isPlayerReady}
+                className="w-9 h-9 rounded-full bg-gray-700/80 hover:bg-gray-600 flex items-center justify-center text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Forward 15 seconds"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={cyclePlaybackRate}
+                disabled={!isPlayerReady}
+                className="min-w-[2.25rem] h-9 px-2 rounded-full bg-gray-700/80 hover:bg-gray-600 flex items-center justify-center text-gray-300 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Playback speed"
+              >
+                {playbackRate}x
               </button>
 
               <button

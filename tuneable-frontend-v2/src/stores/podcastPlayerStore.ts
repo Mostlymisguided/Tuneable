@@ -17,6 +17,8 @@ export interface PodcastPlayerEpisode {
   enclosure?: { url?: string };
 }
 
+const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
+
 interface PodcastPlayerState {
   currentEpisode: PodcastPlayerEpisode | null;
   isPlaying: boolean;
@@ -24,6 +26,7 @@ interface PodcastPlayerState {
   duration: number;
   volume: number;
   isMuted: boolean;
+  playbackRate: number;
 
   setCurrentEpisode: (episode: PodcastPlayerEpisode | null) => void;
   play: () => void;
@@ -34,8 +37,12 @@ interface PodcastPlayerState {
   seekTo: (time: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
+  setPlaybackRate: (rate: number) => void;
+  cyclePlaybackRate: () => void;
   clear: () => void;
 }
+
+export { PLAYBACK_SPEEDS };
 
 export const usePodcastPlayerStore = create<PodcastPlayerState>()(
   persist(
@@ -46,6 +53,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       duration: 0,
       volume: 50,
       isMuted: false,
+      playbackRate: 1,
 
       setCurrentEpisode: (episode) => {
         set({
@@ -67,6 +75,15 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       setVolume: (volume) => set({ volume: Math.max(0, Math.min(100, volume)) }),
       toggleMute: () => set((s) => ({ isMuted: !s.isMuted })),
 
+      setPlaybackRate: (rate) =>
+        set({ playbackRate: Math.max(0.5, Math.min(2, rate)) }),
+      cyclePlaybackRate: () =>
+        set((s) => {
+          const idx = PLAYBACK_SPEEDS.indexOf(s.playbackRate as 1 | 1.25 | 1.5 | 1.75 | 2);
+          const next = idx < 0 || idx >= PLAYBACK_SPEEDS.length - 1 ? PLAYBACK_SPEEDS[0] : PLAYBACK_SPEEDS[idx + 1];
+          return { playbackRate: next };
+        }),
+
       clear: () => {
         set({
           currentEpisode: null,
@@ -81,6 +98,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       partialize: (s) => ({
         volume: s.volume,
         isMuted: s.isMuted,
+        playbackRate: s.playbackRate,
       }),
     }
   )
