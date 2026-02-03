@@ -2,7 +2,25 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
-import { Play, Pause, Volume2, VolumeX, X, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, X } from 'lucide-react';
+
+/** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */
+const SkipBack15Icon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 29.2 A 12 12 0 1 0 14 6.8" />
+    <path d="M14 6.8 L11.5 10.2 L16.5 10.2 Z" fill="currentColor" stroke="none" />
+    <text x="18" y="18.5" textAnchor="middle" dominantBaseline="middle" fill="currentColor" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif">15</text>
+  </svg>
+);
+
+/** Almost-complete circle, arrow clockwise, "15" inside (skip forward 15s). */
+const SkipForward15Icon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 6.8 A 12 12 0 1 1 14 29.2" />
+    <path d="M14 29.2 L11.5 25.8 L16.5 25.8 Z" fill="currentColor" stroke="none" />
+    <text x="18" y="18.5" textAnchor="middle" dominantBaseline="middle" fill="currentColor" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif">15</text>
+  </svg>
+);
 
 const PersistentPodcastPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -238,7 +256,7 @@ const PersistentPodcastPlayer: React.FC = () => {
                 className="w-9 h-9 rounded-full bg-gray-700/80 hover:bg-gray-600 flex items-center justify-center text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Back 15 seconds"
               >
-                <SkipBack className="w-4 h-4" />
+                <SkipBack15Icon className="w-5 h-5" />
               </button>
 
               <button
@@ -262,7 +280,7 @@ const PersistentPodcastPlayer: React.FC = () => {
                 className="w-9 h-9 rounded-full bg-gray-700/80 hover:bg-gray-600 flex items-center justify-center text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Forward 15 seconds"
               >
-                <SkipForward className="w-4 h-4" />
+                <SkipForward15Icon className="w-5 h-5" />
               </button>
 
               <button
