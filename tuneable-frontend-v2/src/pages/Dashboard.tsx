@@ -4,6 +4,7 @@ import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, Min
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
@@ -565,6 +566,8 @@ Join here: ${inviteLink}`.trim();
       
       const allFormattedMedia = await Promise.all(allMediaPromises);
       
+      // Clear podcast player so PlayerRenderer switches to web player
+      usePodcastPlayerStore.getState().clear();
       // Set entire library as queue for auto-transition
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)

@@ -44,6 +44,7 @@ import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import TagInputModal from '../components/TagInputModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
@@ -962,6 +963,8 @@ const UserProfile: React.FC = () => {
       totalBidValue: mediaData.totalAmountBid || 0,
     };
     
+    // Clear podcast player so PlayerRenderer switches to web player
+    usePodcastPlayerStore.getState().clear();
     // Set the media in the webplayer and start playback
     setCurrentMedia(cleanedMedia, 0); // Set media without autoplay
     play(); // Explicitly start playback when user clicks play button
@@ -1008,6 +1011,8 @@ const UserProfile: React.FC = () => {
       };
     });
 
+    // Clear podcast player so PlayerRenderer switches to web player
+    usePodcastPlayerStore.getState().clear();
     // Set the queue and start playing from the first item
     setQueue(formattedQueue as any);
     setCurrentMedia(formattedQueue[0] as any, 0);
@@ -1074,6 +1079,8 @@ const UserProfile: React.FC = () => {
       
       const allFormattedMedia = await Promise.all(allMediaPromises);
       
+      // Clear podcast player so PlayerRenderer switches to web player
+      usePodcastPlayerStore.getState().clear();
       // Set entire library as queue for auto-transition
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)

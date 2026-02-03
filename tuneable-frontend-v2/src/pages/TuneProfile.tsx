@@ -47,6 +47,7 @@ import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { canEditMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
@@ -1647,6 +1648,8 @@ const TuneProfile: React.FC = () => {
     console.log('🎵 Playing from TuneProfile:', formattedSong);
     console.log('Sources:', sources);
 
+    // Clear podcast player so PlayerRenderer switches to web player
+    usePodcastPlayerStore.getState().clear();
     // Clear any existing queue and set new media
     setQueue([formattedSong]);
     setCurrentMedia(formattedSong, 0); // Set media without autoplay

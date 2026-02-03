@@ -4,6 +4,7 @@ import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
@@ -122,6 +123,8 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       totalBidValue: song.globalMediaAggregate,
     };
     
+    // Clear podcast player so PlayerRenderer switches to web player
+    usePodcastPlayerStore.getState().clear();
     // Set the media in the webplayer and start playback
     setCurrentMedia(cleanedMedia, 0); // Set media without autoplay
     play(); // Explicitly start playback when user clicks play button

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI, searchAPI } from '../lib/api';
 import { toast } from 'react-toastify';
@@ -2013,6 +2014,8 @@ const Party: React.FC = () => {
       };
     });
     
+    // Clear podcast player so PlayerRenderer switches to web player
+    usePodcastPlayerStore.getState().clear();
     // Set the queue to the filtered display media
     setQueue(cleanedQueue);
     
@@ -2083,6 +2086,8 @@ const Party: React.FC = () => {
       };
     });
     
+    // Clear podcast player so PlayerRenderer switches to web player
+    usePodcastPlayerStore.getState().clear();
     // Set the queue and start playing from the top
     setQueue(cleanedQueue);
     setCurrentMedia(cleanedQueue[0], 0);
