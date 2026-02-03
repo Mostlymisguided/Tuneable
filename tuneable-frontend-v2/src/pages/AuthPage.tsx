@@ -876,13 +876,6 @@ const AuthPage: React.FC = () => {
             </div>
           )}
           
-          {locationDetectionStatus === 'failed' && (
-            <div className="flex items-center mb-2 text-xs text-orange-600">
-              <XCircle className="h-4 w-4 mr-1" />
-              <span>Could not auto-detect location</span>
-            </div>
-          )}
-          
           {locationDetectionStatus === 'success' && (
             <div className="flex items-center mb-2 text-xs text-green-600">
               <CheckCircle className="h-4 w-4 mr-1" />
@@ -921,14 +914,11 @@ const AuthPage: React.FC = () => {
               ))}
             </select>
           </div>
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            {locationDetectionStatus === 'success' 
-              ? 'Location auto-detected from your IP address. You can edit or remove it.'
-              : locationDetectionStatus === 'failed'
-              ? 'Location detection failed. Please enter your location manually.'
-              : 'Location will be auto-detected after entering a valid invite code.'
-            }
-          </p>
+          {locationDetectionStatus === 'success' && (
+            <p className="text-xs text-gray-500 mt-1 text-center">
+              Location auto-detected from your IP address. You can edit or remove it.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col p-4 flex items-center justify-center">
