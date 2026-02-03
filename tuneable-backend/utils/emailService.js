@@ -442,7 +442,6 @@ async function sendEmailVerification(user, verificationToken) {
             ${FRONTEND_URL}/verify-email?token=${verificationToken}
           </p>
           
-          ${await getUnsubscribeFooter(user)}
           <p style="color: #6b7280; font-size: 12px; margin-top: 10px; text-align: center;">
             This verification link will expire in 24 hours. If you didn't create a Tuneable account, you can safely ignore this email.
           </p>
