@@ -161,6 +161,7 @@ const Party: React.FC = () => {
 
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
+  const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
 
@@ -2446,7 +2447,7 @@ const Party: React.FC = () => {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {topTags.map(({ tag, total }) => {
+                {(isMobile ? (topTagsExpanded ? topTags : topTags.slice(0, 6)) : topTags).map(({ tag, total }) => {
                   const hash = `#${tag}`;
                   const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
                   const weight = Math.max(0.75, Math.min(1.25, total / 50));
@@ -2472,6 +2473,26 @@ const Party: React.FC = () => {
                     </button>
                   );
                 })}
+                {isMobile && topTags.length > 6 && (
+                  <button
+                    type="button"
+                    onClick={() => setTopTagsExpanded((e) => !e)}
+                    className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
+                    aria-expanded={topTagsExpanded}
+                  >
+                    {topTagsExpanded ? (
+                      <>
+                        <Minus className="w-3 h-3" />
+                        Show less
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3 h-3" />
+                        +{topTags.length - 6} more
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           )}
