@@ -6,7 +6,7 @@ struct PodcastEpisodeProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showTipSheet = false
-    @State private var tipAmountPence: Int = 11 // 11p default
+    @State private var tipAmountPounds: Double = 0.11
     @State private var isPlacingBid = false
     @State private var tipError: String?
     @State private var tipSuccess = false
@@ -109,12 +109,31 @@ struct PodcastEpisodeProfileView: View {
                             .foregroundStyle(.green)
                     }
                 } else {
-                    Section("Amount (pence)") {
-                        TextField("Pence", value: $tipAmountPence, format: .number)
-                            .keyboardType(.numberPad)
-                        Text("e.g. 11 = 11p, 110 = £1.10")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    Section("Your tip amount") {
+                        HStack(spacing: 12) {
+                            Button {
+                                adjustTipAmount(by: -0.01)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(tipAmountPounds <= 0.01 ? .gray : .accentColor)
+                            }
+                            .disabled(tipAmountPounds <= 0.01 || isPlacingBid)
+
+                            TextField("0.00", value: $tipAmountPounds, format: .currency(code: "GBP"))
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.center)
+
+                            Button {
+                                adjustTipAmount(by: 0.01)
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.accentColor)
+                            }
+                            .disabled(isPlacingBid)
+                        }
+                        .padding(.vertical, 4)
                     }
                     if let err = tipError {
                         Section {
@@ -126,7 +145,7 @@ struct PodcastEpisodeProfileView: View {
                         Button("Place tip") {
                             Task { await placeTip(ep: ep) }
                         }
-                        .disabled(tipAmountPence < 1 || isPlacingBid)
+                        .disabled(tipAmountPounds < 0.01 || isPlacingBid)
                     }
                 }
             }
@@ -144,12 +163,18 @@ struct PodcastEpisodeProfileView: View {
         .presentationDetents([.medium])
     }
 
+    private func adjustTipAmount(by delta: Double) {
+        let newAmount = (tipAmountPounds + delta)
+        tipAmountPounds = max(0.01, (round(newAmount * 100) / 100))
+    }
+
     private func placeTip(ep: PodcastEpisode) async {
         isPlacingBid = true
         tipError = nil
         tipSuccess = false
+        let amountPence = Int(round(tipAmountPounds * 100))
         do {
-            try await PodcastService.shared.placeGlobalBid(mediaId: ep.id, amountPence: tipAmountPence)
+            try await PodcastService.shared.placeGlobalBid(mediaId: ep.id, amountPence: amountPence)
             tipSuccess = true
             await auth.refreshProfile()
             await load()
@@ -177,7 +202,7 @@ struct PodcastEpisodeProfileView: View {
 private func formatPence(_ pence: Double) -> String {
     let safe = pence.isFinite && !pence.isNaN ? pence : 0
     let pounds = safe / 100
-    return pounds >= 1 ? String(format: "£%.2f", pounds) : "\(Int(safe))p"
+    return String(format: "£%.2f", pounds)
 }
 
 private func durationString(_ seconds: Double) -> String {

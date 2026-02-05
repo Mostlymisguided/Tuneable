@@ -68,6 +68,14 @@ final class PodcastService {
 
     // MARK: - Series detail
 
+    /// Wrapper to decode array elements resiliently: skips episodes that fail to decode
+    private struct FailableEpisodeWrapper: Decodable {
+        let episode: PodcastEpisode?
+        init(from decoder: Decoder) throws {
+            episode = try? PodcastEpisode(from: decoder)
+        }
+    }
+
     struct SeriesDetailResponse: Decodable {
         let series: PodcastSeriesDetail?
         let episodes: [PodcastEpisode]?
@@ -76,17 +84,23 @@ final class PodcastService {
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             series = try? c.decode(PodcastSeriesDetail.self, forKey: .series)
-            episodes = try? c.decode([PodcastEpisode].self, forKey: .episodes)
+            // Decode episodes resiliently: backend format may vary; skip any that fail
+            if let wrapped = try? c.decode([FailableEpisodeWrapper].self, forKey: .episodes) {
+                episodes = wrapped.compactMap(\.episode)
+            } else {
+                episodes = nil
+            }
             stats = try? c.decode(PodcastSeriesStats.self, forKey: .stats)
         }
         private enum CodingKeys: String, CodingKey { case series, episodes, stats }
     }
 
-    func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0) async throws -> SeriesDetailResponse {
-        let items: [URLQueryItem] = [
+    func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0, autoImport: Bool = true) async throws -> SeriesDetailResponse {
+        var items: [URLQueryItem] = [
             URLQueryItem(name: "limit", value: "\(limit)"),
             URLQueryItem(name: "offset", value: "\(offset)"),
         ]
+        items.append(URLQueryItem(name: "autoImport", value: autoImport ? "true" : "false"))
         let res: SeriesDetailResponse = try await client.get("/podcasts/series/\(seriesId)", queryItems: items)
         return res
     }
