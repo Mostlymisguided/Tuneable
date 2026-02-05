@@ -2040,6 +2040,7 @@ router.get('/series/:seriesId', async (req, res) => {
       .sort({ releaseDate: -1 }) // Sort by newest first
       .populate('host.userId', 'username profilePic uuid')
       .populate('addedBy', 'username')
+      .populate('podcastSeries', 'title coverArt')
       .lean();
 
     // Check if we have enough episodes already
@@ -3053,6 +3054,7 @@ router.get('/series/:seriesId', async (req, res) => {
           .sort({ releaseDate: -1 })
           .populate('host.userId', 'username profilePic uuid')
           .populate('addedBy', 'username')
+          .populate('podcastSeries', 'title coverArt')
           .lean();
       }
       } // Close if (taddyUuid || podcastIndexId || iTunesId)
