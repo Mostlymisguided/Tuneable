@@ -136,6 +136,8 @@ enum APIError: LocalizedError {
     case unauthorized
     case http(statusCode: Int, message: String)
 
+    var isUnauthorized: Bool { if case .unauthorized = self { return true }; return false }
+
     var errorDescription: String? {
         switch self {
         case .invalidURL(let path): return "Invalid URL: \(path)"

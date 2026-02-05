@@ -22,6 +22,8 @@ struct MainTabView: View {
         TabView {
             HomeView()
                 .tabItem { Label("Home", systemImage: "house.fill") }
+            PodcastsChartView()
+                .tabItem { Label("Podcasts", systemImage: "mic.fill") }
             PartiesListView()
                 .tabItem { Label("Parties", systemImage: "music.note.list") }
             ProfileView()

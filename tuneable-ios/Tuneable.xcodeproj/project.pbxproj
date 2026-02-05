@@ -22,6 +22,15 @@
 		B0010000000000000000000D /* PartiesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000000D /* PartiesListView.swift */; };
 		B0010000000000000000000E /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000000E /* ProfileView.swift */; };
 		B0010000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000000F /* Assets.xcassets */; };
+		B00100000000000000000011 /* PodcastEpisode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000011 /* PodcastEpisode.swift */; };
+		B00100000000000000000012 /* PodcastSeries.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000012 /* PodcastSeries.swift */; };
+		B00100000000000000000013 /* PodcastService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000013 /* PodcastService.swift */; };
+		B00100000000000000000014 /* PodcastsChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000014 /* PodcastsChartView.swift */; };
+		B00100000000000000000015 /* PodcastSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000015 /* PodcastSearchView.swift */; };
+		B00100000000000000000016 /* PodcastSeriesProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000016 /* PodcastSeriesProfileView.swift */; };
+		B00100000000000000000017 /* PodcastEpisodeProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000017 /* PodcastEpisodeProfileView.swift */; };
+		B00100000000000000000018 /* PodcastPlayerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000018 /* PodcastPlayerStore.swift */; };
+		B00100000000000000000019 /* String+HTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000019 /* String+HTML.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +51,15 @@
 		F0010000000000000000000E /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		F0010000000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F00100000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F00100000000000000000011 /* PodcastEpisode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastEpisode.swift; sourceTree = "<group>"; };
+		F00100000000000000000012 /* PodcastSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastSeries.swift; sourceTree = "<group>"; };
+		F00100000000000000000013 /* PodcastService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastService.swift; sourceTree = "<group>"; };
+		F00100000000000000000014 /* PodcastsChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastsChartView.swift; sourceTree = "<group>"; };
+		F00100000000000000000015 /* PodcastSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastSearchView.swift; sourceTree = "<group>"; };
+		F00100000000000000000016 /* PodcastSeriesProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastSeriesProfileView.swift; sourceTree = "<group>"; };
+		F00100000000000000000017 /* PodcastEpisodeProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastEpisodeProfileView.swift; sourceTree = "<group>"; };
+		F00100000000000000000018 /* PodcastPlayerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastPlayerStore.swift; sourceTree = "<group>"; };
+		F00100000000000000000019 /* String+HTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+HTML.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,14 +87,32 @@
 				F00100000000000000000001 /* TuneableApp.swift */,
 				F00100000000000000000002 /* ContentView.swift */,
 				G00100000000000000000003 /* Config */,
+				G0010000000000000000000A /* Helpers */,
 				G00100000000000000000004 /* Services */,
 				G00100000000000000000005 /* Models */,
 				G00100000000000000000006 /* ViewModels */,
+				G00100000000000000000009 /* stores */,
 				G00100000000000000000007 /* Views */,
 				F0010000000000000000000F /* Assets.xcassets */,
 				F00100000000000000000010 /* Info.plist */,
 			);
 			path = Tuneable;
+			sourceTree = "<group>";
+		};
+		G0010000000000000000000A /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				F00100000000000000000019 /* String+HTML.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		G00100000000000000000009 /* stores */ = {
+			isa = PBXGroup;
+			children = (
+				F00100000000000000000018 /* PodcastPlayerStore.swift */,
+			);
+			path = stores;
 			sourceTree = "<group>";
 		};
 		G00100000000000000000003 /* Config */ = {
@@ -94,6 +130,7 @@
 				F00100000000000000000005 /* AuthService.swift */,
 				F00100000000000000000006 /* KeychainHelper.swift */,
 				F00100000000000000000007 /* PartyService.swift */,
+				F00100000000000000000013 /* PodcastService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -103,6 +140,8 @@
 			children = (
 				F00100000000000000000008 /* User.swift */,
 				F00100000000000000000009 /* Party.swift */,
+				F00100000000000000000011 /* PodcastEpisode.swift */,
+				F00100000000000000000012 /* PodcastSeries.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -122,6 +161,10 @@
 				F0010000000000000000000C /* HomeView.swift */,
 				F0010000000000000000000D /* PartiesListView.swift */,
 				F0010000000000000000000E /* ProfileView.swift */,
+				F00100000000000000000014 /* PodcastsChartView.swift */,
+				F00100000000000000000015 /* PodcastSearchView.swift */,
+				F00100000000000000000016 /* PodcastSeriesProfileView.swift */,
+				F00100000000000000000017 /* PodcastEpisodeProfileView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -212,6 +255,15 @@
 				B0010000000000000000000C /* HomeView.swift in Sources */,
 				B0010000000000000000000D /* PartiesListView.swift in Sources */,
 				B0010000000000000000000E /* ProfileView.swift in Sources */,
+				B00100000000000000000011 /* PodcastEpisode.swift in Sources */,
+				B00100000000000000000012 /* PodcastSeries.swift in Sources */,
+				B00100000000000000000013 /* PodcastService.swift in Sources */,
+				B00100000000000000000014 /* PodcastsChartView.swift in Sources */,
+				B00100000000000000000015 /* PodcastSearchView.swift in Sources */,
+				B00100000000000000000016 /* PodcastSeriesProfileView.swift in Sources */,
+				B00100000000000000000017 /* PodcastEpisodeProfileView.swift in Sources */,
+				B00100000000000000000018 /* PodcastPlayerStore.swift in Sources */,
+				B00100000000000000000019 /* String+HTML.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
