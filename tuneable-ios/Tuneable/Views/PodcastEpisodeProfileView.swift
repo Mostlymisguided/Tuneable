@@ -116,7 +116,7 @@ struct PodcastEpisodeProfileView: View {
                             } label: {
                                 Image(systemName: "minus.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(tipAmountPounds <= 0.01 ? .gray : .accentColor)
+                                    .foregroundStyle(tipAmountPounds <= 0.01 ? Color.gray : Color.accentColor)
                             }
                             .disabled(tipAmountPounds <= 0.01 || isPlacingBid)
 
@@ -129,7 +129,7 @@ struct PodcastEpisodeProfileView: View {
                             } label: {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(.accentColor)
+                                    .foregroundStyle(Color.accentColor)
                             }
                             .disabled(isPlacingBid)
                         }

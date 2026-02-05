@@ -95,8 +95,7 @@ final class PodcastPlayerStore: ObservableObject {
                 let sec = time.seconds
                 self?.currentTime = (sec.isFinite && sec >= 0) ? sec : 0
                 if self?.duration ?? 0 <= 0, let item = p.currentItem {
-                    let d = item.asset.duration
-                    if d.isNumeric {
+                    if let d = try? await item.asset.load(.duration), d.isNumeric {
                         let s = d.seconds
                         self?.duration = (s.isFinite && s >= 0) ? s : 0
                     }
