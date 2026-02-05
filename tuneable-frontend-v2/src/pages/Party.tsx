@@ -2447,7 +2447,7 @@ const Party: React.FC = () => {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {(isMobile ? (topTagsExpanded ? topTags : topTags.slice(0, 6)) : topTags).map(({ tag, total }) => {
+                {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
                   const hash = `#${tag}`;
                   const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
                   const weight = Math.max(0.75, Math.min(1.25, total / 50));
@@ -2473,7 +2473,7 @@ const Party: React.FC = () => {
                     </button>
                   );
                 })}
-                {isMobile && topTags.length > 6 && (
+                {topTags.length > (isMobile ? 6 : 10) && (
                   <button
                     type="button"
                     onClick={() => setTopTagsExpanded((e) => !e)}
@@ -2488,7 +2488,7 @@ const Party: React.FC = () => {
                     ) : (
                       <>
                         <Plus className="w-3 h-3" />
-                        +{topTags.length - 6} more
+                        +{topTags.length - (isMobile ? 6 : 10)} more
                       </>
                     )}
                   </button>
