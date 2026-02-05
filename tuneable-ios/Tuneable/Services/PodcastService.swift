@@ -83,7 +83,7 @@ final class PodcastService {
     }
 
     func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0) async throws -> SeriesDetailResponse {
-        var items: [URLQueryItem] = [
+        let items: [URLQueryItem] = [
             URLQueryItem(name: "limit", value: "\(limit)"),
             URLQueryItem(name: "offset", value: "\(offset)"),
         ]

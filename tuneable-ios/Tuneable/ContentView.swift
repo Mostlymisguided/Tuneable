@@ -17,6 +17,8 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var podcastPlayer: PodcastPlayerStore
+    @State private var showNowPlaying = false
 
     var body: some View {
         TabView {
@@ -28,6 +30,14 @@ struct MainTabView: View {
                 .tabItem { Label("Parties", systemImage: "music.note.list") }
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.fill") }
+        }
+        .overlay(alignment: .bottom) {
+            PodcastMiniBarView(showNowPlaying: $showNowPlaying)
+                .padding(.bottom, 49) // Tab bar height so mini bar sits above it
+        }
+        .fullScreenCover(isPresented: $showNowPlaying) {
+            NowPlayingSheet()
+                .environmentObject(podcastPlayer)
         }
     }
 }
