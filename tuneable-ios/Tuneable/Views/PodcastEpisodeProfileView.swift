@@ -6,7 +6,7 @@ struct PodcastEpisodeProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showTipSheet = false
-    @State private var tipAmountPence: Int = 110 // 11p default
+    @State private var tipAmountPence: Int = 11 // 11p default
     @State private var isPlacingBid = false
     @State private var tipError: String?
     @State private var tipSuccess = false
@@ -110,7 +110,7 @@ struct PodcastEpisodeProfileView: View {
                     Section("Amount (pence)") {
                         TextField("Pence", value: $tipAmountPence, format: .number)
                             .keyboardType(.numberPad)
-                        Text("e.g. 110 = £1.10")
+                        Text("e.g. 11 = 11p, 110 = £1.10")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

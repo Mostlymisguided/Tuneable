@@ -324,7 +324,7 @@ async function sendPaymentNotification(user, amount, currency = 'gbp') {
             <h3 style="margin-top: 0; color: #1f2937;">User Information</h3>
             <p><strong>Username:</strong> @${user.username}</p>
             <p><strong>Email:</strong> ${user.email || 'Not provided'}</p>
-            <p><strong>New Balance:</strong> £${user.balance.toFixed(2)}</p>
+            <p><strong>New Balance:</strong> £${((user.balance || 0) / 100).toFixed(2)}</p>
           </div>
 
           <div style="margin: 30px 0; text-align: center;">

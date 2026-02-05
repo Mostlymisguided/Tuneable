@@ -75,7 +75,7 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
       });
 
       if (response.ok) {
-        toast.success(`Boosted ${episode.title} with $${boostAmount}!`);
+        toast.success(`Boosted ${episode.title} with £${boostAmount.toFixed(2)}!`);
         setShowBoostModal(false);
         if (onBoost) {
           onBoost(episode);

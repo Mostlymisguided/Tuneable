@@ -232,6 +232,26 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Boost amount must be greater than 0' });
     }
     
+    // Validate minimum
+    if (amount < 0.01) {
+      return res.status(400).json({ error: 'Minimum bid is £0.01' });
+    }
+    
+    // Get user and check balance
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const bidAmountPence = Math.round(amount * 100);
+    if ((user.balance || 0) < bidAmountPence) {
+      return res.status(400).json({
+        error: 'Insufficient balance',
+        required: amount,
+        available: (user.balance || 0) / 100
+      });
+    }
+    
     const episode = await Media.findOne({
       _id: episodeId,
       contentType: { $in: ['spoken'] },
@@ -250,12 +270,18 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       return res.status(500).json({ error: 'Global party not found' });
     }
     
-    // Create bid (using mediaId, not episodeId)
+    // Capture PRE balances for ledger
+    const userBalancePre = user.balance || 0;
+    const mediaAggregatePre = episode.globalMediaAggregate || 0;
+    const userBidsPre = await Bid.find({ userId, status: 'active' }).lean();
+    const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
+    
+    // Create bid (using mediaId, not episodeId) - BidMetricsEngine will update aggregates
     const bid = new Bid({
       userId,
       partyId: globalParty._id,
       mediaId: episode._id,
-      amount: Math.round(amount * 100), // Convert to pence
+      amount: bidAmountPence,
       bidScope: 'global',
       partyType: 'global',
       username: req.user.username,
@@ -267,6 +293,41 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     
     await bid.save();
     
+    // Create ledger entry
+    try {
+      const tuneableLedgerService = require('../services/tuneableLedgerService');
+      await tuneableLedgerService.createTipEntry({
+        userId,
+        mediaId: episode._id,
+        partyId: globalParty._id,
+        bidId: bid._id,
+        amount: bidAmountPence,
+        userBalancePre,
+        userAggregatePre,
+        mediaAggregatePre,
+        userTuneBytesPre: null,
+        userTuneBytesPost: null,
+        referenceTransactionId: bid._id,
+        metadata: { bidScope: 'global', platform: 'podcast-boost' }
+      });
+    } catch (ledgerError) {
+      console.error('Failed to create ledger entry for podcast boost:', ledgerError);
+    }
+    
+    // Deduct user balance
+    user.balance = userBalancePre - bidAmountPence;
+    await user.save();
+    
+    // Allocate artist escrow (async)
+    try {
+      const artistEscrowService = require('../services/artistEscrowService');
+      artistEscrowService.allocateEscrowForBid(bid._id, episode._id, bidAmountPence).catch(error => {
+        console.error('Failed to allocate escrow for podcast boost bid:', bid._id, error);
+      });
+    } catch (error) {
+      console.error('Error setting up escrow allocation:', error);
+    }
+    
     // Calculate and award TuneBytes for this bid (async, don't block response)
     try {
       const tuneBytesService = require('../services/tuneBytesService');
@@ -277,11 +338,10 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       console.error('Error setting up TuneBytes calculation:', error);
     }
     
-    // Update episode global aggregate
-    episode.globalMediaAggregate = (episode.globalMediaAggregate || 0) + Math.round(amount * 100);
-    await episode.save();
+    // Refetch episode to get BidMetricsEngine-updated aggregates
+    const updatedEpisode = await Media.findById(episodeId);
     
-    res.json({ message: 'Episode boosted successfully!', episode });
+    res.json({ message: 'Episode boosted successfully!', episode: updatedEpisode || episode, updatedBalance: user.balance });
   } catch (error) {
     console.error('Error boosting episode:', error);
     res.status(500).json({ error: 'Failed to boost episode' });
@@ -305,6 +365,25 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     if (!amount || amount <= 0) {
       console.log('❌ Invalid amount:', amount);
       return res.status(400).json({ error: 'Bid amount must be greater than 0' });
+    }
+    
+    if (amount < 0.01) {
+      return res.status(400).json({ error: 'Minimum bid is £0.01' });
+    }
+    
+    const amountInPence = Math.round(amount * 100);
+    
+    // Get user and check balance
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if ((user.balance || 0) < amountInPence) {
+      return res.status(400).json({
+        error: 'Insufficient balance',
+        required: amount,
+        available: (user.balance || 0) / 100
+      });
     }
     
     // Find episode using Media model
@@ -354,8 +433,11 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       party.media.push(partyMediaEntry);
     }
     
-    // Convert amount to pence
-    const amountInPence = Math.round(amount * 100);
+    // Capture PRE balances for ledger
+    const userBalancePre = user.balance || 0;
+    const mediaAggregatePre = episode.globalMediaAggregate || 0;
+    const userBidsPre = await Bid.find({ userId, status: 'active' }).lean();
+    const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
     
     // Create bid (using mediaId, not episodeId)
     const bid = new Bid({
@@ -373,6 +455,41 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     });
     
     await bid.save();
+    
+    // Create ledger entry
+    try {
+      const tuneableLedgerService = require('../services/tuneableLedgerService');
+      await tuneableLedgerService.createTipEntry({
+        userId,
+        mediaId: episode._id,
+        partyId: party._id,
+        bidId: bid._id,
+        amount: amountInPence,
+        userBalancePre,
+        userAggregatePre,
+        mediaAggregatePre,
+        userTuneBytesPre: null,
+        userTuneBytesPost: null,
+        referenceTransactionId: bid._id,
+        metadata: { bidScope: 'party', platform: 'podcast-party-bid' }
+      });
+    } catch (ledgerError) {
+      console.error('Failed to create ledger entry for podcast party bid:', ledgerError);
+    }
+    
+    // Deduct user balance
+    user.balance = userBalancePre - amountInPence;
+    await user.save();
+    
+    // Allocate artist escrow (async)
+    try {
+      const artistEscrowService = require('../services/artistEscrowService');
+      artistEscrowService.allocateEscrowForBid(bid._id, episode._id, amountInPence).catch(error => {
+        console.error('Failed to allocate escrow for podcast party bid:', bid._id, error);
+      });
+    } catch (error) {
+      console.error('Error setting up escrow allocation:', error);
+    }
     
     // Calculate and award TuneBytes for this bid (async, don't block response)
     try {
@@ -393,7 +510,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     episode.globalMediaAggregate = (episode.globalMediaAggregate || 0) + amountInPence;
     await episode.save();
     
-    res.json({ message: 'Episode added to party and bid placed!', episode });
+    res.json({ message: 'Episode added to party and bid placed!', episode, updatedBalance: user.balance });
   } catch (error) {
     console.error('Error adding episode to party:', error);
     res.status(500).json({ error: 'Failed to add episode to party' });

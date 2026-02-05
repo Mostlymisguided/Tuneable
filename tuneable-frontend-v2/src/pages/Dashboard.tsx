@@ -7,7 +7,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
-import { penceToPounds } from '../utils/currency';
+import { penceToPounds, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import BetaWarningBanner from '../components/BetaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -596,7 +596,7 @@ Join here: ${inviteLink}`.trim();
       return;
     }
 
-    if ((user as any)?.balance < amount) {
+    if ((user as any)?.balance < poundsToPence(amount)) {
       toast.error('Insufficient balance');
       return;
     }
@@ -695,7 +695,7 @@ Join here: ${inviteLink}`.trim();
       return;
     }
     
-    if ((user as any)?.balance < bidAmount) {
+    if ((user as any)?.balance < poundsToPence(bidAmount)) {
       toast.error('Insufficient balance');
       return;
     }

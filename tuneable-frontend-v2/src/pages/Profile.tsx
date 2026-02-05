@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authAPI } from '../lib/api';
 import { toast } from 'react-toastify';
+import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { 
   User, 
@@ -318,7 +319,7 @@ const Profile: React.FC = () => {
               <DollarSign className="w-6 h-6" />
               <div>
                 <p className="text-green-100 text-sm">Wallet Balance</p>
-                <p className="text-2xl font-bold">£{profile.balance.toFixed(2)}</p>
+                <p className="text-2xl font-bold">{penceToPounds(profile.balance)}</p>
               </div>
             </div>
           </div>

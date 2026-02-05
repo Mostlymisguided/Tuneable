@@ -46,7 +46,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
-import { penceToPounds } from '../utils/currency';
+import { penceToPounds, poundsToPence } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
 interface LibraryItem {
@@ -830,8 +830,8 @@ const UserProfile: React.FC = () => {
       return;
     }
 
-    // Check balance
-    if ((currentUser as any)?.balance < bidAmount) {
+    // Check balance (balance is in pence, bidAmount is in pounds)
+    if ((currentUser as any)?.balance < poundsToPence(bidAmount)) {
       toast.error('Insufficient balance');
       return;
     }
