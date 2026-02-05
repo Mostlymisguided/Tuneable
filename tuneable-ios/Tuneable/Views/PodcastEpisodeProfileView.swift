@@ -29,7 +29,9 @@ struct PodcastEpisodeProfileView: View {
             } else if let ep = episode {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        if let url = ep.coverArt.flatMap({ URL(string: $0) }) {
+                        if let url = ep.coverArt.flatMap({ URL(string: $0) })
+                            ?? ep.podcastSeries?.coverArt.flatMap({ URL(string: $0) })
+                            ?? URL(string: AppConfig.defaultCoverArtURL) {
                             AsyncImage(url: url) { ph in
                                 ph.resizable().scaledToFill()
                             } placeholder: {

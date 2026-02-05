@@ -21,4 +21,7 @@ enum AppConfig {
     static var apiPathPrefix: String {
         "\(apiBaseURL)/api"
     }
+
+    /// Default cover art URL for media without artwork (matches web: tuneable-frontend-v2 constants.ts)
+    static let defaultCoverArtURL = "https://uploads.tuneable.stream/cover-art/default-cover.png"
 }

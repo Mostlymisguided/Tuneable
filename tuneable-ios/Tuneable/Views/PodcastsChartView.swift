@@ -116,9 +116,13 @@ struct PodcastsChartView: View {
 struct SeriesCard: View {
     let item: PodcastSeriesItem
 
+    private var coverArtURL: URL? {
+        item.coverArt.flatMap { URL(string: $0) } ?? URL(string: AppConfig.defaultCoverArtURL)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let url = item.coverArt.flatMap({ URL(string: $0) }) {
+            if let url = coverArtURL {
                 AsyncImage(url: url) { ph in
                     ph.resizable().scaledToFill()
                 } placeholder: {
@@ -149,9 +153,15 @@ struct SeriesCard: View {
 struct EpisodeCardSmall: View {
     let episode: PodcastEpisode
 
+    private var coverArtURL: URL? {
+        episode.coverArt.flatMap { URL(string: $0) }
+            ?? episode.podcastSeries?.coverArt.flatMap { URL(string: $0) }
+            ?? URL(string: AppConfig.defaultCoverArtURL)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let url = episode.coverArt.flatMap({ URL(string: $0) }) {
+            if let url = coverArtURL {
                 AsyncImage(url: url) { ph in
                     ph.resizable().scaledToFill()
                 } placeholder: {
@@ -182,9 +192,15 @@ struct EpisodeCardSmall: View {
 struct EpisodeRow: View {
     let episode: PodcastEpisode
 
+    private var coverArtURL: URL? {
+        episode.coverArt.flatMap { URL(string: $0) }
+            ?? episode.podcastSeries?.coverArt.flatMap { URL(string: $0) }
+            ?? URL(string: AppConfig.defaultCoverArtURL)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            if let url = episode.coverArt.flatMap({ URL(string: $0) }) {
+            if let url = coverArtURL {
                 AsyncImage(url: url) { ph in
                     ph.resizable().scaledToFill()
                 } placeholder: {

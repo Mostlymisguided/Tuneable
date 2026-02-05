@@ -55,7 +55,7 @@ struct PodcastSeriesProfileView: View {
 
     private func seriesHeader(_ s: PodcastSeriesDetail) -> some View {
         HStack(alignment: .top, spacing: 16) {
-            if let url = s.coverArt.flatMap({ URL(string: $0) }) {
+            if let url = s.coverArt.flatMap({ URL(string: $0) }) ?? URL(string: AppConfig.defaultCoverArtURL) {
                 AsyncImage(url: url) { ph in
                     ph.resizable().scaledToFill()
                 } placeholder: {
