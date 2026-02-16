@@ -16,12 +16,16 @@ struct PodcastsChartView: View {
             Group {
                 if isLoading && episodes.isEmpty {
                     ProgressView("Loading podcasts…")
+                        .tint(AppTheme.textPrimary)
+                        .foregroundStyle(AppTheme.textPrimary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let msg = errorMessage, episodes.isEmpty {
                     ContentUnavailableView {
                         Label("Couldn't load chart", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(AppTheme.textPrimary)
                     } description: {
                         Text(msg)
+                            .foregroundStyle(AppTheme.textSecondary)
                     } actions: {
                         Button("Retry") { Task { await loadChart() } }
                     }
@@ -63,6 +67,7 @@ struct PodcastsChartView: View {
                                         EpisodeRow(episode: ep)
                                     }
                                     Divider()
+                                        .background(AppTheme.cardBorder)
                                 }
                             }
                             .padding(.horizontal)
@@ -71,7 +76,10 @@ struct PodcastsChartView: View {
                     }
                 }
             }
+            .background(PurpleGradientBackground())
+            .foregroundStyle(AppTheme.textPrimary)
             .navigationTitle("Podcasts")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink(destination: PodcastSearchView()) {
@@ -93,6 +101,7 @@ struct PodcastsChartView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.headline)
+            .foregroundStyle(AppTheme.textPrimary)
             .padding(.horizontal)
             .padding(.top, 8)
     }
@@ -138,12 +147,13 @@ struct SeriesCard: View {
             }
             Text(item.title ?? "Untitled")
                 .font(.subheadline)
+                .foregroundStyle(AppTheme.textPrimary)
                 .lineLimit(2)
                 .frame(width: 120, alignment: .leading)
             if let agg = item.totalGlobalMediaAggregate, agg > 0 {
                 Text(formatPence(agg))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
         }
         .frame(width: 130)
@@ -177,11 +187,12 @@ struct EpisodeCardSmall: View {
             }
             Text(episode.title ?? "Untitled")
                 .font(.caption)
+                .foregroundStyle(AppTheme.textPrimary)
                 .lineLimit(2)
                 .frame(width: 100, alignment: .leading)
             Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textSecondary)
                 .lineLimit(1)
                 .frame(width: 100, alignment: .leading)
         }
@@ -213,22 +224,23 @@ struct EpisodeRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(episode.title ?? "Untitled")
                     .font(.subheadline)
+                    .foregroundStyle(AppTheme.textPrimary)
                     .lineLimit(1)
                 Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textSecondary)
                     .lineLimit(1)
                 if let agg = episode.globalMediaAggregate, agg > 0 {
                     Text(formatPence(agg))
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(AppTheme.textTertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(AppTheme.textTertiary)
         }
         .padding(.vertical, 8)
     }

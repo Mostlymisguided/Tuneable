@@ -17,12 +17,16 @@ struct PodcastEpisodeProfileView: View {
         Group {
             if isLoading && episode == nil {
                 ProgressView("Loading episode…")
+                    .tint(AppTheme.textPrimary)
+                    .foregroundStyle(AppTheme.textPrimary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let msg = errorMessage, episode == nil {
                 ContentUnavailableView {
                     Label("Couldn't load episode", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(AppTheme.textPrimary)
                 } description: {
                     Text(msg)
+                        .foregroundStyle(AppTheme.textSecondary)
                 } actions: {
                     Button("Retry") { Task { await load() } }
                 }
@@ -44,18 +48,19 @@ struct PodcastEpisodeProfileView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(ep.title ?? "Untitled")
                                 .font(.title2)
+                                .foregroundStyle(AppTheme.textPrimary)
                             Text(ep.podcastSeries?.title ?? ep.podcastTitle ?? "")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.textSecondary)
                             if let agg = ep.globalMediaAggregate, agg > 0 {
                                 Text("Tips: \(formatPence(agg))")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(AppTheme.textSecondary)
                             }
                             if let dur = ep.duration, dur > 0 {
                                 Text(durationString(dur))
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(AppTheme.textSecondary)
                             }
                         }
                         .padding(.horizontal)
@@ -69,6 +74,7 @@ struct PodcastEpisodeProfileView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
+                            .tint(AppTheme.accent)
                             .disabled(ep.audioURL == nil)
 
                             Button {
@@ -78,12 +84,14 @@ struct PodcastEpisodeProfileView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
+                            .tint(AppTheme.accent)
                         }
                         .padding(.horizontal)
 
                         if let desc = ep.description, !desc.isEmpty {
                             Text(desc.strippingHTML)
                                 .font(.body)
+                                .foregroundStyle(AppTheme.textPrimary)
                                 .padding(.horizontal)
                         }
                     }
@@ -94,8 +102,11 @@ struct PodcastEpisodeProfileView: View {
                 }
             }
         }
+        .background(PurpleGradientBackground())
+        .foregroundStyle(AppTheme.textPrimary)
         .navigationTitle(episode?.title ?? "Episode")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .refreshable { await load() }
         .onAppear { Task { await load() } }
     }
@@ -116,7 +127,7 @@ struct PodcastEpisodeProfileView: View {
                             } label: {
                                 Image(systemName: "minus.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(tipAmountPounds <= 0.01 ? Color.gray : Color.accentColor)
+                                    .foregroundStyle(tipAmountPounds <= 0.01 ? AppTheme.textTertiary : AppTheme.accent)
                             }
                             .disabled(tipAmountPounds <= 0.01 || isPlacingBid)
 
@@ -129,7 +140,7 @@ struct PodcastEpisodeProfileView: View {
                             } label: {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(AppTheme.accent)
                             }
                             .disabled(isPlacingBid)
                         }
@@ -149,8 +160,12 @@ struct PodcastEpisodeProfileView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PurpleGradientBackground())
+            .foregroundStyle(AppTheme.textPrimary)
             .navigationTitle("Tip episode")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tipSuccess ? "Done" : "Cancel") {

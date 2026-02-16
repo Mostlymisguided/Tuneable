@@ -10,6 +10,8 @@ struct TuneableApp: App {
             ContentView()
                 .environmentObject(auth)
                 .environmentObject(podcastPlayer)
+                .preferredColorScheme(.dark)
+                .tint(AppTheme.accent)
         }
     }
 }

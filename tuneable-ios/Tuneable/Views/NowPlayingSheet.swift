@@ -13,7 +13,7 @@ struct NowPlayingSheet: View {
                 content(episode: episode)
             } else {
                 Text("Nothing playing")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
         }
         .onAppear {
@@ -49,7 +49,7 @@ struct NowPlayingSheet: View {
             Spacer(minLength: 32)
         }
         .padding(.horizontal, 24)
-        .background(Color(.systemGroupedBackground))
+        .background(PurpleGradientBackground())
     }
 
     private var header: some View {
@@ -57,6 +57,7 @@ struct NowPlayingSheet: View {
             Button("Done") {
                 dismiss()
             }
+            .foregroundStyle(AppTheme.accent)
             Spacer()
         }
         .padding(.top, 8)
@@ -92,11 +93,12 @@ struct NowPlayingSheet: View {
         VStack(spacing: 4) {
             Text(episode.title ?? "Untitled")
                 .font(.title2.weight(.semibold))
+                .foregroundStyle(AppTheme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
             Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textSecondary)
         }
         .padding(.vertical, 16)
     }
@@ -113,16 +115,16 @@ struct NowPlayingSheet: View {
                     }
                 }
             )
-            .tint(Color.accentColor)
+            .tint(AppTheme.accent)
 
             HStack {
                 Text(formatTime(scrubberValue))
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textSecondary)
                 Spacer()
                 Text(formatTime(podcastPlayer.duration))
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
         }
         .padding(.bottom, 24)
@@ -135,6 +137,7 @@ struct NowPlayingSheet: View {
             } label: {
                 Image(systemName: "gobackward.15")
                     .font(.system(size: 36))
+                    .foregroundStyle(AppTheme.textPrimary)
             }
 
             Button {
@@ -142,6 +145,7 @@ struct NowPlayingSheet: View {
             } label: {
                 Image(systemName: podcastPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 64))
+                    .foregroundStyle(AppTheme.accent)
             }
 
             Button {
@@ -149,6 +153,7 @@ struct NowPlayingSheet: View {
             } label: {
                 Image(systemName: "goforward.15")
                     .font(.system(size: 36))
+                    .foregroundStyle(AppTheme.textPrimary)
             }
         }
         .padding(.bottom, 16)
@@ -160,7 +165,7 @@ struct NowPlayingSheet: View {
         } label: {
             Text("\(formatRate(podcastPlayer.playbackRate))×")
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textSecondary)
         }
     }
 

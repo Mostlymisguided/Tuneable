@@ -16,11 +16,11 @@ struct PodcastMiniBarView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(episode.title ?? "Untitled")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(AppTheme.textPrimary)
                                 .lineLimit(1)
                             Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppTheme.textSecondary)
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -30,13 +30,13 @@ struct PodcastMiniBarView: View {
                         } label: {
                             Image(systemName: podcastPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                 .font(.system(size: 44))
-                                .foregroundStyle(.tint)
+                                .foregroundStyle(AppTheme.accent)
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(.bar)
+                    .background(AppTheme.gradientStart)
                 }
             }
             .buttonStyle(.plain)
@@ -51,9 +51,9 @@ struct PodcastMiniBarView: View {
                 : 0.0
             ZStack(alignment: .leading) {
                 Rectangle()
-                    .fill(.quaternary)
+                    .fill(AppTheme.cardBackground)
                 Rectangle()
-                    .fill(.tint)
+                    .fill(AppTheme.accent)
                     .frame(width: width * progress)
             }
         }

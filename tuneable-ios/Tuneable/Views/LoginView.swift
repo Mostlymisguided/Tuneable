@@ -17,6 +17,7 @@ struct LoginView: View {
                         .textContentType(.password)
                 } header: {
                     Text("Sign in")
+                        .foregroundStyle(AppTheme.textPrimary)
                 }
 
                 if let msg = auth.errorMessage {
@@ -33,7 +34,7 @@ struct LoginView: View {
                             Spacer()
                             if auth.isLoading {
                                 ProgressView()
-                                    .tint(.primary)
+                                    .tint(AppTheme.textPrimary)
                             } else {
                                 Text("Sign in")
                             }
@@ -44,8 +45,12 @@ struct LoginView: View {
                     .disabled(auth.isLoading || email.isEmpty || password.isEmpty)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PurpleGradientBackground())
+            .foregroundStyle(AppTheme.textPrimary)
             .navigationTitle("Tuneable")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 

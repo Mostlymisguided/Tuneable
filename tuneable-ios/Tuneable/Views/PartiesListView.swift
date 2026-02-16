@@ -12,12 +12,16 @@ struct PartiesListView: View {
             Group {
                 if isLoading && parties.isEmpty {
                     ProgressView("Loading parties…")
+                        .tint(AppTheme.textPrimary)
+                        .foregroundStyle(AppTheme.textPrimary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let msg = errorMessage, parties.isEmpty {
                     ContentUnavailableView {
                         Label("Couldn't load parties", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(AppTheme.textPrimary)
                     } description: {
                         Text(msg)
+                            .foregroundStyle(AppTheme.textSecondary)
                     } actions: {
                         Button("Retry") { Task { await loadParties() } }
                     }
@@ -26,10 +30,16 @@ struct PartiesListView: View {
                         NavigationLink(value: party) {
                             PartyRow(party: party)
                         }
+                        .listRowBackground(AppTheme.cardBackground)
+                        .listRowSeparatorTint(AppTheme.cardBorder)
                     }
+                    .scrollContentBackground(.hidden)
                 }
             }
+            .background(PurpleGradientBackground())
+            .foregroundStyle(AppTheme.textPrimary)
             .navigationTitle("Parties")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Join by code") { showCodeSheet = true }
@@ -68,13 +78,14 @@ struct PartyRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(party.name)
                 .font(.headline)
+                .foregroundStyle(AppTheme.textPrimary)
             Text(party.location)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textSecondary)
             if let status = party.status {
                 Text(status.capitalized)
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(AppTheme.textTertiary)
             }
         }
         .padding(.vertical, 2)
@@ -106,8 +117,12 @@ struct JoinPartyByCodeSheet: View {
                     .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || loading)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PurpleGradientBackground())
+            .foregroundStyle(AppTheme.textPrimary)
             .navigationTitle("Join by code")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -146,21 +161,30 @@ struct PartyDetailView: View {
                     LabeledContent("Status", value: status)
                 }
             }
+            .listRowBackground(AppTheme.cardBackground)
+            .listRowSeparatorTint(AppTheme.cardBorder)
             if let media = party.media, !media.isEmpty {
                 Section("Queue (\(media.count))") {
                     ForEach(media.prefix(20)) { item in
                         Text(item.title ?? "Untitled")
                             .font(.subheadline)
+                            .foregroundStyle(AppTheme.textPrimary)
                     }
                     if media.count > 20 {
                         Text("+ \(media.count - 20) more")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.textSecondary)
                     }
                 }
+                .listRowBackground(AppTheme.cardBackground)
+                .listRowSeparatorTint(AppTheme.cardBorder)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(PurpleGradientBackground())
+        .foregroundStyle(AppTheme.textPrimary)
         .navigationTitle(party.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 }
 

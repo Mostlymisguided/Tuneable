@@ -12,12 +12,16 @@ struct PodcastSeriesProfileView: View {
         Group {
             if isLoading && series == nil {
                 ProgressView("Loading series…")
+                    .tint(AppTheme.textPrimary)
+                    .foregroundStyle(AppTheme.textPrimary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let msg = errorMessage, series == nil {
                 ContentUnavailableView {
                     Label("Couldn't load series", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(AppTheme.textPrimary)
                 } description: {
                     Text(msg)
+                        .foregroundStyle(AppTheme.textSecondary)
                 } actions: {
                     Button("Retry") { Task { await load() } }
                 }
@@ -32,6 +36,7 @@ struct PodcastSeriesProfileView: View {
                         }
                         Text("Episodes")
                             .font(.headline)
+                            .foregroundStyle(AppTheme.textPrimary)
                             .padding(.horizontal)
                         LazyVStack(spacing: 0) {
                             ForEach(episodes) { ep in
@@ -39,6 +44,7 @@ struct PodcastSeriesProfileView: View {
                                     EpisodeRow(episode: ep)
                                 }
                                 Divider()
+                                    .background(AppTheme.cardBorder)
                             }
                         }
                         .padding(.horizontal)
@@ -47,8 +53,11 @@ struct PodcastSeriesProfileView: View {
                 }
             }
         }
+        .background(PurpleGradientBackground())
+        .foregroundStyle(AppTheme.textPrimary)
         .navigationTitle(series?.title ?? "Series")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .refreshable { await load() }
         .onAppear { Task { await load() } }
     }
@@ -68,10 +77,11 @@ struct PodcastSeriesProfileView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(s.title ?? "Untitled")
                     .font(.title2)
+                    .foregroundStyle(AppTheme.textPrimary)
                 if let d = s.description, !d.isEmpty {
                     Text(d.strippingHTML)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.textSecondary)
                         .lineLimit(3)
                 }
             }
@@ -86,18 +96,20 @@ struct PodcastSeriesProfileView: View {
                 VStack(spacing: 2) {
                     Text("\(n)")
                         .font(.headline)
+                        .foregroundStyle(AppTheme.textPrimary)
                     Text("Episodes")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.textSecondary)
                 }
             }
             if let t = st.totalTips, t > 0 {
                 VStack(spacing: 2) {
                     Text(formatPence(t))
                         .font(.headline)
+                        .foregroundStyle(AppTheme.textPrimary)
                     Text("Total tips")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.textSecondary)
                 }
             }
         }

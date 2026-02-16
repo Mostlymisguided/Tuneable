@@ -33,6 +33,9 @@
 		B00100000000000000000019 /* String+HTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000019 /* String+HTML.swift */; };
 		B0010000000000000000001A /* PodcastMiniBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000001A /* PodcastMiniBarView.swift */; };
 		B0010000000000000000001B /* NowPlayingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000001B /* NowPlayingSheet.swift */; };
+		B0010000000000000000001C /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000001C /* AppTheme.swift */; };
+		B0010000000000000000001D /* GlobalPartyMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000001D /* GlobalPartyMedia.swift */; };
+		B0010000000000000000001E /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000001E /* MusicView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +67,9 @@
 		F00100000000000000000019 /* String+HTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+HTML.swift"; sourceTree = "<group>"; };
 		F0010000000000000000001A /* PodcastMiniBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastMiniBarView.swift; sourceTree = "<group>"; };
 		F0010000000000000000001B /* NowPlayingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingSheet.swift; sourceTree = "<group>"; };
+		F0010000000000000000001C /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		F0010000000000000000001D /* GlobalPartyMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalPartyMedia.swift; sourceTree = "<group>"; };
+		F0010000000000000000001E /* MusicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				F00100000000000000000003 /* AppConfig.swift */,
+				F0010000000000000000001C /* AppTheme.swift */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -144,6 +151,7 @@
 			children = (
 				F00100000000000000000008 /* User.swift */,
 				F00100000000000000000009 /* Party.swift */,
+				F0010000000000000000001D /* GlobalPartyMedia.swift */,
 				F00100000000000000000011 /* PodcastEpisode.swift */,
 				F00100000000000000000012 /* PodcastSeries.swift */,
 			);
@@ -163,6 +171,7 @@
 			children = (
 				F0010000000000000000000B /* LoginView.swift */,
 				F0010000000000000000000C /* HomeView.swift */,
+				F0010000000000000000001E /* MusicView.swift */,
 				F0010000000000000000000D /* PartiesListView.swift */,
 				F0010000000000000000000E /* ProfileView.swift */,
 				F00100000000000000000014 /* PodcastsChartView.swift */,
@@ -272,6 +281,9 @@
 				B00100000000000000000019 /* String+HTML.swift in Sources */,
 				B0010000000000000000001A /* PodcastMiniBarView.swift in Sources */,
 				B0010000000000000000001B /* NowPlayingSheet.swift in Sources */,
+				B0010000000000000000001C /* AppTheme.swift in Sources */,
+				B0010000000000000000001D /* GlobalPartyMedia.swift in Sources */,
+				B0010000000000000000001E /* MusicView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

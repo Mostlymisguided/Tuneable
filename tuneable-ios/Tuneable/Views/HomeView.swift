@@ -10,21 +10,24 @@ struct HomeView: View {
                     if let user = auth.user {
                         Text("Hello, \(user.username ?? "User")")
                             .font(.title2)
+                            .foregroundStyle(AppTheme.textPrimary)
                             .padding(.horizontal)
                         Text("Balance: \(formatPence(user.balance ?? 0))")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.textSecondary)
                             .padding(.horizontal)
                     }
                     Text("Join or create parties to curate music together.")
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.textSecondary)
                         .padding()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
             }
+            .purpleGradientBackground()
             .navigationTitle("Home")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .refreshable {
                 await auth.refreshProfile()
             }

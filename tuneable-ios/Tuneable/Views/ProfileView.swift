@@ -19,7 +19,11 @@ struct ProfileView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PurpleGradientBackground())
+            .foregroundStyle(AppTheme.textPrimary)
             .navigationTitle("Profile")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .refreshable {
                 await auth.refreshProfile()
             }

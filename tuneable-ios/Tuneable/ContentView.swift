@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -26,10 +27,18 @@ struct MainTabView: View {
                 .tabItem { Label("Home", systemImage: "house.fill") }
             PodcastsChartView()
                 .tabItem { Label("Podcasts", systemImage: "mic.fill") }
-            PartiesListView()
-                .tabItem { Label("Parties", systemImage: "music.note.list") }
+            MusicView()
+                .tabItem { Label("Music", systemImage: "music.note") }
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.fill") }
+        }
+        .tint(AppTheme.accent)
+        .onAppear {
+            let appearance = UITabBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = UIColor(red: 26/255, green: 26/255, blue: 46/255, alpha: 1)
+            UITabBar.appearance().standardAppearance = appearance
+            UITabBar.appearance().scrollEdgeAppearance = appearance
         }
         .overlay(alignment: .bottom) {
             PodcastMiniBarView(showNowPlaying: $showNowPlaying)
