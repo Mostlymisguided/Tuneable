@@ -2395,6 +2395,8 @@ const Party: React.FC = () => {
               </div>
             </div>
           </div>
+          {/* Partiers stat hidden for now */}
+          {false && (
           <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-purple-600/30 rounded-lg">
@@ -2406,6 +2408,7 @@ const Party: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
           <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)]">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-yellow-600/30 rounded-lg">
@@ -2468,8 +2471,8 @@ const Party: React.FC = () => {
 
                 {/* Inline Add Media Search Panel - Collapsed by default, expand with "Add Tunes" */}
                 {!showVetoed && party && (
-                  <div className="mb-6">
-                    <div className="justify-center text-center rounded-lg p-3 sm:p-4">
+                  <div className="mb-4 md:mb-6">
+                    <div className="justify-center text-center rounded-lg">
                         {!showAddTunesPanel ? (
                           <div className="flex justify-center">
                             <button
@@ -3036,7 +3039,7 @@ const Party: React.FC = () => {
 
                 {/* Tag filter - hidden by default, "Filter by Tag" reveals tag cloud; directly above time sorting */}
                 {!showVetoed && (
-                  <div className="mb-6">
+                  <div className="mb-4 md:mb-6">
                     {!showTagFilterCloud ? (
                       <div className="flex justify-center">
                         <button
@@ -3132,7 +3135,7 @@ const Party: React.FC = () => {
 
                 {/* Sorting Tabs - Only show for Queue, not Vetoed */}
                 {!showVetoed && (
-                  <div className="mb-6">
+                  <div className="mb-4 md:mb-6">
                     <div className="flex flex-row flex-wrap gap-2 justify-center">
                       {[
                         { key: 'all-time', label: 'All Time' },
@@ -3156,7 +3159,7 @@ const Party: React.FC = () => {
                     </div>
                     {/* Play Queue Button */}
                     {getDisplayMedia().length > 0 && (
-                      <div className="flex justify-center mt-4">
+                      <div className="flex justify-center mt-4 md:mt-6">
                         <button
                           onClick={handlePlayQueue}
                           className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
