@@ -16,6 +16,10 @@ enum AppTheme {
     static let accent = Color(red: 147/255, green: 51/255, blue: 234/255)
     static let accentLight = Color(red: 168/255, green: 85/255, blue: 247/255)
 
+    // Metrics card borders (match web Party page)
+    static let metricsTotalTipsBorder = Color(red: 234/255, green: 179/255, blue: 8/255)   // yellow/orange
+    static let metricsAvgTipBorder = Color(red: 34/255, green: 197/255, blue: 94/255)       // green
+
     /// Full-screen purple gradient background matching the web app.
     static var gradient: LinearGradient {
         LinearGradient(

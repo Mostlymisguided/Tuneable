@@ -29,6 +29,13 @@ final class PartyService {
         return res.party
     }
 
+    /// Returns media sorted by tip value for the given time period (e.g. "today", "this-week", "this-month", "all-time").
+    /// For "all-time" the frontend uses party details media; this endpoint still returns valid data.
+    func getMediaSortedByTime(partyId: String, timePeriod: String) async throws -> [GlobalPartyMediaItem] {
+        let res: SortedMediaResponse = try await client.get("/parties/\(partyId)/media/sorted/\(timePeriod)")
+        return res.media
+    }
+
     func joinParty(partyId: String, inviteCode: String? = nil) async throws {
         struct Body: Encodable {
             let inviteCode: String?
