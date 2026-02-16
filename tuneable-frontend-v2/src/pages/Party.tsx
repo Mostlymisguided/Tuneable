@@ -2433,12 +2433,10 @@ const Party: React.FC = () => {
         {/* Top Supporters - centered */}
         <div className="max-w-7xl mx-auto flex justify-center">
           <div className="card p-3 md:p-6 w-full max-w-xl">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3">
+            <div className="text-center mb-2 md:mb-3">
               <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
-              {selectedTagFilters.length > 0 ? (
-                <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
-              ) : (
-                <span className="text-xs text-gray-400">Showing global support</span>
+              {selectedTagFilters.length > 0 && (
+                <p className="text-xs text-purple-300 mt-1">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</p>
               )}
             </div>
             <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
