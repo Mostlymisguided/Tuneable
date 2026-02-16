@@ -27,6 +27,8 @@ struct MusicView: View {
     @State private var showTagFilterExpanded = false
     @State private var showAllTagsInFilter = false
     @State private var showVetoed = false
+    @State private var showAddTunesExpanded = false
+    @State private var addTunesSearchQuery = ""
 
     private let initialTopTagsCount = 6
 
@@ -120,7 +122,7 @@ struct MusicView: View {
 
                         // 4. Action buttons + expandable Top Tags
                         VStack(spacing: 12) {
-                            addTunesButton
+                            addTunesSection
                             filterByTagButton
                             if showTagFilterExpanded {
                                 topTagsCard
@@ -243,24 +245,87 @@ struct MusicView: View {
         }
     }
 
-    private var addTunesButton: some View {
-        Button {
-            if let url = globalPartyWebURL {
-                UIApplication.shared.open(url)
+    private var addTunesSection: some View {
+        Group {
+            if !showAddTunesExpanded {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showAddTunesExpanded = true
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                        Text("Add Tunes")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(red: 126/255, green: 34/255, blue: 206/255))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            } else {
+                VStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        TextField("Paste a YouTube URL or Search for Tunes…", text: $addTunesSearchQuery)
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .submitLabel(.search)
+                            .onSubmit { openSearchOnWeb() }
+                        Button("Hide") {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showAddTunesExpanded = false
+                                addTunesSearchQuery = ""
+                            }
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.textPrimary)
+                    }
+                    Button {
+                        openSearchOnWeb()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                            Text("Search")
+                                .font(.subheadline.weight(.medium))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .background(addTunesSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty ? Color.gray : Color(red: 126/255, green: 34/255, blue: 206/255))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(addTunesSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
             }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "plus")
-                Text("Add Tunes")
-                    .font(.subheadline.weight(.medium))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color(red: 126/255, green: 34/255, blue: 206/255))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .buttonStyle(.plain)
+    }
+
+    private func openSearchOnWeb() {
+        let query = addTunesSearchQuery.trimmingCharacters(in: .whitespaces)
+        let base = AppConfig.apiBaseURL
+        let webBase: String
+        if base.contains("localhost") {
+            webBase = "http://localhost:3000"
+        } else {
+            webBase = base.replacingOccurrences(of: "api.", with: "")
+        }
+        var path = "\(webBase)/search?partyId=\(globalPartyId)"
+        if !query.isEmpty {
+            let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+            path += "&q=\(encoded)"
+        }
+        if let url = URL(string: path) {
+            UIApplication.shared.open(url)
+        }
     }
 
     private var filterByTagButton: some View {
