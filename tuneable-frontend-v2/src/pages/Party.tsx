@@ -124,7 +124,7 @@ const Party: React.FC = () => {
   );
   
   // Inline add media search state
-  // const [showAddMediaPanel, setShowAddMediaPanel] = useState(false); // Removed - search panel now always visible
+  const [showAddTunesPanel, setShowAddTunesPanel] = useState(false);
   const [addMediaSearchQuery, setAddMediaSearchQuery] = useState('');
   const [addMediaResults, setAddMediaResults] = useState<{
     database: any[];
@@ -2290,7 +2290,8 @@ const Party: React.FC = () => {
         </h1>
       </div>
 
-      {/* Share Button - Dropdown Menu */}
+      {/* Share Button - Dropdown Menu (admin only) */}
+      {user?.role?.includes('admin') && (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 p-2">
         <div className="flex justify-center">
           <div className="relative">
@@ -2376,6 +2377,7 @@ const Party: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
       
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
         <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -2534,12 +2536,23 @@ const Party: React.FC = () => {
                   </div>
                 )}
 
-                {/* Inline Add Media Search Panel - Now Always Visible */}
+                {/* Inline Add Media Search Panel - Collapsed by default, expand with "Add Tunes" */}
                 {!showVetoed && party && (
                   <div className="mb-6">
                     <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
-                      <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
-                        
+                        {!showAddTunesPanel ? (
+                          <div className="flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setShowAddTunesPanel(true)}
+                              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 text-white font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add Tunes
+                            </button>
+                          </div>
+                        ) : (
+                          <>
                         {/* Quota Warning Banner */}
                         <QuotaWarningBanner className="mb-4" />
                         
@@ -2561,7 +2574,7 @@ const Party: React.FC = () => {
                          
                         </div>
                         <div className="flex justify-center">
-                        <button
+                          <button
                             onClick={handleAddMediaSearch}
                             disabled={isSearchingNewMedia || !addMediaSearchQuery.trim()}
                             className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
@@ -2572,8 +2585,13 @@ const Party: React.FC = () => {
                               'Search'
                             )}
                           </button>
-                          </div>
+                        </div>
+                          </>
+                        )}
 
+                        {/* Queue Results and search results - only when Add Tunes panel is expanded */}
+                        {showAddTunesPanel && (
+                        <>
                         {/* Queue Results - Real-time search from party queue */}
                         {addMediaSearchQuery.trim() && getFilteredQueueForSearch().length > 0 && (
                           <div className="mb-6">
@@ -3080,6 +3098,8 @@ const Party: React.FC = () => {
                             <p className="text-gray-500 text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
+                        </>
+                        )}
                       </div>
                   </div>
                 )}
@@ -3087,7 +3107,6 @@ const Party: React.FC = () => {
                 {/* Sorting Tabs - Only show for Queue, not Vetoed */}
                 {!showVetoed && (
                   <div className="mb-6">
-                    <h3 className="text-base sm:text-lg font-semibold text-white text-center mb-3 p-2">Sort by Time</h3>
                     <div className="flex flex-row flex-wrap gap-2 justify-center">
                       {[
                         { key: 'all-time', label: 'All Time' },
