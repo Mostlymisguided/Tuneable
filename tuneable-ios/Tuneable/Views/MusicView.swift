@@ -24,8 +24,11 @@ struct MusicView: View {
     @State private var errorMessage: String?
     @State private var isRefreshing = false
     @State private var selectedTagFilters: Set<String> = []
-    @State private var showFilterByTagSheet = false
+    @State private var showTagFilterExpanded = false
+    @State private var showAllTagsInFilter = false
     @State private var showVetoed = false
+
+    private let initialTopTagsCount = 6
 
     /// Display media filtered by selected tags (OR logic); when no tags selected, show all.
     private var displayMedia: [GlobalPartyMediaItem] {
@@ -80,14 +83,17 @@ struct MusicView: View {
         .sorted { $0.totalPence > $1.totalPence }
     }
 
-    private var allTagsFromMedia: [String] {
-        var set: Set<String> = []
+    /// Top tags with total tip amount (pence) for each, sorted by total descending.
+    private var topTagsWithAmounts: [(tag: String, totalPence: Int)] {
+        var totalByTag: [String: Int] = [:]
         for item in media {
+            let amount = item.partyMediaAggregate ?? 0
             for tag in item.tags ?? [] where !tag.isEmpty {
-                set.insert(tag)
+                totalByTag[tag, default: 0] += amount
             }
         }
-        return set.sorted()
+        return totalByTag.map { ($0.key, $0.value) }
+            .sorted { $0.totalPence > $1.totalPence }
     }
 
     var body: some View {
@@ -112,10 +118,13 @@ struct MusicView: View {
                         // 3. Top Supporters
                         topSupportersCard
 
-                        // 4. Action buttons
-                        HStack(spacing: 12) {
+                        // 4. Action buttons + expandable Top Tags
+                        VStack(spacing: 12) {
                             addTunesButton
                             filterByTagButton
+                            if showTagFilterExpanded {
+                                topTagsCard
+                            }
                         }
                         .padding(.horizontal, 16)
 
@@ -166,19 +175,12 @@ struct MusicView: View {
                 }
             }
             .foregroundStyle(AppTheme.textPrimary)
-            .navigationTitle("Music")
+            .navigationTitle("")
+.navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .refreshable { await loadMedia() }
             .onAppear { Task { await loadMedia() } }
             .onChange(of: selectedPeriod) { _, _ in Task { await loadMedia() } }
-            .sheet(isPresented: $showFilterByTagSheet) {
-                FilterByTagSheet(
-                    allTags: allTagsFromMedia,
-                    selected: selectedTagFilters,
-                    onApply: { selectedTagFilters = $0; showFilterByTagSheet = false },
-                    onClear: { selectedTagFilters = []; showFilterByTagSheet = false }
-                )
-            }
         }
     }
 
@@ -263,7 +265,10 @@ struct MusicView: View {
 
     private var filterByTagButton: some View {
         Button {
-            showFilterByTagSheet = true
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showTagFilterExpanded.toggle()
+                if !showTagFilterExpanded { showAllTagsInFilter = false }
+            }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "tag")
@@ -277,6 +282,82 @@ struct MusicView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+    }
+
+    private var topTagsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag")
+                        .foregroundStyle(AppTheme.textPrimary)
+                    Text("Top Tags")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.textPrimary)
+                }
+                Spacer()
+                Button("Hide") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showTagFilterExpanded = false
+                        showAllTagsInFilter = false
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.textPrimary)
+            }
+
+            let tagsToShow = showAllTagsInFilter ? topTagsWithAmounts : Array(topTagsWithAmounts.prefix(initialTopTagsCount))
+            let remainingCount = topTagsWithAmounts.count - initialTopTagsCount
+
+            FlowLayout(spacing: 8) {
+                ForEach(tagsToShow, id: \.tag) { entry in
+                    let isSelected = selectedTagFilters.contains(entry.tag)
+                    Button {
+                        if selectedTagFilters.contains(entry.tag) {
+                            selectedTagFilters.remove(entry.tag)
+                        } else {
+                            selectedTagFilters.insert(entry.tag)
+                        }
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text("#\(entry.tag)")
+                                .font(.caption.weight(.medium))
+                                .lineLimit(1)
+                            Text(formatPenceAsPounds(entry.totalPence))
+                                .font(.caption2)
+                                .foregroundStyle(AppTheme.textTertiary)
+                        }
+                        .foregroundStyle(AppTheme.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(isSelected ? Color(red: 126/255, green: 34/255, blue: 206/255).opacity(0.6) : Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                if !showAllTagsInFilter && remainingCount > 0 {
+                    Button {
+                        showAllTagsInFilter = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.caption.weight(.medium))
+                            Text("+\(remainingCount) more")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundStyle(AppTheme.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var periodPicker: some View {
@@ -339,6 +420,43 @@ struct MusicView: View {
         }
         isLoading = false
         isRefreshing = false
+    }
+}
+
+// MARK: - Flow layout (wraps subviews by content width, no fixed columns)
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width + spacing > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+        }
+        return CGSize(width: maxWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let maxWidth = bounds.width
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width - bounds.minX > maxWidth && x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+        }
     }
 }
 
@@ -458,59 +576,6 @@ struct TopSupportersRow: View {
         .padding(8)
         .background(Color.white.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-// MARK: - Filter by tag sheet
-struct FilterByTagSheet: View {
-    let allTags: [String]
-    let selected: Set<String>
-    let onApply: (Set<String>) -> Void
-    let onClear: () -> Void
-
-    @State private var pendingSelection: Set<String> = []
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(allTags, id: \.self) { tag in
-                    Button {
-                        if pendingSelection.contains(tag) {
-                            pendingSelection.remove(tag)
-                        } else {
-                            pendingSelection.insert(tag)
-                        }
-                    } label: {
-                        HStack {
-                            Text("#\(tag)")
-                                .foregroundStyle(AppTheme.textPrimary)
-                            Spacer()
-                            if pendingSelection.contains(tag) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(AppTheme.accent)
-                            }
-                        }
-                    }
-                    .listRowBackground(AppTheme.cardBackground)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(PurpleGradientBackground())
-            .onAppear { pendingSelection = selected }
-            .navigationTitle("Filter by Tag")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") { onClear() }
-                        .foregroundStyle(AppTheme.textSecondary)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Apply") { onApply(pendingSelection) }
-                        .foregroundStyle(AppTheme.accent)
-                }
-            }
-        }
     }
 }
 
