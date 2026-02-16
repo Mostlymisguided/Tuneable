@@ -1388,6 +1388,44 @@ const Party: React.FC = () => {
     return out;
   }, [party, selectedTagFilters]);
 
+  // Total unique supporters (aggregated by user, same logic as TopSupporters) for load-more cap
+  const totalSupportersCount = useMemo(() => {
+    if (!topSupporterBids.length) return 0;
+    const byUser: Record<string, boolean> = {};
+    topSupporterBids.forEach((bid: any) => {
+      const status = bid.status || (bid._doc && bid._doc.status) || 'active';
+      if (status === 'vetoed') return;
+      const userId = bid.userId?.uuid || bid.userId?.username;
+      if (userId) byUser[userId] = true;
+    });
+    return Object.keys(byUser).length;
+  }, [topSupporterBids]);
+
+  const [topSupportersToShow, setTopSupportersToShow] = useState(10);
+  const topSupportersSentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset to 10 when party/filters change
+  useEffect(() => {
+    setTopSupportersToShow(10);
+  }, [topSupporterBids, selectedTagFilters]);
+
+  // Load more supporters when user scrolls to bottom of Top Supporters list
+  useEffect(() => {
+    const sentinel = topSupportersSentinelRef.current;
+    if (!sentinel || totalSupportersCount <= 10) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry?.isIntersecting) {
+          setTopSupportersToShow((prev) => Math.min(prev + 10, totalSupportersCount));
+        }
+      },
+      { root: sentinel.parentElement, rootMargin: '20px', threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [totalSupportersCount, topSupportersToShow]);
+
   // Removed TuneBytes/user profile fetch for simplicity and performance
 
   // Get media to display based on selected time period and search terms
@@ -2443,7 +2481,12 @@ const Party: React.FC = () => {
               )}
             </div>
             <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
-              <TopSupporters bids={topSupporterBids} maxDisplay={10} />
+              <TopSupporters bids={topSupporterBids} maxDisplay={topSupportersToShow} />
+              {totalSupportersCount > topSupportersToShow && (
+                <div ref={topSupportersSentinelRef} className="h-4 flex items-center justify-center text-xs text-gray-500 py-2" aria-hidden>
+                  Scroll for more
+                </div>
+              )}
             </div>
           </div>
         </div>
