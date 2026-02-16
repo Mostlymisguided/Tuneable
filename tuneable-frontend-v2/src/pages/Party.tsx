@@ -3161,11 +3161,11 @@ const Party: React.FC = () => {
                       <div className="flex justify-center mt-4">
                         <button
                           onClick={handlePlayQueue}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
                           title={`Play ${getDisplayMedia().length} track${getDisplayMedia().length !== 1 ? 's' : ''} from the top`}
                         >
                           <Play className="h-4 w-4" />
-                          <span>Play {party?.name || 'Queue'}</span>
+                          <span>Play</span>
                         </button>
                       </div>
                     )}
