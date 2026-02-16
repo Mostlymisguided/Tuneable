@@ -162,6 +162,7 @@ const Party: React.FC = () => {
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
+  const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
 
@@ -2429,78 +2430,9 @@ const Party: React.FC = () => {
           </div>
         </div>
 
-        {/* Top Tags + Top Supporters (two columns on desktop) */}
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Top Tags Cloud */}
-          {topTags.length > 0 && (
-            <div className="card p-3 md:p-6">
-              <div className="flex items-center justify-between mb-1 md:mb-3">
-                <h3 className="text-lg font-semibold text-white flex items-center">
-                  <Tag className="h-4 w-4 mr-2 text-purple-400" />
-                  Top Tags
-                </h3>
-                {queueSearchTerms.some((t) => t.startsWith('#')) && (
-                  <button
-                    onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => !t.startsWith('#')))}
-                    className="text-sm text-purple-300 hover:text-white"
-                  >
-                    Clear tags
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
-                  const hash = `#${tag}`;
-                  const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
-                  const weight = Math.max(0.75, Math.min(1.25, total / 50));
-                  const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
-
-                  return (
-                    <button
-                      key={tag}
-                      onClick={() =>
-                        setQueueSearchTerms((prev) =>
-                          selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
-                        )
-                      }
-                      className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
-                        selected
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
-                      }`}
-                      title={`${penceToPounds(total)} total across queued tunes`}
-                    >
-                      #{tag}
-                      <span className="ml-2 text-[10px] opacity-70">{penceToPounds(total)}</span>
-                    </button>
-                  );
-                })}
-                {topTags.length > (isMobile ? 6 : 10) && (
-                  <button
-                    type="button"
-                    onClick={() => setTopTagsExpanded((e) => !e)}
-                    className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
-                    aria-expanded={topTagsExpanded}
-                  >
-                    {topTagsExpanded ? (
-                      <>
-                        <Minus className="w-3 h-3" />
-                        Show less
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3 h-3" />
-                        +{topTags.length - (isMobile ? 6 : 10)} more
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Top Supporters */}
-          <div className="card p-3 md:p-6">
+        {/* Top Supporters - centered */}
+        <div className="max-w-7xl mx-auto flex justify-center">
+          <div className="card p-3 md:p-6 w-full max-w-xl">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3">
               <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
               {selectedTagFilters.length > 0 ? (
@@ -3101,6 +3033,102 @@ const Party: React.FC = () => {
                         </>
                         )}
                       </div>
+                  </div>
+                )}
+
+                {/* Tag filter - hidden by default, "Filter by Tag" reveals tag cloud; directly above time sorting */}
+                {!showVetoed && (
+                  <div className="mb-6">
+                    {!showTagFilterCloud ? (
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowTagFilterCloud(true)}
+                          className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+                        >
+                          <Tag className="h-4 w-4 text-purple-400" />
+                          Filter by Tag
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="card p-3 md:p-6 mb-4">
+                        <div className="flex items-center justify-between mb-1 md:mb-3">
+                          <h3 className="text-lg font-semibold text-white flex items-center">
+                            <Tag className="h-4 w-4 mr-2 text-purple-400" />
+                            Top Tags
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            {queueSearchTerms.some((t) => t.startsWith('#')) && (
+                              <button
+                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => !t.startsWith('#')))}
+                                className="text-sm text-purple-300 hover:text-white"
+                              >
+                                Clear tags
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setShowTagFilterCloud(false)}
+                              className="text-sm text-gray-400 hover:text-white"
+                            >
+                              Hide
+                            </button>
+                          </div>
+                        </div>
+                        {topTags.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
+                              const hash = `#${tag}`;
+                              const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
+                              const weight = Math.max(0.75, Math.min(1.25, total / 50));
+                              const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
+
+                              return (
+                                <button
+                                  key={tag}
+                                  onClick={() =>
+                                    setQueueSearchTerms((prev) =>
+                                      selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
+                                    )
+                                  }
+                                  className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
+                                    selected
+                                      ? 'bg-purple-600 text-white'
+                                      : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
+                                  }`}
+                                  title={`${penceToPounds(total)} total across queued tunes`}
+                                >
+                                  #{tag}
+                                  <span className="ml-2 text-[10px] opacity-70">{penceToPounds(total)}</span>
+                                </button>
+                              );
+                            })}
+                            {topTags.length > (isMobile ? 6 : 10) && (
+                              <button
+                                type="button"
+                                onClick={() => setTopTagsExpanded((e) => !e)}
+                                className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
+                                aria-expanded={topTagsExpanded}
+                              >
+                                {topTagsExpanded ? (
+                                  <>
+                                    <Minus className="w-3 h-3" />
+                                    Show less
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-3 h-3" />
+                                    +{topTags.length - (isMobile ? 6 : 10)} more
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-gray-400 text-sm">No tags in this party yet.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
