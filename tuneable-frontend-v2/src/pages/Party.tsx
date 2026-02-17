@@ -3148,24 +3148,26 @@ const Party: React.FC = () => {
                               );
                             })}
                             {topTags.length > (isMobile ? 6 : 10) && (
-                              <button
-                                type="button"
-                                onClick={() => setTopTagsExpanded((e) => !e)}
-                                className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
-                                aria-expanded={topTagsExpanded}
-                              >
-                                {topTagsExpanded ? (
-                                  <>
-                                    <Minus className="w-3 h-3" />
-                                    Show less
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus className="w-3 h-3" />
-                                    +{topTags.length - (isMobile ? 6 : 10)} more
-                                  </>
-                                )}
-                              </button>
+                              <div className="w-full flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setTopTagsExpanded((e) => !e)}
+                                  className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
+                                  aria-expanded={topTagsExpanded}
+                                >
+                                  {topTagsExpanded ? (
+                                    <>
+                                      <Minus className="w-3 h-3" />
+                                      Show less
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="w-3 h-3" />
+                                      Show More
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             )}
                           </div>
                         ) : (
