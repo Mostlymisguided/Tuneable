@@ -42,6 +42,7 @@ struct GlobalPartyBidUser: Codable {
 }
 
 /// Flattened media item from global party details or sorted-by-time API (camelCase from backend).
+/// Backend includes `sources` (e.g. youtube, upload URLs) for playback.
 struct GlobalPartyMediaItem: Codable, Identifiable {
     var id: String { idFromAPI ?? _id ?? uuid ?? "" }
     private let idFromAPI: String?
@@ -55,10 +56,50 @@ struct GlobalPartyMediaItem: Codable, Identifiable {
     let tags: [String]?
     let status: String?
     let bids: [GlobalPartyBid]?
+    /// Playback URLs by platform: e.g. ["youtube": "https://...", "upload": "https://..."]
+    let sources: [String: String]?
 
     enum CodingKeys: String, CodingKey {
         case idFromAPI = "id"
-        case _id, uuid, title, artist, duration, coverArt, partyMediaAggregate, tags, status, bids
+        case _id, uuid, title, artist, duration, coverArt, partyMediaAggregate, tags, status, bids, sources
+    }
+
+    /// First playable URL: youtube preferred, then upload, then any value.
+    var playbackURL: URL? {
+        guard let s = sources else { return nil }
+        let urlString = s["youtube"] ?? s["upload"] ?? s.values.first
+        guard let urlString = urlString, !urlString.isEmpty else { return nil }
+        return URL(string: urlString)
+    }
+
+    /// True when the primary source is YouTube (embed in WKWebView). Otherwise use direct URL (e.g. audio).
+    var isYouTubeSource: Bool {
+        guard let s = sources, let yt = s["youtube"], !yt.isEmpty else { return false }
+        return yt.contains("youtube.com") || yt.contains("youtu.be")
+    }
+
+    /// YouTube video ID for embed URL, or nil if not YouTube.
+    var youtubeVideoId: String? {
+        guard isYouTubeSource, let urlString = sources?["youtube"] else { return nil }
+        return Self.extractYouTubeVideoId(from: urlString)
+    }
+
+    /// Extracts video ID from youtube.com/watch?v=ID, youtu.be/ID, or youtube.com/embed/ID.
+    static func extractYouTubeVideoId(from urlString: String) -> String? {
+        let patterns = [
+            "youtube.com/watch?v=",
+            "youtu.be/",
+            "youtube.com/embed/"
+        ]
+        for prefix in patterns {
+            if let range = urlString.range(of: prefix) {
+                let after = String(urlString[range.upperBound...])
+                let end = after.firstIndex(where: { $0 == "&" || $0 == "?" || $0 == "#" }) ?? after.endIndex
+                let id = String(after[..<end]).trimmingCharacters(in: .whitespaces)
+                return id.isEmpty ? nil : id
+            }
+        }
+        return nil
     }
 }
 

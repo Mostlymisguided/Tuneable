@@ -19,7 +19,9 @@ struct ContentView: View {
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
     @EnvironmentObject var podcastPlayer: PodcastPlayerStore
+    @EnvironmentObject var musicPlayer: MusicPlayerStore
     @State private var showNowPlaying = false
+    @State private var showMusicNowPlaying = false
 
     var body: some View {
         TabView {
@@ -40,13 +42,26 @@ struct MainTabView: View {
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
+        .background {
+            MusicPlayerHostView(store: musicPlayer)
+        }
         .overlay(alignment: .bottom) {
-            PodcastMiniBarView(showNowPlaying: $showNowPlaying)
-                .padding(.bottom, 49) // Tab bar height so mini bar sits above it
+            Group {
+                if musicPlayer.currentItem != nil {
+                    MusicMiniBarView(showNowPlaying: $showMusicNowPlaying)
+                } else if podcastPlayer.currentEpisode != nil {
+                    PodcastMiniBarView(showNowPlaying: $showNowPlaying)
+                }
+            }
+            .padding(.bottom, 49)
         }
         .fullScreenCover(isPresented: $showNowPlaying) {
             NowPlayingSheet()
                 .environmentObject(podcastPlayer)
+        }
+        .fullScreenCover(isPresented: $showMusicNowPlaying) {
+            MusicNowPlayingSheet()
+                .environmentObject(musicPlayer)
         }
     }
 }
@@ -63,4 +78,6 @@ struct MainTabView: View {
             a.user = User(_id: "1", uuid: "u1", username: "demo", email: "demo@example.com", profilePic: nil, personalInviteCode: nil, balance: 0, role: ["user"], isActive: true, joinedParties: nil, homeLocation: nil, creatorProfile: nil, emailVerified: true, tuneBytes: 0)
             return a
         }())
+        .environmentObject(PodcastPlayerStore())
+        .environmentObject(MusicPlayerStore())
 }

@@ -18,6 +18,7 @@ private var globalPartyWebURL: URL? {
 }
 
 struct MusicView: View {
+    @EnvironmentObject private var musicPlayer: MusicPlayerStore
     @State private var media: [GlobalPartyMediaItem] = []
     @State private var selectedPeriod = "today"
     @State private var isLoading = false
@@ -168,7 +169,12 @@ struct MusicView: View {
                         } else {
                             LazyVStack(spacing: 12) {
                                 ForEach(Array(displayMedia.enumerated()), id: \.element.id) { index, item in
-                                    GlobalPartyMediaRow(index: index + 1, item: item)
+                                    let playable = displayMedia.filter { $0.playbackURL != nil }
+                                    GlobalPartyMediaRow(index: index + 1, item: item) {
+                                        if let idx = playable.firstIndex(where: { $0.id == item.id }) {
+                                            musicPlayer.setQueueAndPlay(playable, startIndex: idx)
+                                        }
+                                    }
                                 }
                             }
                             .padding(.horizontal, 16)
@@ -440,9 +446,11 @@ struct MusicView: View {
         .padding(.vertical, 8)
     }
 
+    /// Play the displayed queue: opens the first track’s playback URL (e.g. YouTube) in the system.
+    /// Mirrors web Party “Play” behavior (queue = displayMedia); iOS has no in-app music queue player yet.
     private var playButton: some View {
         Button {
-            // Play queue: placeholder for future playback
+            playDisplayedQueue()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "play.fill")
@@ -456,6 +464,16 @@ struct MusicView: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(Color(red: 126/255, green: 34/255, blue: 206/255)))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Play the queue displayed below (same logic as web: use current time filter + tag filter).
+    /// Uses in-app music player (queue + WKWebView for YouTube / direct audio).
+    private func playDisplayedQueue() {
+        let queue = displayMedia
+        guard !queue.isEmpty else { return }
+        let playable = queue.filter { $0.playbackURL != nil }
+        guard !playable.isEmpty else { return }
+        musicPlayer.setQueueAndPlay(playable, startIndex: 0)
     }
 
     private func formatPenceAsPounds(_ pence: Int) -> String {
@@ -640,6 +658,7 @@ struct TopSupportersRow: View {
 struct GlobalPartyMediaRow: View {
     let index: Int
     let item: GlobalPartyMediaItem
+    var onPlay: (() -> Void)? = nil
 
     private var coverArtURL: URL? {
         guard let urlString = item.coverArt, !urlString.isEmpty else { return nil }
@@ -708,14 +727,20 @@ struct GlobalPartyMediaRow: View {
                     .frame(width: 88, height: 88)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     // Play overlay
-                    Circle()
-                        .fill(Color.black.opacity(0.35))
-                        .frame(width: 44, height: 44)
-                        .overlay(
-                            Image(systemName: "play.fill")
-                                .font(.title2)
-                                .foregroundStyle(.white)
-                        )
+                    Button {
+                        onPlay?()
+                    } label: {
+                        Circle()
+                            .fill(Color.black.opacity(0.35))
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Image(systemName: "play.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.white)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(onPlay == nil)
                 }
                 HStack(spacing: 10) {
                     HStack(spacing: 4) {
@@ -829,4 +854,5 @@ struct GlobalPartyMediaRow: View {
 
 #Preview("Music") {
     MusicView()
+        .environmentObject(MusicPlayerStore())
 }
