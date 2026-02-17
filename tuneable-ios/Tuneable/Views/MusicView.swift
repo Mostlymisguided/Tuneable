@@ -386,14 +386,17 @@ struct MusicView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if !showAllTagsInFilter && remainingCount > 0 {
+            }
+            if !showAllTagsInFilter && remainingCount > 0 {
+                HStack {
+                    Spacer(minLength: 0)
                     Button {
                         showAllTagsInFilter = true
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
                                 .font(.caption.weight(.medium))
-                            Text("+\(remainingCount) more")
+                            Text("Show More")
                                 .font(.caption.weight(.medium))
                         }
                         .foregroundStyle(AppTheme.textPrimary)
@@ -403,6 +406,7 @@ struct MusicView: View {
                         .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    Spacer(minLength: 0)
                 }
             }
         }
@@ -413,25 +417,26 @@ struct MusicView: View {
     }
 
     private var periodPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(timePeriods, id: \.key) { period in
-                    Button {
-                        selectedPeriod = period.key
-                    } label: {
-                        Text(period.label)
-                            .font(.subheadline.weight(.medium))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(selectedPeriod == period.key ? Color(red: 126/255, green: 34/255, blue: 206/255) : Color.white.opacity(0.12))
-                            .foregroundStyle(selectedPeriod == period.key ? .white : AppTheme.textSecondary)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
+        HStack(spacing: 6) {
+            ForEach(timePeriods, id: \.key) { period in
+                Button {
+                    selectedPeriod = period.key
+                } label: {
+                    Text(period.label)
+                        .font(.caption.weight(.medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(selectedPeriod == period.key ? Color(red: 126/255, green: 34/255, blue: 206/255) : Color.white.opacity(0.12))
+                        .foregroundStyle(selectedPeriod == period.key ? .white : AppTheme.textSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
         }
+        .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
 
