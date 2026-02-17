@@ -29,6 +29,7 @@ struct MusicView: View {
     @State private var showVetoed = false
     @State private var showAddTunesExpanded = false
     @State private var addTunesSearchQuery = ""
+    @State private var showMusicSearch = false
 
     private let initialTopTagsCount = 6
 
@@ -183,6 +184,11 @@ struct MusicView: View {
             .refreshable { await loadMedia() }
             .onAppear { Task { await loadMedia() } }
             .onChange(of: selectedPeriod) { _, _ in Task { await loadMedia() } }
+            .sheet(isPresented: $showMusicSearch) {
+                MusicSearchView(initialQuery: $addTunesSearchQuery) {
+                    Task { await loadMedia() }
+                }
+            }
         }
     }
 
@@ -277,7 +283,7 @@ struct MusicView: View {
                             .background(Color.white.opacity(0.12))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .submitLabel(.search)
-                            .onSubmit { openSearchOnWeb() }
+                            .onSubmit { showMusicSearch = true }
                         Button("Hide") {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 showAddTunesExpanded = false
@@ -288,7 +294,7 @@ struct MusicView: View {
                         .foregroundStyle(AppTheme.textPrimary)
                     }
                     Button {
-                        openSearchOnWeb()
+                        showMusicSearch = true
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "magnifyingglass")
@@ -306,25 +312,6 @@ struct MusicView: View {
                     .disabled(addTunesSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-        }
-    }
-
-    private func openSearchOnWeb() {
-        let query = addTunesSearchQuery.trimmingCharacters(in: .whitespaces)
-        let base = AppConfig.apiBaseURL
-        let webBase: String
-        if base.contains("localhost") {
-            webBase = "http://localhost:3000"
-        } else {
-            webBase = base.replacingOccurrences(of: "api.", with: "")
-        }
-        var path = "\(webBase)/search?partyId=\(globalPartyId)"
-        if !query.isEmpty {
-            let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-            path += "&q=\(encoded)"
-        }
-        if let url = URL(string: path) {
-            UIApplication.shared.open(url)
         }
     }
 

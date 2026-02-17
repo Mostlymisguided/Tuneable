@@ -44,4 +44,32 @@ final class PartyService {
         struct Empty: Decodable {}
         let _: Empty = try await client.post("/parties/join/\(partyId)", body: Body(inviteCode: inviteCode, location: nil))
     }
+
+    /// Add media to party with initial bid (tip). Same as web Party "Add & Tip".
+    /// bidAmount in pounds (e.g. 1.10 for £1.10). Requires auth.
+    func addMediaToParty(partyId: String, body: AddMediaBody) async throws -> AddMediaResponse {
+        try await client.post("/parties/\(partyId)/media/add", body: body)
+    }
+}
+
+struct AddMediaBody: Encodable {
+    let url: String
+    let title: String
+    let artist: String
+    let bidAmount: Double
+    let platform: String
+    let duration: Double?
+    let coverArt: String?
+    let category: String?
+    let tags: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case url, title, artist, bidAmount, platform, duration, coverArt, category, tags
+    }
+}
+
+struct AddMediaResponse: Decodable {
+    let isNewMedia: Bool?
+    let updatedBalance: Int?
+    var isDuplicate: Bool? { isNewMedia.map { !$0 } }
 }
