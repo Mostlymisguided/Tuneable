@@ -163,6 +163,7 @@ const Party: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
+  const [showTopFansPanel, setShowTopFansPanel] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
 
@@ -2471,23 +2472,47 @@ const Party: React.FC = () => {
           </div>
         </div>
 
-        {/* Top Supporters - centered */}
+        {/* Top Fans - collapsed by default, expand with button */}
         <div className="max-w-7xl mx-auto flex justify-center">
           <div className="card p-3 md:p-6 w-full max-w-xl">
-            <div className="text-center mb-2 md:mb-3">
-              <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
-              {selectedTagFilters.length > 0 && (
-                <p className="text-xs text-purple-300 mt-1">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</p>
-              )}
-            </div>
-            <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
-              <TopSupporters bids={topSupporterBids} maxDisplay={topSupportersToShow} />
-              {totalSupportersCount > topSupportersToShow && (
-                <div ref={topSupportersSentinelRef} className="h-4 flex items-center justify-center text-xs text-gray-500 py-2" aria-hidden>
-                  Scroll for more
+            {!showTopFansPanel ? (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowTopFansPanel(true)}
+                  className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4 text-purple-400" />
+                  Top Fans
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-2 md:mb-3">
+                  <h3 className="text-base md:text-lg font-semibold text-white">Top Fans</h3>
+                  {selectedTagFilters.length > 0 && (
+                    <p className="text-xs text-purple-300 mt-1">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</p>
+                  )}
                 </div>
-              )}
-            </div>
+                <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
+                  <TopSupporters bids={topSupporterBids} maxDisplay={topSupportersToShow} />
+                  {totalSupportersCount > topSupportersToShow && (
+                    <div ref={topSupportersSentinelRef} className="h-4 flex items-center justify-center text-xs text-gray-500 py-2" aria-hidden>
+                      Scroll for more
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-center mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowTopFansPanel(false)}
+                    className="text-xs text-gray-400 hover:text-gray-300"
+                  >
+                    Hide
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -3181,7 +3206,7 @@ const Party: React.FC = () => {
                 {/* Sorting Tabs - Only show for Queue, not Vetoed */}
                 {!showVetoed && (
                   <div className="mb-4 md:mb-6">
-                    <div className="flex flex-row flex-wrap gap-2 justify-center">
+                    <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
                       {[
                         { key: 'all-time', label: 'All Time' },
                        /* { key: 'this-year', label: 'This Year' }, */
@@ -3192,7 +3217,7 @@ const Party: React.FC = () => {
                         <button
                           key={period.key}
                           onClick={() => handleTimePeriodChange(period.key)}
-                          className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                          className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
                             selectedTimePeriod === period.key
                               ? 'bg-purple-700 text-white'
                               : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
