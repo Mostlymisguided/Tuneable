@@ -12,8 +12,6 @@ import {
   Save,
   X,
   Loader2,
-  Gift,
-  Copy,
   Facebook,
   Youtube,
   Instagram,
@@ -24,10 +22,8 @@ import {
   MapPin,
   ChevronDown,
   ChevronUp,
-  Building,
   CheckCircle,
   Flag,
-  Users,
   Award,
   ArrowUpDown,
   ArrowUp,
@@ -1234,15 +1230,6 @@ const UserProfile: React.FC = () => {
     return unconnected;
   };
 
-  // Copy invite code to clipboard
-  const copyInviteCode = () => {
-    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
-    if (inviteCode) {
-      navigator.clipboard.writeText(inviteCode);
-      toast.success('Invite code copied to clipboard!');
-    }
-  };
-
   // Social media modal handlers
   const openSocialModal = (platform: 'facebook' | 'instagram' | 'soundcloud') => {
     const currentUrl = user?.socialMedia?.[platform];
@@ -1277,11 +1264,6 @@ const UserProfile: React.FC = () => {
       toast.error(error.response?.data?.error || 'Failed to update social media URL');
       throw error;
     }
-  };
-
-  // Label creation handlers
-  const handleAddLabelClick = () => {
-    setIsLabelModalOpen(true);
   };
 
   const handleCollectiveLinked = async () => {
