@@ -23,6 +23,9 @@ const getWalletTopUpStripe = async () => {
     if (mode === 'live' && stripeLive) {
       return stripeLive;
     }
+    if (mode === 'live' && !stripeLive) {
+      console.warn('⚠️ Stripe: Admin mode is "live" but STRIPE_SECRET_KEY_LIVE is not set. Wallet top-ups will use TEST keys until you set STRIPE_SECRET_KEY_LIVE in .env.');
+    }
     // Default to test mode if live not configured or mode is 'test'
     return stripeTest;
   } catch (error) {

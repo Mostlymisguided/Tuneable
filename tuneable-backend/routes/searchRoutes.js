@@ -444,9 +444,19 @@ router.get('/stripe/publishable-key', async (req, res) => {
         const mode = settings.stripe?.walletTopUpMode || 'live';
         
         // Return appropriate publishable key based on mode
-        const publishableKey = mode === 'live' 
-            ? process.env.STRIPE_PUBLISHABLE_KEY_LIVE || process.env.STRIPE_PUBLISHABLE_KEY
-            : process.env.STRIPE_PUBLISHABLE_KEY_TEST || process.env.STRIPE_PUBLISHABLE_KEY;
+        const liveKey = process.env.STRIPE_PUBLISHABLE_KEY_LIVE || process.env.STRIPE_PUBLISHABLE_KEY;
+        const testKey = process.env.STRIPE_PUBLISHABLE_KEY_TEST || process.env.STRIPE_PUBLISHABLE_KEY;
+        const publishableKey = mode === 'live' ? liveKey : testKey;
+
+        // Warn if live mode is selected but live key is missing or is a test key (common misconfiguration)
+        if (mode === 'live') {
+            if (!process.env.STRIPE_PUBLISHABLE_KEY_LIVE) {
+                console.warn('⚠️ Stripe: Admin mode is "live" but STRIPE_PUBLISHABLE_KEY_LIVE is not set. Using fallback key; if it is pk_test_*, Checkout will show Test Mode.');
+            }
+            if (publishableKey && publishableKey.startsWith('pk_test_')) {
+                console.warn('⚠️ Stripe: Live mode selected but publishable key is pk_test_*. Set STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_... in .env to accept real payments.');
+            }
+        }
         
         res.json({ 
             publishableKey: publishableKey || '',
