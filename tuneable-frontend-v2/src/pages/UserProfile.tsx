@@ -39,7 +39,6 @@ import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI } from '../lib/api';
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
-import BetaWarningBanner from '../components/BetaWarningBanner';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import TagInputModal from '../components/TagInputModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -268,8 +267,6 @@ const UserProfile: React.FC = () => {
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
-  const isBetaMode = import.meta.env.VITE_BETA_MODE === 'true' || import.meta.env.VITE_BETA_MODE === true;
-  
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -522,7 +519,7 @@ const UserProfile: React.FC = () => {
       }
       
     }
-  }, [user, isOwnProfile, isBetaMode]);
+  }, [user, isOwnProfile]);
 
   // Clear search results when query is cleared
   useEffect(() => {
@@ -1465,11 +1462,6 @@ const UserProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Beta Warning Banner */}
-        {isBetaMode && isOwnProfile && (
-          <BetaWarningBanner variant="inline" dismissible={true} className="mb-6" />
-        )}
-
         {/* User Profile Header */}
         <div className="mb-8 relative">
           <button

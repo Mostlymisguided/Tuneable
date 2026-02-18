@@ -138,8 +138,7 @@ const RequestInvite: React.FC = () => {
           <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6">
             <h3 className="text-white font-semibold mb-2">Why invite-only?</h3>
             <p className="text-gray-300 text-sm">
-              Tuneable is currently in Beta Testing with a small community of music lovers & creators.
-              
+              Tuneable is invite-only with a growing community of music lovers & creators.
             </p>
           </div>
 

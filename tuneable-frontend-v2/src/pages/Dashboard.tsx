@@ -9,7 +9,6 @@ import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
-import BetaWarningBanner from '../components/BetaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
@@ -831,9 +830,6 @@ Join here: ${inviteLink}`.trim();
     <React.Fragment>
     <div className="min-h-screen bg-gray-900">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Beta Warning Banner */}
-      <BetaWarningBanner variant="inline" dismissible={true} className="mx-auto w-fit mb-6" />
-      
       <div className="mb-8">
         <h1 className="text-3xl text-center font-bold text-gray-300">
           Welcome {user?.username}!

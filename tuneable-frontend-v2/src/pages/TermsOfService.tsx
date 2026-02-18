@@ -452,7 +452,7 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">8.7.6 Payout Eligibility Thresholds</h3>
                 <p className="mb-2">
-                  To help buffer beta user credits and ensure sustainable payout processing, Tuneable has implemented payout eligibility thresholds:
+                  To ensure sustainable payout processing, Tuneable has implemented payout eligibility thresholds:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li><strong>First Payout:</strong> Artists must earn at least £33.00 in total tips before requesting their first payout. This threshold helps ensure that payouts reflect genuine engagement and support from the community.</li>
@@ -461,7 +461,7 @@ const TermsOfService: React.FC = () => {
                   <li><strong>Eligibility Tracking:</strong> Your total escrow earnings are tracked cumulatively. You can view your current earnings, eligibility status, and remaining amount needed for payout eligibility in your artist escrow dashboard.</li>
                 </ul>
                 <p className="mb-2">
-                  These thresholds apply to all payout requests and help ensure that the platform can sustainably process payouts while preventing abuse of beta user credits. Thresholds may be adjusted with 30 days notice to accommodate platform scaling.
+                  These thresholds apply to all payout requests and help ensure that the platform can sustainably process payouts. Thresholds may be adjusted with 30 days notice to accommodate platform scaling.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.7.7 Unclaimed Funds</h3>
