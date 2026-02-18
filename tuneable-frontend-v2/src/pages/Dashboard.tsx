@@ -80,6 +80,7 @@ const Dashboard: React.FC = () => {
   };
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
+  const [showAddTunePanel, setShowAddTunePanel] = useState(false);
   
   // Validation modal state
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -2358,45 +2359,60 @@ Join here: ${inviteLink}`.trim();
           <h2 className="text-2xl font-semibold text-white">Add Tune</h2>
         </div>
         
-        <QuotaWarningBanner className="mb-4" />
-        
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <div className="flex-1 relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              value={addTuneQuery}
-              onChange={(e) => setAddTuneQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddTuneSearch();
-                }
-              }}
-                placeholder="Search or paste YouTube URL..."
-              className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-            />
+        {!showAddTunePanel ? (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowAddTunePanel(true)}
+              className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4 text-purple-400" />
+              Add Tune
+            </button>
           </div>
-          <button
-            onClick={handleAddTuneSearch}
-            disabled={isSearchingTune || !addTuneQuery.trim()}
-            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {isSearchingTune ? 'Searching...' : 'Search'}
-          </button>
-        </div>
+        ) : (
+          <>
+            <QuotaWarningBanner className="mb-4" />
+            
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <div className="flex-1 relative">
+                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={addTuneQuery}
+                  onChange={(e) => setAddTuneQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTuneSearch();
+                    }
+                  }}
+                  placeholder="Search or paste YouTube URL..."
+                  className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <button
+                onClick={handleAddTuneSearch}
+                disabled={isSearchingTune || !addTuneQuery.trim()}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {isSearchingTune ? 'Searching...' : 'Search'}
+              </button>
+            </div>
 
-        {addTuneQuery && (
-          <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
-            <LinkIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-            <span>
-              💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
-            </span>
-          </div>
+            {addTuneQuery && (
+              <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
+                <LinkIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                <span>
+                  💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
+                </span>
+              </div>
+            )}
+          </>
         )}
         
-        {/* Search Results */}
-        {addTuneResults.length > 0 && (
+        {/* Search Results - only when panel is expanded */}
+        {showAddTunePanel && addTuneResults.length > 0 && (
         <div className="mt-4 space-y-2">
             {addTuneResults.map((result) => {
               const mediaId = result._id || result.id;

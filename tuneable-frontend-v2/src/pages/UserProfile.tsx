@@ -238,6 +238,7 @@ const UserProfile: React.FC = () => {
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<any>(null);
   const [isAddingTune, setIsAddingTune] = useState(false);
+  const [showAddTunePanel, setShowAddTunePanel] = useState(false);
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
@@ -1828,41 +1829,56 @@ const UserProfile: React.FC = () => {
         {isOwnProfile && (
           <div className="mb-8">
             <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
-              {/* Quota Warning Banner */}
-              <QuotaWarningBanner className="mb-4" />
-                
-              {/* Search Input */}
-              <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
-                <input
-                  type="text"
-                  value={addTuneSearchQuery}
-                  onChange={(e) => setAddTuneSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTuneSearch();
-                    }
-                  }}
-                  placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
-                  className="flex-1 bg-gray-900 hover:shadow-2xl rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
-                />
-              </div>
-              <div className="flex justify-center">
-                <button
-                  onClick={handleAddTuneSearch}
-                  disabled={isSearchingTune || !addTuneSearchQuery.trim()}
-                  className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
-                >
-                  {isSearchingTune ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    'Search'
-                  )}
-                </button>
-              </div>
+              {!showAddTunePanel ? (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTunePanel(true)}
+                    className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4 text-purple-400" />
+                    Add Tune
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Quota Warning Banner */}
+                  <QuotaWarningBanner className="mb-4" />
+                    
+                  {/* Search Input */}
+                  <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={addTuneSearchQuery}
+                      onChange={(e) => setAddTuneSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTuneSearch();
+                        }
+                      }}
+                      placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
+                      className="flex-1 bg-gray-900 hover:shadow-2xl rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="flex justify-center">
+                    <button
+                      onClick={handleAddTuneSearch}
+                      disabled={isSearchingTune || !addTuneSearchQuery.trim()}
+                      className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                    >
+                      {isSearchingTune ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        'Search'
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
 
-              {/* Database Results */}
-              {addTuneResults.database.length > 0 && (
+              {/* Database Results - only when panel is expanded */}
+              {showAddTunePanel && addTuneResults.database.length > 0 && (
                 <div className="mb-4 mt-4">
                   <div className="flex items-center mb-2">
                     <Music className="h-4 w-4 text-green-400 mr-2" />
@@ -1988,8 +2004,8 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* YouTube Results */}
-              {addTuneResults.youtube.length > 0 && (
+              {/* YouTube Results - only when panel is expanded */}
+              {showAddTunePanel && addTuneResults.youtube.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center mb-2">
                     <Youtube className="h-4 w-4 text-red-400 mr-2" />
