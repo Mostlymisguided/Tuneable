@@ -2474,7 +2474,7 @@ const Party: React.FC = () => {
 
         {/* Top Fans - collapsed by default, expand with button */}
         <div className="max-w-7xl mx-auto flex justify-center">
-          <div className="card p-3 md:p-6 w-full max-w-xl">
+          <div className="w-full max-w-xl">
             {!showTopFansPanel ? (
               <div className="flex justify-center">
                 <button
