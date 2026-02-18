@@ -1694,6 +1694,34 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
+              {/* User metrics - Tips, Total Tips, Avg Tip, Tunes */}
+              {stats && (
+                <div className="mb-4">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+                    <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
+                      <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                      <div className="text-lg md:text-2xl font-bold text-white">{stats.totalBids || 0}</div>
+                      <div className="text-xs md:text-sm text-gray-300">Tips</div>
+                    </div>
+                    <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
+                      <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                      <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
+                      <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
+                    </div>
+                    <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
+                      <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                      <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
+                      <div className="text-xs md:text-sm text-gray-300">Avg Tip</div>
+                    </div>
+                    <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
+                      <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                      <div className="text-lg md:text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
+                      <div className="text-xs md:text-sm text-gray-300">Tunes</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Social Media Buttons - Hide in anonymous mode (unless own profile) */}
               {!((user as any)?.preferences?.anonymousMode && !isOwnProfile) && getSocialMediaLinks().length > 0 && (
                 <div className="mb-2">
@@ -1796,35 +1824,6 @@ const UserProfile: React.FC = () => {
         {/* Tab Content */}
         {viewTab === 'overview' || !isOwnProfile ? (
           <>
-        {/* Tipping Statistics */}
-        {stats && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-center text-white mb-4">Profile Info</h2>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
-                <BarChart3 className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                <div className="text-lg md:text-2xl font-bold text-white">{stats.totalBids || 0}</div>
-                <div className="text-xs md:text-sm text-gray-300">Tips</div>
-              </div>
-              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
-                <Coins className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
-                <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
-              </div>
-              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
-                <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
-                <div className="text-xs md:text-sm text-gray-300">Avg Tip</div>
-              </div>
-              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
-                <Music className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <div className="text-lg md:text-2xl font-bold text-white">{stats.uniqueSongsCount || 0}</div>
-                <div className="text-xs md:text-sm text-gray-300">Tunes</div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Add Tune Search Section - Only show for own profile */}
         {isOwnProfile && (
           <div className="mb-8">
