@@ -39,6 +39,10 @@
 		B0010000000000000000001F /* SearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0010000000000000000001F /* SearchResult.swift */; };
 		B00100000000000000000020 /* SearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000020 /* SearchService.swift */; };
 		B00100000000000000000021 /* MusicSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000021 /* MusicSearchView.swift */; };
+		B00100000000000000000022 /* MusicPlayerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000022 /* MusicPlayerStore.swift */; };
+		B00100000000000000000023 /* MusicMiniBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000023 /* MusicMiniBarView.swift */; };
+		B00100000000000000000024 /* MusicNowPlayingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000024 /* MusicNowPlayingSheet.swift */; };
+		B00100000000000000000025 /* MusicPlayerHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000025 /* MusicPlayerHostView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -76,6 +80,10 @@
 		F0010000000000000000001F /* SearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResult.swift; sourceTree = "<group>"; };
 		F00100000000000000000020 /* SearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchService.swift; sourceTree = "<group>"; };
 		F00100000000000000000021 /* MusicSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSearchView.swift; sourceTree = "<group>"; };
+		F00100000000000000000022 /* MusicPlayerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlayerStore.swift; sourceTree = "<group>"; };
+		F00100000000000000000023 /* MusicMiniBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicMiniBarView.swift; sourceTree = "<group>"; };
+		F00100000000000000000024 /* MusicNowPlayingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicNowPlayingSheet.swift; sourceTree = "<group>"; };
+		F00100000000000000000025 /* MusicPlayerHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlayerHostView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +135,7 @@
 			isa = PBXGroup;
 			children = (
 				F00100000000000000000018 /* PodcastPlayerStore.swift */,
+				F00100000000000000000022 /* MusicPlayerStore.swift */,
 			);
 			path = stores;
 			sourceTree = "<group>";
@@ -189,6 +198,9 @@
 				F00100000000000000000017 /* PodcastEpisodeProfileView.swift */,
 				F0010000000000000000001A /* PodcastMiniBarView.swift */,
 				F0010000000000000000001B /* NowPlayingSheet.swift */,
+				F00100000000000000000023 /* MusicMiniBarView.swift */,
+				F00100000000000000000024 /* MusicNowPlayingSheet.swift */,
+				F00100000000000000000025 /* MusicPlayerHostView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -296,6 +308,10 @@
 				B0010000000000000000001F /* SearchResult.swift in Sources */,
 				B00100000000000000000020 /* SearchService.swift in Sources */,
 				B00100000000000000000021 /* MusicSearchView.swift in Sources */,
+				B00100000000000000000022 /* MusicPlayerStore.swift in Sources */,
+				B00100000000000000000023 /* MusicMiniBarView.swift in Sources */,
+				B00100000000000000000024 /* MusicNowPlayingSheet.swift in Sources */,
+				B00100000000000000000025 /* MusicPlayerHostView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -40,7 +40,7 @@ struct MusicNowPlayingSheet: View {
         VStack(spacing: 0) {
             header
             Spacer()
-            coverSection(item: item)
+            coverOrVideoSection(item: item)
             Spacer()
             titleSection(item: item)
             progressSection
@@ -62,6 +62,17 @@ struct MusicNowPlayingSheet: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 16)
+    }
+
+    @ViewBuilder
+    private func coverOrVideoSection(item: GlobalPartyMediaItem) -> some View {
+        if item.isYouTubeSource {
+            MusicPlayerHostView(store: musicPlayer, isVisibleInSheet: true)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.2), radius: 12, y: 4)
+        } else {
+            coverSection(item: item)
+        }
     }
 
     private func coverSection(item: GlobalPartyMediaItem) -> some View {
@@ -160,6 +171,7 @@ struct MusicNowPlayingSheet: View {
         .padding(.bottom, 16)
     }
 
+    @ViewBuilder
     private var queueContext: some View {
         if musicPlayer.queue.count > 1 {
             Text("Track \(musicPlayer.currentIndex + 1) of \(musicPlayer.queue.count)")

@@ -62,6 +62,11 @@ struct MainTabView: View {
         .fullScreenCover(isPresented: $showMusicNowPlaying) {
             MusicNowPlayingSheet()
                 .environmentObject(musicPlayer)
+                .onAppear { musicPlayer.isMusicSheetPresented = true }
+                .onDisappear { musicPlayer.isMusicSheetPresented = false }
+        }
+        .onChange(of: showMusicNowPlaying) { _, presented in
+            musicPlayer.isMusicSheetPresented = presented
         }
     }
 }

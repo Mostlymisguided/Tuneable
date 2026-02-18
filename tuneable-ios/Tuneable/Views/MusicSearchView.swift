@@ -254,7 +254,7 @@ struct MusicSearchView: View {
                     youtubeResults = v
                 }
             } else {
-                var response = try await SearchService.shared.search(query: q, source: "youtube")
+                let response = try await SearchService.shared.search(query: q, source: "youtube")
                 if response.source == "local", let v = response.videos {
                     databaseResults = v
                 } else if response.source == "external", let v = response.videos {

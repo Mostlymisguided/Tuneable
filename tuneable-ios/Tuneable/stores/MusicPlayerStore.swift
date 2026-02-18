@@ -9,6 +9,8 @@ final class MusicPlayerStore: ObservableObject {
     @Published var duration: TimeInterval = 0
     /// When set, the playback view should seek to this time and then clear it.
     @Published var seekTarget: TimeInterval?
+    /// True when the music now-playing sheet is presented; background WebView pauses so the sheet’s visible WebView can play.
+    @Published var isMusicSheetPresented: Bool = false
 
     var currentItem: GlobalPartyMediaItem? {
         guard currentIndex >= 0, currentIndex < queue.count else { return nil }

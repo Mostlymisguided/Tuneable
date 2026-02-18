@@ -1,24 +1,28 @@
 import SwiftUI
 import WebKit
+import AVFoundation
 
-/// Hosts the actual playback (YouTube embed or direct audio) in a hidden WKWebView.
-/// Observes MusicPlayerStore and loads/plays the current item; pushes time updates back to the store.
+/// Hosts the actual playback (YouTube embed or direct audio) in a WKWebView.
+/// When `isVisibleInSheet` is true, the WebView is shown in the now-playing sheet so iOS allows playback.
 struct MusicPlayerHostView: View {
     @ObservedObject var store: MusicPlayerStore
+    /// When true, this host is the visible one in the sheet (required for iOS to allow programmatic play).
+    var isVisibleInSheet: Bool = false
 
     var body: some View {
-        MusicPlayerWebViewRepresentable(store: store)
-            .frame(width: 1, height: 1)
-            .opacity(0.01)
-            .allowsHitTesting(false)
+        MusicPlayerWebViewRepresentable(store: store, isVisibleInSheet: isVisibleInSheet)
+            .frame(width: isVisibleInSheet ? 280 : 320, height: isVisibleInSheet ? 280 : 180)
+            .opacity(isVisibleInSheet ? 1 : 0.01)
+            .allowsHitTesting(isVisibleInSheet)
     }
 }
 
 private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
     let store: MusicPlayerStore
+    var isVisibleInSheet: Bool = false
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(store: store)
+        Coordinator(store: store, isVisibleInSheet: isVisibleInSheet)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -33,6 +37,7 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
 
         let contentController = WKUserContentController()
         contentController.add(context.coordinator, name: "ended")
+        contentController.add(context.coordinator, name: "playerReady")
         config.userContentController = contentController
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -47,6 +52,12 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
         let coordinator = context.coordinator
         let item = store.currentItem
         let itemId = item?.id ?? ""
+
+        let shouldPauseBackground = !context.coordinator.isVisibleInSheet && store.isMusicSheetPresented
+        if shouldPauseBackground {
+            coordinator.applyPlayPause(false)
+            return
+        }
 
         if coordinator.lastLoadedItemId != itemId {
             coordinator.lastLoadedItemId = itemId
@@ -82,9 +93,11 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
             }
         }
         var lastLoadedItemId: String = ""
+        let isVisibleInSheet: Bool
 
-        init(store: MusicPlayerStore) {
+        init(store: MusicPlayerStore, isVisibleInSheet: Bool = false) {
             self.store = store
+            self.isVisibleInSheet = isVisibleInSheet
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -92,10 +105,21 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
                 Task { @MainActor in
                     store?.next()
                 }
+            } else if message.name == "playerReady" {
+                Task { @MainActor in
+                    let shouldPlay = store?.isPlaying ?? true
+                    if shouldPlay {
+                        configureAudioSessionForPlayback()
+                        applyPlayPause(true)
+                    }
+                }
             }
         }
 
         func loadYouTube(videoId: String, autoplay: Bool) {
+            if autoplay {
+                configureAudioSessionForPlayback()
+            }
             let autoplayVal = autoplay ? "1" : "0"
             let html = """
             <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -113,7 +137,13 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
                 width: '1', height: '1',
                 videoId: vid,
                 playerVars: { playsinline: 1, autoplay: \(autoplayVal), controls: 0 },
-                events: { 'onStateChange': function(e) { if (e.data === YT.PlayerState.ENDED) window.webkit.messageHandlers.ended.postMessage(''); } }
+                events: {
+                  'onReady': function(e) {
+                    if ("\(autoplayVal)" === "1") e.target.playVideo();
+                    try { if (window.webkit && window.webkit.messageHandlers.playerReady) window.webkit.messageHandlers.playerReady.postMessage(''); } catch(err) {}
+                  },
+                  'onStateChange': function(e) { if (e.data === YT.PlayerState.ENDED) window.webkit.messageHandlers.ended.postMessage(''); }
+                }
               });
             }
             function play() { try { if (player && player.playVideo) player.playVideo(); } catch(e){} }
@@ -157,8 +187,32 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
         }
 
         func applyPlayPause(_ play: Bool) {
-            let cmd = play ? "play()" : "pause()"
-            webView?.evaluateJavaScript(cmd) { _, _ in }
+            if play {
+                configureAudioSessionForPlayback()
+                // iOS often ignores the first programmatic play; retry a few times after player is ready.
+                attemptPlay(retriesLeft: 3)
+            } else {
+                let cmd = "pause()"
+                webView?.evaluateJavaScript(cmd) { _, _ in }
+            }
+        }
+
+        private func configureAudioSessionForPlayback() {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default)
+                try session.setActive(true, options: [])
+            } catch {}
+        }
+
+        private func attemptPlay(retriesLeft: Int) {
+            guard retriesLeft > 0 else { return }
+            webView?.evaluateJavaScript("play()") { [weak self] _, _ in
+                guard let self = self, retriesLeft > 1 else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    self.attemptPlay(retriesLeft: retriesLeft - 1)
+                }
+            }
         }
 
         func applySeek(seconds: TimeInterval) {
