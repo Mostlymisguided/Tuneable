@@ -1608,26 +1608,6 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Link Label & Collective Buttons - Only for verified creators or admins viewing own profile */}
-              {isOwnProfile && currentUser && (currentUser.creatorProfile?.verificationStatus === 'verified' || currentUser.role?.includes('admin')) && (
-                <div className="mb-2 flex items-center space-x-2">
-                  <button
-                    onClick={() => setIsCollectiveModalOpen(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
-                  >
-                    <Users className="w-4 h-4" />
-                    <span>Link Collective</span>
-                  </button>
-                  <button
-                    onClick={handleAddLabelClick}
-                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
-                  >
-                    <Building className="w-4 h-4" />
-                    <span>Link Label</span>
-                  </button>
-                </div>
-              )}
-
               {/* Collective Memberships - Above label affiliations */}
               {collectiveMemberships.length > 0 && (
                 <div className="mb-2">
@@ -1751,20 +1731,6 @@ const UserProfile: React.FC = () => {
                   </div>
                 </div>
               )}
-
-              {/* Personal Invite Code - Only visible to profile owner */}
-              {isOwnProfile && (user.primaryInviteCode || user.personalInviteCode) && (
-                <button onClick={copyInviteCode}
-                title="Copy invite code"
-                className="block w-fit px-4 py-2 bg-yellow-600/30 rounded-full text-yellow-200 hover:bg-yellow-600/60 transition-colors text-sm font-medium items-center">
-                  <Gift className="inline h-4 w-4 mr-2" />
-                  <span className="text-gray-300">Invite Code:</span>{' '}
-                  <span className="font-mono font-bold">{user.primaryInviteCode || user.personalInviteCode}</span>
-                 
-                    <Copy className="ml-2 inline h-3.5 w-3.5" />
-                  </button>
-
-              )}
               
               </div>
               <div className="flex justify-end self-end">
@@ -1862,8 +1828,6 @@ const UserProfile: React.FC = () => {
         {isOwnProfile && (
           <div className="mb-8">
             <div className="justify-center text-center rounded-lg p-3 sm:p-4 shadow-xl">
-              <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Tunes to Add</h3>
-                
               {/* Quota Warning Banner */}
               <QuotaWarningBanner className="mb-4" />
                 
