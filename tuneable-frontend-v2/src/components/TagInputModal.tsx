@@ -76,7 +76,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
           <div className="mb-4 p-3 bg-gray-800 rounded-lg">
             <div className="flex items-center space-x-2 mb-1">
               <Music className="h-4 w-4 text-purple-400" />
-              <span className="text-sm font-medium text-gray-300">Adding to party:</span>
+              <span className="text-sm font-medium text-gray-300">Adding to library:</span>
             </div>
             <p className="text-white font-medium">{mediaTitle}</p>
             {mediaArtist && (
@@ -158,7 +158,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
             onClick={handleSubmit}
             className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
-            Add to Party
+            Add to Library
           </button>
         </div>
 
