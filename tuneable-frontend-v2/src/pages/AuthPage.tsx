@@ -336,7 +336,7 @@ const AuthPage: React.FC = () => {
       setAccountLockedUntil(null);
       setLoginError(''); // Clear error on success
       toast.success('Login successful!');
-      navigate('/dashboard');
+      navigate('/profile');
     } catch (error: any) {
       // Log full error for debugging
       console.error('Login error:', error);

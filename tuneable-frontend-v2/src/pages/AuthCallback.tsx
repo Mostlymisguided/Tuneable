@@ -71,7 +71,7 @@ const AuthCallback: React.FC = () => {
             navigate('/profile?oauth_success=true');
           } else {
             toast.success('Login successful!');
-            navigate('/dashboard');
+            navigate('/profile');
           }
         } catch (error: any) {
           console.error('Error during OAuth callback:', error);
