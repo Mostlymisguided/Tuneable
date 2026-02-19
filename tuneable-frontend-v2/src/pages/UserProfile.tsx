@@ -20,8 +20,6 @@ import {
   Settings,
   Bell,
   MapPin,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   Flag,
   Award,
@@ -183,13 +181,12 @@ const UserProfile: React.FC = () => {
   const { user: currentUser, handleOAuthCallback } = useAuth();
   
   // Web player store for playing media
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [mediaWithBids, setMediaWithBids] = useState<MediaWithBids[]>([]);
-  const [tagRankings, setTagRankings] = useState<any[]>([]);
-  const [showAllTunes, setShowAllTunes] = useState(false);
+  const [, setMediaWithBids] = useState<MediaWithBids[]>([]);
+  const [, setTagRankings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Tip history state
@@ -917,103 +914,6 @@ const UserProfile: React.FC = () => {
     if (roles.includes('moderator')) return 'text-blue-400';
     if (roles.includes('creator')) return 'text-white';
     return 'text-green-400';
-  };
-
-  // Handle playing media from Top Tunes
-  const handlePlayMedia = (mediaData: any) => {
-    if (!mediaData.media) return;
-    
-    const media = mediaData.media;
-    const mediaId = media._id || media.uuid;
-    
-    if (!mediaId) {
-      toast.error('Unable to identify media item');
-      return;
-    }
-
-    // Clean and format the media for the webplayer
-    let sources = {};
-    
-    if (media.sources) {
-      sources = media.sources;
-    } else {
-      // Fallback to individual source fields
-      if (media.youtubeId) sources = { ...sources, youtube: media.youtubeId };
-      if (media.uploadUrl) sources = { ...sources, upload: media.uploadUrl };
-    }
-    
-    const cleanedMedia = {
-      id: mediaId,
-      title: media.title,
-      artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
-      artists: Array.isArray(media.artist) ? media.artist : (media.artists || []), // Preserve full artist array with userIds
-      featuring: media.featuring || [],
-      duration: media.duration,
-      coverArt: media.coverArt,
-      sources: sources,
-      globalMediaAggregate: media.globalMediaAggregate || 0,
-      bids: mediaData.bids || [],
-      addedBy: media.addedBy || null,
-      totalBidValue: mediaData.totalAmountBid || 0,
-    };
-    
-    // Clear podcast player so PlayerRenderer switches to web player
-    usePodcastPlayerStore.getState().clear();
-    // Set the media in the webplayer and start playback
-    setCurrentMedia(cleanedMedia, 0); // Set media without autoplay
-    play(); // Explicitly start playback when user clicks play button
-    setGlobalPlayerActive(true);
-    
-    toast.success(`Now playing: ${cleanedMedia.title}`);
-  };
-
-  // Handle playing all top tunes
-  const handlePlayTopTunes = () => {
-    if (!mediaWithBids || mediaWithBids.length === 0) {
-      toast.error('No tunes available to play');
-      return;
-    }
-
-    // Format all media items for the queue
-    const formattedQueue = mediaWithBids.map((mediaData) => {
-      const media = mediaData.media as any; // Use any to access all properties
-      const mediaId = media._id || media.uuid;
-      
-      // Clean and format sources
-      let sources: any = {};
-      if (media.sources) {
-        sources = media.sources;
-      } else {
-        if (media.youtubeId) sources = { ...sources, youtube: media.youtubeId };
-        if (media.uploadUrl) sources = { ...sources, upload: media.uploadUrl };
-      }
-      
-      return {
-        id: mediaId,
-        _id: media._id,
-        title: media.title,
-        artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
-        artists: Array.isArray(media.artist) ? media.artist : (media.artists || []),
-        featuring: media.featuring || [],
-        duration: media.duration || 0, // Default to 0 if undefined
-        coverArt: media.coverArt,
-        sources: sources,
-        globalMediaAggregate: media.globalMediaAggregate || 0,
-        bids: mediaData.bids || [],
-        addedBy: media.addedBy || null,
-        totalBidValue: mediaData.totalAmount || 0,
-      };
-    });
-
-    // Clear podcast player so PlayerRenderer switches to web player
-    usePodcastPlayerStore.getState().clear();
-    // Set the queue and start playing from the first item
-    setQueue(formattedQueue as any);
-    setCurrentMedia(formattedQueue[0] as any, 0);
-    play();
-    setGlobalPlayerActive(true);
-    
-    toast.success(`Playing ${formattedQueue.length} top tune${formattedQueue.length !== 1 ? 's' : ''}`);
   };
 
   // Load tune library
