@@ -117,9 +117,16 @@ const api = axios.create({
   },
 });
 
+// Token getter: AuthContext registers this so we use in-memory token when localStorage
+// was cleared by another tab (avoids "No token provided" when user state is stale)
+let authTokenGetter: (() => string | null) | null = null;
+export const setAuthTokenGetter = (getter: (() => string | null) | null) => {
+  authTokenGetter = getter;
+};
+
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = authTokenGetter?.() ?? localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -144,7 +151,7 @@ api.interceptors.response.use(
       
       // Only redirect if user had a token (meaning they were authenticated but token expired/invalid)
       // If no token exists, the route might be public and we shouldn't redirect
-      const hadToken = localStorage.getItem('token');
+      const hadToken = authTokenGetter?.() ?? localStorage.getItem('token');
       
       if (!isAuthEndpoint && hadToken) {
         // Clear auth data and redirect to login for other endpoints

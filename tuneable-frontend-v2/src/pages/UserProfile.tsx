@@ -178,7 +178,7 @@ const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user: currentUser, handleOAuthCallback } = useAuth();
+  const { user: currentUser, token: authToken, handleOAuthCallback } = useAuth();
   
   // Web player store for playing media
   const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
@@ -809,6 +809,11 @@ const UserProfile: React.FC = () => {
       toast.info('Please log in to add tunes');
       return;
     }
+    if (!authToken && !localStorage.getItem('token')) {
+      toast.error('Your session has expired. Please log in again.');
+      navigate('/login?returnUrl=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
 
     const mediaKey = media._id || media.id || '';
     const rawAmount = addTuneBidAmounts[mediaKey] ?? '';
@@ -891,7 +896,13 @@ const UserProfile: React.FC = () => {
       setShowAddTuneTagModal(false);
     } catch (error: any) {
       console.error('Error adding tune:', error);
-      toast.error(error.response?.data?.error || 'Failed to add tune');
+      const msg = error.response?.data?.error;
+      if (error.response?.status === 401 && (msg?.includes('token') || msg?.includes('No token'))) {
+        toast.error('Your session has expired. Please log in again.');
+        navigate('/login?returnUrl=' + encodeURIComponent(window.location.pathname));
+      } else {
+        toast.error(msg || 'Failed to add tune');
+      }
     } finally {
       setIsAddingTune(false);
     }

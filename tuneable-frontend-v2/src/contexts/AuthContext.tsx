@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { authAPI } from '../lib/api';
+import React, { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
+import { authAPI, setAuthTokenGetter } from '../lib/api';
 
 // Define types directly to avoid import issues
 export interface User {
@@ -147,6 +147,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Register token getter so api interceptor uses in-memory token when localStorage
+  // was cleared by another tab (fixes "No token provided" on Add Tune etc.)
+  const tokenRef = useRef<string | null>(null);
+  tokenRef.current = token;
+  useEffect(() => {
+    setAuthTokenGetter(() => tokenRef.current ?? localStorage.getItem('token'));
+    return () => setAuthTokenGetter(null);
+  }, []);
+
+  // Sync auth state when another tab clears token (e.g. after 401)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'token' && e.newValue === null) {
+        setToken(null);
+        setUser(null);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
