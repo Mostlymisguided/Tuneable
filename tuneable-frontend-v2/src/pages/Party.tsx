@@ -64,22 +64,6 @@ interface PartyUpdateMessage {
 
 const VALID_TIME_PERIODS = ['all-time', 'today', 'this-week', 'this-month', 'this-year'] as const;
 
-/** Toggle to show 3 design variation preview cards at top of queue */
-const SHOW_DESIGN_VARIATIONS = true;
-
-/** Demo data for design variation preview cards when queue has items */
-const DEMO_MEDIA = {
-  title: 'Treasure',
-  artist: 'Marcus Gad meets Tamal',
-  coverArt: 'https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482ff3',
-  duration: 261,
-  tags: ['Reggae', 'Fungi', 'Fantastic Fungi', 'Paul Stamets', 'Champignon Reggae'],
-  _id: 'demo-1',
-  id: 'demo-1',
-  artists: [],
-  bids: [{ amount: 1, addedBy: { displayName: 'Ted' } }]
-};
-
 /** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
 function getTagTermsFromSearchParams(params: URLSearchParams, isGlobal: boolean): string[] {
   if (!isGlobal) return [];
@@ -2646,7 +2630,7 @@ const Party: React.FC = () => {
                                           e.stopPropagation();
                                           handleActionButtonClick(item);
                                         }}
-                                        className="absolute top-2 right-2 z-20 p-1 md:p-1.5 bg-gray-700/80 hover:bg-gray-600 text-white rounded-md transition-colors shadow-lg"
+                                        className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white transition-colors"
                                         title="Actions"
                                       >
                                         <X className="h-3 w-3 md:h-4 md:w-4" />
@@ -3301,127 +3285,7 @@ const Party: React.FC = () => {
                         <div className="text-gray-400">Loading sorted media...</div>
                       </div>
                     ) : (
-                      <>
-                        {/* Design variation preview cards */}
-                        {SHOW_DESIGN_VARIATIONS && (() => {
-                          const first = getDisplayMedia()[0];
-                          const raw = first ? (selectedTimePeriod === 'all-time' ? (first as any).mediaId || first : first) : null;
-                          const demoMedia = raw ? { ...raw, artists: Array.isArray((raw as any).artists) ? (raw as any).artists : [], artist: (raw as any).artist || DEMO_MEDIA.artist, featuring: (raw as any).featuring || [], coverArt: (raw as any).coverArt || DEMO_MEDIA.coverArt, title: (raw as any).title || DEMO_MEDIA.title } : { ...DEMO_MEDIA, artists: [], featuring: [] };
-                          const tipAmount = '0.11';
-                          const TipStepper = () => (
-                            <div className="flex md:flex-col items-center space-x-0">
-                              <button type="button" className="hidden md:inline px-4 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 rounded-tr-xl rounded-tl-xl text-black transition-colors flex items-center justify-center"><Plus className="h-3 w-3 md:h-4 md:w-4" /></button>
-                              <button type="button" className="md:hidden px-1.5 py-2 md:px-6 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"><Minus className="h-3 w-3 md:h-4 md:w-4" /></button>
-                              <input type="text" readOnly value={tipAmount} className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-center text-gray text-xs md:text-sm" />
-                              <button type="button" className="hidden md:inline px-1.5 py-2 md:px-4 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white rounded-bl-xl rounded-br-xl text-black transition-colors flex items-center justify-center"><Minus className="h-3 w-3 md:h-4 md:w-4" /></button>
-                              <button type="button" className="md:hidden px-1.5 py-2 md:px-2 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"><Plus className="h-3 w-3 md:h-4 md:w-4" /></button>
-                            </div>
-                          );
-                          const Metrics = ({ className = '' }: { className?: string }) => (
-                            <div className={className}>
-                              <div className="flex flex-col items-center">
-                                <Coins className="h-3 w-3 md:h-4 md:w-4 text-gray-300" />
-                                <span className="text-[9px] md:text-xs text-gray-300">£0.01</span>
-                              </div>
-                              <div className="flex flex-col items-center">
-                                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-gray-300" />
-                                <span className="text-[9px] md:text-xs text-gray-300">£0.01</span>
-                              </div>
-                            </div>
-                          );
-                          return (
-                            <div className="mb-8">
-                              <p className="text-gray-400 text-sm mb-3 font-medium">Design variations (preview)</p>
-                              <div className="space-y-4">
-                                {/* Variation A - Clean minimal */}
-                                <div key="var-a" className="rounded-xl border border-gray-600/60 bg-gray-800/40 p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-lg transition-shadow">
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0"><span className="text-white font-bold text-[10px] md:text-sm">1</span></div>
-                                    <div className="relative w-24 h-24 md:w-20 md:h-20 rounded overflow-hidden flex-shrink-0">
-                                      <img src={demoMedia.coverArt || DEFAULT_COVER_ART} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <h4 className="font-medium text-white text-sm truncate">{demoMedia.title}</h4>
-                                      <p className="text-gray-400 text-xs truncate">{demoMedia.artist}</p>
-                                      <div className="flex items-center gap-1 mt-1"><Clock className="h-3 w-3 text-gray-500" /><span className="text-xs text-gray-400">{formatDuration(demoMedia.duration)}</span></div>
-                                      {demoMedia.tags && demoMedia.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                          {demoMedia.tags.slice(0, 5).map((t: string, i: number) => <span key={i} className="px-2 py-0.5 bg-purple-700/60 text-white text-[10px] rounded-full">#{t}</span>)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <div className="flex flex-row md:flex-col items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-900/40 border border-gray-600/40">
-                                      <Metrics className="flex flex-row md:flex-col items-center gap-2 md:gap-1" />
-                                    </div>
-                                    <div className="flex flex-row md:flex-col items-center gap-1">
-                                      <TipStepper />
-                                      <button className="px-3 py-1.5 bg-purple-800 hover:bg-purple-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">Tip £{tipAmount}</button>
-                                    </div>
-                                  </div>
-                                </div>
-                                {/* Variation B - Floating glass */}
-                                <div key="var-b" className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow">
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-500/80 to-pink-500/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg"><span className="text-white font-bold text-[10px] md:text-sm">2</span></div>
-                                    <div className="relative w-24 h-24 md:w-20 md:h-20 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-white/10">
-                                      <img src={demoMedia.coverArt || DEFAULT_COVER_ART} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <h4 className="font-medium text-white text-sm truncate">{demoMedia.title}</h4>
-                                      <p className="text-gray-400 text-xs truncate">{demoMedia.artist}</p>
-                                      <div className="flex items-center gap-1 mt-1"><Clock className="h-3 w-3 text-gray-500" /><span className="text-xs text-gray-400">{formatDuration(demoMedia.duration)}</span></div>
-                                      {demoMedia.tags && demoMedia.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                          {demoMedia.tags.slice(0, 5).map((t: string, i: number) => <span key={i} className="px-2 py-0.5 bg-white/10 text-white text-[10px] rounded-full backdrop-blur-sm">#{t}</span>)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <div className="flex flex-row md:flex-col items-center gap-2 px-3 py-2 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-                                      <Metrics className="flex flex-row md:flex-col items-center gap-2 md:gap-1" />
-                                    </div>
-                                    <div className="flex flex-row md:flex-col items-center gap-1 px-2 py-2 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-                                      <TipStepper />
-                                      <button className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-500 text-white rounded-lg text-sm font-medium whitespace-nowrap backdrop-blur-sm">Tip £{tipAmount}</button>
-                                    </div>
-                                  </div>
-                                </div>
-                                {/* Variation C - Bold contrast */}
-                                <div key="var-c" className="rounded-xl border-2 border-purple-500/60 bg-gray-900 p-4 flex flex-col md:flex-row md:items-center gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:shadow-[0_0_25px_rgba(168,85,247,0.3)] transition-shadow">
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-purple-400/50"><span className="text-white font-bold text-[10px] md:text-sm">3</span></div>
-                                    <div className="relative w-24 h-24 md:w-20 md:h-20 rounded overflow-hidden flex-shrink-0 ring-2 ring-purple-400/30">
-                                      <img src={demoMedia.coverArt || DEFAULT_COVER_ART} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <h4 className="font-medium text-white text-sm truncate">{demoMedia.title}</h4>
-                                      <p className="text-gray-400 text-xs truncate">{demoMedia.artist}</p>
-                                      <div className="flex items-center gap-1 mt-1"><Clock className="h-3 w-3 text-gray-500" /><span className="text-xs text-gray-400">{formatDuration(demoMedia.duration)}</span></div>
-                                      {demoMedia.tags && demoMedia.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                          {demoMedia.tags.slice(0, 5).map((t: string, i: number) => <span key={i} className="px-2 py-0.5 bg-purple-600 text-white text-[10px] rounded-full font-medium">#{t}</span>)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <div className="flex flex-row md:flex-col items-center gap-2 px-3 py-2 rounded-lg bg-purple-900/40 border border-purple-500/40">
-                                      <Metrics className="flex flex-row md:flex-col items-center gap-2 md:gap-1" />
-                                    </div>
-                                    <div className="flex flex-row md:flex-col items-center gap-1 px-2 py-2 rounded-lg bg-purple-900/40 border border-purple-500/40">
-                                      <TipStepper />
-                                      <button className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-semibold whitespace-nowrap">Tip £{tipAmount}</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                        {getDisplayMedia().map((item: any, index: number) => {
+                      getDisplayMedia().map((item: any, index: number) => {
                         // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
                         const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
                         // Ensure artists array is set for ClickableArtistDisplay
@@ -3450,10 +3314,10 @@ const Party: React.FC = () => {
                                   e.stopPropagation();
                                   handleActionButtonClick(item);
                                 }}
-                                className="absolute top-2 right-2 z-20 p-1 md:p-1.5 border hover:bg-gray-600 text-white rounded-md transition-colors shadow-lg"
+                                className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white transition-colors"
                                 title="Actions"
                               >
-                                <X className="h-2 w-2 md:h-4 md:w-4" />
+                                <X className="h-3 w-3 md:h-4 md:w-4" />
                               </button>
                             )}
                             
@@ -3692,8 +3556,7 @@ const Party: React.FC = () => {
                             </div>
                           </div>
                         );
-                      })}
-                      </>
+                      })
                     )}
                   </div>
                 )}
