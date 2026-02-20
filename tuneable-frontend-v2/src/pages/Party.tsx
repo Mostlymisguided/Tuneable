@@ -64,6 +64,22 @@ interface PartyUpdateMessage {
 
 const VALID_TIME_PERIODS = ['all-time', 'today', 'this-week', 'this-month', 'this-year'] as const;
 
+/** Toggle to show 3 design variation preview cards at top of queue */
+const SHOW_DESIGN_VARIATIONS = true;
+
+/** Demo data for design variation preview cards when queue has items */
+const DEMO_MEDIA = {
+  title: 'Treasure',
+  artist: 'Marcus Gad meets Tamal',
+  coverArt: 'https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482ff3',
+  duration: 261,
+  tags: ['Reggae', 'Fungi', 'Fantastic Fungi', 'Paul Stamets', 'Champignon Reggae'],
+  _id: 'demo-1',
+  id: 'demo-1',
+  artists: [],
+  bids: [{ amount: 1, addedBy: { displayName: 'Ted' } }]
+};
+
 /** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
 function getTagTermsFromSearchParams(params: URLSearchParams, isGlobal: boolean): string[] {
   if (!isGlobal) return [];
@@ -2756,7 +2772,7 @@ const Party: React.FC = () => {
                                                 });
                                               }}
                                               disabled={isBidding}
-                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-tr-xl text-black transition-colors flex items-center justify-center"
+                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-tr-xl text-black transition-colors flex items-center justify-center"
                                             >
                                               <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                             </button>
@@ -2931,7 +2947,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-lg rounded-br-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </button>
@@ -3044,7 +3060,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-lg rounded-br-lg text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </button>
@@ -3285,7 +3301,127 @@ const Party: React.FC = () => {
                         <div className="text-gray-400">Loading sorted media...</div>
                       </div>
                     ) : (
-                      getDisplayMedia().map((item: any, index: number) => {
+                      <>
+                        {/* Design variation preview cards */}
+                        {SHOW_DESIGN_VARIATIONS && (() => {
+                          const first = getDisplayMedia()[0];
+                          const raw = first ? (selectedTimePeriod === 'all-time' ? (first as any).mediaId || first : first) : null;
+                          const demoMedia = raw ? { ...raw, artists: Array.isArray((raw as any).artists) ? (raw as any).artists : [], artist: (raw as any).artist || DEMO_MEDIA.artist, featuring: (raw as any).featuring || [], coverArt: (raw as any).coverArt || DEMO_MEDIA.coverArt, title: (raw as any).title || DEMO_MEDIA.title } : { ...DEMO_MEDIA, artists: [], featuring: [] };
+                          const tipAmount = '0.11';
+                          const TipStepper = () => (
+                            <div className="flex md:flex-col items-center space-x-0">
+                              <button type="button" className="hidden md:inline px-4 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 rounded-tr-xl rounded-tl-xl text-black transition-colors flex items-center justify-center"><Plus className="h-3 w-3 md:h-4 md:w-4" /></button>
+                              <button type="button" className="md:hidden px-1.5 py-2 md:px-6 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"><Minus className="h-3 w-3 md:h-4 md:w-4" /></button>
+                              <input type="text" readOnly value={tipAmount} className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-center text-gray text-xs md:text-sm" />
+                              <button type="button" className="hidden md:inline px-1.5 py-2 md:px-4 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white rounded-bl-xl rounded-br-xl text-black transition-colors flex items-center justify-center"><Minus className="h-3 w-3 md:h-4 md:w-4" /></button>
+                              <button type="button" className="md:hidden px-1.5 py-2 md:px-2 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"><Plus className="h-3 w-3 md:h-4 md:w-4" /></button>
+                            </div>
+                          );
+                          const Metrics = ({ className = '' }: { className?: string }) => (
+                            <div className={className}>
+                              <div className="flex flex-col items-center">
+                                <Coins className="h-3 w-3 md:h-4 md:w-4 text-gray-300" />
+                                <span className="text-[9px] md:text-xs text-gray-300">£0.01</span>
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-gray-300" />
+                                <span className="text-[9px] md:text-xs text-gray-300">£0.01</span>
+                              </div>
+                            </div>
+                          );
+                          return (
+                            <div className="mb-8">
+                              <p className="text-gray-400 text-sm mb-3 font-medium">Design variations (preview)</p>
+                              <div className="space-y-4">
+                                {/* Variation A - Clean minimal */}
+                                <div key="var-a" className="rounded-xl border border-gray-600/60 bg-gray-800/40 p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-lg transition-shadow">
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0"><span className="text-white font-bold text-[10px] md:text-sm">1</span></div>
+                                    <div className="relative w-24 h-24 md:w-20 md:h-20 rounded overflow-hidden flex-shrink-0">
+                                      <img src={demoMedia.coverArt || DEFAULT_COVER_ART} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="font-medium text-white text-sm truncate">{demoMedia.title}</h4>
+                                      <p className="text-gray-400 text-xs truncate">{demoMedia.artist}</p>
+                                      <div className="flex items-center gap-1 mt-1"><Clock className="h-3 w-3 text-gray-500" /><span className="text-xs text-gray-400">{formatDuration(demoMedia.duration)}</span></div>
+                                      {demoMedia.tags && demoMedia.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {demoMedia.tags.slice(0, 5).map((t: string, i: number) => <span key={i} className="px-2 py-0.5 bg-purple-700/60 text-white text-[10px] rounded-full">#{t}</span>)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex flex-row md:flex-col items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-900/40 border border-gray-600/40">
+                                      <Metrics className="flex flex-row md:flex-col items-center gap-2 md:gap-1" />
+                                    </div>
+                                    <div className="flex flex-row md:flex-col items-center gap-1">
+                                      <TipStepper />
+                                      <button className="px-3 py-1.5 bg-purple-800 hover:bg-purple-600 text-white rounded-lg text-sm font-medium whitespace-nowrap">Tip £{tipAmount}</button>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Variation B - Floating glass */}
+                                <div key="var-b" className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow">
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-500/80 to-pink-500/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg"><span className="text-white font-bold text-[10px] md:text-sm">2</span></div>
+                                    <div className="relative w-24 h-24 md:w-20 md:h-20 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-white/10">
+                                      <img src={demoMedia.coverArt || DEFAULT_COVER_ART} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="font-medium text-white text-sm truncate">{demoMedia.title}</h4>
+                                      <p className="text-gray-400 text-xs truncate">{demoMedia.artist}</p>
+                                      <div className="flex items-center gap-1 mt-1"><Clock className="h-3 w-3 text-gray-500" /><span className="text-xs text-gray-400">{formatDuration(demoMedia.duration)}</span></div>
+                                      {demoMedia.tags && demoMedia.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {demoMedia.tags.slice(0, 5).map((t: string, i: number) => <span key={i} className="px-2 py-0.5 bg-white/10 text-white text-[10px] rounded-full backdrop-blur-sm">#{t}</span>)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex flex-row md:flex-col items-center gap-2 px-3 py-2 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
+                                      <Metrics className="flex flex-row md:flex-col items-center gap-2 md:gap-1" />
+                                    </div>
+                                    <div className="flex flex-row md:flex-col items-center gap-1 px-2 py-2 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
+                                      <TipStepper />
+                                      <button className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-500 text-white rounded-lg text-sm font-medium whitespace-nowrap backdrop-blur-sm">Tip £{tipAmount}</button>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Variation C - Bold contrast */}
+                                <div key="var-c" className="rounded-xl border-2 border-purple-500/60 bg-gray-900 p-4 flex flex-col md:flex-row md:items-center gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:shadow-[0_0_25px_rgba(168,85,247,0.3)] transition-shadow">
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-purple-400/50"><span className="text-white font-bold text-[10px] md:text-sm">3</span></div>
+                                    <div className="relative w-24 h-24 md:w-20 md:h-20 rounded overflow-hidden flex-shrink-0 ring-2 ring-purple-400/30">
+                                      <img src={demoMedia.coverArt || DEFAULT_COVER_ART} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="font-medium text-white text-sm truncate">{demoMedia.title}</h4>
+                                      <p className="text-gray-400 text-xs truncate">{demoMedia.artist}</p>
+                                      <div className="flex items-center gap-1 mt-1"><Clock className="h-3 w-3 text-gray-500" /><span className="text-xs text-gray-400">{formatDuration(demoMedia.duration)}</span></div>
+                                      {demoMedia.tags && demoMedia.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {demoMedia.tags.slice(0, 5).map((t: string, i: number) => <span key={i} className="px-2 py-0.5 bg-purple-600 text-white text-[10px] rounded-full font-medium">#{t}</span>)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex flex-row md:flex-col items-center gap-2 px-3 py-2 rounded-lg bg-purple-900/40 border border-purple-500/40">
+                                      <Metrics className="flex flex-row md:flex-col items-center gap-2 md:gap-1" />
+                                    </div>
+                                    <div className="flex flex-row md:flex-col items-center gap-1 px-2 py-2 rounded-lg bg-purple-900/40 border border-purple-500/40">
+                                      <TipStepper />
+                                      <button className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-semibold whitespace-nowrap">Tip £{tipAmount}</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {getDisplayMedia().map((item: any, index: number) => {
                         // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
                         const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
                         // Ensure artists array is set for ClickableArtistDisplay
@@ -3305,7 +3441,7 @@ const Party: React.FC = () => {
                         return (
                           <div
                             key={`queued-${mediaData.id}-${index}`}
-                            className="card flex flex-col md:flex-row md:items-center hover:shadow-2xl relative p-1.5 md:p-4"
+                            className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4"
                           >
                             {/* Action Button - Top Right (opens modal with available actions) */}
                             {(isHost || isAdmin || getUserBid(item)) && (
@@ -3330,17 +3466,17 @@ const Party: React.FC = () => {
                             
                             {/* Mobile-only wrapper for thumbnail + details side by side */}
                             <div className="flex flex-row md:contents items-start gap-2 mb-1 md:mb-0">
-                              {/* Media Thumbnail with Overlays */}
+                              {/* Media Thumbnail with Overlays - styled as variation 1 */}
                               <div 
-                                className="relative w-32 h-32 cursor-pointer group flex-shrink-0"
+                                className="relative w-24 h-24 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
                                 onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                               >
                                 <img
                                   src={mediaData.coverArt || DEFAULT_COVER_ART}
                                   alt={mediaData.title || 'Unknown Media'}
-                                  className="w-full h-full rounded object-cover"
-                                  width="192"
-                                  height="192"
+                                  className="w-full h-full object-cover"
+                                  width="96"
+                                  height="96"
                                 />
                                 
                                 {/* Play Icon Overlay */}
@@ -3357,54 +3493,46 @@ const Party: React.FC = () => {
                                 </div>
                               </div>
                               
-                              {/* Media Details */}
+                              {/* Media Details - variation 1 style: title, artist, duration (below artist), tags */}
                               <div className="flex-1 min-w-0 md:ml-4">
-                                <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 md:space-x-2">
                                   <h4 
-                                    className="font-medium text-white text-sm md:text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
+                                  className="font-medium text-white text-sm truncate cursor-pointer hover:text-purple-300 transition-colors"
                                     onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
                                   >
                                     {mediaData.title || 'Unknown Media'}
                                   </h4>
-                                  <span className="hidden md:inline text-gray-400">•</span>
-                                  <span className="text-gray-300 text-sm md:text-lg truncate font-light">
+                                <p className="text-gray-400 text-xs truncate">
                                     <ClickableArtistDisplay media={mediaData} />
-                                  </span>
-                                  <div className="flex items-center space-x-1 md:ml-2">
-                                    <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
-                                    <span className="text-xs md:text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
+                                </p>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3 text-gray-500" />
+                                  <span className="text-xs text-gray-400">{formatDuration(mediaData.duration)}</span>
                                   </div>
-                                </div>
-                                
-                                {/* Mini Supporters Bar - shows top supporters for this media */}
-                                <div className="md:mt-0">
-                                  <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
-                                </div>
-                                
-                                {/* Tags Display */}
                                 {mediaData.tags && mediaData.tags.length > 0 && (
-                                  <div className="mt-1 md:mt-2 flex">
-                                    <div className="flex flex-wrap gap-1">
+                                  <div className="mt-1 flex flex-wrap gap-1">
                                       {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
                                         <Link
                                           key={tagIndex}
                                           to={`/tune/${mediaData._id || mediaData.id}`}
-                                          className="px-2 py-1 bg-purple-700/60 hover:bg-purple-500 text-white text-[10px] md:text-sm rounded-full transition-colors no-underline"
+                                        className="px-2 py-0.5 bg-purple-700/60 hover:bg-purple-500 text-white text-[10px] rounded-full transition-colors no-underline"
                                         >
                                           #{tag}
                                         </Link>
                                       ))}
-                                    </div>
                                   </div>
                                 )}
                               </div>
+                            </div>
+                            {/* Mini Supporters Bar - to the right of media details, left of tip metrics */}
+                            <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
+                              <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
                             </div>
                             {/* Action Buttons */}
                             <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
                               <div className="flex items-center justify-center space-x-2">
                                 {/* Metrics Display */}
-                                <div className="flex flex-row md:flex-col items-center space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-1 py-1 md:px-2 md:py-2 rounded-lg">
-                                  <div className="text-center p-1 md:p-2">
+                                <div className="flex flex-row md:flex-col items-center gap-2 md:gap-1 px-2 py-1.5 rounded-lg bg-purple-900/40 border border-purple-500/40">
+                                  <div className="text-center p-0.5">
                                     <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Tip Total">
                                       <Coins className="h-3 w-3 md:h-4 md:w-4" />
                                     </div>
@@ -3412,7 +3540,7 @@ const Party: React.FC = () => {
                                       {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
                                     </div>
                                   </div>
-                                  <div className="text-center p-1 md:p-2">
+                                  <div className="text-center p-0.5">
                                     <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Average Tip">
                                       <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
                                     </div>
@@ -3423,8 +3551,8 @@ const Party: React.FC = () => {
                                 </div>
                                 {/* Inline tipping controls (API still expects bid terminology) */}
                                 <div className="flex flex-row items-center space-x-1 md:space-x-2">
-                                  {/* Input group with +/- buttons */}
-                                  <div className="flex md:flex-col items-center space-x-0">
+                                  {/* Input group with +/- buttons - vertical stepper on md+ (+, input, -), horizontal row with Tip button */}
+                                  <div className="flex flex-row md:flex-col items-center space-x-0 md:space-y-0.5">
                                   <button
                                       type="button"
                                       onClick={(e) => {
@@ -3440,7 +3568,7 @@ const Party: React.FC = () => {
                                         });
                                       }}
                                       disabled={isBidding}
-                                      className="hidden md:inline px-4 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-tl-xl text-black transition-colors flex items-center justify-center"
+                                      className="hidden md:inline px-4 py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-tl-lg text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3466,8 +3594,8 @@ const Party: React.FC = () => {
                                         const minBid = getEffectiveMinimumBid(mediaData);
                                         return current <= minBid;
                                       })()}
-                                      className="md:hidden px-1.5 py-2 md:px-6
-                                       md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"
+                                      className="md:hidden px-1.5 py-1.5 md:px-6
+                                       md:py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-bl-lg text-black transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3483,7 +3611,7 @@ const Party: React.FC = () => {
                                         ...queueBidAmounts,
                                         [mediaData._id || mediaData.id]: e.target.value
                                       })}
-                                      className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1.5 md:py-2 text-center text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1 md:py-1.5 text-center text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       onClick={(e) => e.stopPropagation()}
                                     />
                                     <button
@@ -3509,7 +3637,7 @@ const Party: React.FC = () => {
                                         return current <= minBid;
                                       })()}
                                       className="hidden md:inline px-1.5 py-2 md:px-4
-                                       md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
+                                       md:py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-lg rounded-br-lg text-black transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3528,7 +3656,7 @@ const Party: React.FC = () => {
                                         });
                                       }}
                                       disabled={isBidding}
-                                      className="md:hidden px-1.5 py-2 md:px-2 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
+                                      className="md:hidden px-1.5 py-1.5 md:px-2 md:py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-br-lg text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3564,7 +3692,8 @@ const Party: React.FC = () => {
                             </div>
                           </div>
                         );
-                      })
+                      })}
+                      </>
                     )}
                   </div>
                 )}
