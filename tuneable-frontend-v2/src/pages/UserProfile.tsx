@@ -191,7 +191,6 @@ const UserProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   // Tip history state
   const [tipHistory, setTipHistory] = useState<any[]>([]);
-  const [tipHistoryStats, setTipHistoryStats] = useState<any>(null);
   const [isLoadingTipHistory, setIsLoadingTipHistory] = useState(false);
   const [tipHistoryFilters, setTipHistoryFilters] = useState({
     status: '' as 'active' | 'vetoed' | 'refunded' | '',
@@ -399,7 +398,6 @@ const UserProfile: React.FC = () => {
       
       const response = await userAPI.getTipHistory(params);
       setTipHistory(response.tips || []);
-      setTipHistoryStats(response.stats || null);
       setTipHistoryPagination(response.pagination || null);
     } catch (err: any) {
       console.error('Error loading tip history:', err);
@@ -2051,7 +2049,7 @@ const UserProfile: React.FC = () => {
                         Artwork
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
                         onClick={() => {
                           if (librarySortField === 'title') {
                             setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
@@ -2061,13 +2059,13 @@ const UserProfile: React.FC = () => {
                           }
                         }}
                       >
-                        <div className="flex items-center">
+                        <div className="flex items-center truncate">
                           Title
                           {getLibrarySortIcon('title')}
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
                         onClick={() => {
                           if (librarySortField === 'artist') {
                             setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
@@ -2077,7 +2075,7 @@ const UserProfile: React.FC = () => {
                           }
                         }}
                       >
-                        <div className="flex items-center">
+                        <div className="flex items-center truncate">
                           Artist
                           {getLibrarySortIcon('artist')}
                         </div>
@@ -2174,16 +2172,17 @@ const UserProfile: React.FC = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 max-w-[220px] w-[220px]">
                           <button
                             onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
-                            className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                            className="block w-full min-w-0 truncate text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                            title={item.title}
                           >
                             {item.title}
                           </button>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm text-gray-300">
+                        <td className="px-4 py-3 max-w-[220px] w-[220px]">
+                          <div className="min-w-0 truncate text-sm text-gray-300" title={item.artist}>
                             <ClickableArtistDisplay media={item} />
                           </div>
                         </td>
@@ -2218,32 +2217,6 @@ const UserProfile: React.FC = () => {
         ) : viewTab === 'tip-history' ? (
           /* TIP HISTORY TAB */
           <div className="space-y-6">
-            {/* Stats Summary */}
-            {tipHistoryStats && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="card bg-black/20 rounded-lg p-4 text-center">
-                  <BarChart3 className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-                  <div className="text-xl font-bold text-white">{tipHistoryStats.totalTips || 0}</div>
-                  <div className="text-xs text-gray-300">Total Tips</div>
-                </div>
-                <div className="card bg-black/20 rounded-lg p-4 text-center">
-                  <Coins className="w-6 h-6 text-green-400 mx-auto mb-2" />
-                  <div className="text-xl font-bold text-white">{penceToPounds(tipHistoryStats.totalAmount || 0)}</div>
-                  <div className="text-xs text-gray-300">Total Amount</div>
-                </div>
-                <div className="card bg-black/20 rounded-lg p-4 text-center">
-                  <TrendingUp className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-                  <div className="text-xl font-bold text-white">{penceToPounds(tipHistoryStats.averageTip || 0)}</div>
-                  <div className="text-xs text-gray-300">Avg Tip</div>
-                </div>
-                <div className="card bg-black/20 rounded-lg p-4 text-center">
-                  <Activity className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
-                  <div className="text-xl font-bold text-white">{tipHistoryStats.activeTips || 0}</div>
-                  <div className="text-xs text-gray-300">Active</div>
-                </div>
-              </div>
-            )}
-
             {/* Filters */}
             <div className="card bg-black/20 rounded-lg p-4 mb-6">
               <div className="flex flex-wrap gap-4 items-center">
