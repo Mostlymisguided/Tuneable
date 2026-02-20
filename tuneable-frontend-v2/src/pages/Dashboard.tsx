@@ -2473,7 +2473,7 @@ Join here: ${inviteLink}`.trim();
                             [mediaIdKey]: newAmount.toFixed(2)
                           }));
                         }}
-                        className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                        className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"
                       >
                         <Minus className="h-3 w-3" />
                       </button>
@@ -2509,7 +2509,7 @@ Join here: ${inviteLink}`.trim();
                             [mediaIdKey]: newAmount.toFixed(2)
                           }));
                         }}
-                        className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                        className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
                       >
                         <Plus className="h-3 w-3" />
                       </button>

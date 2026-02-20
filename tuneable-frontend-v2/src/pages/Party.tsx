@@ -2756,7 +2756,7 @@ const Party: React.FC = () => {
                                                 });
                                               }}
                                               disabled={isBidding}
-                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-tr-xl text-white transition-colors flex items-center justify-center"
+                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-tr-xl text-black transition-colors flex items-center justify-center"
                                             >
                                               <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                             </button>
@@ -2797,9 +2797,9 @@ const Party: React.FC = () => {
                                                 const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
                                                 return current <= minBid;
                                               })()}
-                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
                                             >
-                                              <Minus className="h-3 w-3 md:h-4 md:w-4 text-gray-300" />
+                                              <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                             </button>
                                           </div>
                                           {/* Tip Button */}
@@ -2900,7 +2900,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3" />
                                     </button>
@@ -2931,7 +2931,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </button>
@@ -3013,7 +3013,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3" />
                                     </button>
@@ -3044,7 +3044,7 @@ const Party: React.FC = () => {
                                           [mediaId]: newAmount.toFixed(2)
                                         }));
                                       }}
-                                      className="px-1.5 py-2 bg-gray-700 hover:bg-gray-800 rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                                      className="px-1.5 py-2 bg-white hover:bg-gray-900 hover:text-white rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </button>
@@ -3440,7 +3440,7 @@ const Party: React.FC = () => {
                                         });
                                       }}
                                       disabled={isBidding}
-                                      className="hidden md:inline px-4 md:py-1.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-tl-xl text-white transition-colors flex items-center justify-center"
+                                      className="hidden md:inline px-4 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-tl-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3467,7 +3467,7 @@ const Party: React.FC = () => {
                                         return current <= minBid;
                                       })()}
                                       className="md:hidden px-1.5 py-2 md:px-6
-                                       md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl text-white transition-colors flex items-center justify-center"
+                                       md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3509,7 +3509,7 @@ const Party: React.FC = () => {
                                         return current <= minBid;
                                       })()}
                                       className="hidden md:inline px-1.5 py-2 md:px-4
-                                       md:py-1.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                                       md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Minus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
@@ -3528,7 +3528,7 @@ const Party: React.FC = () => {
                                         });
                                       }}
                                       disabled={isBidding}
-                                      className="md:hidden px-1.5 py-2 md:px-2 md:py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl text-white transition-colors flex items-center justify-center"
+                                      className="md:hidden px-1.5 py-2 md:px-2 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
                                     >
                                       <Plus className="h-3 w-3 md:h-4 md:w-4" />
                                     </button>
