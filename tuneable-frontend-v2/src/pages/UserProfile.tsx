@@ -1402,7 +1402,7 @@ const UserProfile: React.FC = () => {
           </div>
           
           <div className="card p-4 flex flex-col sm:flex-row items-start relative">
-            <div className='absolute top-0 right-0'>
+            <div className='absolute top-0 right-0 flex flex-col items-end gap-2'>
 
               {/* Member Since */}
               <div className="flex rounded-full p-4 items-center">
@@ -1411,8 +1411,11 @@ const UserProfile: React.FC = () => {
                   {formatJoinDate(user.createdAt)}
                 </span>
               </div>
-          
-      
+
+              {/* Role (Admin/Moderator/Creator/User) */}
+              <span className={`px-3 py-2 bg-purple-600/50 text-xs md:text-base rounded-full font-semibold ${getRoleColor(user.role)}`}>
+                {getRoleDisplay(user.role)}
+              </span>
             </div>
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
@@ -1655,11 +1658,6 @@ const UserProfile: React.FC = () => {
               )}
               
               </div>
-              <div className="flex justify-end self-end">
-              <span className={`px-3 py-2 bg-purple-600/50 text-xs md:text-base rounded-full font-semibold ${getRoleColor(user.role)}`}>
-                  {getRoleDisplay(user.role)}
-                </span>
-            </div>
           </div>
         </div>
 
