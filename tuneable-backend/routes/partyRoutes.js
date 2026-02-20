@@ -3921,7 +3921,8 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             const Media = require('../models/Media');
             allMediaWithBids = await Media.find({
                 ...GLOBAL_PARTY_TUNES_FILTER,
-                bids: { $exists: true, $ne: [] }
+                bids: { $exists: true, $ne: [] },
+                status: { $ne: 'vetoed' } // Exclude globally vetoed media (matches main party fetch)
             })
             .populate({
                 path: 'bids',
