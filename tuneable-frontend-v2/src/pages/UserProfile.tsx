@@ -2019,6 +2019,18 @@ const UserProfile: React.FC = () => {
                   {tuneLibrary.length}
                 </span>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const sorted = getSortedLibrary();
+                  if (sorted.length > 0) handlePlayLibrary(sorted[0], 0);
+                }}
+                disabled={isLoadingLibrary || tuneLibrary.length === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
+              >
+                <Play className="h-4 w-4" fill="currentColor" />
+                Play
+              </button>
             </div>
 
             {isLoadingLibrary ? (
