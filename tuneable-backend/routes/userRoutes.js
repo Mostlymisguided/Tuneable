@@ -2193,11 +2193,13 @@ router.get('/:userId/profile', async (req, res) => {
         select: 'name partyCode uuid _id',
       })
       .sort({ createdAt: -1 }) // Most recent bids first
-      .limit(50); // Limit to 50 most recent bids
+      .limit(50); // Limit to 50 most recent bids for display
 
-    // Calculate bidding statistics
-    const totalBids = userBids.length;
-    const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+    // Calculate bidding statistics from ALL bids (not just the 50 displayed)
+    // Header stats must match tip history tab which uses full bid count
+    const allUserBidsForStats = await Bid.find({ userId: userObj._id }).select('amount mediaId').lean();
+    const totalBids = allUserBidsForStats.length;
+    const totalAmountBid = allUserBidsForStats.reduce((sum, bid) => sum + (bid.amount || 0), 0);
     const averageBidAmount = totalBids > 0 ? totalAmountBid / totalBids : 0;
     
     // Calculate global user statistics
@@ -2209,8 +2211,8 @@ router.get('/:userId/profile', async (req, res) => {
     const allUsers = await User.find({}).select('_id');
     const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
     
-    // Get unique media items bid on
-    const uniqueMedia = [...new Set(userBids.map(bid => bid.mediaId?._id?.toString()).filter(Boolean))];
+    // Get unique media items bid on (from ALL bids)
+    const uniqueMedia = [...new Set(allUserBidsForStats.map(bid => bid.mediaId?.toString()).filter(Boolean))];
     
     // Get top 5 highest bids
     const topBids = [...userBids]
