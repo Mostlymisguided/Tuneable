@@ -237,8 +237,9 @@ const CreatorRegister: React.FC = () => {
     'Electronic','Techno', 'House', 'Minimal', 'D&B', 'Jungle', 'Trance',
     'Indie', 'Folk', 'Blues', 'Soul', 'Pop', 'Rock', 'Hip Hop', 'Rap', 'R&B', 
     'Country', 'Jazz', 'Disco', 'Classical', 'Reggae', 'Metal',  
-    'Funk', 'Punk', 'Alternative', 'Dance', 'Latin', 'World',
-    
+    'Funk', 'Punk', 'Alternative', 'Dance', 'Latin', 'World', 'Comedy', 'News', 
+'Politics', 'Business', 'Tech', 'Science', 'Health', 'Spirituality', 'Philosophy', 
+    'History', 'Culture', 'Self Development', 'True Crime', 'Documentary', 'Audiobook'
   ];
 
   const availableRoles = [
@@ -444,7 +445,7 @@ const CreatorRegister: React.FC = () => {
           {/* Artist Name */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Artist/Stage Name *
+              Creator/Stage Name *
             </label>
             <input
               type="text"
@@ -459,7 +460,7 @@ const CreatorRegister: React.FC = () => {
           {/* Bio */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Artist Bio
+              Creator Bio
             </label>
             <textarea
               value={formData.bio}
@@ -476,7 +477,7 @@ const CreatorRegister: React.FC = () => {
           {/* Roles */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Your Roles * (Select All That Apply)
+              Your Roles* (Select All That Apply)
             </label>
             <div className="flex flex-wrap gap-2">
               {availableRoles.map((role) => (
@@ -635,7 +636,7 @@ const CreatorRegister: React.FC = () => {
       <div>
         <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
           <Music className="h-6 w-6 mr-2 text-purple-400" />
-          Musical Details
+          Creator Details
         </h3>
 
         <div className="space-y-4">
@@ -831,7 +832,7 @@ const CreatorRegister: React.FC = () => {
           {/* Label */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Record Label
+              Record Label / Publisher
             </label>
             <input
               type="text"
@@ -859,7 +860,7 @@ const CreatorRegister: React.FC = () => {
           {/* Distributor */}
           <div>
             <label className="block text-white font-medium mb-2">
-              Music Distributor
+              Distributor
             </label>
             <select
               value={formData.distributor}

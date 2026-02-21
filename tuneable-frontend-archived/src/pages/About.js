@@ -34,10 +34,10 @@ const About = () => {
           Our aims include:
         </p>
          <ul>
-    <li>Promote healing and communication through music;</li>
-    <li>Democratically and transparently chart the global media catalogue;</li>
-    <li>Empower artists by encouraging users to pay a fair price for music;</li>
-    <li>Promote the adoption of more resonant musical tuning standards such as A4 = 432hz;</li>
+    <li>Promote healing through music;</li>
+    <li>Democratically chart global media;</li>
+    <li>Empower creators by encouraging users to pay a fair price for music;</li>
+    <li>More resonant tuning standards such as A4 = 432hz;</li>
     <li>Provide participatory musical experiences in public and private spaces;</li>
     <li>Support wellness initiatives such as sound therapy and mobile or floating healing venues.</li>
   </ul>
