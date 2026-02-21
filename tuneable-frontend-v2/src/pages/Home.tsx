@@ -6,7 +6,7 @@ const Home: React.FC = () => {
   const aims: Array<{ icon: React.ReactElement; title: string }> = [
     {
       icon: <Globe className="h-8 w-8 text-blue-400" />,
-      title: "Democratically + Transparently Chart The Global Media Catalogue",
+      title: "Democratically Chart Global Media",
      // description: "Creating a fair and open system for discovering and promoting music worldwide."
     },
     {
@@ -16,22 +16,22 @@ const Home: React.FC = () => {
     },
     {
       icon: <Users className="h-8 w-8 text-orange-400" />,
-      title: "Empower Artists by Maximising Their Earnings",
+      title: "Empower Artists Maximising Their Earnings",
       //description: "Creating inclusive spaces where everyone can contribute to the musical experience."
     },
     {
       icon: <Waves className="h-8 w-8 text-green-400" />,
-      title: "More Resonant Musical Tuning Standards (e.g. A4 = 432hz)",
+      title: "More Resonant Tuning (e.g. A4 = 432hz)",
      // description: "Advocating for natural tuning that resonates with human consciousness and nature."
     },
     {
       icon: <Heart className="h-8 w-8 text-pink-400" />,
-      title: "Promote Healing and Communication Through Music",
+      title: "Promote Healing Through Music",
       //description: "We believe music has the power to heal and connect people across all boundaries."
     },
     {
       icon: <Shield className="h-8 w-8 text-indigo-400" />,
-      title: "Support Sound Healing + Wellness Venues",
+      title: "Support Sound Healing Venues",
      // description: "Integrating music therapy and healing practices into our platform and community."
     }
   ];
@@ -43,13 +43,13 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
             
-            {/* Social Music Democracy Badge */}
+            {/* Social Music Democracy Badge 
             <div className="flex justify-center mb-8">
               <div className="bg-gradient-to-r from-purple-700 to-purple-800 px-6 py-3 rounded-full flex items-center space-x-2 shadow-lg">
                 <Zap className="h-5 w-5 text-yellow-400" />
                 <span className="text-white text-xl font-semibold">The Democratic Media App</span>
               </div>
-            </div>
+            </div>*/}
             
             {/* Main Title */}
             <h1 className="text-5xl md:text-7xl font-bold p-6 leading-tight">
@@ -152,7 +152,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Our Mission
+              Mission
             </h2>
           </div>
 
@@ -179,9 +179,11 @@ const Home: React.FC = () => {
               Community Interest Company
             </h2>
             <p className="text-xl text-gray-200 leading-relaxed mb-8">
-              As a registered CIC, Tuneable is legally committed to using assets and profits 
-              for the benefit of the community. Not driven by shareholder returns, but a 
-               mission to create positive social impact through music.
+              A UK registered CIC
+            </p>
+            <p className="text-xl text-gray-200 leading-relaxed mb-8">
+            Tuneable is legally bound to use profits 
+            for the benefit of the community 
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 text-center">
@@ -214,7 +216,7 @@ const Home: React.FC = () => {
       <section className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Join Our Creative Evolution
+            Join The Creative Evolution
           </h2>
         
           <div className="flex flex-col sm:flex-row justify-center gap-4">
