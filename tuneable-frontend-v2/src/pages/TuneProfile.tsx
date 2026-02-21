@@ -11,7 +11,6 @@ import {
   ThumbsUp,
   Trash2,
   Play,
-  ExternalLink,
   Globe,
   Tag,
   Mic,
@@ -21,8 +20,6 @@ import {
   Award,
   X,
   Save,
-  Youtube,
-  Music2,
   Coins,
   Loader2,
   Flag,
@@ -1094,93 +1091,6 @@ const TuneProfile: React.FC = () => {
     setEditForm({ ...editForm, featuring });
   };
 
-  // Get platform icon and color
-  const getPlatformIcon = (platform: string) => {
-    const platformLower = platform.toLowerCase();
-    switch (platformLower) {
-      case 'youtube':
-        return { icon: Youtube, color: 'hover:bg-red-600/30 hover:border-red-500', bgColor: 'bg-red-600/20' };
-      case 'soundcloud':
-        return { icon: Music2, color: 'hover:bg-orange-600/30 hover:border-orange-500', bgColor: 'bg-orange-600/20' };
-      default:
-        return { icon: ExternalLink, color: 'hover:bg-purple-600/30 hover:border-purple-500', bgColor: 'bg-purple-600/20' };
-    }
-  };
-
-  // Get available external links
-  const getExternalLinks = () => {
-    const links: Array<{
-      platform: string;
-      url: string;
-      icon: any;
-      color: string;
-      bgColor: string;
-      displayName: string;
-    }> = [];
-    
-    // Add links from sources
-    if (media?.sources) {
-      Object.entries(media.sources).forEach(([platform, url]) => {
-        // Skip 'upload' source - it's internal file storage, not an external platform link
-        if (platform.toLowerCase() === 'upload') {
-          return;
-        }
-        
-        const { icon, color, bgColor } = getPlatformIcon(platform);
-        links.push({
-          platform,
-          url,
-          icon,
-          color,
-          bgColor,
-          displayName: platform.charAt(0).toUpperCase() + platform.slice(1)
-        });
-      });
-    }
-    
-    // Auto-populate YouTube link from externalIds if not already in sources
-    if (media?.externalIds?.youtube && !media?.sources?.youtube) {
-      const youtubeId = media.externalIds.youtube;
-      const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
-      const { icon, color, bgColor } = getPlatformIcon('youtube');
-      links.push({
-        platform: 'youtube',
-        url: youtubeUrl,
-        icon,
-        color,
-        bgColor,
-        displayName: 'YouTube'
-      });
-    }
-    
-    return links;
-  };
-
-  // Get platforms that can be added
-  const getMissingPlatforms = () => {
-    if (!canEditTune()) return [];
-    
-    const existingSources = media?.sources || {};
-    const existingExternalIds = media?.externalIds || {};
-    const allPlatforms = ['YouTube', 'SoundCloud'];
-    
-    return allPlatforms
-      .filter(platform => {
-        const platformLower = platform.toLowerCase();
-        // Don't show "Add" button if link exists in sources OR in externalIds
-        return !existingSources[platformLower] && !existingExternalIds[platformLower];
-      })
-      .map(platform => {
-        const { icon, color } = getPlatformIcon(platform);
-        return {
-          platform: platform.toLowerCase(),
-          displayName: platform,
-          icon,
-          color
-        };
-      });
-  };
-
   // Handle cover art file upload
   const handleCoverArtUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1226,12 +1136,6 @@ const TuneProfile: React.FC = () => {
   // Handle cover art upload button click
   const handleCoverArtUploadClick = () => {
     coverArtFileInputRef.current?.click();
-  };
-
-  // Handle adding a new link
-  const handleAddLink = (platform: string) => {
-    setSelectedPlatform(platform);
-    setShowAddLinkModal(true);
   };
 
   // Save new link
@@ -2075,7 +1979,7 @@ const TuneProfile: React.FC = () => {
               </div>
               
               {/* Tip Metrics Grid */}
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 md:gap-2 px-2 md:px-0">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 md:gap-2 w-fit max-w-xl">
                 {/* Tip Total */}
                 <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-green-500/50">
                   <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Tip Total</div>
@@ -2125,44 +2029,6 @@ const TuneProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* External Source Links - Desktop only */}
-              {getExternalLinks().length > 0 && (
-                <div className="hidden md:block my-4">
-                  <div className="flex flex-wrap gap-2">
-                    {getExternalLinks().map((link) => (
-                      <a
-                        key={link.platform}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center space-x-2 px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all ${link.color}`}
-                      >
-                        <link.icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{link.displayName}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Add External Links - Only for admin/verified creators */}
-              {canEditTune() && getMissingPlatforms().length > 0 && (
-                <div className="my-4">
-                  <div className="text-xs text-gray-400 mb-2">Add external links:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {getMissingPlatforms().map((platform) => (
-                      <button
-                        key={platform.platform}
-                        onClick={() => handleAddLink(platform.platform)}
-                        className={`flex items-center space-x-2 px-3 py-1.5 bg-black/10 border rounded-lg text-xs font-medium transition-all ${platform.color}`}
-                      >
-                        <platform.icon className="w-3.5 h-3.5" />
-                        <span>Add {platform.displayName}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
