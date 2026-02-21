@@ -14,6 +14,7 @@ const podcastIndexService = require('../services/podcastIndexService');
 const applePodcastsService = require('../services/applePodcastsService');
 const taddyService = require('../services/taddyService');
 const podcastAdapter = require('../services/podcastAdapter');
+const spotifyService = require('../services/spotifyService');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
 
 const router = express.Router();
@@ -1376,6 +1377,166 @@ router.post('/import-link', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error importing from URL:', error);
     res.status(500).json({ error: 'Failed to import podcast from URL: ' + error.message });
+  }
+});
+
+// Check if user has Spotify connected (for import UI)
+router.get('/spotify-status', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('spotifyId').lean();
+    res.json({ connected: !!user?.spotifyId });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to check Spotify status' });
+  }
+});
+
+// Import podcasts from user's Spotify saved shows
+router.post('/import-spotify', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId).select('spotifyAccessToken spotifyId');
+    if (!user?.spotifyAccessToken) {
+      return res.status(400).json({ error: 'Spotify not connected. Please connect your Spotify account first.' });
+    }
+
+    const maxShows = Math.min(parseInt(req.body.maxShows) || 50, 50);
+    const episodesPerShow = Math.min(parseInt(req.body.episodesPerShow) || 10, 50);
+
+    const savedShows = await spotifyService.getSavedShows(user.spotifyAccessToken, maxShows);
+    const imported = { series: [], episodes: 0 };
+    const errors = [];
+
+    for (const show of savedShows) {
+      try {
+        const seriesData = spotifyService.convertShowToSeriesFormat(show);
+        const { episodes } = await spotifyService.getShowEpisodes(
+          user.spotifyAccessToken,
+          show.id,
+          episodesPerShow
+        );
+        const series = await podcastAdapter.createOrFindSeries(
+          { ...seriesData, spotifyId: show.id },
+          userId,
+          'spotify'
+        );
+        imported.series.push({ id: series._id, title: series.title });
+
+        for (const ep of episodes) {
+          try {
+            const episodeData = spotifyService.convertEpisodeToOurFormat(ep, show);
+            await podcastAdapter.importEpisodeWithSeries(
+              'spotify',
+              episodeData,
+              seriesData,
+              userId
+            );
+            imported.episodes += 1;
+          } catch (epErr) {
+            errors.push({ episode: ep.name, reason: epErr.message });
+          }
+        }
+      } catch (showErr) {
+        errors.push({ show: show.name, reason: showErr.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      imported: {
+        seriesCount: imported.series.length,
+        episodeCount: imported.episodes,
+        series: imported.series
+      },
+      errors: errors.length ? errors : undefined
+    });
+  } catch (error) {
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Spotify token expired. Please reconnect Spotify.' });
+    }
+    console.error('Spotify import error:', error);
+    res.status(500).json({ error: error.message || 'Failed to import from Spotify' });
+  }
+});
+
+// Import podcasts from OPML file (e.g. exported from Overcast, Pocket Casts, etc.)
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+
+router.post('/import-opml', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ error: 'No file uploaded. Please upload an OPML file.' });
+    }
+    const userId = req.user._id;
+    const xml = req.file.buffer.toString('utf-8');
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(xml);
+    const opml = result.opml || result;
+    const body = opml.body || opml;
+    const outlines = Array.isArray(body.outline) ? body.outline : (body.outline ? [body.outline] : []);
+
+    const feedUrls = [];
+    function collectFeeds(items) {
+      for (const item of items) {
+        const url = item.xmlUrl || item.url;
+        if (url && (url.includes('/') || url.startsWith('http'))) {
+          feedUrls.push(url.trim());
+        }
+        if (item.outline) {
+          collectFeeds(Array.isArray(item.outline) ? item.outline : [item.outline]);
+        }
+      }
+    }
+    collectFeeds(outlines);
+
+    const uniqueUrls = [...new Set(feedUrls)];
+    const imported = { series: [], episodes: 0 };
+    const errors = [];
+
+    for (const rssUrl of uniqueUrls.slice(0, 50)) {
+      try {
+        const rssResult = await parseRSSFeed(rssUrl, 20);
+        const channel = rssResult.channel || {};
+        const seriesData = {
+          title: channel.title || 'Unknown Podcast',
+          description: channel.description || channel.summary || '',
+          author: channel.author || '',
+          image: channel.image || null,
+          categories: channel.categories || [],
+          language: channel.language || 'en',
+          explicit: channel.explicit || false,
+          rssUrl
+        };
+        const series = await podcastAdapter.createOrFindSeries(seriesData, userId, 'opml');
+        imported.series.push({ id: series._id, title: series.title });
+
+        for (const item of (rssResult.episodes || []).slice(0, 20)) {
+          try {
+            item.feedUrl = rssUrl;
+            await podcastAdapter.importEpisodeWithSeries('rss', item, seriesData, userId);
+            imported.episodes += 1;
+          } catch (epErr) {
+            errors.push({ episode: item.title, reason: epErr.message });
+          }
+        }
+      } catch (feedErr) {
+        errors.push({ feed: rssUrl, reason: feedErr.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      imported: {
+        seriesCount: imported.series.length,
+        episodeCount: imported.episodes,
+        series: imported.series
+      },
+      errors: errors.length ? errors : undefined
+    });
+  } catch (error) {
+    console.error('OPML import error:', error);
+    res.status(500).json({ error: error.message || 'Failed to import OPML' });
   }
 });
 

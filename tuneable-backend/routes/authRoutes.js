@@ -1021,6 +1021,94 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   });
 }
 
+// Spotify OAuth routes (for podcast import - link_account only)
+if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+  router.get('/spotify', async (req, res, next) => {
+    if (req.query.redirect) {
+      req.session = req.session || {};
+      req.session.oauthRedirect = req.query.redirect;
+    }
+    if (req.query.link_account === 'true') {
+      req.session = req.session || {};
+      req.session.linkAccount = true;
+      const currentUser = await extractUserFromToken(req);
+      if (currentUser) {
+        req.session.linkingUserId = currentUser._id;
+        req.session.linkingUserUuid = currentUser.uuid;
+      } else {
+        console.warn('⚠️ Spotify link requested but no valid user token found');
+      }
+    }
+    passport.authenticate('spotify', {
+      scope: ['user-library-read'],
+      showDialog: false
+    })(req, res, next);
+  });
+
+  router.get('/spotify/callback',
+    (req, res, next) => {
+      passport.authenticate('spotify', { session: false }, (err, user, info) => {
+        if (err) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const redirectUrl = req.session?.oauthRedirect
+            ? decodeURIComponent(req.session.oauthRedirect)
+            : `${frontendUrl}/podcasts`;
+          if (req.session) {
+            delete req.session.oauthRedirect;
+            delete req.session.linkAccount;
+            delete req.session.linkingUserId;
+            delete req.session.linkingUserUuid;
+          }
+          const msg = encodeURIComponent(err.message || 'Spotify connection failed');
+          return res.redirect(`${redirectUrl}?error=spotify_auth_failed&message=${msg}`);
+        }
+        if (!user) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const redirectUrl = req.session?.oauthRedirect
+            ? decodeURIComponent(req.session.oauthRedirect)
+            : `${frontendUrl}/podcasts`;
+          if (req.session) {
+            delete req.session.oauthRedirect;
+            delete req.session.linkAccount;
+            delete req.session.linkingUserId;
+            delete req.session.linkingUserUuid;
+          }
+          return res.redirect(`${redirectUrl}?error=spotify_auth_failed`);
+        }
+        req.user = user;
+        next();
+      })(req, res, next);
+    },
+    async (req, res) => {
+      try {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const token = jwt.sign(
+          { userId: req.user.uuid, email: req.user.email, username: req.user.username },
+          SECRET_KEY,
+          { expiresIn: '24h' }
+        );
+        if (req.session?.oauthRedirect) {
+          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
+          res.redirect(`${redirectUrl}&token=${token}&oauth_success=true`);
+        } else {
+          res.redirect(`${frontendUrl}/podcasts?token=${token}&oauth_success=true`);
+        }
+      } catch (error) {
+        console.error('Spotify callback error:', error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/podcasts?error=spotify_auth_failed`);
+      }
+    }
+  );
+} else {
+  router.get('/spotify', (req, res) => res.status(503).json({ error: 'Spotify OAuth not configured' }));
+  router.get('/spotify/callback', (req, res) => res.status(503).json({ error: 'Spotify OAuth not configured' }));
+}
+
 // Token refresh endpoint
 router.post('/refresh', authMiddleware, async (req, res) => {
   try {

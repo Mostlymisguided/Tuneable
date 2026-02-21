@@ -31,6 +31,9 @@ class PodcastAdapter {
       case 'apple':
         mediaData = this.fromApple(episodeData, seriesData);
         break;
+      case 'spotify':
+        mediaData = this.fromSpotify(episodeData, seriesData);
+        break;
       default:
         throw new Error(`Unknown podcast source: ${source}`);
     }
@@ -446,7 +449,58 @@ class PodcastAdapter {
       releaseDate: appleEpisode.releaseDate ? new Date(appleEpisode.releaseDate) : new Date()
     };
   }
-  
+
+  /**
+   * Convert Spotify episode to Media format
+   */
+  fromSpotify(spotifyEpisode, seriesData = null) {
+    const show = spotifyEpisode.show || seriesData;
+    const coverArt = show?.images?.[0]?.url || seriesData?.image || null;
+    const categories = seriesData?.categories || [];
+    const primaryGenreName = categories[0] || null;
+
+    return {
+      title: spotifyEpisode.name || 'Untitled Episode',
+      contentType: ['spoken'],
+      contentForm: ['podcastepisode'],
+      mediaType: ['mp3'],
+
+      host: (show?.publisher || seriesData?.author)
+        ? [{ name: show.publisher || seriesData.author, userId: null, verified: false }]
+        : [],
+
+      episodeNumber: null,
+      seasonNumber: null,
+      duration: spotifyEpisode.duration || 0,
+      explicit: spotifyEpisode.explicit || false,
+      description: spotifyEpisode.description || '',
+
+      coverArt,
+
+      genres: categories,
+      tags: this.buildTags(primaryGenreName, categories, categories),
+      language: seriesData?.language || 'en',
+
+      sources: new Map(
+        [
+          ['audio_direct', spotifyEpisode.audioPreviewUrl],
+          ['spotify', spotifyEpisode.spotifyUrl]
+        ].filter(([_, url]) => url)
+      ),
+
+      externalIds: new Map(
+        [
+          ['spotify', spotifyEpisode.id],
+          ['podcastSeries_spotify', show?.id || seriesData?.spotifyId]
+        ].filter(([_, id]) => id)
+      ),
+
+      releaseDate: spotifyEpisode.releaseDate
+        ? new Date(spotifyEpisode.releaseDate)
+        : new Date()
+    };
+  }
+
   /**
    * Parse duration from various formats
    */
@@ -469,14 +523,19 @@ class PodcastAdapter {
    * Create or find podcast series as Media
    */
   async createOrFindSeries(seriesData, addedBy, source = null) {
-    // Check if series already exists
-    const existing = await Media.findOne({
-      $or: [
-        { 'externalIds.taddy': seriesData.taddyUuid },
-        { 'externalIds.podcastIndex': seriesData.podcastIndexId },
-        { 'externalIds.iTunes': seriesData.iTunesId }
-      ].filter(q => Object.values(q)[0])
-    });
+    // Check if series already exists (by external IDs or RSS URL)
+    const orConditions = [
+      { 'externalIds.taddy': seriesData.taddyUuid },
+      { 'externalIds.podcastIndex': seriesData.podcastIndexId },
+      { 'externalIds.iTunes': seriesData.iTunesId },
+      { 'externalIds.spotify': seriesData.spotifyId }
+    ].filter(q => Object.values(q)[0]);
+    if (seriesData.rssUrl) {
+      orConditions.push({ 'sources.rss': seriesData.rssUrl });
+    }
+    const existing = orConditions.length
+      ? await Media.findOne({ $or: orConditions })
+      : null;
     
     if (existing) {
       // Update RSS feed if we have a new one from a different source
@@ -548,7 +607,10 @@ class PodcastAdapter {
         if (seriesData.iTunesId) {
           sourceMap.set('apple', `https://podcasts.apple.com/podcast/id${seriesData.iTunesId}`);
         }
-        
+        if (seriesData.spotifyId || seriesData.spotifyUrl) {
+          sourceMap.set('spotify', seriesData.spotifyUrl || `https://open.spotify.com/show/${seriesData.spotifyId}`);
+        }
+
         return sourceMap;
       })(),
       
@@ -556,7 +618,8 @@ class PodcastAdapter {
         [
           ['taddy', seriesData.taddyUuid],
           ['podcastIndex', seriesData.podcastIndexId?.toString()],
-          ['iTunes', seriesData.iTunesId?.toString()]
+          ['iTunes', seriesData.iTunesId?.toString()],
+          ['spotify', seriesData.spotifyId]
         ].filter(([_, id]) => id)
       ),
       

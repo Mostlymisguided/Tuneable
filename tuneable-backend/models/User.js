@@ -19,6 +19,9 @@ const userSchema = new mongoose.Schema({
   instagramId: { type: String, unique: true, sparse: true },
   instagramUsername: { type: String },
   instagramAccessToken: { type: String },
+  spotifyId: { type: String, unique: true, sparse: true },
+  spotifyAccessToken: { type: String },
+  spotifyRefreshToken: { type: String },
   cellPhone:{ type: String }, 
   givenName:{ type: String },
   familyName:{ type: String },
@@ -208,7 +211,8 @@ const userSchema = new mongoose.Schema({
     instagram: { type: Boolean, default: false },
     facebook: { type: Boolean, default: false },
     soundcloud: { type: Boolean, default: false },
-    google: { type: Boolean, default: false }
+    google: { type: Boolean, default: false },
+    spotify: { type: Boolean, default: false }
   },
   
   // Label affiliations

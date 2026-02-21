@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI } from '../lib/api';
@@ -25,7 +25,9 @@ import {
   Linkedin,
   Coins,
   Users,
-  Tag
+  Tag,
+  Music2,
+  Upload
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -89,7 +91,8 @@ interface PodcastEpisode {
 
 const Podcasts: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, token, handleOAuthCallback, refreshUser } = useAuth();
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -117,6 +120,10 @@ const Podcasts: React.FC = () => {
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showImportSection, setShowImportSection] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [isImportingSpotify, setIsImportingSpotify] = useState(false);
+  const [isImportingOpml, setIsImportingOpml] = useState(false);
+  const [opmlFile, setOpmlFile] = useState<File | null>(null);
   
   // Search pagination state
   const [searchOffset, setSearchOffset] = useState(0);
@@ -159,6 +166,44 @@ const Podcasts: React.FC = () => {
   useEffect(() => {
     fetchChart();
   }, [filters]);
+
+  // Fetch Spotify connection status when user is logged in
+  useEffect(() => {
+    if (user && token) {
+      fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/spotify-status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => setSpotifyConnected(!!data.connected))
+        .catch(() => setSpotifyConnected(false));
+    } else {
+      setSpotifyConnected(false);
+    }
+  }, [user, token]);
+
+  // Handle OAuth callback when returning from Spotify connect
+  useEffect(() => {
+    const urlToken = searchParams.get('token');
+    const oauthSuccess = searchParams.get('oauth_success');
+    const error = searchParams.get('error');
+    const message = searchParams.get('message');
+    if (urlToken && oauthSuccess === 'true') {
+      handleOAuthCallback(urlToken).then(() => {
+        refreshUser?.();
+        const next = new URLSearchParams(searchParams);
+        next.delete('token');
+        next.delete('oauth_success');
+        setSearchParams(next, { replace: true });
+        toast.success('Spotify connected! You can now import your podcasts.');
+      }).catch(() => toast.error('Failed to complete Spotify connection'));
+    } else if (error === 'spotify_auth_failed') {
+      toast.error(decodeURIComponent(message || 'Spotify connection failed'));
+      const next = new URLSearchParams(searchParams);
+      next.delete('error');
+      next.delete('message');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, handleOAuthCallback, refreshUser, setSearchParams]);
 
   useEffect(() => {
     fetchTopEpisodes();
@@ -495,6 +540,86 @@ const Podcasts: React.FC = () => {
       toast.error(error.message || 'Failed to import podcast from URL');
     } finally {
       setIsImportingLink(false);
+    }
+  };
+
+  const handleConnectSpotify = () => {
+    if (!user) {
+      toast.error('Please log in to connect Spotify');
+      navigate('/login');
+      return;
+    }
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    const redirectUrl = encodeURIComponent(`${window.location.origin}/podcasts?oauth_success=true`);
+    const token = localStorage.getItem('token');
+    window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+  };
+
+  const handleImportFromSpotify = async () => {
+    if (!user) {
+      toast.error('Please log in to import podcasts');
+      navigate('/login');
+      return;
+    }
+    if (!spotifyConnected) {
+      handleConnectSpotify();
+      return;
+    }
+    setIsImportingSpotify(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/import-spotify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ maxShows: 50, episodesPerShow: 10 })
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      toast.success(`Imported ${data.imported?.seriesCount || 0} series and ${data.imported?.episodeCount || 0} episodes from Spotify`);
+      fetchChart();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to import from Spotify');
+    } finally {
+      setIsImportingSpotify(false);
+    }
+  };
+
+  const handleImportOpml = async () => {
+    if (!user) {
+      toast.error('Please log in to import podcasts');
+      navigate('/login');
+      return;
+    }
+    if (!opmlFile) {
+      toast.error('Please select an OPML file first');
+      return;
+    }
+    setIsImportingOpml(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', opmlFile);
+      const res = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/import-opml`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          body: formData
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      toast.success(`Imported ${data.imported?.seriesCount || 0} series and ${data.imported?.episodeCount || 0} episodes from OPML`);
+      setOpmlFile(null);
+      fetchChart();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to import OPML');
+    } finally {
+      setIsImportingOpml(false);
     }
   };
 
@@ -906,7 +1031,7 @@ const Podcasts: React.FC = () => {
 
   // Share functionality
   const shareUrl = window.location.href;
-  const shareText = `Check out the top podcast episodes on Tuneable! Support your favourite podcasts and discover new content.`;
+  const shareText = `Check out the top podcast episodes on Tuneable! Support your favourite Creators and discover new content.`;
 
   const handleNativeShare = async () => {
     if (navigator.share) {
@@ -1338,34 +1463,107 @@ const Podcasts: React.FC = () => {
             </div>
           </div>
 
-          {/* Link Import - Collapsible */}
+          {/* Import Options - Collapsible */}
           {showImportSection && (
-            <div className="mt-3">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
-                  className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                />
+            <div className="mt-3 space-y-4">
+              {/* URL Import */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Import from URL</h4>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
+                    className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleImportLink}
+                    disabled={isImportingLink || !linkUrl.trim()}
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  >
+                    {isImportingLink ? (
+                      <>
+                        <Loader className="h-5 w-5 animate-spin" />
+                        <span>Importing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="h-5 w-5" />
+                        <span>Import</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Spotify Import */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Import from Spotify</h4>
+                <p className="text-xs text-gray-400 mb-2">
+                  Connect your Spotify account and import your saved podcast subscriptions.
+                </p>
                 <button
-                  onClick={handleImportLink}
-                  disabled={isImportingLink || !linkUrl.trim()}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  onClick={handleImportFromSpotify}
+                  disabled={isImportingSpotify || !user}
+                  className="px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
                 >
-                  {isImportingLink ? (
+                  {isImportingSpotify ? (
                     <>
                       <Loader className="h-5 w-5 animate-spin" />
                       <span>Importing...</span>
                     </>
+                  ) : spotifyConnected ? (
+                    <>
+                      <Music2 className="h-5 w-5" />
+                      <span>Import My Spotify Podcasts</span>
+                    </>
                   ) : (
                     <>
-                      <LinkIcon className="h-5 w-5" />
-                      <span>Import</span>
+                      <Music2 className="h-5 w-5" />
+                      <span>Connect Spotify & Import</span>
                     </>
                   )}
                 </button>
+              </div>
+
+              {/* OPML Import */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Import from OPML</h4>
+                <p className="text-xs text-gray-400 mb-2">
+                  Export subscriptions from Overcast, Pocket Casts, Castro, etc. and upload the OPML file.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <label className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-gray-700 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-600 transition-colors">
+                    <Upload className="h-5 w-5 text-purple-400" />
+                    <span className="text-sm text-gray-300 truncate">
+                      {opmlFile ? opmlFile.name : 'Choose OPML file...'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".opml,.xml"
+                      className="hidden"
+                      onChange={(e) => setOpmlFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                  <button
+                    onClick={handleImportOpml}
+                    disabled={isImportingOpml || !opmlFile || !user}
+                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  >
+                    {isImportingOpml ? (
+                      <>
+                        <Loader className="h-5 w-5 animate-spin" />
+                        <span>Importing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5" />
+                        <span>Import OPML</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}

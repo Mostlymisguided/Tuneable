@@ -1492,6 +1492,60 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   console.log('⚠️  Instagram OAuth not configured - INSTAGRAM_CLIENT_ID or INSTAGRAM_CLIENT_SECRET missing');
 }
 
+// Spotify OAuth Strategy - for podcast import (user-library-read scope)
+if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+  const SpotifyStrategy = require('passport-spotify').Strategy;
+  passport.use(new SpotifyStrategy({
+      clientID: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      callbackURL: process.env.SPOTIFY_CALLBACK_URL || 'http://localhost:8000/api/auth/spotify/callback',
+      passReqToCallback: true
+    },
+    async (req, accessToken, refreshToken, expires_in, profile, done) => {
+      try {
+        const isLinkingAccount = req.session?.linkAccount === true;
+        const linkingUserId = req.session?.linkingUserId;
+
+        let user = await User.findOne({ spotifyId: profile.id });
+
+        if (user) {
+          if (isLinkingAccount && linkingUserId) {
+            if (user._id.toString() !== linkingUserId) {
+              return done(new Error('This Spotify account is already linked to another user.'), null);
+            }
+          }
+          user.spotifyAccessToken = accessToken;
+          user.spotifyRefreshToken = refreshToken || user.spotifyRefreshToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.spotify = true;
+          await user.save();
+          return done(null, user);
+        }
+
+        if (isLinkingAccount && linkingUserId) {
+          user = await User.findById(linkingUserId);
+          if (!user) return done(new Error('User not found'), null);
+          user.spotifyId = profile.id;
+          user.spotifyAccessToken = accessToken;
+          user.spotifyRefreshToken = refreshToken;
+          user.oauthVerified = user.oauthVerified || {};
+          user.oauthVerified.spotify = true;
+          await user.save();
+          return done(null, user);
+        }
+
+        return done(new Error('Please log in first, then connect Spotify from the Podcasts page.'), null);
+      } catch (error) {
+        console.error('Spotify OAuth error:', error);
+        return done(error, null);
+      }
+    }
+  ));
+  console.log('✅ Spotify OAuth configured (podcast import)');
+} else {
+  console.log('⚠️  Spotify OAuth not configured - SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET missing');
+}
+
 // Generate unique invite code
 function generateInviteCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
