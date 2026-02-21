@@ -24,10 +24,10 @@ import {
   Facebook,
   Linkedin,
   Coins,
-  Users,
   Tag,
   Music2,
-  Upload
+  Upload,
+  Award
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -75,6 +75,7 @@ interface PodcastEpisode {
   sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
+  globalMediaBidTop?: number;
   // Bids for top supporters
   bids?: Array<{
     _id?: string;
@@ -143,9 +144,9 @@ const Podcasts: React.FC = () => {
   const shareDropdownRef = useRef<HTMLDivElement>(null);
 
   // Metrics
-  const [totalEpisodes, setTotalEpisodes] = useState(0);
   const [totalTips, setTotalTips] = useState(0);
   const [avgTip, setAvgTip] = useState(0);
+  const [topTip, setTopTip] = useState(0);
 
   // Top Podcast Episodes
   const [topPodcastEpisodes, setTopPodcastEpisodes] = useState<PodcastEpisode[]>([]);
@@ -272,12 +273,14 @@ const Podcasts: React.FC = () => {
       setAvailableFilters(data.filters || { categories: [], genres: [], tags: [] });
       
       // Calculate metrics
-      setTotalEpisodes(episodesList.length);
       const total = episodesList.reduce((sum: number, ep: PodcastEpisode) => sum + (ep.globalMediaAggregate || 0), 0);
       setTotalTips(total);
       const tipCount = episodesList.reduce((sum: number, ep: PodcastEpisode) => sum + (ep.bids?.length || 0), 0);
       const avg = tipCount > 0 ? total / tipCount : 0;
       setAvgTip(avg);
+      const fromBidTop = episodesList.map((ep: PodcastEpisode) => ep.globalMediaBidTop || 0);
+      const fromBids = episodesList.flatMap((ep: PodcastEpisode) => (ep.bids || []).map(b => b.amount));
+      setTopTip(Math.max(0, ...fromBidTop, ...fromBids));
     } catch (error: any) {
       console.error('Error fetching chart:', error);
       toast.error('Failed to load podcast chart');
@@ -1235,18 +1238,7 @@ const Podcasts: React.FC = () => {
 
       {/* Metrics */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-600/30 rounded-lg">
-                <Music className="h-5 w-5 text-purple-300" />
-              </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{totalEpisodes}</div>
-                <div className="text-xs text-gray-400">Episodes</div>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-purple-600/30 rounded-lg">
@@ -1272,11 +1264,11 @@ const Podcasts: React.FC = () => {
           <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-purple-600/30 rounded-lg">
-                <Users className="h-5 w-5 text-purple-300" />
+                <Award className="h-5 w-5 text-purple-300" />
               </div>
               <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{totalEpisodes}</div>
-                <div className="text-xs text-gray-400">Ranked</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(topTip)}</div>
+                <div className="text-xs text-gray-400">Top Tip</div>
               </div>
             </div>
           </div>
