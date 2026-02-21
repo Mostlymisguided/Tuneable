@@ -76,7 +76,7 @@ const Navbar: React.FC = () => {
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
                   <Music className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Tunes</span>
+                  <span className="hidden sm:inline">Music</span>
                 </Link>
                 {/* <Link
                   to="/podcasts"
