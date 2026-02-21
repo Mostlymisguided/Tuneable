@@ -35,7 +35,7 @@ const About = () => {
         </p>
          <ul>
     <li>Promote healing and communication through music;</li>
-    <li>Democratically and transparently chart the global music catalogue;</li>
+    <li>Democratically and transparently chart the global media catalogue;</li>
     <li>Empower artists by encouraging users to pay a fair price for music;</li>
     <li>Promote the adoption of more resonant musical tuning standards such as A4 = 432hz;</li>
     <li>Provide participatory musical experiences in public and private spaces;</li>

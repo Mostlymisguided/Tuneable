@@ -102,7 +102,7 @@ const About: React.FC = () => {
       <section className="py-16 bg-gradient-to-r from-purple-600 to-indigo-600 text-white" style={{ marginBottom: '50px' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ paddingTop: '30px', paddingBottom: '30px' }}>
-            Join Our Creative Revolution
+            Join Our Creative Evolution
           </h2>
           <p className="text-xl text-purple-100 mb-8">
             Be part of a community that's reshaping how music brings people together

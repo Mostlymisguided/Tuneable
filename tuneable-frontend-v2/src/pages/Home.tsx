@@ -6,7 +6,7 @@ const Home: React.FC = () => {
   const aims: Array<{ icon: React.ReactElement; title: string }> = [
     {
       icon: <Globe className="h-8 w-8 text-blue-400" />,
-      title: "Democratically + Transparently Chart The Global Music Catalogue",
+      title: "Democratically + Transparently Chart The Global Media Catalogue",
      // description: "Creating a fair and open system for discovering and promoting music worldwide."
     },
     {
@@ -101,7 +101,7 @@ const Home: React.FC = () => {
                 <Coins className="h-10 w-10 text-green-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Tip on Tunes
+                Tip on Media
               </h3>
               <p className="text-gray-300 leading-relaxed">
                 Tip Your Favorite Media to the Top
@@ -214,7 +214,7 @@ const Home: React.FC = () => {
       <section className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Join Our Musical Evolution
+            Join Our Creative Evolution
           </h2>
         
           <div className="flex flex-col sm:flex-row justify-center gap-4">
