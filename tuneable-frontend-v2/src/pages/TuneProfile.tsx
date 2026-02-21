@@ -282,6 +282,12 @@ const TuneProfile: React.FC = () => {
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
 
+  // Collapsible sections: Top Fans, Top Tips, Top Parties, Tag Rankings
+  const [showTopFans, setShowTopFans] = useState(false);
+  const [showTopTips, setShowTopTips] = useState(false);
+  const [showTopParties, setShowTopParties] = useState(false);
+  const [showTagRankings, setShowTagRankings] = useState(false);
+
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -1973,10 +1979,33 @@ const TuneProfile: React.FC = () => {
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
               <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
-              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2
-              ">
+              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
                 <ClickableArtistDisplay media={media} />
               </div>
+              
+              {/* Duration & Tags */}
+              {(media.duration || (media.tags && media.tags.length > 0)) && (
+                <div className="flex flex-col items-center md:items-start gap-1.5 px-2 mb-3 text-sm text-gray-400">
+                  {media.duration && (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-gray-500" />
+                      {formatDuration(media.duration)}
+                    </span>
+                  )}
+                  {media.tags && media.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {media.tags.map((tag, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-full bg-white/5 text-gray-300 border border-white/10 hover:border-purple-500/40 hover:text-purple-300 transition-colors text-xs font-medium"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               
               {/* Tip Metrics Grid */}
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 md:gap-2 w-fit max-w-xl">
@@ -2255,132 +2284,160 @@ const TuneProfile: React.FC = () => {
             </div>
           </div>
 
-        {/* Top Supporters */}
+        {/* Top Fans - collapsible */}
         {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-              <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400" />
-              Top Supporters
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopSupporters bids={media.bids} maxDisplay={10} />
-            </div>
+          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
+            <button
+              onClick={() => setShowTopFans(!showTopFans)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400 flex-shrink-0" />
+                {showTopFans ? 'Top Fans' : 'Show Top Fans'}
+              </span>
+              {showTopFans ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showTopFans && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <TopSupporters bids={media.bids} maxDisplay={10} />
+              </div>
+            )}
           </div>
         )}
 
-        {/* Top Tips */}
+        {/* Top Tips - collapsible */}
         {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-              <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
-              Top Tips
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopBidders bids={media.bids} maxDisplay={5} />
-            </div>
+          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
+            <button
+              onClick={() => setShowTopTips(!showTopTips)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400 flex-shrink-0" />
+                {showTopTips ? 'Top Tips' : 'Show Top Tips'}
+              </span>
+              {showTopTips ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showTopTips && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <TopBidders bids={media.bids} maxDisplay={5} />
+              </div>
+            )}
           </div>
         )}
 
-        {/* Top Parties */}
-        <div className="mb-6 px-2 md:px-0">
-          <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-            <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
-            Top Parties {topParties.length > 0 && `(${topParties.length})`}
-          </h2>
-          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-            {(() => {
-              console.log('🎪 Rendering Top Parties section, length:', topParties.length);
-              console.log('🎪 Top Parties data:', topParties);
-              return null;
-            })()}
-            {topParties.length > 0 ? (
-              <div className="space-y-2 md:space-y-3">
-                {topParties.map((party, index) => (
-                  <div 
-                    key={party._id} 
-                    className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+        {/* Top Parties - collapsible */}
+        <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
+          <button
+            onClick={() => setShowTopParties(!showTopParties)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+          >
+            <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+              <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400 flex-shrink-0" />
+              {showTopParties ? 'Top Parties' : 'Show Top Parties'}
+              {topParties.length > 0 && ` (${topParties.length})`}
+            </span>
+            {showTopParties ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+          </button>
+          {showTopParties && (
+            <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+              {topParties.length > 0 ? (
+                <div className="space-y-2 md:space-y-3">
+                  {topParties.map((party, index) => (
+                    <div 
+                      key={party._id} 
+                      className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold">#{index + 1}</span>
+                        </div>
+                        <div>
+                          <h3 className="text-white font-semibold text-lg">{party.name}</h3>
+                          <p className="text-sm text-gray-400">{party.location}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-green-400">
+                            {penceToPounds(party.partyMediaAggregate || 0)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {party.bidCount || 0} {party.bidCount === 1 ? 'bid' : 'bids'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/party/${party._id}`)}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          View Party
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
+                  <p>This tune hasn't been added to any parties yet</p>
+                  <p className="text-sm text-gray-500 mt-2">Be the first to add it to a party!</p>
+                </div>
+              )}
+
+              {/* Add to Other Party Button */}
+              {user && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <button
+                    onClick={handleOpenAddToPartyModal}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-white font-bold">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <h3 className="text-white font-semibold text-lg">{party.name}</h3>
-                        <p className="text-sm text-gray-400">{party.location}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-green-400">
-                          {penceToPounds(party.partyMediaAggregate || 0)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {party.bidCount || 0} {party.bidCount === 1 ? 'bid' : 'bids'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => navigate(`/party/${party._id}`)}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
-                      >
-                        View Party
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-400">
-                <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
-                <p>This tune hasn't been added to any parties yet</p>
-                <p className="text-sm text-gray-500 mt-2">Be the first to add it to a party!</p>
-              </div>
-            )}
-            
-            {/* Add to Other Party Button */}
-            {user && (
-              <div className="mt-4 pt-4 border-t border-gray-700">
-                <button
-                  onClick={handleOpenAddToPartyModal}
-                  className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add to Other Party</span>
-                </button>
-              </div>
-            )}
-          </div>
+                    <Plus className="h-4 w-4" />
+                    <span>Add to Other Party</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Tag Rankings */}
+        {/* Tag Rankings - collapsible */}
         {tagRankings.length > 0 && (
-          <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-              <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
-              Tag Rankings
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {tagRankings.map((ranking, index) => (
-                  <div 
-                    key={index} 
-                    className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
-                  >
-                    <div className="flex items-center space-x-2 md:space-x-3">
-                      <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                      <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-base md:text-lg font-bold text-purple-400">
-                        #{ranking.rank}
+          <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
+            <button
+              onClick={() => setShowTagRankings(!showTagRankings)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400 flex-shrink-0" />
+                {showTagRankings ? 'Tag Rankings' : 'Show Tag Rankings'}
+              </span>
+              {showTagRankings ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showTagRankings && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {tagRankings.map((ranking, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                    >
+                      <div className="flex items-center space-x-2 md:space-x-3">
+                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
                       </div>
-                      <div className="text-xs text-gray-400">
-                        of {ranking.total} • Top {ranking.percentile}%
+                      <div className="text-right">
+                        <div className="text-base md:text-lg font-bold text-purple-400">
+                          #{ranking.rank}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          of {ranking.total} • Top {ranking.percentile}%
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
