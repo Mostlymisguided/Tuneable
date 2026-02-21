@@ -1711,7 +1711,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     ? `${window.location.origin}/podcasts/${media._id}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
-  const shareText = `Support your Favourite Artists on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
+  const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
 
   // Update Open Graph meta tags for better Facebook sharing
   useEffect(() => {

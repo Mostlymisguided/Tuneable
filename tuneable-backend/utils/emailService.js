@@ -532,7 +532,7 @@ async function sendWelcomeEmail(user) {
             <ul style="margin: 0; padding-left: 20px;">
               <li>🎵 <strong>Discover Music:</strong> Browse trending tunes and find your next favorite song</li>
               <li>🎉 <strong>Join Parties:</strong> Create or join music parties with friends</li>
-              <li>💰 <strong>Tip on Tunes:</strong> Place tips on songs you love during parties</li>
+              <li>💰 <strong>Tip on Media:</strong> Place tips on songs you love during parties</li>
               <li>👤 <strong>Build Your Profile:</strong> Add your music preferences and social links</li>
             </ul>
           </div>

@@ -567,7 +567,7 @@ const PodcastSeriesProfile: React.FC = () => {
 
   // Share functionality
   const shareUrl = window.location.href;
-  const shareText = `Check out "${series?.title || 'this podcast'}" on Tuneable! Support your favourite podcasts and discover new content.`;
+  const shareText = `Check out "${series?.title || 'this podcast'}" on Tuneable! Support your favourite Creators and discover new content.`;
 
   const handleNativeShare = async () => {
     if (navigator.share) {

@@ -205,8 +205,8 @@ Join here: ${inviteLink}`.trim();
   const handleFacebookShare = useCallback(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
     const quote = inviteCode 
-      ? `Support your favourite Artists on Tuneable! Join with this invite code: ${inviteCode}`
-      : 'Support your favourite Artists on Tuneable! Join the social music platform for tipping on tunes.';
+      ? `Support your favourite Creators on Tuneable! Join with this invite code: ${inviteCode}`
+      : 'Support your favourite Creators on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;
@@ -221,7 +221,7 @@ Join here: ${inviteLink}`.trim();
     }
 
     // Create Instagram-friendly invite message
-    const instagramMessage = `Support your favourite Artists on Tuneable! 🎵\n\nJoin with this invite code: ${inviteCode}\n\n${inviteLink}`;
+    const instagramMessage = `Support your favourite Creators on Tuneable! 🎵\n\nJoin with this invite code: ${inviteCode}\n\n${inviteLink}`;
 
     try {
       // Copy message to clipboard first

@@ -47,20 +47,20 @@ const Home: React.FC = () => {
             <div className="flex justify-center mb-8">
               <div className="bg-gradient-to-r from-purple-700 to-purple-800 px-6 py-3 rounded-full flex items-center space-x-2 shadow-lg">
                 <Zap className="h-5 w-5 text-yellow-400" />
-                <span className="text-white text-xl font-semibold">The Social Music App</span>
+                <span className="text-white text-xl font-semibold">The Democratic Media App</span>
               </div>
             </div>
             
             {/* Main Title */}
             <h1 className="text-5xl md:text-7xl font-bold p-6 leading-tight">
-              <span className="text-white">Musical</span>
+              <span className="text-white">Creative</span>
               <br />
               <span className="text-pink-400">Democracy</span>
             </h1>
             
             {/* Description */}
             <p className="text-xl md:text-2xl p-12 text-gray-200 max-w-3xl mx-auto leading-relaxed" style={{ marginTop: '20px' }}>
-            Tip Your Favourite Tunes - Support Your Favourite Artists - Influence Global Charts
+            Tip Your Favourite Media - Support Your Favourite Creators - Influence Global Charts
             </p>
             
             {/* CTA Buttons */}
@@ -104,7 +104,7 @@ const Home: React.FC = () => {
                 Tip on Tunes
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Tip Your Favorite Tunes to the Top
+                Tip Your Favorite Media to the Top
               </p>
             </div>
 
@@ -113,10 +113,10 @@ const Home: React.FC = () => {
                 <Zap className="h-10 w-10 text-yellow-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Support Artists
+                Support Creators
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Artists Earn Most of Your Tips
+                Creators Earn Most of Your Tips
               </p>
             </div>
             <div className="text-center group">
@@ -127,7 +127,7 @@ const Home: React.FC = () => {
                 Earn TuneBytes
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Rewards for Discovering Popular Music
+                Rewards for Discovering Popular Media
               </p>
             </div>
 
@@ -136,10 +136,10 @@ const Home: React.FC = () => {
                 <Users className="h-10 w-10 text-blue-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Discover Music
+                Discover
               </h3>
               <p className="text-gray-300 leading-relaxed">
-                Find Music from All Around the World
+                Find Music & Media from All Around the World
               </p>
             </div>
 
