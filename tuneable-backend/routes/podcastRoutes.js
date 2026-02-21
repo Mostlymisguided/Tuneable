@@ -1791,7 +1791,7 @@ router.get('/series/:seriesId/info', async (req, res) => {
       contentForm: { $in: ['podcastepisode'] }
     });
 
-    // Calculate basic stats
+    // Calculate basic stats (avg tip = total tips / episodes that received tips, not all episodes)
     const statsResult = await Media.aggregate([
       {
         $match: {
@@ -1803,14 +1803,15 @@ router.get('/series/:seriesId/info', async (req, res) => {
       {
         $group: {
           _id: null,
-          totalTips: { $sum: '$globalMediaAggregate' },
-          episodeCount: { $sum: 1 }
+          totalTips: { $sum: { $ifNull: ['$globalMediaAggregate', 0] } },
+          episodeCount: { $sum: 1 },
+          episodesWithTips: { $sum: { $cond: [{ $gt: [{ $ifNull: ['$globalMediaAggregate', 0] }, 0] }, 1, 0] } }
         }
       }
     ]);
 
-    const stats = statsResult[0] || { totalTips: 0, episodeCount: 0 };
-    const avgTip = stats.episodeCount > 0 ? stats.totalTips / stats.episodeCount : 0;
+    const stats = statsResult[0] || { totalTips: 0, episodeCount: 0, episodesWithTips: 0 };
+    const avgTip = stats.episodesWithTips > 0 ? stats.totalTips / stats.episodesWithTips : 0;
 
     // Get top episode for stats
     const topEpisode = await Media.findOne({
@@ -3066,10 +3067,11 @@ router.get('/series/:seriesId', async (req, res) => {
     // Convert series to plain object for response
     const seriesObj = series.toObject ? series.toObject() : series;
 
-    // Calculate stats
+    // Calculate stats (avg tip = total tips / episodes that received tips, not all episodes)
     const totalEpisodes = episodes.length;
     const totalTips = episodes.reduce((sum, ep) => sum + (ep.globalMediaAggregate || 0), 0);
-    const avgTip = totalEpisodes > 0 ? totalTips / totalEpisodes : 0;
+    const episodesWithTips = episodes.filter(ep => (ep.globalMediaAggregate || 0) > 0).length;
+    const avgTip = episodesWithTips > 0 ? totalTips / episodesWithTips : 0;
     const topEpisode = episodes.length > 0 ? 
       episodes.reduce((top, ep) => 
         (ep.globalMediaAggregate || 0) > (top.globalMediaAggregate || 0) ? ep : top
