@@ -2075,51 +2075,51 @@ const TuneProfile: React.FC = () => {
               </div>
               
               {/* Tip Metrics Grid */}
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 gap-y-2 md:gap-4 px-2 md:px-0">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 md:gap-2 px-2 md:px-0">
                 {/* Tip Total */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
-                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Tip Total</div>
-                  <div className="text-base md:text-2xl font-bold text-green-400">
+                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-green-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Tip Total</div>
+                  <div className="text-base md:text-lg font-bold text-green-400">
                     {penceToPounds(media.globalMediaAggregate)}
                   </div>
                 </div>
                 
                 {/* Total Tips Count */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-cyan-500/50">
-                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Total Tips</div>
-                  <div className="text-base md:text-2xl font-bold text-cyan-400">
+                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-cyan-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Total Tips</div>
+                  <div className="text-base md:text-lg font-bold text-cyan-400">
                     {media.bids?.length || 0}
                   </div>
                 </div>
                 
                 {/* Global Rank */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-pink-500/50">
-                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
-                  <div className="text-base md:text-2xl font-bold text-pink-400">
+                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-pink-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Global Rank</div>
+                  <div className="text-base md:text-lg font-bold text-pink-400">
                     #{media.globalMediaAggregateTopRank || '-'}
                   </div>
                 </div>
                 
                 {/* Top Fan - Now visible on mobile */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-purple-500/50">
-                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
-                  <div className="text-base md:text-2xl font-bold text-purple-400">
+                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-purple-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Top Fan</div>
+                  <div className="text-base md:text-lg font-bold text-purple-400">
                     {penceToPounds(media.globalMediaAggregateTop)}
                   </div>
                 </div>
                 
                 {/* Top Tip - Hidden on mobile */}
-                <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Tip</div>
-                  <div className="text-2xl font-bold text-yellow-400">
+                <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-yellow-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Top Tip</div>
+                  <div className="text-lg font-bold text-yellow-400">
                     {penceToPounds(media.globalMediaBidTop)}
                   </div>
                 </div>
                 
                 {/* Average Tip - Hidden on mobile */}
-                <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Tip</div>
-                  <div className="text-2xl font-bold text-blue-400">
+                <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-blue-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Avg Tip</div>
+                  <div className="text-lg font-bold text-blue-400">
                     £{calculateGlobalMediaBidAvg(media).toFixed(2)}
                   </div>
                 </div>
