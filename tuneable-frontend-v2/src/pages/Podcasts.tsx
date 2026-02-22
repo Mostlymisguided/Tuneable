@@ -20,6 +20,8 @@ import {
   Copy,
   Check,
   ChevronDown,
+  Plus,
+  Minus,
   Twitter,
   Facebook,
   Linkedin,
@@ -120,6 +122,7 @@ const Podcasts: React.FC = () => {
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showSearchSection, setShowSearchSection] = useState(false);
   const [showImportSection, setShowImportSection] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [isImportingSpotify, setIsImportingSpotify] = useState(false);
@@ -1405,8 +1408,20 @@ const Podcasts: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        {/* Search/Import Panel - Always Visible */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 mb-6 border border-purple-500/30">
+        {/* Search/Import Panel - Collapsible */}
+        <div className="mb-6 flex flex-col items-center">
+          <button
+            onClick={() => setShowSearchSection(!showSearchSection)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 border border-purple-500/30 transition-colors"
+          >
+            <span className="flex items-center text-xl font-bold text-white">
+              <Search className="h-5 w-5 mr-2 text-purple-400 flex-shrink-0" />
+              {showSearchSection ? 'Search for Podcast Episodes' : 'Search For Podcasts'}
+            </span>
+            {showSearchSection ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+          </button>
+          {showSearchSection && (
+        <div className="mt-3 w-full bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-purple-500/30">
           <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Podcast Episodes</h3>
           
           {/* Search */}
@@ -1573,6 +1588,8 @@ const Podcasts: React.FC = () => {
             </button>
           )}
         </div>
+          )}
+        </div>
 
         {/* Filters Panel */}
         <div className="mb-6 flex justify-center">
@@ -1677,7 +1694,7 @@ const Podcasts: React.FC = () => {
           </div>
         )}
 
-        {/* Top Tags + Top Supporters (two columns on desktop) */}
+        {/* Top Tags + Top Fans (two columns on desktop) */}
         {!showSearchResults && (
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Top Tags Cloud */}
@@ -1735,10 +1752,10 @@ const Podcasts: React.FC = () => {
               </div>
             )}
 
-            {/* Top Supporters */}
+            {/* Top Fans */}
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 md:p-6 border border-purple-500/30">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3">
-                <h3 className="text-base md:text-lg font-semibold text-white">Top Supporters</h3>
+                <h3 className="text-base md:text-lg font-semibold text-white">Top Fans</h3>
                 {selectedTagFilters.length > 0 ? (
                   <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
                 ) : (
