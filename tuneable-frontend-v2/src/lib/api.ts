@@ -847,6 +847,12 @@ export const userAPI = {
     return response.data;
   },
 
+  // Get another user's tune library by userId (for viewing their profile)
+  getTuneLibraryByUserId: async (userId: string) => {
+    const response = await api.get(`/users/${userId}/tune-library`);
+    return response.data;
+  },
+
   // Get user's tip history (all individual bids/tips)
   getTipHistory: async (params?: {
     partyId?: string;

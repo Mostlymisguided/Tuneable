@@ -679,12 +679,12 @@ const UserProfile: React.FC = () => {
     }
   }, [viewTab, isOwnProfile, isSettingsMode, walletHistoryFilters]);
 
-  // Load tune library when viewing tune library tab
+  // Load tune library when viewing tune library tab (own profile or another user's)
   useEffect(() => {
-    if ((viewTab === 'tune-library' || viewTab === 'podcast-library') && isOwnProfile && !isSettingsMode) {
+    if ((viewTab === 'tune-library' || viewTab === 'podcast-library') && !isSettingsMode && userId) {
       loadTuneLibrary();
     }
-  }, [viewTab, isOwnProfile, isSettingsMode]);
+  }, [viewTab, isOwnProfile, isSettingsMode, userId]);
 
   const formatJoinDate = (dateString: string) => {
     if (!dateString) return 'Unknown';
@@ -927,11 +927,14 @@ const UserProfile: React.FC = () => {
     return 'text-green-400';
   };
 
-  // Load tune library
+  // Load tune library (for own profile uses /me, for other users uses their userId)
   const loadTuneLibrary = async () => {
+    if (!userId) return;
     try {
       setIsLoadingLibrary(true);
-      const data = await userAPI.getTuneLibrary();
+      const data = isOwnProfile
+        ? await userAPI.getTuneLibrary()
+        : await userAPI.getTuneLibraryByUserId(userId);
       setTuneLibrary(data.library || []);
     } catch (error) {
       console.error('Failed to load tune library:', error);

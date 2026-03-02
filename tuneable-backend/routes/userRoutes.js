@@ -754,11 +754,8 @@ router.get('/invited', authMiddleware, async (req, res) => {
   }
 });
 
-// Get user's tune library (all media they've bid on with metrics)
-router.get('/me/tune-library', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+// Shared helper to fetch tune library for a user by their MongoDB _id
+async function fetchTuneLibraryForUser(user) {
     
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
@@ -771,10 +768,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
     }).lean();
     
     if (userBids.length === 0) {
-      return res.json({ 
-        library: [],
-        total: 0
-      });
+      return { library: [], total: 0 };
     }
     
     // Group bids by mediaId and calculate aggregates
@@ -826,10 +820,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
       .filter(id => id !== null && id !== undefined);
     
     if (mediaIds.length === 0) {
-      return res.json({ 
-        library: [],
-        total: 0
-      });
+      return { library: [], total: 0 };
     }
     
     // Fetch media details (include contentForm to distinguish music vs podcast)
@@ -987,18 +978,46 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
       }
     });
     
-    res.json({ 
-      library,
-      total: library.length
-    });
+    return { library, total: library.length };
+}
+
+// Get user's tune library (authenticated user - /me)
+// @route   GET /api/users/me/tune-library
+// @desc    Get the authenticated user's tune library
+// @access  Private
+router.get('/me/tune-library', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const result = await fetchTuneLibraryForUser(user);
+    res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      error: 'Error fetching tune library', 
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    res.status(500).json({ error: 'Error fetching tune library', details: error.message });
+  }
+});
+
+// Get a user's tune library by userId (public - for viewing other users' profiles)
+// @route   GET /api/users/:userId/tune-library
+// @desc    Get a user's tune library (public profile data)
+// @access  Public
+router.get('/:userId/tune-library', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    let user;
+    if (userId.includes('-')) {
+      user = await User.findOne({ uuid: userId });
+    } else if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    } else {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const result = await fetchTuneLibraryForUser(user);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching tune library:', error);
+    res.status(500).json({ error: 'Error fetching tune library', details: error.message });
   }
 });
 
