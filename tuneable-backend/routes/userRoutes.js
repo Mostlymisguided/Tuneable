@@ -795,7 +795,12 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
           userBidTotal: 0,
           bidCount: 0,
           lastBidAt: bid.createdAt,
-          firstBidAt: bid.createdAt
+          firstBidAt: bid.createdAt,
+          // Store denormalized fields from bid for fallback when Media doc not found
+          mediaTitle: bid.mediaTitle,
+          mediaArtist: bid.mediaArtist,
+          mediaCoverArt: bid.mediaCoverArt,
+          mediaDuration: bid.mediaDuration
         };
       }
       
@@ -906,41 +911,57 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
       }
     });
     
-    // Build library items
+    // Build library items (use Media when found, else fallback to bid denormalized data)
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        if (!media) {
-          console.warn('Media not found for mediaId:', aggregate.mediaId);
-          return null;
-        }
-        
-        try {
-          // Transform artist array to string
+        let title, artist, coverArt, duration, bpm, tags, globalMediaAggregate, mediaUuid;
+
+        if (media) {
           let artistName = 'Unknown Artist';
           if (Array.isArray(media.artist) && media.artist.length > 0) {
             artistName = media.artist[0].name || media.artist[0] || 'Unknown Artist';
           } else if (typeof media.artist === 'string') {
             artistName = media.artist;
           }
-          
-          const globalMediaAggregate = media.globalMediaAggregate || 0;
+          title = media.title || 'Unknown Title';
+          artist = artistName;
+          coverArt = media.coverArt || null;
+          duration = media.duration || null;
+          bpm = media.bpm || null;
+          tags = media.tags || [];
+          globalMediaAggregate = media.globalMediaAggregate || 0;
+          mediaUuid = media.uuid || media._id?.toString() || media._id;
+        } else {
+          // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
+          console.warn('Media not found for mediaId:', aggregate.mediaId, '- using bid denormalized data');
+          title = aggregate.mediaTitle || 'Unknown Title';
+          artist = aggregate.mediaArtist || 'Unknown Artist';
+          coverArt = aggregate.mediaCoverArt || null;
+          duration = aggregate.mediaDuration || null;
+          bpm = null;
+          tags = [];
+          globalMediaAggregate = aggregate.userBidTotal || 0; // Best we have without Media
+          mediaUuid = aggregate.mediaId;
+        }
+
+        try {
           const totalBidCount = bidCountLookup[aggregate.mediaId] || 1;
-          const globalMediaAggregateAvg = totalBidCount > 0 
-            ? globalMediaAggregate / totalBidCount 
+          const globalMediaAggregateAvg = totalBidCount > 0
+            ? globalMediaAggregate / totalBidCount
             : 0;
-          
+
           return {
-            mediaId: media._id?.toString() || media._id,
-            mediaUuid: media.uuid || media._id?.toString() || media._id,
-            title: media.title || 'Unknown Title',
-            artist: artistName,
-            coverArt: media.coverArt || null,
-            duration: media.duration || null,
-            bpm: media.bpm || null,
-            tags: media.tags || [],
-            globalMediaAggregate: globalMediaAggregate,
-            globalMediaAggregateAvg: globalMediaAggregateAvg,
+            mediaId: aggregate.mediaId,
+            mediaUuid,
+            title,
+            artist,
+            coverArt,
+            duration,
+            bpm,
+            tags,
+            globalMediaAggregate,
+            globalMediaAggregateAvg,
             globalUserMediaAggregate: aggregate.userBidTotal || 0,
             bidCount: aggregate.bidCount || 0,
             tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,
@@ -952,7 +973,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
           return null;
         }
       })
-      .filter(item => item !== null); // Remove any null items from missing media
+      .filter(item => item !== null);
     
     // Sort by last bid date (most recent first) by default
     library.sort((a, b) => {
@@ -2197,7 +2218,7 @@ router.get('/:userId/profile', async (req, res) => {
 
     // Calculate bidding statistics from ALL bids (not just the 50 displayed)
     // Header stats must match tip history tab which uses full bid count
-    const allUserBidsForStats = await Bid.find({ userId: userObj._id }).select('amount mediaId').lean();
+    const allUserBidsForStats = await Bid.find({ userId: userObj._id }).select('amount mediaId status').lean();
     const totalBids = allUserBidsForStats.length;
     const totalAmountBid = allUserBidsForStats.reduce((sum, bid) => sum + (bid.amount || 0), 0);
     const averageBidAmount = totalBids > 0 ? totalAmountBid / totalBids : 0;
@@ -2211,8 +2232,9 @@ router.get('/:userId/profile', async (req, res) => {
     const allUsers = await User.find({}).select('_id');
     const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
     
-    // Get unique media items bid on (from ALL bids)
-    const uniqueMedia = [...new Set(allUserBidsForStats.map(bid => bid.mediaId?.toString()).filter(Boolean))];
+    // Get unique media items bid on - from ACTIVE bids only (matches tune library which only shows active bids)
+    const activeBidsForStats = allUserBidsForStats.filter(bid => bid.status === 'active');
+    const uniqueMedia = [...new Set(activeBidsForStats.map(bid => bid.mediaId?.toString()).filter(Boolean))];
     
     // Get top 5 highest bids
     const topBids = [...userBids]
