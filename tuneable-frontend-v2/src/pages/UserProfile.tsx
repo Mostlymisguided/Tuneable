@@ -5,6 +5,7 @@ import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants'
 import { 
   Coins, 
   Music, 
+  Podcast,
   TrendingUp,
   Clock,
   BarChart3,
@@ -50,6 +51,7 @@ interface LibraryItem {
   coverArt?: string;
   duration?: number;
   bpm?: number;
+  contentForm?: string[];
   globalMediaAggregate: number;
   globalMediaAggregateAvg: number;
   globalUserMediaAggregate: number;
@@ -237,7 +239,7 @@ const UserProfile: React.FC = () => {
   const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
   
   // View mode tabs - controlled by query params
-  const viewTab = (searchParams.get('view') as 'tip-history' | 'wallet-history' | 'tune-library') || 'tune-library';
+  const viewTab = (searchParams.get('view') as 'tip-history' | 'wallet-history' | 'tune-library' | 'podcast-library') || 'tune-library';
   
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -416,7 +418,7 @@ const UserProfile: React.FC = () => {
     setSearchParams({ settings: 'true', tab });
   };
 
-  const handleViewTabChange = (tab: 'tip-history' | 'wallet-history' | 'tune-library') => {
+  const handleViewTabChange = (tab: 'tip-history' | 'wallet-history' | 'tune-library' | 'podcast-library') => {
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
       newParams.set('view', tab);
@@ -679,7 +681,7 @@ const UserProfile: React.FC = () => {
 
   // Load tune library when viewing tune library tab
   useEffect(() => {
-    if (viewTab === 'tune-library' && isOwnProfile && !isSettingsMode) {
+    if ((viewTab === 'tune-library' || viewTab === 'podcast-library') && isOwnProfile && !isSettingsMode) {
       loadTuneLibrary();
     }
   }, [viewTab, isOwnProfile, isSettingsMode]);
@@ -940,10 +942,10 @@ const UserProfile: React.FC = () => {
   };
 
   // Handle playing media from Tune Library with auto-transition
-  const handlePlayLibrary = async (item: LibraryItem, index: number) => {
+  const handlePlayLibrary = async (item: LibraryItem, index: number, list?: LibraryItem[]) => {
     try {
-      // Use sorted library to maintain the order the user sees
-      const sortedLibrary = getSortedLibrary();
+      // Use provided list or full library to maintain the order the user sees
+      const sortedLibrary = list ?? getSortedLibrary();
       
       // Fetch all media details for the entire library to create the queue
       const allMediaPromises = sortedLibrary.map(async (libItem) => {
@@ -996,9 +998,13 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  // Sort library items
-  const getSortedLibrary = () => {
-    return [...tuneLibrary].sort((a, b) => {
+  const isPodcastItem = (item: LibraryItem) => {
+    const cf = item.contentForm;
+    return cf && (Array.isArray(cf) ? cf.includes('podcastepisode') : cf === 'podcastepisode');
+  };
+
+  const sortLibraryItems = (items: LibraryItem[]) => {
+    return [...items].sort((a, b) => {
       let aValue: any;
       let bValue: any;
 
@@ -1039,6 +1045,10 @@ const UserProfile: React.FC = () => {
       return 0;
     });
   };
+
+  const getSortedMusicLibrary = () => sortLibraryItems(tuneLibrary.filter(item => !isPodcastItem(item)));
+  const getSortedPodcastLibrary = () => sortLibraryItems(tuneLibrary.filter(item => isPodcastItem(item)));
+  const getSortedLibrary = () => sortLibraryItems(tuneLibrary);
 
   const getLibrarySortIcon = (field: string) => {
     if (librarySortField !== field) {
@@ -1678,6 +1688,16 @@ const UserProfile: React.FC = () => {
                 Tune Library
               </button>
               <button
+                onClick={() => handleViewTabChange('podcast-library')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'podcast-library'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Podcast Library
+              </button>
+              <button
                 onClick={() => handleViewTabChange('tip-history')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   viewTab === 'tip-history'
@@ -2013,16 +2033,16 @@ const UserProfile: React.FC = () => {
                 <Music className="h-6 w-6 text-purple-400 mr-2" />
                 <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
                 <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
-                  {tuneLibrary.length}
+                  {getSortedMusicLibrary().length}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  const sorted = getSortedLibrary();
-                  if (sorted.length > 0) handlePlayLibrary(sorted[0], 0);
+                  const sorted = getSortedMusicLibrary();
+                  if (sorted.length > 0) handlePlayLibrary(sorted[0], 0, sorted);
                 }}
-                disabled={isLoadingLibrary || tuneLibrary.length === 0}
+                disabled={isLoadingLibrary || getSortedMusicLibrary().length === 0}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
               >
                 <Play className="h-4 w-4" fill="currentColor" />
@@ -2034,10 +2054,10 @@ const UserProfile: React.FC = () => {
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
               </div>
-            ) : tuneLibrary.length === 0 ? (
+            ) : getSortedMusicLibrary().length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
-                <p>You haven't tipped on any media yet.</p>
+                <p>You haven't tipped on any music yet.</p>
                 <p className="text-sm mt-2">Start tipping on tunes to build your library!</p>
               </div>
             ) : (
@@ -2150,10 +2170,10 @@ const UserProfile: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-gray-800 divide-y divide-gray-700">
-                    {getSortedLibrary().map((item, index) => (
+                    {getSortedMusicLibrary().map((item, index) => (
                       <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlayLibrary(item, index)}>
+                          <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlayLibrary(item, index, getSortedMusicLibrary())}>
                             {item.coverArt ? (
                               <img 
                                 src={item.coverArt} 
@@ -2203,6 +2223,215 @@ const UserProfile: React.FC = () => {
                             onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
                             className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                             title="View tune"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : viewTab === 'podcast-library' ? (
+          /* PODCAST LIBRARY TAB */
+          <div className="space-y-6">
+            <div className="card flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <Podcast className="h-6 w-6 text-purple-400 mr-2" />
+                <h2 className="text-2xl font-semibold text-white">Podcast Library</h2>
+                <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+                  {getSortedPodcastLibrary().length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const sorted = getSortedPodcastLibrary();
+                  if (sorted.length > 0) handlePlayLibrary(sorted[0], 0, sorted);
+                }}
+                disabled={isLoadingLibrary || getSortedPodcastLibrary().length === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
+              >
+                <Play className="h-4 w-4" fill="currentColor" />
+                Play
+              </button>
+            </div>
+
+            {isLoadingLibrary ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : getSortedPodcastLibrary().length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <Podcast className="h-12 w-12 mx-auto mb-4 text-gray-500" />
+                <p>You haven't tipped on any podcasts yet.</p>
+                <p className="text-sm mt-2">Start tipping on podcast episodes to build your library!</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Artwork
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
+                        onClick={() => {
+                          if (librarySortField === 'title') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('title');
+                            setLibrarySortDirection('asc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center truncate">
+                          Title
+                          {getLibrarySortIcon('title')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
+                        onClick={() => {
+                          if (librarySortField === 'artist') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('artist');
+                            setLibrarySortDirection('asc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center truncate">
+                          Show / Host
+                          {getLibrarySortIcon('artist')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                        onClick={() => {
+                          if (librarySortField === 'duration') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('duration');
+                            setLibrarySortDirection('asc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Duration
+                          {getLibrarySortIcon('duration')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                        onClick={() => {
+                          if (librarySortField === 'globalMediaAggregateAvg') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('globalMediaAggregateAvg');
+                            setLibrarySortDirection('desc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Avg Tip
+                          {getLibrarySortIcon('globalMediaAggregateAvg')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                        onClick={() => {
+                          if (librarySortField === 'globalUserMediaAggregate') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('globalUserMediaAggregate');
+                            setLibrarySortDirection('desc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          Your Tip
+                          {getLibrarySortIcon('globalUserMediaAggregate')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer"
+                        onClick={() => {
+                          if (librarySortField === 'tuneBytesEarned') {
+                            setLibrarySortDirection(librarySortDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setLibrarySortField('tuneBytesEarned');
+                            setLibrarySortDirection('desc');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          TuneBytes
+                          {getLibrarySortIcon('tuneBytesEarned')}
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800 divide-y divide-gray-700">
+                    {getSortedPodcastLibrary().map((item, index) => (
+                      <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlayLibrary(item, index, getSortedPodcastLibrary())}>
+                            {item.coverArt ? (
+                              <img 
+                                src={item.coverArt} 
+                                alt={item.title}
+                                className="w-full h-full rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-700 rounded flex items-center justify-center">
+                                <Podcast className="h-6 w-6 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors shadow-lg">
+                                <Play className="h-4 w-4 text-white ml-0.5" fill="currentColor" />
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 max-w-[220px] w-[220px]">
+                          <button
+                            onClick={() => navigate(`/podcasts/${item.mediaId || item.mediaUuid}`)}
+                            className="block w-full min-w-0 truncate text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                            title={item.title}
+                          >
+                            {item.title}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 max-w-[220px] w-[220px]">
+                          <div className="min-w-0 truncate text-sm text-gray-300" title={item.artist}>
+                            <ClickableArtistDisplay media={item} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{penceToPounds(item.globalMediaAggregateAvg)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-green-400">{penceToPounds(item.globalUserMediaAggregate)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => navigate(`/podcasts/${item.mediaId || item.mediaUuid}`)}
+                            className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                            title="View episode"
                           >
                             View
                           </button>

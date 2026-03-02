@@ -832,9 +832,9 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
       });
     }
     
-    // Fetch media details
+    // Fetch media details (include contentForm to distinguish music vs podcast)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm globalMediaAggregate uuid _id tags')
+      .select('title artist coverArt duration bpm globalMediaAggregate uuid _id tags contentForm')
       .lean();
     
     // Create media lookup
@@ -915,7 +915,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        let title, artist, coverArt, duration, bpm, tags, globalMediaAggregate, mediaUuid;
+        let title, artist, coverArt, duration, bpm, tags, globalMediaAggregate, mediaUuid, contentForm;
 
         if (media) {
           let artistName = 'Unknown Artist';
@@ -932,6 +932,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
           tags = media.tags || [];
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
+          contentForm = media.contentForm || [];
         } else {
           // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
           console.warn('Media not found for mediaId:', aggregate.mediaId, '- using bid denormalized data');
@@ -943,6 +944,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
           tags = [];
           globalMediaAggregate = aggregate.userBidTotal || 0; // Best we have without Media
           mediaUuid = aggregate.mediaId;
+          contentForm = [];
         }
 
         try {
@@ -960,6 +962,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
             duration,
             bpm,
             tags,
+            contentForm: contentForm || [],
             globalMediaAggregate,
             globalMediaAggregateAvg,
             globalUserMediaAggregate: aggregate.userBidTotal || 0,
