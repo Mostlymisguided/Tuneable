@@ -1897,6 +1897,8 @@ const TuneProfile: React.FC = () => {
 
   const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
 
+  const isAdmin = user?.role?.includes('admin');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
@@ -2646,9 +2648,9 @@ const TuneProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Links Section */}
-        {media.sources && Object.keys(media.sources).length > 0 && (
-          <div className="mb-8 hidden px-2">
+        {/* Links Section - admin only */}
+        {isAdmin && media.sources && Object.keys(media.sources).length > 0 && (
+          <div className="mb-8 px-2">
             <h2 className="text-xl font-bold text-white mb-3">Links</h2>
             <div className="bg-black/20 rounded-lg p-4">
               <div className="flex flex-wrap gap-3 justify-center">
