@@ -220,6 +220,10 @@ const UserProfile: React.FC = () => {
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [librarySortField, setLibrarySortField] = useState<string>('lastBidAt');
   const [librarySortDirection, setLibrarySortDirection] = useState<'asc' | 'desc'>('desc');
+  // Increase tip modal (for tune/podcast library)
+  const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
+  const [increaseTipAmount, setIncreaseTipAmount] = useState<string>('0.11');
+  const [isPlacingLibraryTip, setIsPlacingLibraryTip] = useState(false);
   
   // Add Tune search state
   const [addTuneSearchQuery, setAddTuneSearchQuery] = useState('');
@@ -941,6 +945,31 @@ const UserProfile: React.FC = () => {
       toast.error('Failed to load tune library');
     } finally {
       setIsLoadingLibrary(false);
+    }
+  };
+
+  // Place additional tip on a library item (tune or podcast)
+  const handlePlaceLibraryTip = async () => {
+    if (!libraryItemToTip || !currentUser) return;
+    const amount = parseFloat(increaseTipAmount);
+    if (isNaN(amount) || amount < 0.01) {
+      toast.error('Enter at least £0.01');
+      return;
+    }
+    const mediaId = libraryItemToTip.mediaUuid || libraryItemToTip.mediaId;
+    if (!mediaId) return;
+    setIsPlacingLibraryTip(true);
+    try {
+      await mediaAPI.placeGlobalBid(mediaId, amount);
+      toast.success(`Added £${amount.toFixed(2)} tip on "${libraryItemToTip.title}"`);
+      setLibraryItemToTip(null);
+      setIncreaseTipAmount('0.11');
+      await loadTuneLibrary();
+    } catch (err: any) {
+      console.error('Error placing tip:', err);
+      toast.error(err.response?.data?.error || 'Failed to place tip');
+    } finally {
+      setIsPlacingLibraryTip(false);
     }
   };
 
@@ -2222,13 +2251,27 @@ const UserProfile: React.FC = () => {
                           <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
-                            className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                            title="View tune"
-                          >
-                            View
-                          </button>
+                          {isOwnProfile ? (
+                            <button
+                              onClick={() => {
+                                setLibraryItemToTip(item);
+                                setIncreaseTipAmount('0.11');
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                              title="Increase tip"
+                            >
+                              <Plus className="h-3 w-3" />
+                              Tip
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
+                              className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                              title="View tune"
+                            >
+                              View
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2431,13 +2474,27 @@ const UserProfile: React.FC = () => {
                           <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() => navigate(`/podcasts/${item.mediaId || item.mediaUuid}`)}
-                            className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                            title="View episode"
-                          >
-                            View
-                          </button>
+                          {isOwnProfile ? (
+                            <button
+                              onClick={() => {
+                                setLibraryItemToTip(item);
+                                setIncreaseTipAmount('0.11');
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                              title="Increase tip"
+                            >
+                              <Plus className="h-3 w-3" />
+                              Tip
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate(`/podcasts/${item.mediaId || item.mediaUuid}`)}
+                              className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                              title="View episode"
+                            >
+                              View
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -3937,6 +3994,72 @@ const UserProfile: React.FC = () => {
         onClose={() => setIsCollectiveModalOpen(false)}
         onSuccess={handleCollectiveLinked}
       />
+      {/* Increase Tip Modal (Tune / Podcast Library) */}
+      {libraryItemToTip && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-sm w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-white">Increase tip</h2>
+              <button
+                onClick={() => setLibraryItemToTip(null)}
+                className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-gray-300 text-sm mb-2 truncate" title={libraryItemToTip.title}>
+              {libraryItemToTip.title}
+            </p>
+            <p className="text-gray-400 text-xs mb-4 truncate">{libraryItemToTip.artist}</p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-gray-400">£</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={increaseTipAmount}
+                onChange={(e) => setIncreaseTipAmount(e.target.value)}
+                className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[0.11, 0.50, 1.11, 2.22, 5.55].map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setIncreaseTipAmount(a.toFixed(2))}
+                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  £{a.toFixed(2)}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLibraryItemToTip(null)}
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePlaceLibraryTip}
+                disabled={isPlacingLibraryTip || parseFloat(increaseTipAmount) < 0.01}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {isPlacingLibraryTip ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>Tip £{parseFloat(increaseTipAmount) >= 0.01 ? parseFloat(increaseTipAmount).toFixed(2) : '—'}</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tag Input Modal for Add Tune */}
       <TagInputModal
         isOpen={showAddTuneTagModal}
