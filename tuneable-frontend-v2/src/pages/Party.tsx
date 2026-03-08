@@ -1839,26 +1839,6 @@ const Party: React.FC = () => {
     }
   };
 
-  const handleKickUser = async (userId: string, username: string) => {
-    const isAdmin = user?.role?.includes('admin');
-    
-    if (!isHost && !isAdmin) {
-      toast.error('Only the host or admin can kick users');
-      return;
-    }
-
-    try {
-      const reason = window.prompt(`Kick ${username} from party? (Optional reason):`);
-      if (reason === null) return; // User cancelled
-
-      await partyAPI.kickUser(partyId!, userId, reason || undefined);
-      toast.success(`${username} has been removed from the party`);
-      await fetchPartyDetails();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to kick user');
-    }
-  };
-
   const handleUnkickUser = async (userId: string, username: string) => {
     const isAdmin = user?.role?.includes('admin');
     
@@ -1961,17 +1941,6 @@ const Party: React.FC = () => {
   const handleBidModalClose = () => {
     setBidModalOpen(false);
     setSelectedMedia(null);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-GB', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const handleNavigateWithWarning = (path: string, action: string) => {
@@ -3708,70 +3677,6 @@ const Party: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Partiers List */}
-          {party.partiers && party.partiers.length > 0 && (
-            <div className="card">
-              <h3 className="text-lg font-semibold text-white mb-4">Partiers ({party.partiers.length})</h3>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {party.partiers.map((partier: any, index: number) => {
-                  const hostId = typeof party.host === 'object' && party.host?._id 
-                    ? party.host._id.toString() 
-                    : typeof party.host === 'string' 
-                    ? party.host 
-                    : party.host?.uuid || party.host?.id;
-                  const partierId = partier._id?.toString() || partier.id?.toString() || partier.uuid || partier;
-                  const partierUserId = typeof partier === 'object' && partier._id 
-                    ? partier._id.toString() 
-                    : typeof partier === 'string' 
-                    ? partier 
-                    : partier.id || partier.uuid;
-                  const isPartierHost = partierUserId === hostId;
-                  const canKick = (isHost || user?.role?.includes('admin')) && !isPartierHost && partierUserId !== user?._id?.toString();
-                  
-                  return (
-                    <div key={`${partierId}-${index}`} className="flex items-center justify-between space-x-3 p-2 rounded hover:bg-gray-800/50 transition-colors">
-                      <div className="flex items-center space-x-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-medium text-white">
-                            {typeof partier === 'object' && partier.username 
-                              ? partier.username.charAt(0).toUpperCase() 
-                              : '?'}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm text-white truncate">
-                              {typeof partier === 'object' && partier.username 
-                                ? partier.username 
-                                : 'Unknown User'}
-                            </span>
-                            {isPartierHost && (
-                              <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded flex-shrink-0">
-                                Host
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {canKick && (
-                        <button
-                          onClick={() => handleKickUser(
-                            partierUserId,
-                            typeof partier === 'object' && partier.username ? partier.username : 'this user'
-                          )}
-                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors flex-shrink-0"
-                          title="Remove user from party"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Kicked Users (Host/Admin Only) */}
           {party.kickedUsers && party.kickedUsers.length > 0 && (isHost || user?.role?.includes('admin')) && (
             <div className="card">
@@ -3811,29 +3716,6 @@ const Party: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Party Info */}
-          <div className="card">
-            <h3 className="text-lg font-semibold text-white mb-4">Party Info</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex  items-center">
-                <span className="text-white mr-2">Type:</span>
-                <span className="px-2 text-white capitalize">{party.type}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-white mr-2">Location:</span>
-                <span className="px-2 text-white">{party.location}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-white mr-2">Created:</span>
-                <span className="px-2 text-white">{formatDate(party.createdAt)}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-white mr-2">Status:</span>
-                <span className="px-2 text-green-600 capitalize">{party.status}</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       </div>
