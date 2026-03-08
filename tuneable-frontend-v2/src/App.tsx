@@ -40,6 +40,7 @@ import CollectiveProfile from './pages/CollectiveProfile';
 import Admin from './pages/Admin';
 import CreatorRegister from './pages/CreatorRegister';
 import CreatorUpload from './pages/CreatorUpload';
+import CreatorYouTubeImport from './pages/CreatorYouTubeImport';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 import Notifications from './pages/Notifications';
@@ -216,6 +217,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <CreatorUpload />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/import-youtube" 
+              element={
+                <ProtectedRoute>
+                  <CreatorYouTubeImport />
                 </ProtectedRoute>
               } 
             />
