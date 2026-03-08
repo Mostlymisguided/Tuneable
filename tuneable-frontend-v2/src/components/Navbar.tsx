@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Headphones, Music, Home, LogOut, Compass, Podcast } from 'lucide-react';
+import { User as UserIcon, Headphones, Music, Home, LogOut, Compass, Podcast, Plus } from 'lucide-react';
+import AddMediaModal from './AddMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
@@ -8,6 +9,7 @@ import { penceToPounds } from '../utils/currency';
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showAddMediaModal, setShowAddMediaModal] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -15,6 +17,7 @@ const Navbar: React.FC = () => {
   };
 
   return (
+    <>
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-900/20 shadow-lg border-purple-400">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between h-12 sm:h-16">
@@ -50,13 +53,13 @@ const Navbar: React.FC = () => {
                   </Link>
                 )}
                 {(user.role?.includes('creator') || user.role?.includes('admin')) && (
-                  <Link
-                    to="/creator/upload"
-                    className="hidden sm:block px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium transition-colors"
-                    style={{ textDecoration: 'none' }}
+                  <button
+                    onClick={() => setShowAddMediaModal(true)}
+                    className="flex items-center justify-center w-10 h-10 sm:w-10 sm:h-10 px-0 py-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium transition-colors hover:from-purple-500 hover:to-pink-500"
+                    title="Add media"
                   >
-                    Upload
-                  </Link>
+                    <Plus className="h-5 w-5" />
+                  </button>
                 )}
                 <Link
                   to="/podcasts"
@@ -191,6 +194,13 @@ const Navbar: React.FC = () => {
         </div>
       </div>
     </nav>
+    {showAddMediaModal && (
+      <AddMediaModal
+        isOpen={showAddMediaModal}
+        onClose={() => setShowAddMediaModal(false)}
+      />
+    )}
+    </>
   );
 };
 
