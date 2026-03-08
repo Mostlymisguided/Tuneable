@@ -159,6 +159,14 @@ const Party: React.FC = () => {
   
   const [showVetoed, setShowVetoed] = useState(false);
 
+  // Media queue pagination - show first 20, load 20 more per "Show more" click
+  const [visibleMediaCount, setVisibleMediaCount] = useState(20);
+  const MEDIA_PAGE_SIZE = 20;
+  // Reset visible count when party or time period changes
+  useEffect(() => {
+    setVisibleMediaCount(MEDIA_PAGE_SIZE);
+  }, [partyId, selectedTimePeriod]);
+
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
@@ -3254,7 +3262,7 @@ const Party: React.FC = () => {
                         <div className="text-gray-400">Loading sorted media...</div>
                       </div>
                     ) : (
-                      getDisplayMedia().map((item: any, index: number) => {
+                      getDisplayMedia().slice(0, visibleMediaCount).map((item: any, index: number) => {
                         // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
                         const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
                         // Ensure artists array is set for ClickableArtistDisplay
@@ -3526,6 +3534,18 @@ const Party: React.FC = () => {
                           </div>
                         );
                       })
+                    )}
+                    {!isLoadingSortedMedia && getDisplayMedia().length > visibleMediaCount && (
+                      <div className="flex justify-center pt-4 pb-2">
+                        <button
+                          type="button"
+                          onClick={() => setVisibleMediaCount((prev) => prev + MEDIA_PAGE_SIZE)}
+                          className="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors flex items-center gap-2"
+                        >
+                          <ChevronDown className="h-5 w-5" />
+                          Show more ({getDisplayMedia().length - visibleMediaCount} remaining)
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
