@@ -16,7 +16,7 @@ const Home: React.FC = () => {
     },
     {
       icon: <Users className="h-8 w-8 text-orange-400" />,
-      title: "Empower Creators Maximising Their Earnings",
+      title: "Maximise Creators Earnings",
       //description: "Creating inclusive spaces where everyone can contribute to the musical experience."
     },
     {
