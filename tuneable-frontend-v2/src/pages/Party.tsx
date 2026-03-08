@@ -18,7 +18,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
@@ -122,8 +122,8 @@ const Party: React.FC = () => {
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
     getTagTermsFromSearchParams(searchParams, partyId === 'global')
   );
-  
-  // Inline add media search state
+  // Live-typing queue search (filters as you type; Enter adds to queueSearchTerms as pill)
+  const [queueSearchInput, setQueueSearchInput] = useState('');
   const [showAddTunesPanel, setShowAddTunesPanel] = useState(false);
   const [addMediaSearchQuery, setAddMediaSearchQuery] = useState('');
   const [addMediaResults, setAddMediaResults] = useState<{
@@ -1466,14 +1466,17 @@ const Party: React.FC = () => {
     // REMOVED: Real-time search filter from addMediaSearchQuery
     // Queue now remains whole, matching items appear in search results
     
-    // Apply search filter if search terms exist (from PartyQueueSearch component)
-    if (queueSearchTerms.length > 0) {
+    // Apply search filter: stored terms (pills) + current typing (live filter)
+    const liveTerm = queueSearchInput.trim();
+    const allTerms = liveTerm ? [...queueSearchTerms, liveTerm] : queueSearchTerms;
+    
+    if (allTerms.length > 0) {
       media = media.filter((item: any) => {
         const mediaItem = item.mediaId || item;
         
         // Separate regular search terms and tag search terms
-        const regularTerms = queueSearchTerms.filter(term => !term.startsWith('#'));
-        const tagTerms = queueSearchTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
+        const regularTerms = allTerms.filter(term => !term.startsWith('#'));
+        const tagTerms = allTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
         
         // Check if ANY regular search term matches title, artist, or category
         const matchesRegularSearch = regularTerms.length === 0 || regularTerms.some(term => {
@@ -1503,7 +1506,9 @@ const Party: React.FC = () => {
         return matchesRegularSearch && matchesTagSearch;
       });
       
-      console.log(`🔍 Filtered queue: ${media.length} media items match search terms:`, queueSearchTerms);
+      if (queueSearchTerms.length > 0 || liveTerm) {
+        console.log(`🔍 Filtered queue: ${media.length} media items match search terms:`, allTerms);
+      }
     }
     
     return media;
@@ -3079,6 +3084,63 @@ const Party: React.FC = () => {
                         </>
                         )}
                       </div>
+                  </div>
+                )}
+
+                {/* Queue search: filter by tag, artist, title as you type; Enter adds term as pill */}
+                {!showVetoed && (
+                  <div className="mb-4 md:mb-6">
+                    <div className="w-full max-w-2xl mx-auto">
+                      <div className="relative flex items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
+                        <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
+                        <input
+                          type="text"
+                          value={queueSearchInput}
+                          onChange={(e) => setQueueSearchInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const raw = queueSearchInput.trim();
+                              if (!raw) return;
+                              if (!queueSearchTerms.includes(raw)) {
+                                setQueueSearchTerms([...queueSearchTerms, raw]);
+                              }
+                              setQueueSearchInput('');
+                            }
+                          }}
+                          placeholder="Search by tag, artist, title… (Enter adds filter)"
+                          className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none"
+                          aria-label="Search queue by tag, artist, or title"
+                        />
+                      </div>
+                      {queueSearchTerms.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {queueSearchTerms.map((term) => (
+                            <span
+                              key={term}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-600/80 text-white"
+                            >
+                              {term}
+                              <button
+                                type="button"
+                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => t !== term))}
+                                className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
+                                aria-label={`Remove filter ${term}`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setQueueSearchTerms([])}
+                            className="px-3 py-1.5 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
