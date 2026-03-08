@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight, Youtube, Loader2 } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from 'react-toastify';
@@ -50,6 +50,7 @@ interface SearchResult {
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
   const [isLoadingInvited, setIsLoadingInvited] = useState(false);
@@ -60,6 +61,12 @@ const Dashboard: React.FC = () => {
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
   const [showAllLibrary, setShowAllLibrary] = useState(false);
   const [isCreatorBannerDismissed, setIsCreatorBannerDismissed] = useState(false);
+  
+  // Increase tip modal (Dashboard tune library)
+  const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
+  const [increaseTipAmount, setIncreaseTipAmount] = useState<string>('0.11');
+  const [isPlacingLibraryTip, setIsPlacingLibraryTip] = useState(false);
+  const [tipModalStep, setTipModalStep] = useState<'amount' | 'confirm'>('amount');
   
   // Add Tune feature state
   const [addTuneQuery, setAddTuneQuery] = useState('');
@@ -365,6 +372,15 @@ Join here: ${inviteLink}`.trim();
     }
   }, []);
 
+  // Open add-tune panel when navigated from AddMediaModal (Search option)
+  useEffect(() => {
+    const state = location.state as { openAddTune?: boolean } | null;
+    if (state?.openAddTune) {
+      setShowAddTunePanel(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
   useEffect(() => {
     const loadInvitedUsers = async () => {
       try {
@@ -580,36 +596,44 @@ Join here: ${inviteLink}`.trim();
     }
   };
 
-  const handleIncreaseBid = async (item: LibraryItem) => {
+  const handleOpenTipModal = (item: LibraryItem) => {
     if (!user) {
       toast.info('Please log in to place a tip');
       navigate('/login');
       return;
     }
+    setLibraryItemToTip(item);
+    setIncreaseTipAmount(getUserDefaultTip().toFixed(2));
+    setTipModalStep('amount');
+  };
 
-    const amountStr = prompt(`Enter tip amount for "${item.title}" (minimum £${minimumBid.toFixed(2)}):`);
-    if (!amountStr) return;
-
-    const amount = parseFloat(amountStr);
+  const handlePlaceLibraryTip = async () => {
+    if (!libraryItemToTip || !user) return;
+    const amount = parseFloat(increaseTipAmount);
     if (isNaN(amount) || amount < minimumBid) {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
     }
-
     if ((user as any)?.balance < poundsToPence(amount)) {
       toast.error('Insufficient balance');
       return;
     }
-
+    const mediaId = libraryItemToTip.mediaUuid || libraryItemToTip.mediaId;
+    if (!mediaId) return;
+    setIsPlacingLibraryTip(true);
     try {
-      await mediaAPI.placeGlobalBid(item.mediaUuid || item.mediaId, amount);
+      await mediaAPI.placeGlobalBid(mediaId, amount);
       toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
-      // Reload library to update bid amounts
+      setLibraryItemToTip(null);
+      setIncreaseTipAmount('0.11');
+      setTipModalStep('amount');
       const data = await userAPI.getTuneLibrary();
       setTuneLibrary(data.library || []);
     } catch (error: any) {
       console.error('Error placing bid:', error);
       toast.error(error.response?.data?.error || 'Failed to place tip');
+    } finally {
+      setIsPlacingLibraryTip(false);
     }
   };
 
@@ -1028,15 +1052,24 @@ Join here: ${inviteLink}`.trim();
 
                   {creatorActiveTab === 'media' && (
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                         <h3 className="text-lg font-semibold text-white">My Media</h3>
-                        <button
-                          onClick={handleUploadClick}
-                          className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Media
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Link
+                            to="/creator/import-youtube"
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
+                          >
+                            <Youtube className="h-4 w-4 flex-shrink-0" />
+                            Import from YouTube
+                          </Link>
+                          <button
+                            onClick={handleUploadClick}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                          >
+                            <Upload className="h-4 w-4 flex-shrink-0" />
+                            Upload Media
+                          </button>
+                        </div>
                       </div>
 
                       {isLoadingMyMedia ? (
@@ -2955,7 +2988,7 @@ Join here: ${inviteLink}`.trim();
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
-                        onClick={() => handleIncreaseBid(item)}
+                        onClick={() => handleOpenTipModal(item)}
                         className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                         title="Increase tip"
                       >
@@ -3013,6 +3046,136 @@ Join here: ${inviteLink}`.trim();
         category={validationCategory}
         duration={validationDuration}
       />
+
+      {/* Increase Tip Modal (Dashboard Tune Library) */}
+      {libraryItemToTip && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-sm w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-white">
+                {tipModalStep === 'amount' ? 'Increase tip' : 'Confirm tip'}
+              </h2>
+              <button
+                onClick={() => {
+                  setLibraryItemToTip(null);
+                  setTipModalStep('amount');
+                }}
+                className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {tipModalStep === 'amount' ? (
+              <>
+                <p className="text-gray-300 text-sm mb-2 truncate" title={libraryItemToTip.title}>
+                  {libraryItemToTip.title}
+                </p>
+                <p className="text-gray-400 text-xs mb-4 truncate">{libraryItemToTip.artist}</p>
+                <div className="flex items-center gap-0 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const n = Math.max(0.01, (parseFloat(increaseTipAmount) || 0.11) - 0.01);
+                      setIncreaseTipAmount(n.toFixed(2));
+                    }}
+                    disabled={parseFloat(increaseTipAmount) <= 0.01}
+                    className="px-3 py-2.5 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-l-lg transition-colors"
+                    aria-label="Decrease amount"
+                  >
+                    <Minus className="h-4 w-4 text-white" />
+                  </button>
+                  <div className="flex items-center flex-1 bg-gray-800 border-y border-gray-600">
+                    <span className="pl-3 text-gray-400">£</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={increaseTipAmount}
+                      onChange={(e) => setIncreaseTipAmount(e.target.value)}
+                      className="flex-1 bg-transparent px-2 py-2 text-white focus:outline-none w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const n = (parseFloat(increaseTipAmount) || 0) + 0.01;
+                      setIncreaseTipAmount(n.toFixed(2));
+                    }}
+                    className="px-3 py-2.5 bg-gray-600 hover:bg-gray-500 rounded-r-lg transition-colors"
+                    aria-label="Increase amount"
+                  >
+                    <Plus className="h-4 w-4 text-white" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {[0.11, 0.50, 1.11, 2.22, 5.55].map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setIncreaseTipAmount(a.toFixed(2))}
+                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                    >
+                      £{a.toFixed(2)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLibraryItemToTip(null);
+                      setTipModalStep('amount');
+                    }}
+                    className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => parseFloat(increaseTipAmount) >= 0.01 && setTipModalStep('confirm')}
+                    disabled={parseFloat(increaseTipAmount) < 0.01}
+                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    Tip £{parseFloat(increaseTipAmount) >= 0.01 ? parseFloat(increaseTipAmount).toFixed(2) : '—'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-300 text-sm mb-2 truncate" title={libraryItemToTip.title}>
+                  {libraryItemToTip.title}
+                </p>
+                <p className="text-gray-400 text-xs mb-4">
+                  Add <span className="font-semibold text-green-400">£{parseFloat(increaseTipAmount).toFixed(2)}</span> to your tip?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipModalStep('amount')}
+                    className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePlaceLibraryTip}
+                    disabled={isPlacingLibraryTip}
+                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isPlacingLibraryTip ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Confirm'
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <TagInputModal
         isOpen={showAddTuneTagModal}
