@@ -4,6 +4,17 @@ import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-rea
 import { partyAPI } from '../lib/api';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
+import {
+  isNativeAudioPlatform,
+  loadNativeTrack,
+  playNativeAudio,
+  pauseNativeAudio,
+  destroyNativeAudio,
+  setNativeAudioEndedCallback,
+  getNativeCurrentTime,
+  getNativeDuration,
+  seekNativeAudio,
+} from '../services/nativeAudioPlayer';
 
 interface PlayerMedia {
   id: string;
@@ -136,6 +147,45 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     try {
       const fullUrl = resolveUploadAudioUrl(audioUrl);
 
+      if (isNativeAudioPlatform()) {
+        setIsPlayerReady(false);
+        setIsLoading(true);
+        setCurrentTime(0);
+        setDuration(0);
+
+        const artistName = typeof media.artist === 'string'
+          ? media.artist
+          : (media as any).artist?.[0]?.name || 'Unknown Artist';
+
+        setNativeAudioEndedCallback(() => {
+          if (currentPartyId && media?._id && isHost) {
+            partyAPI.completeMedia(currentPartyId, media._id)
+              .then(() => next())
+              .catch(() => next());
+          } else {
+            next();
+          }
+        });
+
+        loadNativeTrack(fullUrl, {
+          title: media.title,
+          artist: artistName,
+          artwork: media.coverArt,
+        })
+          .then(async () => {
+            const dur = await getNativeDuration().catch(() => 0);
+            setDuration(dur || media.duration || 0);
+            setIsPlayerReady(true);
+            setIsLoading(false);
+          })
+          .catch((error) => {
+            console.error('MP3Player: Native audio init failed:', error);
+            setIsLoading(false);
+          });
+
+        return;
+      }
+
       console.log('MP3Player: Setting audio source to:', fullUrl);
       console.log('MP3Player: Original URL was:', audioUrl);
       
@@ -222,6 +272,11 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (isNativeAudioPlatform()) {
+        setNativeAudioEndedCallback(null);
+        destroyNativeAudio().catch(() => {});
+        return;
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
@@ -230,9 +285,36 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     };
   }, []);
 
+  // Native time polling
+  useEffect(() => {
+    if (!isNativeAudioPlatform() || !isPlayerReady) return;
+    const interval = setInterval(async () => {
+      try {
+        const t = await getNativeCurrentTime();
+        setCurrentTime(t);
+      } catch {
+        // Player not active
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isPlayerReady]);
+
   // Handle play/pause
   useEffect(() => {
-    if (!audioRef.current || !isPlayerReady) return;
+    if (!isPlayerReady) return;
+
+    if (isNativeAudioPlatform()) {
+      const action = isPlaying ? playNativeAudio : pauseNativeAudio;
+      action().catch((error) => {
+        console.error('MP3Player: Native play/pause error:', error);
+        if (useWebPlayerStore.getState().isPlaying) {
+          useWebPlayerStore.getState().pause();
+        }
+      });
+      return;
+    }
+
+    if (!audioRef.current) return;
 
     try {
       if (isPlaying) {
@@ -303,7 +385,11 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     setCurrentTime(clampedTime);
     
     try {
-      if (audioRef.current) {
+      if (isNativeAudioPlatform()) {
+        seekNativeAudio(clampedTime).catch((error) => {
+          console.error('MP3Player: Native seek error:', error);
+        });
+      } else if (audioRef.current) {
         audioRef.current.currentTime = clampedTime;
       }
     } catch (error) {

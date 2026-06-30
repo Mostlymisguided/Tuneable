@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tuneable</string>
+    <string name="title_activity_main">Tuneable</string>
+    <string name="package_name">stream.tuneable.app</string>
+    <string name="custom_url_scheme">stream.tuneable.app</string>
+</resources>

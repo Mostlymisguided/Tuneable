@@ -60,3 +60,16 @@ tuneable-ios/Tuneable.xcodeproj/project.xcworkspace/xcuserdata/
 tuneable-ios/Tuneable.xcodeproj/xcuserdata/
 tuneable-ios/DerivedData/
 tuneable-ios/build/
+
+# Capacitor iOS/Android local Xcode/Android Studio state
+tuneable-frontend-v2/ios/**/xcuserdata/
+tuneable-frontend-v2/ios/App/App/public/
+tuneable-frontend-v2/android/.gradle/
+tuneable-frontend-v2/android/app/build/
+tuneable-frontend-v2/android/build/
+tuneable-frontend-v2/android/local.properties
+
+# Local MP3 migration run artifacts (scripts stay in repo when added separately)
+tuneable-backend/scripts/bulk-attach-log*.txt
+tuneable-backend/scripts/pending-approvals.csv
+tuneable-backend/scripts/pending-approvals.json
