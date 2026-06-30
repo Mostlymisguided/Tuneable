@@ -15,8 +15,9 @@ const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const MetadataExtractor = require('../utils/metadataExtractor');
-const { canUploadMedia, canEditMedia } = require('../utils/permissionHelpers');
+const { canUploadMedia, canEditMedia, isAdmin } = require('../utils/permissionHelpers');
 const { getCanonicalTag } = require('../utils/tagNormalizer');
+const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
 /**
  * Capitalize the first letter of each word in a tag (title case)
@@ -759,6 +760,160 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
   }
 });
 
+// @route   POST /api/media/:mediaId/attach-upload
+// @desc    Attach an MP3 to existing media (e.g. YouTube catalog entry) and enable playback
+// @access  Private (admin, media editor, or uploader with rights confirmation)
+router.post('/:mediaId/attach-upload', authMiddleware, mediaUpload.single('audioFile'), async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const userId = req.user._id;
+    const user = req.user;
+    const {
+      rightsConfirmed,
+      uploaderRole = 'owner',
+      rightsDisclaimer,
+    } = req.body;
+
+    if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
+      return res.status(400).json({ error: 'Rights confirmation is required' });
+    }
+
+    const audioFile = req.file;
+    if (!audioFile) {
+      return res.status(400).json({ error: 'MP3 audio file is required' });
+    }
+
+    let media;
+    if (mediaId.includes('-')) {
+      media = await Media.findOne({ uuid: mediaId });
+    } else if (isValidObjectId(mediaId)) {
+      media = await Media.findById(mediaId);
+    } else {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const canAttach = isAdmin(user) || canEditMedia(user, media) || canUploadMedia(user);
+    if (!canAttach) {
+      return res.status(403).json({ error: 'Not authorized to attach audio to this media' });
+    }
+
+    if (media.sources?.get?.('upload') || media.sources?.upload) {
+      return res.status(409).json({ error: 'This media already has an uploaded audio file' });
+    }
+
+    let fileUrl;
+    try {
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const s3Client = new S3Client({
+        region: 'auto',
+        endpoint: process.env.R2_ENDPOINT,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        },
+      });
+
+      const username = user.username || 'unknown';
+      const timestamp = Date.now();
+      const safeFilename = audioFile.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const mediaKey = media.uuid || media._id.toString();
+      const audioKey = `media-uploads/${mediaKey}-${username}-${timestamp}-${safeFilename}`;
+
+      await s3Client.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: audioKey,
+        Body: audioFile.buffer,
+        ContentType: 'audio/mpeg',
+        ACL: 'public-read',
+        CacheControl: 'public, max-age=31536000',
+      }));
+
+      fileUrl = getPublicUrl(audioKey);
+    } catch (uploadError) {
+      console.error('attach-upload R2 error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload audio file' });
+    }
+
+    const isThirdParty = uploaderRole === 'third_party';
+    const verificationMethod = isThirdParty ? 'third_party_claim' : 'attach_upload';
+    const verificationNotes = isThirdParty
+      ? (rightsDisclaimer || 'Third-party upload with rights disclaimer')
+      : 'Audio attached to existing catalog entry';
+
+    if (!media.sources || typeof media.sources.set !== 'function') {
+      media.sources = new Map(Object.entries(media.sources || {}));
+    }
+    media.sources.set('upload', fileUrl);
+    media.rightsCleared = true;
+    media.rightsConfirmedBy = userId;
+    media.rightsConfirmedAt = new Date();
+    if (!media.mediaType?.includes('mp3')) {
+      media.mediaType = [...(media.mediaType || []), 'mp3'];
+    }
+
+    const existingOwner = media.mediaOwners?.find(
+      (o) => o.userId && o.userId.toString() === userId.toString()
+    );
+    if (!existingOwner) {
+      media.mediaOwners = media.mediaOwners || [];
+      media.mediaOwners.push({
+        userId,
+        percentage: isThirdParty ? 0 : 100,
+        role: isThirdParty ? 'contributor' : 'creator',
+        verified: !isThirdParty,
+        verifiedAt: isThirdParty ? null : new Date(),
+        verifiedBy: isThirdParty ? null : userId,
+        verificationMethod,
+        verificationNotes,
+        verificationSource: 'attach_upload',
+        addedBy: userId,
+        addedAt: new Date(),
+        lastUpdatedAt: new Date(),
+        lastUpdatedBy: userId,
+      });
+    }
+
+    if (audioFile.buffer) {
+      try {
+        const extracted = await MetadataExtractor.extractFromBuffer(audioFile.buffer, audioFile.originalname);
+        if (extracted?.duration && !media.duration) {
+          media.duration = extracted.duration;
+        }
+      } catch (metaErr) {
+        console.warn('attach-upload metadata extraction skipped:', metaErr.message);
+      }
+    }
+
+    await media.save();
+
+    const sourcesObj = {};
+    media.sources.forEach((value, key) => {
+      sourcesObj[key] = value;
+    });
+
+    console.log(`✅ Attached upload to media "${media.title}" (${media.uuid}) by ${user.username}`);
+
+    res.json({
+      message: 'Audio attached successfully — media is now playable',
+      media: {
+        _id: media._id,
+        uuid: media.uuid,
+        title: media.title,
+        sources: sourcesObj,
+        rightsCleared: media.rightsCleared,
+        ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }),
+      },
+    });
+  } catch (error) {
+    console.error('Error attaching upload:', error);
+    res.status(500).json({ error: 'Failed to attach upload', details: error.message });
+  }
+});
+
 // @route   GET /api/media
 // @desc    Get all media with pagination and filtering
 // @access  Public
@@ -1227,6 +1382,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       creatorDisplay: populatedMedia.creatorDisplay || formatCreatorDisplay(populatedMedia.artist || [], populatedMedia.featuring || []), // Display string for UI
       globalMediaAggregateTopRank: rank, // Add computed rank
       globalMediaAggregate: calculatedGlobalMediaAggregate, // Override with calculated value from all bids
+      ...enrichMediaWithPlayability({ ...mediaObj, sources: sourcesObj }),
     };
 
     console.log('📤 Sending media profile response:', {

@@ -12,6 +12,7 @@ import Navbar from './components/Navbar';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import MP3Player from './components/MP3Player';
 import PersistentPodcastPlayer from './components/PersistentPodcastPlayer';
+import { isMediaPlayable } from './utils/mediaPlayability';
 import Home from './pages/Home';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
@@ -67,35 +68,30 @@ const PlayerRenderer = () => {
     return <PersistentPodcastPlayer />;
   }
 
-  // Helper function to detect media type
-  const detectMediaType = (media: any): 'youtube' | 'audio' | null => {
+  // Helper function to detect media type (upload-only for playback; YouTube is catalog-only)
+  const detectMediaType = (media: any): 'audio' | null => {
     if (!media?.sources) return null;
 
     if (Array.isArray(media.sources)) {
       for (const source of media.sources) {
-        if (source?.platform === 'youtube' && source.url) return 'youtube';
         if (source?.platform === 'upload' && source.url) return 'audio';
       }
-    } else if (typeof media.sources === 'object') {
-      if (media.sources.youtube) return 'youtube';
-      if (media.sources.upload) return 'audio';
+    } else if (typeof media.sources === 'object' && media.sources.upload) {
+      return 'audio';
     }
 
     return null;
   };
 
   if (!currentMedia) {
-    return <PersistentWebPlayer />; // Default to YouTube player
+    return <PersistentWebPlayer />; // Empty player chrome
   }
 
-  const mediaType = detectMediaType(currentMedia);
-
-  // Simple conditional rendering - one player at a time
-  if (mediaType === 'audio') {
+  if (isMediaPlayable(currentMedia) && detectMediaType(currentMedia) === 'audio') {
     return <MP3Player media={currentMedia} />;
   }
 
-  // Default to YouTube player for YouTube media or unknown types
+  // Catalog entries awaiting upload — no audio engine
   return <PersistentWebPlayer />;
 };
 

@@ -8,6 +8,7 @@ import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
+import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
 interface TopTunesSong {
   id: string;
@@ -105,6 +106,18 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     
     if (!mediaId) {
       toast.error('Unable to identify media item');
+      return;
+    }
+
+    const enriched = enrichMediaWithPlayability({
+      sources: song.sources || {},
+      rightsCleared: (song as any).rightsCleared,
+      contentForm: (song as any).contentForm,
+    });
+
+    if (!isMediaPlayable(enriched)) {
+      toast.info('This track is not playable yet — visit the tune page to pledge support.');
+      navigate(`/tune/${mediaId}`);
       return;
     }
 

@@ -53,6 +53,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import { isMediaPlayable, getSupportMode, enrichMediaWithPlayability, isYouTubeOnly } from '../utils/mediaPlayability';
 
 interface Media {
   _id: string;
@@ -356,7 +357,7 @@ const TuneProfile: React.FC = () => {
       setLoading(true);
       const response = await mediaAPI.getProfile(mediaId!);
       console.log('📥 Media profile response:', response);
-      setMedia(response.media);
+      setMedia(enrichMediaWithPlayability(response.media));
       setComments(response.media.comments || []);
       console.log('✅ Media profile loaded successfully');
     } catch (err: any) {
@@ -1516,6 +1517,15 @@ const TuneProfile: React.FC = () => {
   const handlePlaySong = () => {
     if (!media) return;
 
+    if (!isMediaPlayable(media)) {
+      toast.info(
+        isYouTubeOnly(media) || getSupportMode(media) === 'pledge'
+          ? 'This track is not playable yet — pledge to support getting it on Tuneable.'
+          : 'Playback is not available for this track yet.'
+      );
+      return;
+    }
+
     console.log('🎵 Raw media object:', media);
     console.log('🎵 Raw sources:', media.sources, typeof media.sources);
 
@@ -1967,14 +1977,26 @@ const TuneProfile: React.FC = () => {
                 alt={`${media.title} cover`}
                 className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
-              {/* Play Button Overlay */}
+              {/* Play / awaiting upload overlay */}
               <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                onClick={handlePlaySong}
+                className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
+                  isMediaPlayable(media)
+                    ? 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
+                    : 'bg-black/50 opacity-100 cursor-default'
+                }`}
+                onClick={isMediaPlayable(media) ? handlePlaySong : undefined}
               >
-                <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
-                  <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
-                </div>
+                {isMediaPlayable(media) ? (
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                    <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
+                  </div>
+                ) : (
+                  <div className="text-center px-4">
+                    <Upload className="h-8 w-8 text-amber-400 mx-auto mb-2" />
+                    <p className="text-white text-sm font-semibold">Awaiting upload</p>
+                    <p className="text-gray-300 text-xs mt-1">Pledge to support this tune</p>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -2188,16 +2210,18 @@ const TuneProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* Global Tip Section - Support This Tune */}
+        {/* Global Tip / Pledge Section */}
         <div className="mb-6 px-2 md:px-0">
           <div className="max-w-2xl mx-auto">
             <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
               <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
                 <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                Support This Tune
+                {getSupportMode(media) === 'pledge' ? 'Pledge For This Tune' : 'Support This Tune'}
               </h3>
               <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                Boost this tune's global ranking and support the artist
+                {getSupportMode(media) === 'pledge'
+                  ? 'Pledge funds help bring this track onto Tuneable when audio is uploaded by the rights holder or a verified contributor.'
+                  : 'Boost this tune\'s global ranking and support the artist'}
               </p>
               
               <div className="flex flex-row items-center justify-center mb-4">
@@ -2253,7 +2277,11 @@ const TuneProfile: React.FC = () => {
                     <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
                   ) : (
                     <span>
-                      {!user ? 'Sign in to Tip' : (isGlobalBidValid ? `Tip £${globalBidInput}` : 'Enter Tip')}
+                      {!user
+                        ? (getSupportMode(media) === 'pledge' ? 'Sign in to Pledge' : 'Sign in to Tip')
+                        : (isGlobalBidValid
+                          ? `${getSupportMode(media) === 'pledge' ? 'Pledge' : 'Tip'} £${globalBidInput}`
+                          : `Enter ${getSupportMode(media) === 'pledge' ? 'Pledge' : 'Tip'}`)}
                     </span>
                   )}
                 </button>
@@ -3925,6 +3953,7 @@ const TuneProfile: React.FC = () => {
         mediaArtist={media?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
+        mode={media ? getSupportMode(media) : 'tip'}
       />
 
       {/* Add Link Modal */}

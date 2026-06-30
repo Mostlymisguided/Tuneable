@@ -20,6 +20,8 @@ interface BidConfirmationModalProps {
   isLoading?: boolean;
   party?: Party;
   user?: User | null;
+  /** tip = playable media; pledge = YouTube-only / awaiting upload */
+  mode?: 'tip' | 'pledge';
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -33,6 +35,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   isLoading = false,
   party,
   user,
+  mode = 'tip',
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -130,12 +133,15 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   if (!isOpen) return null;
 
   const hasInsufficientFunds = bidAmount > userBalance;
+  const isPledge = mode === 'pledge';
+  const actionLabel = isPledge ? 'Pledge' : 'Tip';
+  const actionLabelLower = actionLabel.toLowerCase();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
       <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Confirm Your Tip</h2>
+          <h2 className="text-xl font-semibold text-white">Confirm Your {actionLabel}</h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-200 transition-colors"
@@ -149,18 +155,25 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         <div className="mb-4 p-3 bg-gray-700 rounded-lg">
           <div className="flex items-center space-x-2 mb-1">
             <Music className="h-4 w-4 text-purple-400" />
-            <span className="text-sm font-medium text-gray-300">Tipping on:</span>
+            <span className="text-sm font-medium text-gray-300">
+              {isPledge ? 'Pledging on:' : 'Tipping on:'}
+            </span>
           </div>
           <p className="text-white font-medium">{mediaTitle}</p>
           {mediaArtist && (
             <p className="text-gray-400 text-sm">by {mediaArtist}</p>
+          )}
+          {isPledge && (
+            <p className="text-amber-300/90 text-xs mt-2">
+              This track is not playable yet. Your pledge supports bringing it onto Tuneable when audio is uploaded.
+            </p>
           )}
         </div>
 
         {/* Bid Amount Summary */}
         <div className="mb-4 p-4 bg-purple-900/30 rounded-lg border border-purple-600">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-300">Your Tip Amount:</span>
+            <span className="text-sm text-gray-300">Your {actionLabel} Amount:</span>
             <span className="text-2xl font-bold text-purple-400">£{bidAmount.toFixed(2)}</span>
           </div>
         </div>
@@ -183,9 +196,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           <div className="mb-4 p-3 bg-blue-900/30 border border-blue-600 rounded-lg flex items-start space-x-2">
             <MapPin className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-blue-300">Your Tip Location</p>
+              <p className="text-sm font-medium text-blue-300">Your {actionLabel} Location</p>
               <p className="text-xs text-blue-400 mt-1">
-                Your tip will appear in the <strong>{formatLocation(user.homeLocation)}</strong> party, 
+                Your {actionLabelLower} will appear in the <strong>{formatLocation(user.homeLocation)}</strong> party, 
                 not this {formatLocationFilter(party.locationFilter)} party. 
                 This helps support artists in your local community!
               </p>
@@ -283,14 +296,14 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>
-                  {progressStep === 'placing' && 'Placing tip...'}
+                  {progressStep === 'placing' && `Placing ${actionLabelLower}...`}
                   {progressStep === 'processing' && 'Processing transaction...'}
                   {progressStep === 'updating' && 'Updating party...'}
                   {!progressStep && 'Processing...'}
                 </span>
               </>
             ) : (
-              'Confirm Tip'
+              `Confirm ${actionLabel}`
             )}
           </button>
         </div>

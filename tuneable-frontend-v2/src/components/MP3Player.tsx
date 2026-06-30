@@ -3,6 +3,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-react';
 import { partyAPI } from '../lib/api';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
+import { resolveUploadAudioUrl } from '../utils/audioUrls';
 
 interface PlayerMedia {
   id: string;
@@ -133,23 +134,8 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     console.log('MP3Player: Media sources:', media.sources);
 
     try {
-      // Construct the correct URL for uploaded media
-      let fullUrl;
-      if (audioUrl.startsWith('http')) {
-        // Already a full URL (from R2 or other sources)
-        fullUrl = audioUrl;
-      } else if (audioUrl.startsWith('/uploads/media-uploads/')) {
-        // R2 upload - remove the leading /uploads/ and construct R2 URL
-        const r2Key = audioUrl.replace('/uploads/', '');
-        fullUrl = `https://uploads.tuneable.stream/${r2Key}`;
-      } else if (audioUrl.startsWith('/uploads/')) {
-        // Other uploads - construct full R2 URL
-        fullUrl = `https://uploads.tuneable.stream${audioUrl}`;
-      } else {
-        // Fallback to local development
-        fullUrl = `${window.location.origin}${audioUrl}`;
-      }
-      
+      const fullUrl = resolveUploadAudioUrl(audioUrl);
+
       console.log('MP3Player: Setting audio source to:', fullUrl);
       console.log('MP3Player: Original URL was:', audioUrl);
       
@@ -310,7 +296,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
   // Handle seeking
   const handleSeek = (newTime: number) => {
-    if (!audioRef.current || !duration) return;
+    if (!duration) return;
     
     isSeekingRef.current = true;
     const clampedTime = Math.max(0, Math.min(newTime, duration));

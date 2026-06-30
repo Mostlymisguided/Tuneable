@@ -547,6 +547,26 @@ export const mediaAPI = {
     return response.data;
   },
 
+  attachUpload: async (
+    mediaId: string,
+    audioFile: File,
+    options?: { uploaderRole?: 'owner' | 'third_party'; rightsDisclaimer?: string }
+  ) => {
+    const formData = new FormData();
+    formData.append('audioFile', audioFile);
+    formData.append('rightsConfirmed', 'true');
+    if (options?.uploaderRole) {
+      formData.append('uploaderRole', options.uploaderRole);
+    }
+    if (options?.rightsDisclaimer) {
+      formData.append('rightsDisclaimer', options.rightsDisclaimer);
+    }
+    const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   updateMedia: async (mediaId: string, updates: {
     title?: string;
     artist?: string;

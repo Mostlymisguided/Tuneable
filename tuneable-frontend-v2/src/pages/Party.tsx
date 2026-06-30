@@ -24,6 +24,7 @@ import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
 import { isLocationMatch, formatLocation } from '../utils/locationHelpers';
 import { getCanonicalTag } from '../utils/tagNormalizer';
+import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -1985,10 +1986,13 @@ const Party: React.FC = () => {
   // Handle clicking play button on media in the queue
   const handlePlayMedia = (item: any, index: number) => {
     // Get the filtered display media to set as the queue
-    const displayMedia = getDisplayMedia();
+    const displayMedia = getDisplayMedia().filter((displayItem: any) => {
+      const mediaData = selectedTimePeriod === 'all-time' ? (displayItem.mediaId || displayItem) : displayItem;
+      return isMediaPlayable(enrichMediaWithPlayability(mediaData));
+    });
     
     if (displayMedia.length === 0) {
-      toast.error('No tracks to play');
+      toast.info('No playable tracks in this list — pledge on tracks awaiting upload or wait for audio to be added.');
       return;
     }
     
@@ -2057,10 +2061,13 @@ const Party: React.FC = () => {
 
   // Handle playing the entire displayed queue from the top
   const handlePlayQueue = () => {
-    const displayMedia = getDisplayMedia();
+    const displayMedia = getDisplayMedia().filter((item: any) => {
+      const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+      return isMediaPlayable(enrichMediaWithPlayability(mediaData));
+    });
     
     if (displayMedia.length === 0) {
-      toast.error('No tracks to play');
+      toast.info('No playable tracks in this list — pledge on tracks awaiting upload or wait for audio to be added.');
       return;
     }
     
