@@ -222,7 +222,7 @@ const YouTubeLikedImport: React.FC = () => {
                 value={maxVideos}
                 onChange={(e) => setMaxVideos(parseInt(e.target.value) || 50)}
                 min="1"
-                max="500"
+                max="50"
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
               <p className="text-sm text-gray-400 mt-1">

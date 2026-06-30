@@ -48,22 +48,22 @@ const AddMediaModal: React.FC<AddMediaModalProps> = ({ isOpen, onClose }) => {
 
   const options = [
     {
-      label: 'Search Library / YouTube',
-      description: 'Find tunes in our database or add from YouTube',
+      label: 'Search',
+      description: 'Find tunes in our library',
       icon: Search,
       onClick: handleSearch,
       className: 'hover:bg-purple-600/30 border-purple-500/50',
     },
     {
-      label: 'Import from YouTube',
-      description: 'Import your liked videos from YouTube',
+      label: 'Import from likes',
+      description: 'Import likes from YouTube',
       icon: Download,
       onClick: handleImport,
       className: 'hover:bg-red-600/30 border-red-500/50',
     },
     {
-      label: 'Upload MP3',
-      description: 'Upload your own audio file',
+      label: 'Upload',
+      description: 'Upload your own tunes',
       icon: Upload,
       onClick: handleUpload,
       className: 'hover:bg-pink-600/30 border-pink-500/50',

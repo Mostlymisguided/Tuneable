@@ -210,13 +210,13 @@ const CreatorYouTubeImport: React.FC = () => {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Max videos (1–500)</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Max videos (1–50)</label>
             <input
               type="number"
               value={maxVideos}
-              onChange={(e) => setMaxVideos(Math.min(500, Math.max(1, parseInt(e.target.value) || 50)))}
+              onChange={(e) => setMaxVideos(Math.min(50, Math.max(1, parseInt(e.target.value) || 50)))}
               min={1}
-              max={500}
+              max={50}
               className="w-full py-3 px-4 bg-gray-900 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>

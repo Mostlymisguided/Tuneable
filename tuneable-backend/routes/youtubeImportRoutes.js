@@ -168,7 +168,7 @@ router.post('/client/liked-videos/import', authMiddleware, async (req, res) => {
             });
         }
 
-        const videoCount = Math.min(parseInt(maxVideos) || 100, 500);
+        const videoCount = Math.min(parseInt(maxVideos) || 100, 50);
         const estimate = estimateQuotaUsage(videoCount);
         if (estimate.total > 9500) {
             return res.status(400).json({
@@ -241,9 +241,9 @@ router.post('/liked-videos/import', adminMiddleware, async (req, res) => {
 
         // Validate maxVideos
         const videoCount = parseInt(maxVideos);
-        if (videoCount > 500) {
+        if (videoCount > 50) {
             return res.status(400).json({ 
-                error: 'Maximum 500 videos per import to avoid quota limits' 
+                error: 'Maximum 50 videos per import to avoid quota limits' 
             });
         }
 
