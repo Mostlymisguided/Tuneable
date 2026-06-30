@@ -45,6 +45,8 @@ import CreatorYouTubeImport from './pages/CreatorYouTubeImport';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 import Notifications from './pages/Notifications';
+import { AuthDeepLinkListener } from './capacitor/authDeepLink';
+import { getApiOrigin } from './utils/platform';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
@@ -137,6 +139,7 @@ const ProfileRedirect = () => {
 const AppContent = () => {
   return (
     <Router>
+      <AuthDeepLinkListener />
       <div className="min-h-screen">
         <Navbar />
         <main className="pt-16 pb-32">
@@ -317,7 +320,7 @@ function App() {
     // Fetch the Stripe publishable key from the backend
     const fetchStripeKey = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/search/stripe/publishable-key`);
+        const response = await fetch(`${getApiOrigin()}/api/search/stripe/publishable-key`);
         if (response.ok) {
           const data = await response.json();
           if (data.publishableKey) {

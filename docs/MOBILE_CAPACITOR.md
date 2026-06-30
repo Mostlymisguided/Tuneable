@@ -1,59 +1,83 @@
 # Tuneable Mobile (Capacitor)
 
-## Quick start
+## Quick start (local dev API)
 
 ```bash
 cd tuneable-frontend-v2
-npm run build
-npx cap sync
-npx cap open ios    # or: npx cap open android
+npm run cap:ios      # or cap:android
 ```
 
-Scripts: `npm run cap:sync`, `npm run cap:ios`, `npm run cap:android`
+## Production / TestFlight builds
+
+Bundle the **live API** into `dist/` before syncing to native:
+
+```bash
+cd tuneable-frontend-v2
+npm run cap:ios:prod    # or cap:android:prod
+```
+
+This runs `build:prod` with `VITE_API_URL=https://tuneable.stream/api`, then `cap sync`.
+
+Override via `env.production.local` (copy from `env.production.example`).
 
 ## Architecture
 
-- **Web**: existing React app in `dist/`
-- **Native shell**: `ios/` and `android/` (Capacitor)
-- **Background audio**: `@mediagrid/capacitor-native-audio` via `src/services/nativeAudioPlayer.ts`
-- **MP3 playback**: `MP3Player.tsx` uses native audio on device, HTML5 `<audio>` on web
+- **Web**: React app in `dist/`
+- **Native shell**: `ios/` and `android/`
+- **Background audio**: `@mediagrid/capacitor-native-audio` → lock-screen controls
+- **MP3 playback**: `MP3Player.tsx` uses native audio on device, HTML5 on web
+- **OAuth**: system browser (`@capacitor/browser`) → deep link `stream.tuneable.app://auth/callback?...`
 
-## MP3 library migration
+## iOS → TestFlight checklist
 
-Match local iTunes library to YouTube catalog entries and attach uploads:
+1. `npm run cap:ios:prod`
+2. Xcode → **Signing & Capabilities** → select your team, bundle `stream.tuneable.app`
+3. Confirm **Background Modes → Audio** is enabled
+4. **Product → Archive** → Distribute → App Store Connect
+5. App Store Connect → TestFlight → add internal testers
+6. Test on a **physical device**: login (Google), MP3 playback, background/lock screen
+
+## Android → internal testing
+
+1. `npm run cap:android:prod`
+2. Android Studio → Build → Generate Signed Bundle (AAB)
+3. Play Console → Internal testing → upload AAB
+4. Test login + background playback on device
+
+## OAuth deep links
+
+| Platform | Config |
+|----------|--------|
+| iOS | `CFBundleURLSchemes`: `stream.tuneable.app` in `Info.plist` |
+| Android | intent-filter `stream.tuneable.app` / host `auth` in `AndroidManifest.xml` |
+| App code | `AuthDeepLinkListener` routes to `/auth/callback` |
+
+Social login opens Safari/Chrome; after auth the backend redirects to  
+`stream.tuneable.app://auth/callback?oauth_success=true&token=...` which re-opens the app.
+
+No Google Cloud Console change needed — the Google redirect URI remains your **backend** callback URL.
+
+## App icon & splash (TODO)
+
+Replace Capacitor defaults in:
+
+- iOS: `ios/App/App/Assets.xcassets/AppIcon.appiconset/`
+- Android: `android/app/src/main/res/mipmap-*/`
+
+Source asset: `public/Tuneable-Logo-180x180.svg` (export 1024×1024 PNG for App Store).
+
+## Env reference
+
+| Variable | Example | When |
+|----------|---------|------|
+| `VITE_API_URL` | `https://tuneable.stream/api` | Required for prod mobile builds |
+| `VITE_BACKEND_URL` | `https://tuneable.stream` | Stripe key fetch, optional |
+
+## Day-to-day dev loop
 
 ```bash
-cd tuneable-backend
-
-# Preview matches (scans Music/Artist/Album/*.mp3 recursively)
-node scripts/bulkAttachMp3FromDirectory.js \
-  --dir "/Users/admin/Music/iTunes/iTunes Media" \
-  --dry-run
-
-# Upload matched files to R2 and enable playback
-node scripts/bulkAttachMp3FromDirectory.js \
-  --dir "/Users/admin/Music/iTunes/iTunes Media" \
-  --execute \
-  --user-id YOUR_MONGO_USER_ID
+npm run cap:sync:prod   # after frontend changes
+# Xcode / Android Studio → Run on device
 ```
 
-Options: `--limit N` to cap uploads. Set `BULK_UPLOAD_USER_ID` in `.env` to skip `--user-id`.
-
-Log output: `tuneable-backend/scripts/bulk-attach-log.txt`
-
-## iOS notes
-
-- `UIBackgroundModes: audio` is set in `ios/App/App/Info.plist`
-- In Xcode, also enable **Background Modes → Audio** on the App target if needed
-- Test background playback on a **physical device** (simulator is unreliable)
-
-## Android notes
-
-- Foreground service permissions are in `AndroidManifest.xml`
-- Test on a physical device for lock-screen controls
-
-## Env / API URL
-
-Production builds bundle `dist/` locally. Set `VITE_API_URL` at build time to point at your API (e.g. `https://api.tuneable.stream/api`).
-
-For live-reload dev against local Vite, you can temporarily set `server.url` in `capacitor.config.ts` (not for store builds).
+For live-reload against local Vite (dev only), temporarily set `server.url` in `capacitor.config.ts` — not for store builds.

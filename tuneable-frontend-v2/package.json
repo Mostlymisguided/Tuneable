@@ -8,13 +8,18 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "build:prod": "VITE_API_URL=https://tuneable.stream/api VITE_BACKEND_URL=https://tuneable.stream tsc -b && vite build",
     "cap:sync": "npm run build && npx cap sync",
+    "cap:sync:prod": "npm run build:prod && npx cap sync",
     "cap:ios": "npm run cap:sync && npx cap open ios",
-    "cap:android": "npm run cap:sync && npx cap open android"
+    "cap:ios:prod": "npm run cap:sync:prod && npx cap open ios",
+    "cap:android": "npm run cap:sync && npx cap open android",
+    "cap:android:prod": "npm run cap:sync:prod && npx cap open android"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
     "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/ios": "^8.4.1",

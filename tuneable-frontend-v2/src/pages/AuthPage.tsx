@@ -14,8 +14,10 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
+import { Browser } from '@capacitor/browser';
 import { userAPI } from '../lib/api';
 import { COUNTRIES } from '../constants';
+import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
 
 // Default invite code for register page; set VITE_DEFAULT_INVITE_CODE to empty to require a code again
 const DEFAULT_INVITE_CODE = ((import.meta.env.VITE_DEFAULT_INVITE_CODE ?? 'PE856').trim() || null) as string | null;
@@ -253,27 +255,21 @@ const AuthPage: React.FC = () => {
     setTimeout(() => setShowInviteCodeError(false), 3000);
   };
 
-  const handleSocialAuth = (provider: 'facebook' | 'google' | 'instagram' | 'soundcloud') => {
+  const handleSocialAuth = async (provider: 'facebook' | 'google' | 'instagram' | 'soundcloud') => {
     // Check if invite code is required for registration
     if (isRegisterPage && !inviteCodeValid) {
       triggerInviteCodeError();
       return;
     }
 
-    // VITE_API_URL already includes /api, so don't add it again
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    
-    // Pass invite code as state parameter for OAuth
-    const inviteParam = formData.parentInviteCode ? `?invite=${formData.parentInviteCode}` : '';
-    
-    if (provider === 'facebook') {
-      window.location.href = `${baseUrl}/auth/facebook${inviteParam}`;
-    } else if (provider === 'google') {
-      window.location.href = `${baseUrl}/auth/google${inviteParam}`;
-    } else if (provider === 'instagram') {
-      window.location.href = `${baseUrl}/auth/instagram${inviteParam}`;
-    } else if (provider === 'soundcloud') {
-      window.location.href = `${baseUrl}/auth/soundcloud${inviteParam}`;
+    const oauthUrl = buildOAuthStartUrl(provider, {
+      inviteCode: formData.parentInviteCode || undefined,
+    });
+
+    if (isNativeApp()) {
+      await Browser.open({ url: oauthUrl });
+    } else {
+      window.location.href = oauthUrl;
     }
   };
 
