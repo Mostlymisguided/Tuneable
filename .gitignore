@@ -23,6 +23,7 @@ tuneable-backend/config/mongod.conf
 tuneable-backend/data/db/
 tuneable-backend/data/mongodb/
 tuneable-backend/data/mongodb-new/
+tuneable-backend/scripts/mongodb-backup-*/
 !tuneable-backend/data/db/.keep
 
 # System files
