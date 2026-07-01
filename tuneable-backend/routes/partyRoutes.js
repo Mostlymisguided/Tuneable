@@ -3809,6 +3809,9 @@ router.post('/:partyId/unkick/:userId', authMiddleware, resolvePartyId(), async 
 router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, timePeriod } = req.params;
+        const locationPlaceId = typeof req.query.locationPlaceId === 'string'
+            ? req.query.locationPlaceId.trim()
+            : '';
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
 
         if (!validTimePeriods.includes(timePeriod)) {
@@ -3823,6 +3826,10 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
 
         if (!isRequestingGlobalParty && !req.user) {
             return res.status(401).json({ error: 'Please log in to view sorted media' });
+        }
+
+        if (locationPlaceId && !isRequestingGlobalParty) {
+            return res.status(400).json({ error: 'Location filtering is only available for the global party' });
         }
 
         let party;
@@ -3908,6 +3915,11 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
         let bids;
         let allMediaWithBids;
 
+        const bidPopulateMatch = { status: 'active' };
+        if (locationPlaceId) {
+            bidPopulateMatch.bidderLocationAncestorIds = locationPlaceId;
+        }
+
         if (isRequestingGlobalParty) {
             // For Global Party, get bids from ALL parties within the time period
             let bidQuery = { 
@@ -3918,19 +3930,35 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 bidQuery.createdAt = { $gte: startDate };
             }
 
-            bids = await Bid.find(bidQuery).select('mediaId amount createdAt partyId');
+            if (locationPlaceId) {
+                bidQuery.bidderLocationAncestorIds = locationPlaceId;
+            }
+
+            bids = await Bid.find(bidQuery).select('mediaId amount createdAt partyId bidderLocationAncestorIds bidderLocationDisplay');
+
+            const matchingMediaIds = locationPlaceId
+                ? [...new Set(bids.map((bid) => bid.mediaId?.toString()).filter(Boolean))]
+                : null;
             
             // Get all media that has bids within the time period (tunes only for Global Party)
             const Media = require('../models/Media');
-            allMediaWithBids = await Media.find({
+            const mediaQuery = {
                 ...GLOBAL_PARTY_TUNES_FILTER,
                 bids: { $exists: true, $ne: [] },
                 status: { $ne: 'vetoed' } // Exclude globally vetoed media (matches main party fetch)
-            })
+            };
+            if (matchingMediaIds && matchingMediaIds.length === 0) {
+                allMediaWithBids = [];
+                bids = [];
+            } else {
+            if (matchingMediaIds && matchingMediaIds.length > 0) {
+                mediaQuery._id = { $in: matchingMediaIds };
+            }
+            allMediaWithBids = await Media.find(mediaQuery)
             .populate({
                 path: 'bids',
                 model: 'Bid',
-                match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
+                match: bidPopulateMatch,
                 populate: {
                     path: 'userId',
                     select: 'username profilePic uuid homeLocation secondaryLocation'
@@ -3954,8 +3982,9 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 model: 'User',
                 select: 'username profilePic uuid creatorProfile.artistName'
             });
+            }
 
-            console.log(`🌍 Global Party time sorting: Found ${bids.length} bids within time period, ${allMediaWithBids.length} media with bids`);
+            console.log(`🌍 Global Party time sorting: Found ${bids.length} bids within time period, ${allMediaWithBids.length} media with bids${locationPlaceId ? ` (location: ${locationPlaceId})` : ''}`);
         } else {
             // Regular party logic - get bids for this specific party
             let bidQuery = { 
@@ -3986,7 +4015,12 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             processedMedia = allMediaWithBids
                 .map((media) => {
                     // Filter to only active bids (populate match may not filter all cases)
-                    const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
+                    const activeBids = (media.bids || []).filter((bid) => {
+                        if (bid.status !== 'active') return false;
+                        if (!locationPlaceId) return true;
+                        return Array.isArray(bid.bidderLocationAncestorIds)
+                            && bid.bidderLocationAncestorIds.includes(locationPlaceId);
+                    });
                     
                     // Skip media with no active bids
                     if (activeBids.length === 0) {
@@ -4040,6 +4074,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                     };
                 })
                 .filter(media => media !== null) // Remove media with no active bids
+                .filter(media => !locationPlaceId || (media.timePeriodBidValue || 0) > 0)
                 .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
         } else {
             // Regular party logic - process party media
@@ -4097,7 +4132,8 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             media: processedMedia,
             count: processedMedia.length,
             periodStartDate: startDate,
-            periodEndDate: now
+            periodEndDate: now,
+            locationFilter: locationPlaceId ? { placeId: locationPlaceId } : null,
         });
 
     } catch (err) {

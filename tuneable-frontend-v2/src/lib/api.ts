@@ -455,8 +455,12 @@ export const partyAPI = {
     return response.data;
   },
   
-  getMediaSortedByTime: async (partyId: string, timePeriod: string) => {
-    const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`);
+  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string }) => {
+    const params: Record<string, string> = {};
+    if (options?.locationPlaceId) {
+      params.locationPlaceId = options.locationPlaceId;
+    }
+    const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`, { params });
     return response.data;
   },
   

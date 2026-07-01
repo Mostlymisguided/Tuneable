@@ -5,7 +5,7 @@ import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
-import { partyAPI, searchAPI } from '../lib/api';
+import { partyAPI, searchAPI, locationAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
 // import PartyQueueSearch from '../components/PartyQueueSearch'; // Commented out for now
@@ -18,11 +18,12 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
-import { isLocationMatch, formatLocation } from '../utils/locationHelpers';
+import { isLocationMatch, formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
@@ -91,7 +92,7 @@ const Party: React.FC = () => {
   const initialPeriod = periodParam && VALID_TIME_PERIODS.includes(periodParam as any) ? periodParam : 'today';
   const isGlobalParty = partyId === 'global';
   
-  // Helper function to get effective minimum bid (media-level override takes precedence)
+  // Helper function to get effective minimum bid
   const getEffectiveMinimumBid = (media?: any): number => {
     return media?.minimumBid ?? party?.minimumBid ?? 0.01;
   };
@@ -118,6 +119,9 @@ const Party: React.FC = () => {
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showLocationFilter, setShowLocationFilter] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
+  const useSortedQueue = selectedTimePeriod !== 'all-time' || !!selectedLocation?.placeId;
   
   // Search state (initial tag terms from URL for global party: ?tag= or ?tags=)
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
@@ -166,7 +170,7 @@ const Party: React.FC = () => {
   // Reset visible count when party or time period changes
   useEffect(() => {
     setVisibleMediaCount(MEDIA_PAGE_SIZE);
-  }, [partyId, selectedTimePeriod]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId]);
 
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
@@ -341,18 +345,23 @@ const Party: React.FC = () => {
   useEffect(() => {
     if (partyId) {
       fetchPartyDetails();
-      if (selectedTimePeriod !== 'all-time') {
-        fetchSortedMedia(selectedTimePeriod);
-      }
     }
   }, [partyId]);
+
+  useEffect(() => {
+    if (!partyId) return;
+    if (useSortedQueue) {
+      fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId);
+    } else {
+      setSortedMedia([]);
+    }
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
     const p = searchParams.get('period');
     if (p && VALID_TIME_PERIODS.includes(p as any) && p !== selectedTimePeriod) {
       setSelectedTimePeriod(p);
-      if (p !== 'all-time' && partyId) fetchSortedMedia(p);
     }
   }, [searchParams]);
 
@@ -388,6 +397,48 @@ const Party: React.FC = () => {
       return next;
     }, { replace: true });
   }, [isGlobalParty, queueSearchTerms, searchParams]);
+
+  const locationPlaceIdFromUrl = searchParams.get('location');
+
+  // Sync location from URL (global party: shared links, back/forward)
+  useEffect(() => {
+    if (!isGlobalParty) return;
+    if (!locationPlaceIdFromUrl) {
+      setSelectedLocation(null);
+      return;
+    }
+
+    let cancelled = false;
+    locationAPI.resolve(locationPlaceIdFromUrl)
+      .then((response) => {
+        if (!cancelled) {
+          setSelectedLocation(response.location as ResolvedLocation);
+          setShowLocationFilter(true);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to resolve location from URL:', error);
+        if (!cancelled) {
+          setSelectedLocation({ placeId: locationPlaceIdFromUrl, display: locationPlaceIdFromUrl });
+          setShowLocationFilter(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationPlaceIdFromUrl, isGlobalParty]);
+
+  const handleLocationFilterChange = (location: ResolvedLocation | null) => {
+    setSelectedLocation(location);
+    if (!isGlobalParty) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (location?.placeId) next.set('location', location.placeId);
+      else next.delete('location');
+      return next;
+    }, { replace: true });
+  };
 
   // Manual refresh only for remote parties (no automatic polling)
   // Remote parties will refresh on user actions (bids, adds, skips) and manual refresh button
@@ -610,12 +661,16 @@ const Party: React.FC = () => {
 
 
   // Sorting functions
-  const fetchSortedMedia = async (timePeriod: string) => {
+  const fetchSortedMedia = async (timePeriod: string, locationPlaceId?: string | null) => {
     if (!partyId) return;
     
     setIsLoadingSortedMedia(true);
     try {
-      const response = await partyAPI.getMediaSortedByTime(partyId, timePeriod);
+      const response = await partyAPI.getMediaSortedByTime(
+        partyId,
+        timePeriod,
+        locationPlaceId ? { locationPlaceId } : undefined
+      );
       setSortedMedia(response.media || []);
     } catch (error: any) {
       console.error('Error fetching sorted media:', error);
@@ -635,10 +690,11 @@ const Party: React.FC = () => {
 
   const handleTimePeriodChange = (timePeriod: string) => {
     setSelectedTimePeriod(timePeriod);
-    setSearchParams({ period: timePeriod });
-    if (timePeriod !== 'all-time') {
-      fetchSortedMedia(timePeriod);
-    }
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('period', timePeriod);
+      return next;
+    });
   };
 
   const handleRefresh = async () => {
@@ -647,9 +703,8 @@ const Party: React.FC = () => {
       // Refresh party data (includes all bids)
       await fetchPartyDetails();
       
-      // If viewing a time-filtered period, also refresh sorted media
-      if (selectedTimePeriod !== 'all-time') {
-        await fetchSortedMedia(selectedTimePeriod);
+      if (useSortedQueue) {
+        await fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId);
       }
       
       toast.success('Party data refreshed');
@@ -1126,8 +1181,8 @@ const Party: React.FC = () => {
           });
           
           // If viewing a time-filtered period, also refresh sorted media
-          if (selectedTimePeriod !== 'all-time') {
-            fetchSortedMedia(selectedTimePeriod).catch(error => {
+          if (useSortedQueue) {
+            fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId).catch(error => {
               console.error('Background sorted media refresh error:', error);
             });
           }
@@ -1147,8 +1202,8 @@ const Party: React.FC = () => {
           // On error, refresh to get correct state
           fetchPartyDetails().catch(console.error);
           // Also refresh sorted media if viewing time-filtered period
-          if (selectedTimePeriod !== 'all-time') {
-            fetchSortedMedia(selectedTimePeriod).catch(console.error);
+          if (useSortedQueue) {
+            fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId).catch(console.error);
           }
         } finally {
           setIsBidding(false);
@@ -1238,8 +1293,8 @@ const Party: React.FC = () => {
           });
           
           // If viewing a time-filtered period, also refresh sorted media
-          if (selectedTimePeriod !== 'all-time') {
-            fetchSortedMedia(selectedTimePeriod).catch(error => {
+          if (useSortedQueue) {
+            fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId).catch(error => {
               console.error('Background sorted media refresh error:', error);
             });
           }
@@ -1250,8 +1305,8 @@ const Party: React.FC = () => {
           // On error, refresh to get correct state
           fetchPartyDetails().catch(console.error);
           // Also refresh sorted media if viewing time-filtered period
-          if (selectedTimePeriod !== 'all-time') {
-            fetchSortedMedia(selectedTimePeriod).catch(console.error);
+          if (useSortedQueue) {
+            fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId).catch(console.error);
           }
         } finally {
           setIsBidding(false); // Reset bidding state
@@ -1334,6 +1389,13 @@ const Party: React.FC = () => {
     return (party && party.media) ? party.media : [];
   };
 
+  const getQueueMediaForAggregation = () => {
+    if (useSortedQueue) {
+      return sortedMedia.filter((item: any) => item.status === 'active');
+    }
+    return getPartyMedia().filter((item: any) => item.status === 'active');
+  };
+
   // Top Tags cloud (proxy for GlobalTagAggregate using party/global aggregates)
   const topTags = useMemo(() => {
     if (!party) return [] as Array<{ tag: string; total: number; count: number }>;
@@ -1373,7 +1435,7 @@ const Party: React.FC = () => {
   const topSupporterBids = useMemo(() => {
     if (!party) return [] as any[];
     const out: any[] = [];
-    const media = getPartyMedia().filter((it: any) => it.status === 'active');
+    const media = getQueueMediaForAggregation();
     
     for (const item of media) {
       const m = item.mediaId || item;
@@ -1393,10 +1455,16 @@ const Party: React.FC = () => {
         );
         if (!ok) continue;
       }
-      (m.bids || []).forEach((b: any) => out.push(b));
+      (m.bids || []).forEach((b: any) => {
+        if (selectedLocation?.placeId) {
+          const ancestors = b.bidderLocationAncestorIds || [];
+          if (!ancestors.includes(selectedLocation.placeId)) return;
+        }
+        out.push(b);
+      });
     }
     return out;
-  }, [party, selectedTagFilters]);
+  }, [party, selectedTagFilters, sortedMedia, useSortedQueue, selectedLocation?.placeId]);
 
   // Total unique supporters (aggregated by user, same logic as TopSupporters) for load-more cap
   const totalSupportersCount = useMemo(() => {
@@ -1417,7 +1485,7 @@ const Party: React.FC = () => {
   // Reset to 10 when party/filters change
   useEffect(() => {
     setTopSupportersToShow(10);
-  }, [topSupporterBids, selectedTagFilters]);
+  }, [topSupporterBids, selectedTagFilters, selectedLocation?.placeId]);
 
   // Load more supporters when user scrolls to bottom of Top Supporters list
   useEffect(() => {
@@ -1441,24 +1509,22 @@ const Party: React.FC = () => {
   // Get media to display based on selected time period and search terms
   const getDisplayMedia = () => {
     let media;
-    if (selectedTimePeriod === 'all-time') {
-      // Show regular party media - explicitly filter out vetoed items
-      const allMedia = getPartyMedia();
-      media = allMedia.filter((item: any) => {
-        // Only show items with status 'active', explicitly exclude 'vetoed' and undefined/null
-        const isActive = item.status === 'active';
-        if (!isActive && item.status === 'vetoed') {
-          // Debug: log if we're filtering out vetoed items
-          console.log('🚫 Filtering out vetoed media:', (item.mediaId || item)?.title, 'status:', item.status);
-        }
-        return isActive;
-      });
-    } else {
-      // Show sorted media from the selected time period
+    if (useSortedQueue) {
+      // Time-sorted queue, or all-time with a location filter (server re-aggregates tips)
       media = sortedMedia.filter((item: any) => {
         const isActive = item.status === 'active';
         if (!isActive && item.status === 'vetoed') {
           console.log('🚫 Filtering out vetoed sorted media:', item.title, 'status:', item.status);
+        }
+        return isActive;
+      });
+    } else {
+      // All-time without location filter — use full party queue
+      const allMedia = getPartyMedia();
+      media = allMedia.filter((item: any) => {
+        const isActive = item.status === 'active';
+        if (!isActive && item.status === 'vetoed') {
+          console.log('🚫 Filtering out vetoed media:', (item.mediaId || item)?.title, 'status:', item.status);
         }
         return isActive;
       });
@@ -1923,8 +1989,8 @@ const Party: React.FC = () => {
       await fetchPartyDetails();
       
       // Refresh sorted media if viewing a time-filtered period
-      if (selectedTimePeriod !== 'all-time') {
-        await fetchSortedMedia(selectedTimePeriod);
+      if (useSortedQueue) {
+        await fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId);
       }
       
       setBidModalOpen(false);
@@ -2479,8 +2545,15 @@ const Party: React.FC = () => {
               <>
                 <div className="text-center mb-2 md:mb-3">
                   <h3 className="text-base md:text-lg font-semibold text-white">Top Fans</h3>
-                  {selectedTagFilters.length > 0 && (
-                    <p className="text-xs text-purple-300 mt-1">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</p>
+                  {(selectedTagFilters.length > 0 || selectedLocation?.display || selectedLocation?.city) && (
+                    <div className="text-xs text-purple-300 mt-1 space-y-0.5">
+                      {selectedLocation?.display || selectedLocation?.city ? (
+                        <p>Tips from {formatLocation(selectedLocation)}</p>
+                      ) : null}
+                      {selectedTagFilters.length > 0 ? (
+                        <p>Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</p>
+                      ) : null}
+                    </div>
                   )}
                 </div>
                 <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
@@ -3148,6 +3221,58 @@ const Party: React.FC = () => {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Location filter - global party only; above tag filter */}
+                {!showVetoed && isGlobalParty && (
+                  <div className="mb-4 md:mb-6">
+                    {!showLocationFilter ? (
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowLocationFilter(true)}
+                          className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+                        >
+                          <MapPin className="h-4 w-4 text-purple-400" />
+                          Filter by Location
+                          {selectedLocation?.placeId ? (
+                            <span className="text-xs text-purple-300 font-normal truncate max-w-[12rem]">
+                              ({formatLocation(selectedLocation)})
+                            </span>
+                          ) : null}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="card p-3 md:p-6 mb-4 max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-lg font-semibold text-white flex items-center">
+                            <MapPin className="h-4 w-4 mr-2 text-purple-400" />
+                            Filter by Location
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setShowLocationFilter(false)}
+                            className="text-sm text-gray-400 hover:text-white"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-3">
+                          Show tunes ranked by tips from supporters in this place and anywhere within it.
+                        </p>
+                        <LocationAutocomplete
+                          value={selectedLocation}
+                          onChange={handleLocationFilterChange}
+                          placeholder="Search city, town, or region…"
+                        />
+                        {selectedLocation?.placeId && (
+                          <p className="text-xs text-purple-300 mt-2">
+                            Showing tips from {formatLocation(selectedLocation)} and below
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
