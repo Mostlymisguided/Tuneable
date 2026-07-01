@@ -305,8 +305,8 @@ const Help: React.FC = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-8 shadow-2xl">
           <div className="mb-8">
-            <Link to="/" className="text-purple-300 hover:text-purple-200 font-medium transition-colors inline-flex items-center gap-2">
-              ← Back to Home
+            <Link to="/explore" className="text-purple-300 hover:text-purple-200 font-medium transition-colors inline-flex items-center gap-2">
+              ← Back to Explore
             </Link>
           </div>
           

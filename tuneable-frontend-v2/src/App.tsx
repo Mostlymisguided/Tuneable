@@ -13,7 +13,6 @@ import PersistentWebPlayer from './components/PersistentWebPlayer';
 import MP3Player from './components/MP3Player';
 import PersistentPodcastPlayer from './components/PersistentPodcastPlayer';
 import { isMediaPlayable } from './utils/mediaPlayability';
-import Home from './pages/Home';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
 import AuthCallback from './pages/AuthCallback';
@@ -144,7 +143,8 @@ const AppContent = () => {
         <Navbar />
         <main className="pt-16 pb-32">
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Navigate to="/party/global?period=all-time" replace />} />
+            <Route path="/home" element={<Navigate to="/about" replace />} />
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage />} />

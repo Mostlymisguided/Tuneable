@@ -93,10 +93,10 @@ const RequestInvite: React.FC = () => {
 
             <div className="space-y-3">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/explore')}
                 className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all"
               >
-                Back to Home
+                Back to Explore
               </button>
               <button
                 onClick={() => {

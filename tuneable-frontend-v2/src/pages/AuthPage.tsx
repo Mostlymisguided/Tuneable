@@ -272,7 +272,7 @@ const AuthPage: React.FC = () => {
   };
 
   const handleClose = () => {
-    navigate('/');
+    navigate('/explore');
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

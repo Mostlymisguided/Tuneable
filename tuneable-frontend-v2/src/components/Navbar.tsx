@@ -13,7 +13,7 @@ const Navbar: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/explore');
   };
 
   return (
@@ -22,7 +22,7 @@ const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between h-12 sm:h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
+            <Link to="/explore" className="flex items-center space-x-2">
               <img 
                 src="/Tuneable-Logo-180x180.svg" 
                 alt="Tuneable Logo" 
@@ -130,6 +130,21 @@ const Navbar: React.FC = () => {
               </>
             ) : (
               <div className="flex items-center space-x-3">
+                <Link
+                  to="/about"
+                  className="hidden sm:flex px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors items-center justify-center"
+                  style={{ textDecoration: 'none' }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
+                    (e.target as HTMLElement).style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                    (e.target as HTMLElement).style.color = '#D1D5DB';
+                  }}
+                >
+                  About
+                </Link>
                 <Link
                   to="/explore"
                   className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center"

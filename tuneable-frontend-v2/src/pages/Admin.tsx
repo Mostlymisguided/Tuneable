@@ -183,7 +183,7 @@ const Admin: React.FC = () => {
         refreshReportCounts();
       } else {
         setIsAdmin(false);
-        navigate('/');
+        navigate('/explore');
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
@@ -976,7 +976,7 @@ const Admin: React.FC = () => {
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">Welcome, {user?.username}</span>
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/explore')}
                 className="text-gray-400 hover:text-white transition-colors"
               >
                 Back to App
