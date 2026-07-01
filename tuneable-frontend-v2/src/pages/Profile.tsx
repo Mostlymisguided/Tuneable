@@ -3,6 +3,8 @@ import { authAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import { 
   User, 
   MapPin, 
@@ -27,27 +29,8 @@ interface UserProfile {
   cellPhone?: string;
   givenName?: string;
   familyName?: string;
-  homeLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-    countryCode?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-    detectedFromIP?: boolean;
-  };
-  secondaryLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-    countryCode?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-  };
-  } | null;
+  homeLocation?: ResolvedLocation;
+  secondaryLocation?: ResolvedLocation | null;
   balance: number;
   personalInviteCode: string;
   facebookId?: string;
@@ -66,16 +49,8 @@ const Profile: React.FC = () => {
     givenName: '',
     familyName: '',
     cellPhone: '',
-    homeLocation: {
-      city: '',
-      region: '',
-      country: ''
-    },
-    secondaryLocation: null as {
-      city: string;
-      region: string;
-      country: string;
-    } | null,
+    homeLocation: null as ResolvedLocation | null,
+    secondaryLocation: null as ResolvedLocation | null,
     defaultTip: 0.11
   });
 
@@ -94,16 +69,8 @@ const Profile: React.FC = () => {
         givenName: (response.user as any).givenName || '',
         familyName: (response.user as any).familyName || '',
         cellPhone: (response.user as any).cellPhone || '',
-        homeLocation: {
-          city: response.user.homeLocation?.city || '',
-          region: response.user.homeLocation?.region || '',
-          country: response.user.homeLocation?.country || ''
-        },
-        secondaryLocation: response.user.secondaryLocation ? {
-          city: response.user.secondaryLocation.city || '',
-          region: response.user.secondaryLocation.region || '',
-          country: response.user.secondaryLocation.country || ''
-        } : null,
+        homeLocation: response.user.homeLocation ? { ...response.user.homeLocation } : null,
+        secondaryLocation: response.user.secondaryLocation ? { ...response.user.secondaryLocation } : null,
         defaultTip: (response.user as any).preferences?.defaultTip || 0.11
       });
     } catch (error) {
@@ -163,16 +130,8 @@ const Profile: React.FC = () => {
         givenName: profile?.givenName || '',
         familyName: profile?.familyName || '',
         cellPhone: profile?.cellPhone || '',
-        homeLocation: {
-          city: profile?.homeLocation?.city || '',
-          region: profile?.homeLocation?.region || '',
-          country: profile?.homeLocation?.country || ''
-        },
-        secondaryLocation: profile?.secondaryLocation ? {
-          city: profile.secondaryLocation.city || '',
-          region: profile.secondaryLocation.region || '',
-          country: profile.secondaryLocation.country || ''
-        } : null,
+        homeLocation: profile?.homeLocation ? { ...profile.homeLocation } : null,
+        secondaryLocation: profile?.secondaryLocation ? { ...profile.secondaryLocation } : null,
         defaultTip: (profile as any)?.preferences?.defaultTip || 0.11
       });
     }
@@ -446,55 +405,13 @@ const Profile: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-300">Location & Social</h2>
               
               {isEditing ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.homeLocation.city}
-                      onChange={(e) => setEditForm({
-                        ...editForm, 
-                        homeLocation: {...editForm.homeLocation, city: e.target.value}
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Enter city"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Region/State
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.homeLocation.region}
-                      onChange={(e) => setEditForm({
-                        ...editForm, 
-                        homeLocation: {...editForm.homeLocation, region: e.target.value}
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Enter region/state"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.homeLocation.country}
-                      onChange={(e) => setEditForm({
-                        ...editForm, 
-                        homeLocation: {...editForm.homeLocation, country: e.target.value}
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Enter country"
-                    />
-                  </div>
-                </div>
+                <LocationAutocomplete
+                  variant="light"
+                  label="Home Location"
+                  value={editForm.homeLocation}
+                  onChange={(location) => setEditForm({ ...editForm, homeLocation: location })}
+                  placeholder="Search for your home city or town"
+                />
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3">
@@ -502,15 +419,7 @@ const Profile: React.FC = () => {
                     <div>
                       <p className="text-sm text-gray-500">Location</p>
                       <p className="font-medium">
-                        {(() => {
-                          const location = profile.homeLocation;
-                          if (location?.city && location?.country) {
-                            return location.region 
-                              ? `${location.city}, ${location.region}, ${location.country}`
-                              : `${location.city}, ${location.country}`;
-                          }
-                          return 'Not set';
-                        })()}
+                        {profile.homeLocation ? formatLocation(profile.homeLocation) : 'Not set'}
                       </p>
                     </div>
                   </div>

@@ -16,8 +16,9 @@ import {
 import axios from 'axios';
 import { Browser } from '@capacitor/browser';
 import { userAPI } from '../lib/api';
-import { COUNTRIES } from '../constants';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import type { ResolvedLocation } from '../utils/locationHelpers';
 
 // Default invite code for register page; set VITE_DEFAULT_INVITE_CODE to empty to require a code again
 const DEFAULT_INVITE_CODE = ((import.meta.env.VITE_DEFAULT_INVITE_CODE ?? 'PE856').trim() || null) as string | null;
@@ -62,11 +63,7 @@ const AuthPage: React.FC = () => {
     givenName: '',
     familyName: '',
     parentInviteCode: '',
-    homeLocation: {
-      city: '',
-      region: '',
-      country: '',
-    },
+    homeLocation: null as ResolvedLocation | null,
     secondaryLocation: null as {
       city: string;
       region: string;
@@ -220,11 +217,12 @@ const AuthPage: React.FC = () => {
         setFormData(prev => ({
           ...prev,
           homeLocation: {
-            ...prev.homeLocation,
+            ...(prev.homeLocation || {}),
             country: response.location.country,
-            city: prev.homeLocation.city || response.location.city,
-            region: prev.homeLocation.region || response.location.region,
-          }
+            city: prev.homeLocation?.city || response.location.city,
+            region: prev.homeLocation?.region || response.location.region,
+            detectedFromIP: true,
+          },
         }));
         
         setLocationDetectionStatus('success');
@@ -285,15 +283,7 @@ const AuthPage: React.FC = () => {
       setLoginError('');
     }
     
-    if (name === 'city' || name === 'region' || name === 'country') {
-      setFormData({
-        ...formData,
-        homeLocation: {
-          ...formData.homeLocation,
-          [name]: value,
-        },
-      });
-    } else if (name === 'parentInviteCode') {
+    if (name === 'parentInviteCode') {
       const upperCode = value.toUpperCase();
       setFormData({
         ...formData,
@@ -855,66 +845,33 @@ const AuthPage: React.FC = () => {
         </div>
 
         {/* Location Fields */}
-        <div className="flex flex-col flex items-center justify-center">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">
-            Home Location (Optional)
-            {locationDetectionStatus === 'success' && (
-              <span className="ml-2 text-xs text-green-600">
-                ✓ Auto-detected
-              </span>
-            )}
-          </h3>
+        <div className="flex flex-col w-full">
+          <LocationAutocomplete
+            variant="light"
+            label="Home Location (Optional)"
+            value={formData.homeLocation}
+            onChange={(location) => setFormData({ ...formData, homeLocation: location })}
+            placeholder="Search for your home city or town"
+          />
+          {locationDetectionStatus === 'success' && (
+            <p className="text-xs text-gray-500 mt-1 text-center">
+              Country hint auto-detected from your IP. Search above to pick your exact place.
+            </p>
+          )}
           
           {/* Location detection status */}
           {isDetectingLocation && (
-            <div className="flex items-center mb-2 text-xs text-blue-600">
+            <div className="flex items-center justify-center mt-2 text-xs text-blue-600">
               <div className="animate-spin h-4 w-4 border-2 border-blue-300 border-t-blue-600 rounded-full mr-2"></div>
               <span>Detecting your location...</span>
             </div>
           )}
           
-          {locationDetectionStatus === 'success' && (
-            <div className="flex items-center mb-2 text-xs text-green-600">
+          {locationDetectionStatus === 'success' && !isDetectingLocation && (
+            <div className="flex items-center justify-center mt-2 text-xs text-green-600">
               <CheckCircle className="h-4 w-4 mr-1" />
-              <span>Location auto-detected successfully</span>
+              <span>Location hint auto-detected</span>
             </div>
-          )}
-          <div className="grid grid-cols-2 gap-2 w-full">
-            <input
-              id="city"
-              name="city"
-              type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="City"
-              value={formData.homeLocation.city}
-              onChange={handleChange}
-            />
-            <input
-              id="region"
-              name="region"
-              type="text"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              placeholder="State/Region/County"
-              value={formData.homeLocation.region}
-              onChange={handleChange}
-            />
-            <select
-              id="country"
-              name="country"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 focus:ring-2 focus:ring-black focus:ring-offset-1"
-              value={formData.homeLocation.country}
-              onChange={handleChange}
-            >
-              <option value="">Select Country</option>
-              {COUNTRIES.map(country => (
-                <option key={country} value={country}>{country}</option>
-              ))}
-            </select>
-          </div>
-          {locationDetectionStatus === 'success' && (
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              Location auto-detected from your IP address. You can edit or remove it.
-            </p>
           )}
         </div>
 

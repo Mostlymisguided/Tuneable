@@ -10,6 +10,23 @@ export interface InviteCode {
   usageCount: number;
 }
 
+export interface MapboxLocationFields {
+  placeProvider?: 'mapbox';
+  placeId?: string;
+  featureType?: string;
+  ancestorIds?: string[];
+  ancestors?: {
+    placeId: string;
+    label: string;
+    placetype: string;
+    regionCode?: string;
+    countryCode?: string;
+  }[];
+  label?: string;
+  display?: string;
+  resolvedAt?: string;
+}
+
 export interface User {
   id: string;
   _id?: string; // MongoDB ObjectId for internal matching
@@ -31,7 +48,7 @@ export interface User {
     discoveryRank: number;
     reason: 'discovery' | 'popularity_growth';
   }[];
-  homeLocation?: {
+  homeLocation?: MapboxLocationFields & {
     city?: string;
     region?: string;
     country?: string;
@@ -42,7 +59,7 @@ export interface User {
     };
     detectedFromIP?: boolean;
   };
-  secondaryLocation?: {
+  secondaryLocation?: (MapboxLocationFields & {
     city?: string;
     region?: string;
     country?: string;
@@ -51,7 +68,7 @@ export interface User {
       lat: number;
       lng: number;
     };
-  } | null;
+  }) | null;
   role: string[];
   isActive: boolean;
   joinedParties?: {

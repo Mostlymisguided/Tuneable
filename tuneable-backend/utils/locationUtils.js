@@ -315,9 +315,91 @@ function mergeLocation(newLocationData, existingLocation = null) {
   return processLocation(mergedData);
 }
 
+const MAPBOX_LOCATION_FIELDS = [
+  'placeProvider',
+  'placeId',
+  'featureType',
+  'ancestorIds',
+  'ancestors',
+  'label',
+  'display',
+  'resolvedAt',
+];
+
+/**
+ * Merge legacy city/region/country fields with Mapbox-resolved metadata.
+ * @param {Object} locationData - From client or mapboxGeocodingService
+ * @param {Object|null} existingLocation
+ * @returns {Object|null}
+ */
+function applyResolvedLocation(locationData, existingLocation = null) {
+  if (!locationData || (typeof locationData === 'object' && Object.keys(locationData).length === 0)) {
+    return existingLocation || null;
+  }
+
+  const base = processLocation(locationData, existingLocation) || {};
+  const merged = { ...base };
+
+  for (const field of MAPBOX_LOCATION_FIELDS) {
+    if (locationData[field] !== undefined && locationData[field] !== null) {
+      merged[field] = locationData[field];
+    } else if (existingLocation?.[field] !== undefined && merged[field] === undefined) {
+      merged[field] = existingLocation[field];
+    }
+  }
+
+  if (locationData.detectedFromIP !== undefined) {
+    merged.detectedFromIP = locationData.detectedFromIP;
+  } else if (merged.detectedFromIP === undefined) {
+    merged.detectedFromIP = existingLocation?.detectedFromIP || false;
+  }
+
+  if (!merged.display && (merged.city || merged.country)) {
+    merged.display = [merged.city, merged.region, merged.country].filter(Boolean).join(', ');
+  }
+
+  if (!merged.city && !merged.country && !merged.placeId) {
+    return existingLocation || null;
+  }
+
+  return merged;
+}
+
+/**
+ * Snapshot home location onto a Bid for Tunefeed filtering and leaderboard display.
+ */
+function getBidLocationSnapshot(homeLocation) {
+  if (!homeLocation) {
+    return {};
+  }
+
+  const placeId = homeLocation.placeId || null;
+  const ancestorIds = Array.isArray(homeLocation.ancestorIds) ? homeLocation.ancestorIds : [];
+  const bidderLocationAncestorIds = placeId
+    ? [...new Set([placeId, ...ancestorIds])]
+    : [...ancestorIds];
+
+  if (!bidderLocationAncestorIds.length) {
+    return {};
+  }
+
+  const display =
+    homeLocation.display ||
+    [homeLocation.city, homeLocation.region, homeLocation.country].filter(Boolean).join(', ') ||
+    null;
+
+  return {
+    bidderHomePlaceId: placeId,
+    bidderLocationAncestorIds,
+    bidderLocationDisplay: display,
+  };
+}
+
 module.exports = {
   countryCodeMap,
   processLocation,
-  mergeLocation
+  mergeLocation,
+  applyResolvedLocation,
+  getBidLocationSnapshot,
 };
 

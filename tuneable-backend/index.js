@@ -646,6 +646,7 @@ app.use('/api/email', emailRoutes); // Email routes
 app.use('/api/labels', labelRoutes); // Label routes
 app.use('/api/collectives', collectiveRoutes); // Collective routes
 app.use('/api/notifications', notificationRoutes); // Notification routes
+app.use('/api/locations', require('./routes/locationRoutes')); // Mapbox location suggest/resolve
 app.use('/api/artist-escrow', require('./routes/artistEscrowRoutes')); // Artist escrow routes
 app.use('/api/verification', require('./routes/verificationRoutes')); // Transaction verification routes
 app.use('/api/ledger', require('./routes/ledgerRoutes')); // Ledger management routes

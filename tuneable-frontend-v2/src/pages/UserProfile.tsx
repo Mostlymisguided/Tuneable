@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
   Coins, 
   Music, 
@@ -42,6 +42,8 @@ import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, poundsToPence } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 
 interface LibraryItem {
   mediaId: string;
@@ -81,27 +83,8 @@ interface UserProfile {
   givenName?: string;
   familyName?: string;
   cellPhone?: string;
-    homeLocation?: {
-      city?: string;
-      region?: string;
-      country?: string;
-      countryCode?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-      detectedFromIP?: boolean;
-    };
-    secondaryLocation?: {
-      city?: string;
-      region?: string;
-      country?: string;
-      countryCode?: string;
-      coordinates?: {
-        lat: number;
-        lng: number;
-  };
-    } | null;
+  homeLocation?: ResolvedLocation;
+  secondaryLocation?: ResolvedLocation | null;
   role: string[];
   isActive: boolean;
   createdAt: string;
@@ -274,16 +257,8 @@ const UserProfile: React.FC = () => {
     givenName: '',
     familyName: '',
     cellPhone: '',
-    homeLocation: {
-      city: '',
-      region: '',
-      country: ''
-    },
-    secondaryLocation: null as {
-      city: string;
-      region: string;
-      country: string;
-    } | null,
+    homeLocation: null as ResolvedLocation | null,
+    secondaryLocation: null as ResolvedLocation | null,
     socialMedia: {
       soundcloud: '',
       facebook: '',
@@ -457,16 +432,8 @@ const UserProfile: React.FC = () => {
         givenName: user.givenName || '',
         familyName: user.familyName || '',
         cellPhone: user.cellPhone || '',
-        homeLocation: {
-          city: user.homeLocation?.city || '',
-          region: user.homeLocation?.region || '',
-          country: user.homeLocation?.country || ''
-        },
-        secondaryLocation: user.secondaryLocation ? {
-          city: user.secondaryLocation.city || '',
-          region: user.secondaryLocation.region || '',
-          country: user.secondaryLocation.country || ''
-        } : null,
+        homeLocation: user.homeLocation ? { ...user.homeLocation } : null,
+        secondaryLocation: user.secondaryLocation ? { ...user.secondaryLocation } : null,
         socialMedia: {
           soundcloud: user.socialMedia?.soundcloud || '',
           facebook: user.socialMedia?.facebook || '',
@@ -1306,14 +1273,14 @@ const UserProfile: React.FC = () => {
       const { socialMedia, homeLocation, secondaryLocation, ...otherFields } = editForm;
       const formattedData = {
         ...otherFields,
-        homeLocation: homeLocation,
-        secondaryLocation: secondaryLocation && (secondaryLocation.city || secondaryLocation.region || secondaryLocation.country)
+        homeLocation: homeLocation || undefined,
+        secondaryLocation: secondaryLocation && (secondaryLocation.placeId || secondaryLocation.city || secondaryLocation.region || secondaryLocation.country || secondaryLocation.display)
           ? secondaryLocation
           : null,
         socialMedia: socialMedia
       };
       
-      await authAPI.updateProfile(formattedData);
+      await authAPI.updateProfile(formattedData as Partial<import('../types').User>);
       toast.success('Profile updated successfully!');
       setUsernameError(null); // Clear any errors on success
       // Only update modal state if NOT in settings mode
@@ -1496,30 +1463,18 @@ const UserProfile: React.FC = () => {
                     {user.givenName} {user.familyName}
                   </p>
                 )}
-                {(user.homeLocation?.city || user.homeLocation?.country || user.secondaryLocation?.city || user.secondaryLocation?.country) && (
+                {(user.homeLocation?.display || user.homeLocation?.city || user.homeLocation?.country || user.secondaryLocation?.display || user.secondaryLocation?.city || user.secondaryLocation?.country) && (
                   <div className="flex flex-col gap-2 mb-1">
-                    {user.homeLocation?.city || user.homeLocation?.country ? (
+                    {user.homeLocation?.display || user.homeLocation?.city || user.homeLocation?.country ? (
                       <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                         <MapPin className="h-3.5 w-3.5" />
-                        <span>
-                          {[
-                            user.homeLocation?.city,
-                            user.homeLocation?.region,
-                            user.homeLocation?.country
-                          ].filter(Boolean).join(', ')}
-                        </span>
+                        <span>{formatLocation(user.homeLocation)}</span>
               </div>
                     ) : null}
-                    {user.secondaryLocation?.city || user.secondaryLocation?.country ? (
+                    {user.secondaryLocation?.display || user.secondaryLocation?.city || user.secondaryLocation?.country ? (
                       <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                         <MapPin className="h-3.5 w-3.5" />
-                        <span>
-                          {[
-                            user.secondaryLocation?.city,
-                            user.secondaryLocation?.region,
-                            user.secondaryLocation?.country
-                          ].filter(Boolean).join(', ')}
-                    </span>
+                        <span>{formatLocation(user.secondaryLocation)}</span>
                   </div>
                     ) : null}
                 </div>
@@ -2995,51 +2950,12 @@ const UserProfile: React.FC = () => {
 
                 {/* Home Location */}
                 <div className="mb-6">
-                  <label className="block text-white font-medium mb-3">Home Location</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-white text-sm mb-2">City</label>
-                      <input
-                        type="text"
-                        value={editForm.homeLocation.city}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          homeLocation: { ...editForm.homeLocation, city: e.target.value }
-                        })}
-                        className="input"
-                        placeholder="Enter city"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-white text-sm mb-2">Region/State</label>
-                      <input
-                        type="text"
-                        value={editForm.homeLocation.region}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          homeLocation: { ...editForm.homeLocation, region: e.target.value }
-                        })}
-                        className="input"
-                        placeholder="Enter region/state"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-white text-sm mb-2">Country</label>
-                      <select
-                        value={editForm.homeLocation.country}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          homeLocation: { ...editForm.homeLocation, country: e.target.value }
-                        })}
-                        className="input"
-                      >
-                        <option value="">Select Country</option>
-                        {COUNTRIES.map(country => (
-                          <option key={country} value={country}>{country}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  <LocationAutocomplete
+                    label="Home Location"
+                    value={editForm.homeLocation}
+                    onChange={(location) => setEditForm({ ...editForm, homeLocation: location })}
+                    placeholder="Search for your home city or town"
+                  />
                 </div>
 
                 {/* Secondary Location */}
@@ -3067,50 +2983,11 @@ const UserProfile: React.FC = () => {
                     </button>
                   </div>
                   {editForm.secondaryLocation ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-white text-sm mb-2">City</label>
-                        <input
-                          type="text"
-                          value={editForm.secondaryLocation.city}
-                          onChange={(e) => setEditForm({ 
-                            ...editForm, 
-                            secondaryLocation: { ...editForm.secondaryLocation!, city: e.target.value }
-                          })}
-                          className="input"
-                          placeholder="Enter city"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white text-sm mb-2">Region/State</label>
-                        <input
-                          type="text"
-                          value={editForm.secondaryLocation.region}
-                          onChange={(e) => setEditForm({ 
-                            ...editForm, 
-                            secondaryLocation: { ...editForm.secondaryLocation!, region: e.target.value }
-                          })}
-                          className="input"
-                          placeholder="Enter region/state"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white text-sm mb-2">Country</label>
-                        <select
-                          value={editForm.secondaryLocation.country}
-                          onChange={(e) => setEditForm({ 
-                            ...editForm, 
-                            secondaryLocation: { ...editForm.secondaryLocation!, country: e.target.value }
-                          })}
-                          className="input"
-                        >
-                          <option value="">Select Country</option>
-                          {COUNTRIES.map(country => (
-                            <option key={country} value={country}>{country}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                    <LocationAutocomplete
+                      value={editForm.secondaryLocation}
+                      onChange={(location) => setEditForm({ ...editForm, secondaryLocation: location })}
+                      placeholder="Search for a secondary location"
+                    />
                   ) : (
                     <p className="text-gray-400 text-sm">No secondary location added</p>
                   )}
@@ -3760,51 +3637,12 @@ const UserProfile: React.FC = () => {
 
               {/* Home Location */}
               <div className="mb-4">
-                <label className="block text-white font-medium mb-3">Home Location</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                    <label className="block text-white text-sm mb-2">City</label>
-                  <input
-                    type="text"
-                    value={editForm.homeLocation.city}
-                    onChange={(e) => setEditForm({ 
-                      ...editForm, 
-                      homeLocation: { ...editForm.homeLocation, city: e.target.value }
-                    })}
-                    className="input"
-                    placeholder="Enter city"
-                  />
-                </div>
-                <div>
-                    <label className="block text-white text-sm mb-2">Region/State</label>
-                    <input
-                      type="text"
-                      value={editForm.homeLocation.region}
-                      onChange={(e) => setEditForm({ 
-                        ...editForm, 
-                        homeLocation: { ...editForm.homeLocation, region: e.target.value }
-                      })}
-                      className="input"
-                      placeholder="Enter region/state"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white text-sm mb-2">Country</label>
-                  <select
-                    value={editForm.homeLocation.country}
-                    onChange={(e) => setEditForm({ 
-                      ...editForm, 
-                      homeLocation: { ...editForm.homeLocation, country: e.target.value }
-                    })}
-                    className="input"
-                  >
-                    <option value="">Select Country</option>
-                    {COUNTRIES.map(country => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
-                </div>
+                <LocationAutocomplete
+                  label="Home Location"
+                  value={editForm.homeLocation}
+                  onChange={(location) => setEditForm({ ...editForm, homeLocation: location })}
+                  placeholder="Search for your home city or town"
+                />
               </div>
 
               {/* Secondary Location */}
@@ -3832,50 +3670,11 @@ const UserProfile: React.FC = () => {
                   </button>
                 </div>
                 {editForm.secondaryLocation ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-white text-sm mb-2">City</label>
-                      <input
-                        type="text"
-                        value={editForm.secondaryLocation.city}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { ...editForm.secondaryLocation!, city: e.target.value }
-                        })}
-                        className="input"
-                        placeholder="Enter city"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-white text-sm mb-2">Region/State</label>
-                      <input
-                        type="text"
-                        value={editForm.secondaryLocation.region}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { ...editForm.secondaryLocation!, region: e.target.value }
-                        })}
-                        className="input"
-                        placeholder="Enter region/state"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-white text-sm mb-2">Country</label>
-                      <select
-                        value={editForm.secondaryLocation.country}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { ...editForm.secondaryLocation!, country: e.target.value }
-                        })}
-                        className="input"
-                      >
-                        <option value="">Select Country</option>
-                        {COUNTRIES.map(country => (
-                          <option key={country} value={country}>{country}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  <LocationAutocomplete
+                    value={editForm.secondaryLocation}
+                    onChange={(location) => setEditForm({ ...editForm, secondaryLocation: location })}
+                    placeholder="Search for a secondary location"
+                  />
                 ) : (
                   <p className="text-gray-400 text-sm">No secondary location added</p>
                 )}

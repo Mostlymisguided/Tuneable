@@ -84,6 +84,13 @@ const bidSchema = new mongoose.Schema({
         enum: ['web', 'mobile', 'tablet', 'desktop', 'unknown'],
         default: 'unknown'
     }, // Platform where bid was placed
+
+    // ========================================
+    // BIDDER LOCATION SNAPSHOT (Mapbox / Tunefeed filtering)
+    // ========================================
+    bidderHomePlaceId: { type: String },
+    bidderLocationAncestorIds: [{ type: String }],
+    bidderLocationDisplay: { type: String },
     
     // ========================================
     // PERFORMANCE OPTIMIZATION (Phase 1)
@@ -245,6 +252,7 @@ bidSchema.index({ userId: 1, createdAt: -1 }); // User's recent bids
 bidSchema.index({ mediaId: 1, createdAt: -1 }); // Media's recent bids
 bidSchema.index({ partyId: 1, createdAt: -1 }); // Party's recent bids
 bidSchema.index({ transactionHash: 1 }); // Hash lookup for verification
+bidSchema.index({ status: 1, bidderLocationAncestorIds: 1, createdAt: -1, mediaId: 1 }); // Tunefeed location filter
 
 // ========================================
 // HASH GENERATION

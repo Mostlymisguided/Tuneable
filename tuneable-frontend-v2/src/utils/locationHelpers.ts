@@ -1,16 +1,23 @@
 // Location matching and formatting utilities
 
+import type { MapboxLocationFields } from '../types';
+
 export interface Location {
   city?: string;
   region?: string;
   country?: string;
   countryCode?: string;
+  display?: string;
+  placeId?: string;
+  ancestorIds?: string[];
   coordinates?: {
     lat: number;
     lng: number;
   };
   detectedFromIP?: boolean;
 }
+
+export type ResolvedLocation = MapboxLocationFields & Location;
 
 /**
  * Check if user location matches party location filter
@@ -54,6 +61,10 @@ export function isLocationMatch(
 export function formatLocation(location: Location | null | undefined): string {
   if (!location) {
     return 'Unknown Location';
+  }
+
+  if (location.display) {
+    return location.display;
   }
   
   if (location.city && location.country) {

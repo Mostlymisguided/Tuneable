@@ -370,15 +370,12 @@ router.post(
       const locationData = homeLocation || locations?.primary;
       
       if (locationData && Object.keys(locationData).length > 0 && 
-          (locationData.city || locationData.country)) {
-        homeLocationData = {
-          city: locationData.city || null,
-          region: locationData.region || null,
-          country: locationData.country || null,
-          countryCode: locationData.country ? countryCodeMap[locationData.country] || null : null,
-          coordinates: locationData.coordinates || null,
-          detectedFromIP: false // Since user confirmed/edited it in the form
-        };
+          (locationData.city || locationData.country || locationData.placeId)) {
+        const { applyResolvedLocation } = require('../utils/locationUtils');
+        homeLocationData = applyResolvedLocation({
+          ...locationData,
+          detectedFromIP: false,
+        });
         console.log('Using user-provided location:', homeLocationData);
       } else {
         // No location provided - use null values
@@ -392,14 +389,9 @@ router.post(
       // Handle secondary location
       let secondaryLocationData = null;
       if (locations?.secondary && Object.keys(locations.secondary).length > 0 &&
-          (locations.secondary.city || locations.secondary.country)) {
-        secondaryLocationData = {
-          city: locations.secondary.city || null,
-          region: locations.secondary.region || null,
-          country: locations.secondary.country || null,
-          countryCode: locations.secondary.country ? countryCodeMap[locations.secondary.country] || null : null,
-          coordinates: locations.secondary.coordinates || null
-        };
+          (locations.secondary.city || locations.secondary.country || locations.secondary.placeId)) {
+        const { applyResolvedLocation } = require('../utils/locationUtils');
+        secondaryLocationData = applyResolvedLocation(locations.secondary);
       }
       
       // Case-insensitive check for existing email or username
@@ -1888,25 +1880,17 @@ router.put('/profile', authMiddleware, async (req, res) => {
     if (homeLocationChanged) {
       const locationData = homeLocation || locations?.primary;
       if (locationData) {
+        const { applyResolvedLocation } = require('../utils/locationUtils');
         const oldHomeLocation = user.homeLocation ? { ...user.homeLocation } : null;
-        user.homeLocation = {
-          ...user.homeLocation,
-          city: locationData.city !== undefined ? locationData.city : user.homeLocation?.city,
-          region: locationData.region !== undefined ? locationData.region : user.homeLocation?.region,
-          country: locationData.country !== undefined ? locationData.country : user.homeLocation?.country,
-          countryCode: locationData.country && countryCodeMap[locationData.country]
-            ? countryCodeMap[locationData.country]
-            : (user.homeLocation?.countryCode || null),
-          coordinates: locationData.coordinates !== undefined ? locationData.coordinates : user.homeLocation?.coordinates,
-          detectedFromIP: locationData.detectedFromIP !== undefined ? locationData.detectedFromIP : (user.homeLocation?.detectedFromIP || false)
-        };
+        user.homeLocation = applyResolvedLocation(locationData, user.homeLocation);
         
         // Check if location actually changed (for auto-join logic)
         const locationChanged = !oldHomeLocation || 
           oldHomeLocation.city !== user.homeLocation.city ||
           oldHomeLocation.region !== user.homeLocation.region ||
           oldHomeLocation.country !== user.homeLocation.country ||
-          oldHomeLocation.countryCode !== user.homeLocation.countryCode;
+          oldHomeLocation.countryCode !== user.homeLocation.countryCode ||
+          oldHomeLocation.placeId !== user.homeLocation.placeId;
         
         // Auto-join location parties if location changed and has countryCode
         if (locationChanged && user.homeLocation.countryCode) {
@@ -1929,16 +1913,8 @@ router.put('/profile', authMiddleware, async (req, res) => {
         // Remove secondary location
         user.secondaryLocation = null;
       } else if (secondaryData) {
-        user.secondaryLocation = {
-          ...user.secondaryLocation,
-          city: secondaryData.city !== undefined ? secondaryData.city : user.secondaryLocation?.city,
-          region: secondaryData.region !== undefined ? secondaryData.region : user.secondaryLocation?.region,
-          country: secondaryData.country !== undefined ? secondaryData.country : user.secondaryLocation?.country,
-          countryCode: secondaryData.country && countryCodeMap[secondaryData.country]
-            ? countryCodeMap[secondaryData.country]
-            : (user.secondaryLocation?.countryCode || null),
-          coordinates: secondaryData.coordinates !== undefined ? secondaryData.coordinates : user.secondaryLocation?.coordinates
-        };
+        const { applyResolvedLocation } = require('../utils/locationUtils');
+        user.secondaryLocation = applyResolvedLocation(secondaryData, user.secondaryLocation);
       }
     }
 

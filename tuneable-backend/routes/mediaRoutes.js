@@ -2515,7 +2515,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       isInitialBid: !partyMediaEntry,
       mediaContentType: media.contentType,
       mediaContentForm: media.contentForm,
-      mediaDuration: media.duration
+      mediaDuration: media.duration,
+      ...require('../utils/locationUtils').getBidLocationSnapshot(user.homeLocation),
     });
 
     await bid.save();

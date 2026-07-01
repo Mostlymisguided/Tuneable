@@ -97,6 +97,8 @@ export interface User {
   };
 }
 
+import type { ResolvedLocation } from '../utils/locationHelpers';
+
 interface RegisterData {
   username: string;
   email: string;
@@ -105,16 +107,8 @@ interface RegisterData {
   cellPhone?: string;
   givenName?: string;
   familyName?: string;
-  homeLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-  };
-  secondaryLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-  } | null;
+  homeLocation?: ResolvedLocation | null;
+  secondaryLocation?: ResolvedLocation | null;
 }
 
 interface AuthContextType {

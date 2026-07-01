@@ -16,6 +16,7 @@ const { broadcastToParty } = require('../utils/socketIO');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
+const { getBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
@@ -1906,6 +1907,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaContentForm: media.contentForm,
             mediaDuration: media.duration,
             platform: detectedPlatform,
+            ...getBidLocationSnapshot(user.homeLocation),
             
             // Note: Aggregate values are computed dynamically by BidMetricsEngine
             // and are no longer stored in the Bid model
@@ -2490,7 +2492,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             mediaContentType: populatedMedia.contentType,
             mediaContentForm: populatedMedia.contentForm,
             mediaDuration: populatedMedia.duration,
-            platform: detectedPlatform
+            platform: detectedPlatform,
+            ...getBidLocationSnapshot(user.homeLocation),
             
             // Note: Aggregate values are computed dynamically by BidMetricsEngine
             // and are no longer stored in the Bid model

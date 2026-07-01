@@ -92,7 +92,23 @@ const userSchema = new mongoose.Schema({
       lat: { type: Number },
       lng: { type: Number },
     },
-    detectedFromIP: { type: Boolean, default: false } // Track if auto-detected from IP
+    detectedFromIP: { type: Boolean, default: false }, // Track if auto-detected from IP
+    // Mapbox-resolved hierarchy (permanent geocoding)
+    placeProvider: { type: String, enum: ['mapbox'] },
+    placeId: { type: String },
+    featureType: { type: String },
+    ancestorIds: [{ type: String }],
+    ancestors: [{
+      placeId: { type: String },
+      label: { type: String },
+      placetype: { type: String },
+      regionCode: { type: String },
+      countryCode: { type: String },
+      _id: false,
+    }],
+    label: { type: String },
+    display: { type: String },
+    resolvedAt: { type: Date },
   },
   secondaryLocation: {
     city: { type: String },
@@ -102,7 +118,22 @@ const userSchema = new mongoose.Schema({
     coordinates: {
       lat: { type: Number },
       lng: { type: Number },
-    }
+    },
+    placeProvider: { type: String, enum: ['mapbox'] },
+    placeId: { type: String },
+    featureType: { type: String },
+    ancestorIds: [{ type: String }],
+    ancestors: [{
+      placeId: { type: String },
+      label: { type: String },
+      placetype: { type: String },
+      regionCode: { type: String },
+      countryCode: { type: String },
+      _id: false,
+    }],
+    label: { type: String },
+    display: { type: String },
+    resolvedAt: { type: Date },
   },
   preferences: {
     theme: { type: String, default: 'light' },

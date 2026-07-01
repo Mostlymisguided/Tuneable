@@ -720,6 +720,28 @@ export const topTunesAPI = {
   },
 };
 
+// Location API (Mapbox geocoding via backend)
+export const locationAPI = {
+  suggest: async (q: string, options?: { country?: string; worldview?: string; limit?: number }) => {
+    const response = await api.get('/locations/suggest', {
+      params: { q, ...options },
+    });
+    return response.data as {
+      suggestions: {
+        mapboxId: string;
+        label: string;
+        placeFormatted: string | null;
+        featureType: string | null;
+      }[];
+    };
+  },
+
+  resolve: async (mapboxId: string) => {
+    const response = await api.post('/locations/resolve', { mapboxId });
+    return response.data as { location: Record<string, unknown> };
+  },
+};
+
 export const userAPI = {
   getProfile: async (userId: string) => {
     const response = await api.get(`/users/${userId}/profile`);
