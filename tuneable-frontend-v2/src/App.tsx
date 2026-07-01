@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ToastContainer, cssTransition } from 'react-toastify';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -40,7 +40,7 @@ import LabelProfile from './pages/LabelProfile';
 import CollectiveProfile from './pages/CollectiveProfile';
 import Admin from './pages/Admin';
 import CreatorRegister from './pages/CreatorRegister';
-import CreatorUpload from './pages/CreatorUpload';
+const CreatorUpload = lazy(() => import('./pages/CreatorUpload'));
 import CreatorYouTubeImport from './pages/CreatorYouTubeImport';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -215,7 +215,9 @@ const AppContent = () => {
               path="/creator/upload" 
               element={
                 <ProtectedRoute>
-                  <CreatorUpload />
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <CreatorUpload />
+                  </Suspense>
                 </ProtectedRoute>
               } 
             />

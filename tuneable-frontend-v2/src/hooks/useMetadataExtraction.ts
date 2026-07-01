@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { parseBlob } from 'music-metadata';
 
 export interface ExtractedMetadata {
   // Basic information
@@ -76,6 +75,7 @@ export const useMetadataExtraction = () => {
     try {
       console.log('🔍 Extracting metadata from:', file.name);
       
+      const { parseBlob } = await import('music-metadata');
       const metadata = await parseBlob(file);
       
       // Extract basic metadata
