@@ -14,11 +14,11 @@ final class AuthViewModel: ObservableObject {
         user = auth.cachedUser()
     }
 
-    func login(email: String, password: String) async {
+    func login(identifier: String, password: String) async {
         isLoading = true
         errorMessage = nil
         do {
-            user = try await auth.login(email: email, password: password)
+            user = try await auth.login(identifier: identifier, password: password)
         } catch {
             errorMessage = error.localizedDescription
         }

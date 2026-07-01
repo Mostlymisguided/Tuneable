@@ -291,6 +291,18 @@ userSchema.statics.findByEmail = async function(email) {
   return this.findOne({ email }).select('-password');
 };
 
+// Static method to find a user by email or username (case-insensitive)
+userSchema.statics.findByLoginIdentifier = async function(identifier) {
+  const trimmed = (identifier || '').trim();
+  if (!trimmed) return null;
+
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const field = trimmed.includes('@') ? 'email' : 'username';
+  return this.findOne({
+    [field]: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, 'i') },
+  });
+};
+
 // Generate email verification token
 userSchema.methods.generateEmailVerificationToken = function() {
   const crypto = require('crypto');

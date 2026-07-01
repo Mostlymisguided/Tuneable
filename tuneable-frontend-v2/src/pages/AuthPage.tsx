@@ -370,7 +370,7 @@ const AuthPage: React.FC = () => {
       } else if (error.response.status === 400) {
         // Validation error
         const validationError = error.response?.data?.error || error.response?.data?.details?.[0]?.msg;
-        errorMessage = validationError || 'Please check your email and password format.';
+        errorMessage = validationError || 'Please check your username/email and password format.';
         toast.error(errorMessage, {
           autoClose: 7000,
           pauseOnHover: true,
@@ -578,15 +578,16 @@ const AuthPage: React.FC = () => {
       )}
 
       <form className="w-full" onSubmit={handleLogin}>
-        <label htmlFor="email" className="sr-only">Email address</label>
+        <label htmlFor="loginIdentifier" className="sr-only">Email or username</label>
         <input
+          id="loginIdentifier"
           name="email"
-          type="email"
-          autoComplete="email"
+          type="text"
+          autoComplete="username"
           required
           disabled={accountLockedUntil !== null && accountLockedUntil > new Date()}
           className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          placeholder="Email Address"
+          placeholder="Email or username"
           value={formData.email}
           onChange={handleChange}
         />

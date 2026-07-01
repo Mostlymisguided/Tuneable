@@ -2,17 +2,16 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var auth: AuthViewModel
-    @State private var email = ""
+    @State private var loginIdentifier = ""
     @State private var password = ""
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Email", text: $email)
-                        .textContentType(.emailAddress)
+                    TextField("Email or username", text: $loginIdentifier)
+                        .textContentType(.username)
                         .autocapitalization(.none)
-                        .keyboardType(.emailAddress)
                     SecureField("Password", text: $password)
                         .textContentType(.password)
                 } header: {
@@ -42,7 +41,7 @@ struct LoginView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    .disabled(auth.isLoading || email.isEmpty || password.isEmpty)
+                    .disabled(auth.isLoading || loginIdentifier.isEmpty || password.isEmpty)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -56,7 +55,7 @@ struct LoginView: View {
 
     private func signIn() {
         Task {
-            await auth.login(email: email, password: password)
+            await auth.login(identifier: loginIdentifier, password: password)
         }
     }
 }

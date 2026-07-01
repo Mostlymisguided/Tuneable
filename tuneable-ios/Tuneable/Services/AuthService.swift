@@ -8,17 +8,17 @@ final class AuthService {
     var token: String? { KeychainHelper.string(forKey: KeychainHelper.tokenKey) }
     var isLoggedIn: Bool { token != nil }
 
-    /// Login with email/password. Returns user and stores token + user in Keychain.
-    func login(email: String, password: String) async throws -> User {
+    /// Login with email/username and password. Returns user and stores token + user in Keychain.
+    func login(identifier: String, password: String) async throws -> User {
         struct LoginBody: Encodable {
-            let email: String
+            let identifier: String
             let password: String
         }
         struct LoginResponse: Decodable {
             let token: String
             let user: User
         }
-        let data = try await client.postData("/users/login", body: LoginBody(email: email, password: password), authenticated: false)
+        let data = try await client.postData("/users/login", body: LoginBody(identifier: identifier, password: password), authenticated: false)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let c = try decoder.singleValueContainer()

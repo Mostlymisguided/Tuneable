@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { check, validationResult } = require('express-validator');
+const { check, body, validationResult } = require('express-validator');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -587,28 +587,37 @@ router.post(
 router.post(
   '/login',
   [
-    check('email').isEmail().withMessage('Valid email is required'),
     check('password').notEmpty().withMessage('Password is required'),
+    body().custom((_, { req }) => {
+      const identifier = (req.body.identifier || req.body.email || '').trim();
+      if (!identifier) {
+        throw new Error('Email or username is required');
+      }
+      if (identifier.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+        throw new Error('Valid email is required');
+      }
+      return true;
+    }),
   ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ error: 'Invalid email or password format', details: errors.array() });
+        return res.status(400).json({ error: 'Invalid credentials format', details: errors.array() });
       }
 
-      const { email, password } = req.body;
+      const identifier = (req.body.identifier || req.body.email || '').trim();
+      const { password } = req.body;
       
-      // Find user by email
-      const user = await User.findOne({ email });
+      const user = await User.findByLoginIdentifier(identifier);
       if (!user) {
-        console.log(`Login attempt failed: User not found for email: ${email}`);
+        console.log(`Login attempt failed: User not found for identifier: ${identifier}`);
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
       // Check if user is active
       if (!user.isActive) {
-        console.log(`Login attempt failed: Inactive user: ${email}`);
+        console.log(`Login attempt failed: Inactive user: ${identifier}`);
         return res.status(401).json({ error: 'Account is inactive. Please contact support.' });
       }
 
@@ -637,7 +646,7 @@ router.post(
       // Compare password
       const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
-        console.log(`Login attempt failed: Invalid password for email: ${email}`);
+        console.log(`Login attempt failed: Invalid password for identifier: ${identifier}`);
         
         // Increment failed login attempts
         user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
