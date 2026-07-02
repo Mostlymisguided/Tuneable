@@ -1907,8 +1907,6 @@ const TuneProfile: React.FC = () => {
 
   const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
 
-  const isAdmin = user?.role?.includes('admin');
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
@@ -2671,33 +2669,6 @@ const TuneProfile: React.FC = () => {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Links Section - admin only */}
-        {isAdmin && media.sources && Object.keys(media.sources).length > 0 && (
-          <div className="mb-8 px-2">
-            <h2 className="text-xl font-bold text-white mb-3">Links</h2>
-            <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex flex-wrap gap-3 justify-center">
-                {Object.entries(media.sources).map(([platform, url]) => (
-                  <a
-                    key={platform}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center px-4 py-2.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors group"
-                  >
-                    <svg className="w-5 h-5 mr-2 text-white" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                    <span className="text-white text-sm font-semibold group-hover:text-gray-200 transition-colors">
-                      Watch on YouTube
-                    </span>
-                  </a>
-                ))}
               </div>
             </div>
           </div>
