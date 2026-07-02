@@ -65,6 +65,18 @@ interface PartyUpdateMessage {
 
 const VALID_TIME_PERIODS = ['all-time', 'today', 'this-week', 'this-month', 'this-year'] as const;
 
+const TIME_PERIOD_OPTIONS = [
+  { key: 'all-time', label: 'All Time' },
+  { key: 'this-month', label: 'This Month' },
+  { key: 'this-week', label: 'This Week' },
+  { key: 'today', label: 'Today' },
+] as const;
+
+function formatTimePeriodLabel(period: string): string {
+  return TIME_PERIOD_OPTIONS.find((p) => p.key === period)?.label
+    ?? period.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
 /** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
 function getTagTermsFromSearchParams(params: URLSearchParams, isGlobal: boolean): string[] {
   if (!isGlobal) return [];
@@ -175,6 +187,7 @@ const Party: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
+  const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showTopFansPanel, setShowTopFansPanel] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
@@ -359,8 +372,11 @@ const Party: React.FC = () => {
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
     const p = searchParams.get('period');
-    if (p && VALID_TIME_PERIODS.includes(p as any) && p !== selectedTimePeriod) {
-      setSelectedTimePeriod(p);
+    if (p && VALID_TIME_PERIODS.includes(p as any)) {
+      if (p !== selectedTimePeriod) {
+        setSelectedTimePeriod(p);
+      }
+      setShowTimeFilter(true);
     }
   }, [searchParams]);
 
@@ -3131,27 +3147,70 @@ const Party: React.FC = () => {
                   </div>
                 )}
 
-                {/* Location filter - global party only; above tag filter */}
-                {!showVetoed && isGlobalParty && (
+                {/* Queue filters: location, tag, time — trigger row + collapsible panels */}
+                {!showVetoed && (
                   <div className="mb-4 md:mb-6">
-                    {!showLocationFilter ? (
-                      <div className="flex justify-center">
+                    <div className="flex flex-wrap justify-center items-center gap-2">
+                      {isGlobalParty && (
                         <button
                           type="button"
-                          onClick={() => setShowLocationFilter(true)}
-                          className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
+                          onClick={() => setShowLocationFilter((open) => !open)}
+                          className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                            showLocationFilter ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                          }`}
                         >
-                          <MapPin className="h-4 w-4 text-purple-400" />
-                          Filter by Location
+                          <MapPin className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                          Location
                           {selectedLocation?.placeId ? (
-                            <span className="text-xs text-purple-300 font-normal truncate max-w-[12rem]">
+                            <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
                               ({formatLocation(selectedLocation)})
                             </span>
                           ) : null}
                         </button>
-                      </div>
-                    ) : (
-                      <div className="card p-3 md:p-6 mb-4 max-w-2xl mx-auto">
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowTagFilterCloud((open) => !open)}
+                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                          showTagFilterCloud ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                        }`}
+                      >
+                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        Tag
+                        {selectedTagFilters.length > 0 ? (
+                          <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
+                            ({selectedTagFilters.map((t) => `#${t}`).join(', ')})
+                          </span>
+                        ) : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTimeFilter((open) => !open)}
+                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                          showTimeFilter ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                        }`}
+                      >
+                        <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        Time
+                        <span className="text-xs text-purple-300 font-normal">
+                          ({formatTimePeriodLabel(selectedTimePeriod)})
+                        </span>
+                      </button>
+                      {getDisplayMedia().length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handlePlayQueue}
+                          className="px-3 sm:px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 shadow-lg"
+                          title={`Play ${getDisplayMedia().length} track${getDisplayMedia().length !== 1 ? 's' : ''} from the top`}
+                        >
+                          <Play className="h-4 w-4" />
+                          Play
+                        </button>
+                      )}
+                    </div>
+
+                    {showLocationFilter && isGlobalParty && (
+                      <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-white flex items-center">
                             <MapPin className="h-4 w-4 mr-2 text-purple-400" />
@@ -3180,25 +3239,9 @@ const Party: React.FC = () => {
                         )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Tag filter - hidden by default, "Filter by Tag" reveals tag cloud */}
-                {!showVetoed && (
-                  <div className="mb-4 md:mb-6">
-                    {!showTagFilterCloud ? (
-                      <div className="flex justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setShowTagFilterCloud(true)}
-                          className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
-                        >
-                          <Tag className="h-4 w-4 text-purple-400" />
-                          Filter by Tag
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="card p-3 md:p-6 mb-4">
+                    {showTagFilterCloud && (
+                      <div className="card p-3 md:p-6 mt-3">
                         <div className="flex items-center justify-between mb-1 md:mb-3">
                           <h3 className="text-lg font-semibold text-white flex items-center">
                             <Tag className="h-4 w-4 mr-2 text-purple-400" />
@@ -3278,6 +3321,39 @@ const Party: React.FC = () => {
                         )}
                       </div>
                     )}
+
+                    {showTimeFilter && (
+                      <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-lg font-semibold text-white flex items-center">
+                            <Clock className="h-4 w-4 mr-2 text-purple-400" />
+                            Sort by Time
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setShowTimeFilter(false)}
+                            className="text-sm text-gray-400 hover:text-white"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                        <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
+                          {TIME_PERIOD_OPTIONS.map((period) => (
+                            <button
+                              key={period.key}
+                              onClick={() => handleTimePeriodChange(period.key)}
+                              className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
+                                selectedTimePeriod === period.key
+                                  ? 'bg-purple-700 text-white'
+                                  : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                              }`}
+                            >
+                              {period.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3335,46 +3411,6 @@ const Party: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
-
-                {/* Sorting Tabs - Only show for Queue, not Vetoed */}
-                {!showVetoed && (
-                  <div className="mb-4 md:mb-6">
-                    <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
-                      {[
-                        { key: 'all-time', label: 'All Time' },
-                       /* { key: 'this-year', label: 'This Year' }, */
-                        { key: 'this-month', label: 'This Month' },
-                        { key: 'this-week', label: 'This Week' },
-                        { key: 'today', label: 'Today' }
-                      ].map((period) => (
-                        <button
-                          key={period.key}
-                          onClick={() => handleTimePeriodChange(period.key)}
-                          className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
-                            selectedTimePeriod === period.key
-                              ? 'bg-purple-700 text-white'
-                              : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {period.label}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Play Queue Button */}
-                    {getDisplayMedia().length > 0 && (
-                      <div className="flex justify-center mt-4 md:mt-6">
-                        <button
-                          onClick={handlePlayQueue}
-                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg"
-                          title={`Play ${getDisplayMedia().length} track${getDisplayMedia().length !== 1 ? 's' : ''} from the top`}
-                        >
-                          <Play className="h-4 w-4" />
-                          <span>Play</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
 
