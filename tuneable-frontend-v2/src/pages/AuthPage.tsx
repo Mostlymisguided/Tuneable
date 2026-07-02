@@ -19,6 +19,7 @@ import { userAPI } from '../lib/api';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import type { ResolvedLocation } from '../utils/locationHelpers';
+import { buildRegisterUrl, buildLoginUrl, getReturnUrlFromSearch } from '../utils/authHelpers';
 
 // Default invite code for register page; set VITE_DEFAULT_INVITE_CODE to empty to require a code again
 const DEFAULT_INVITE_CODE = ((import.meta.env.VITE_DEFAULT_INVITE_CODE ?? 'PE856').trim() || null) as string | null;
@@ -77,6 +78,10 @@ const AuthPage: React.FC = () => {
 
   // Check if we're on the register page
   const isRegisterPage = location.pathname === '/register';
+  const returnUrl = getReturnUrlFromSearch(location.search);
+  const returnPathParam = new URLSearchParams(location.search).get('returnUrl');
+  const registerLink = buildRegisterUrl(returnPathParam ? { returnPath: returnPathParam } : undefined);
+  const loginLink = buildLoginUrl(returnPathParam ?? undefined);
 
   // Countdown timer for account lockout
   useEffect(() => {
@@ -322,7 +327,7 @@ const AuthPage: React.FC = () => {
       setAccountLockedUntil(null);
       setLoginError(''); // Clear error on success
       toast.success('Login successful!');
-      navigate('/profile');
+      navigate(returnUrl);
     } catch (error: any) {
       // Log full error for debugging
       console.error('Login error:', error);
@@ -417,7 +422,7 @@ const AuthPage: React.FC = () => {
       const { confirmPassword, ...registerData } = formData;
       await register(registerData);
       toast.success('Registration successful!');
-      navigate('/dashboard');
+      navigate(returnUrl === '/profile' ? '/dashboard' : returnUrl);
     } catch (error: any) {
       console.error('Error registering user:', error);
       const errorResponse = error.response?.data || {};
@@ -610,8 +615,16 @@ const AuthPage: React.FC = () => {
         </p>
       <div className="mt-2 text-center text-sm text-slate-600">
         Don't have an account?{' '}
-        <Link to="/register" className="font-medium underline">
+        <Link to={registerLink} className="font-medium underline">
           Sign up
+        </Link>
+      </div>
+      <div className="mt-4 px-4 pb-2 flex justify-center">
+        <Link
+          to={registerLink}
+          className="py-2 px-4 w-auto max-w-md flex justify-center items-center border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-700 transition ease-in duration-200 text-center text-base font-semibold rounded-lg"
+        >
+          Create an account
         </Link>
       </div>
     </div>
@@ -890,7 +903,7 @@ const AuthPage: React.FC = () => {
 
       <div className="mt-6 text-center text-sm text-slate-600">
         Already have an account?{' '}
-        <Link to="/login" className="font-medium text-blue-700 hover:text-blue-500 hover:underline">
+        <Link to={loginLink} className="font-medium text-blue-700 hover:text-blue-500 hover:underline">
           Sign in
         </Link>
       </div>

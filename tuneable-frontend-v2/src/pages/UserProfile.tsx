@@ -40,6 +40,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, poundsToPence } from '../utils/currency';
+import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
@@ -708,8 +709,8 @@ const UserProfile: React.FC = () => {
     if (!addTuneSearchQuery.trim()) return;
     
     if (!currentUser) {
-      toast.info('Please sign up to search for tunes');
-      navigate('/register');
+      toast.info('Please sign in to search for tunes');
+      navigate(buildLoginUrl(getCurrentReturnPath()));
       return;
     }
 
@@ -789,7 +790,7 @@ const UserProfile: React.FC = () => {
     }
     if (!authToken && !localStorage.getItem('token')) {
       toast.error('Your session has expired. Please log in again.');
-      navigate('/login?returnUrl=' + encodeURIComponent(window.location.pathname));
+      navigate(buildLoginUrl(getCurrentReturnPath()));
       return;
     }
 
@@ -882,7 +883,7 @@ const UserProfile: React.FC = () => {
       const msg = error.response?.data?.error;
       if (error.response?.status === 401 && (msg?.includes('token') || msg?.includes('No token'))) {
         toast.error('Your session has expired. Please log in again.');
-        navigate('/login?returnUrl=' + encodeURIComponent(window.location.pathname));
+        navigate(buildLoginUrl(getCurrentReturnPath()));
       } else {
         toast.error(msg || 'Failed to add tune');
       }

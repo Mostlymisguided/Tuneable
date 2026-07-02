@@ -21,6 +21,7 @@ import TopSupporters from '../components/TopSupporters';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
+import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import {
   isLocationMatch,
   formatLocation,
@@ -784,11 +785,9 @@ const Party: React.FC = () => {
     const query = searchQuery.trim();
     if (!query) return;
     
-    // Check if user is logged in - redirect to registration if not
     if (!user) {
-      const redirectUrl = getRegistrationUrl();
-      toast.info('Please sign up to search for tunes');
-      navigate(redirectUrl);
+      toast.info('Please sign in to search for tunes');
+      navigate(redirectToLogin());
       return;
     }
     
@@ -955,24 +954,12 @@ const Party: React.FC = () => {
     return 'Unknown';
   };
 
-  // Helper function to get registration URL with invite code for private parties
-  const getRegistrationUrl = () => {
-    if (party?.privacy === 'private' && party?.host) {
-      const hostInviteCode = typeof party.host === 'object' && (party.host.primaryInviteCode || party.host.personalInviteCode)
-        ? (party.host.primaryInviteCode || party.host.personalInviteCode)
-        : null;
-      if (hostInviteCode) {
-        return `/register?invite=${hostInviteCode}`;
-      }
-    }
-    return '/register';
-  };
+  const redirectToLogin = () => navigate(buildLoginUrl(getCurrentReturnPath()));
 
   const handleAddMediaToParty = async (media: any) => {
     if (!user) {
-      const redirectUrl = getRegistrationUrl();
-      toast.info('Please sign up to add media to parties');
-      navigate(redirectUrl);
+      toast.info('Please sign in to add media to parties');
+      navigate(redirectToLogin());
       return;
     }
     if (!partyId) return;
@@ -1049,10 +1036,9 @@ const Party: React.FC = () => {
     
     // Check if user is logged in
     if (!user) {
-      const redirectUrl = getRegistrationUrl();
-      toast.info('Please sign up to place tips');
-      navigate(redirectUrl);
-      setIsBidding(false); // Reset on early return
+      toast.info('Please sign in to place tips');
+      navigate(redirectToLogin());
+      setIsBidding(false);
       return;
     }
     
@@ -1771,11 +1757,10 @@ const Party: React.FC = () => {
   const handleInlineBid = async (media: any) => {
     if (!partyId) return;
     
-    // Check if user is logged in - redirect to registration if not
+    // Check if user is logged in
     if (!user) {
-      const redirectUrl = getRegistrationUrl();
-      toast.info('Please sign up to place tips');
-      navigate(redirectUrl);
+      toast.info('Please sign in to place tips');
+      navigate(redirectToLogin());
       return;
     }
     
@@ -2049,11 +2034,9 @@ const Party: React.FC = () => {
     } catch (error: any) {
       console.error('Error placing bid:', error);
       
-      // Handle authentication errors - redirect to registration with invite code for private parties
       if (error.response?.status === 401) {
-        const redirectUrl = getRegistrationUrl();
-        toast.info('Please sign up to place tips');
-        navigate(redirectUrl);
+        toast.info('Please sign in to place tips');
+        navigate(redirectToLogin());
         setBidModalOpen(false);
         setSelectedMedia(null);
         return;
