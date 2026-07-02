@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants';
 import { 
@@ -45,7 +45,7 @@ import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { canEditMedia } from '../utils/permissionHelpers';
+import { canEditMedia, isCreator, isAdminOrCreator } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
@@ -298,6 +298,14 @@ const TuneProfile: React.FC = () => {
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
 
+  // Attach audio to catalog entry (awaiting upload)
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const [showAttachAudioModal, setShowAttachAudioModal] = useState(false);
+  const [attachAudioFile, setAttachAudioFile] = useState<File | null>(null);
+  const [attachAudioRightsConfirmed, setAttachAudioRightsConfirmed] = useState(false);
+  const [attachAudioDisclaimer, setAttachAudioDisclaimer] = useState('');
+  const [isAttachingAudio, setIsAttachingAudio] = useState(false);
+
   // WebPlayer integration
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } = useWebPlayerStore();
 
@@ -382,6 +390,15 @@ const TuneProfile: React.FC = () => {
   // Check if user can edit this tune
   const canEditTune = () => {
     return canEditMedia(user, media);
+  };
+
+  const canAttachAudio = () => {
+    if (!user || !media || isMediaPlayable(media)) return false;
+    return canEditTune() || isAdminOrCreator(user);
+  };
+
+  const isContributorAudioUpload = () => {
+    return canAttachAudio() && isCreator(user) && !canEditTune();
   };
 
   // Helper function to get country code from country name
@@ -1143,6 +1160,85 @@ const TuneProfile: React.FC = () => {
   // Handle cover art upload button click
   const handleCoverArtUploadClick = () => {
     coverArtFileInputRef.current?.click();
+  };
+
+  const handleAttachAudioClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.info('Please log in to upload audio');
+      navigate('/login');
+      return;
+    }
+    if (!canAttachAudio()) return;
+    setShowAttachAudioModal(true);
+  };
+
+  const handleAttachAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isMp3 =
+      file.type === 'audio/mpeg' ||
+      file.type === 'audio/mp3' ||
+      file.name.toLowerCase().endsWith('.mp3');
+    if (!isMp3) {
+      toast.error('Please select an MP3 file');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Audio file must be less than 50MB');
+      return;
+    }
+    setAttachAudioFile(file);
+  };
+
+  const closeAttachAudioModal = () => {
+    setShowAttachAudioModal(false);
+    setAttachAudioFile(null);
+    setAttachAudioRightsConfirmed(false);
+    setAttachAudioDisclaimer('');
+    setIsAttachingAudio(false);
+    if (audioFileInputRef.current) {
+      audioFileInputRef.current.value = '';
+    }
+  };
+
+  const handleAttachAudioSubmit = async () => {
+    if (!attachAudioFile || !mediaId) return;
+    if (!attachAudioRightsConfirmed) {
+      toast.error('Please confirm your rights to upload this audio');
+      return;
+    }
+    if (isContributorAudioUpload() && !attachAudioDisclaimer.trim()) {
+      toast.error('Please describe your authorization to upload on behalf of the rights holder');
+      return;
+    }
+
+    setIsAttachingAudio(true);
+    try {
+      const isContributor = isContributorAudioUpload();
+      const response = await mediaAPI.attachUpload(
+        media?._id || mediaId,
+        attachAudioFile,
+        isContributor
+          ? {
+              uploaderRole: 'third_party',
+              rightsDisclaimer: attachAudioDisclaimer.trim(),
+            }
+          : { uploaderRole: 'owner' }
+      );
+      if (response.media) {
+        setMedia(enrichMediaWithPlayability(response.media));
+      } else {
+        await fetchMediaProfile();
+      }
+      toast.success('Audio uploaded — this tune is now playable!');
+      closeAttachAudioModal();
+    } catch (err: any) {
+      console.error('Error attaching audio:', err);
+      toast.error(err.response?.data?.error || 'Failed to upload audio');
+      setIsAttachingAudio(false);
+    }
   };
 
   // Save new link
@@ -1992,7 +2088,24 @@ const TuneProfile: React.FC = () => {
                   <div className="text-center px-4">
                     <Upload className="h-8 w-8 text-amber-400 mx-auto mb-2" />
                     <p className="text-white text-sm font-semibold">Awaiting upload</p>
-                    <p className="text-gray-300 text-xs mt-1">Tip to support this tune</p>
+                    {canAttachAudio() ? (
+                      <>
+                        <p className="text-gray-300 text-xs mt-1 mb-3">
+                          {isContributorAudioUpload()
+                            ? 'Upload audio on behalf of the rights holder'
+                            : 'Upload your audio to make this tune playable'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleAttachAudioClick}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold rounded-lg shadow-lg transition-all"
+                        >
+                          {isContributorAudioUpload() ? 'Upload on behalf' : 'Upload audio'}
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-gray-300 text-xs mt-1">Tip to support this tune</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -4149,6 +4262,144 @@ const TuneProfile: React.FC = () => {
                   </>
                 ) : (
                   <span>Add to Party</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attach Audio Modal */}
+      {showAttachAudioModal && media && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
+          <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl md:text-2xl font-bold text-white">
+                {isContributorAudioUpload() ? 'Upload on behalf' : 'Upload audio'}
+              </h2>
+              <button
+                onClick={closeAttachAudioModal}
+                disabled={isAttachingAudio}
+                className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <p className="text-gray-300 text-sm mb-4">
+              {isContributorAudioUpload()
+                ? `Attach an MP3 for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
+                : `Attach your MP3 for "${media.title}". This will make the tune playable on Tuneable.`}
+            </p>
+
+            {isContributorAudioUpload() && (
+              <div className="mb-4 bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+                <p className="text-amber-200 text-sm font-medium mb-2">Contributor upload</p>
+                <p className="text-gray-300 text-sm">
+                  You are uploading as a verified contributor, not as the primary rights holder.
+                  Please confirm you have explicit authorization from the rights holder to upload
+                  this audio file to Tuneable.
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-white font-medium mb-2">MP3 file</label>
+              <input
+                ref={audioFileInputRef}
+                type="file"
+                accept="audio/mpeg,.mp3"
+                onChange={handleAttachAudioFileSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => audioFileInputRef.current?.click()}
+                disabled={isAttachingAudio}
+                className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload className="h-5 w-5" />
+                {attachAudioFile ? attachAudioFile.name : 'Choose MP3 file'}
+              </button>
+              {attachAudioFile && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {(attachAudioFile.size / (1024 * 1024)).toFixed(1)} MB
+                </p>
+              )}
+            </div>
+
+            {isContributorAudioUpload() && (
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Authorization from rights holder
+                </label>
+                <textarea
+                  value={attachAudioDisclaimer}
+                  onChange={(e) => setAttachAudioDisclaimer(e.target.value)}
+                  placeholder="Describe how you are authorized to upload this file (e.g. label manager, distributor, artist representative, written permission)..."
+                  className="input min-h-24"
+                  maxLength={1000}
+                  disabled={isAttachingAudio}
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  {attachAudioDisclaimer.length}/1000 characters
+                </div>
+              </div>
+            )}
+
+            <div className="mb-6 bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="attach-audio-rights-confirmation"
+                  checked={attachAudioRightsConfirmed}
+                  onChange={(e) => setAttachAudioRightsConfirmed(e.target.checked)}
+                  disabled={isAttachingAudio}
+                  className="mt-1 h-5 w-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <label htmlFor="attach-audio-rights-confirmation" className="text-sm text-gray-300">
+                  <strong className="text-white">Rights confirmation:</strong>{' '}
+                  {isContributorAudioUpload()
+                    ? 'I confirm I have authorization from the rights holder to upload this audio, and I grant Tuneable CIC a non-exclusive license to host and stream it.'
+                    : 'I confirm that I own or have authorization to distribute the rights in this work, and I grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.'}
+                  {' '}
+                  <Link to="/terms-of-service" className="text-purple-400 underline hover:text-purple-300">
+                    View Terms
+                  </Link>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={closeAttachAudioModal}
+                disabled={isAttachingAudio}
+                className="btn-secondary flex-1 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAttachAudioSubmit}
+                disabled={
+                  isAttachingAudio ||
+                  !attachAudioFile ||
+                  !attachAudioRightsConfirmed ||
+                  (isContributorAudioUpload() && !attachAudioDisclaimer.trim())
+                }
+                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isAttachingAudio ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5" />
+                    <span>Upload</span>
+                  </>
                 )}
               </button>
             </div>
