@@ -419,11 +419,11 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   }
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-50">
+    <div className="fixed bottom-0 left-0 right-0 z-50">
       {/* Hidden audio element */}
       <audio ref={audioRef} className="hidden" />
       
-      {/* MP3 Player UI - positioned above PersistentWebPlayer */}
+      {/* MP3 Player UI */}
       <div className="bg-gray-800/95 backdrop-blur-xl border border-gray-600/50 shadow-2xl rounded-t-lg">
         {/* Progress Bar Row */}
         <div 
