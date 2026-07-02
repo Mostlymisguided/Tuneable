@@ -16,6 +16,7 @@ const taddyService = require('../services/taddyService');
 const podcastAdapter = require('../services/podcastAdapter');
 const spotifyService = require('../services/spotifyService');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
+const { getBidLocationSnapshot } = require('../utils/locationUtils');
 
 const router = express.Router();
 
@@ -289,7 +290,8 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       partyName: globalParty.name,
       mediaTitle: episode.title,
       mediaArtist: episode.host && episode.host.length > 0 ? episode.host[0].name : '',
-      mediaCoverArt: episode.coverArt || ''
+      mediaCoverArt: episode.coverArt || '',
+      ...getBidLocationSnapshot(user.homeLocation),
     });
     
     await bid.save();
@@ -452,7 +454,8 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       partyName: party.name,
       mediaTitle: episode.title,
       mediaArtist: episode.host && episode.host.length > 0 ? episode.host[0].name : '',
-      mediaCoverArt: episode.coverArt || ''
+      mediaCoverArt: episode.coverArt || '',
+      ...getBidLocationSnapshot(user.homeLocation),
     });
     
     await bid.save();
