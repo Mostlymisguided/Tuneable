@@ -2547,16 +2547,19 @@ const Party: React.FC = () => {
       )}
       
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        <div className="justify-center flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-600/30 rounded-lg">
-                <Music className="h-5 w-5 text-purple-300" />
+        <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:justify-center sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-gray-900/80 px-2 py-2 sm:px-4 sm:py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] min-w-0">
+            <div className="flex items-center space-x-1.5 sm:space-x-3">
+              <div className="p-1 sm:p-2 bg-purple-600/30 rounded-lg shrink-0">
+                <Music className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-purple-300" />
                 </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{getDisplayMedia().length}</div>
-                <div className="text-xs text-gray-400">
-                  {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
+              <div className="min-w-0">
+                <div className="text-sm sm:text-2xl font-bold text-white leading-tight">{getDisplayMedia().length}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 truncate leading-tight">
+                  <span className="sm:hidden">{selectedTimePeriod === 'all-time' ? 'Tunes' : 'Queue'}</span>
+                  <span className="hidden sm:inline">
+                    {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
+                  </span>
                 </div>
               </div>
             </div>
@@ -2575,25 +2578,25 @@ const Party: React.FC = () => {
             </div>
           </div>
           )}
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-yellow-600/30 rounded-lg">
-                <Coins className="h-5 w-5 text-yellow-300" />
+          <div className="bg-gray-900/80 px-2 py-2 sm:px-4 sm:py-3 rounded-lg border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)] min-w-0">
+            <div className="flex items-center space-x-1.5 sm:space-x-3">
+              <div className="p-1 sm:p-2 bg-yellow-600/30 rounded-lg shrink-0">
+                <Coins className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-yellow-300" />
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(calculateTotalBids())}</div>
-                <div className="text-xs text-gray-400">Total Tips</div>
+              <div className="min-w-0">
+                <div className="text-sm sm:text-2xl font-bold text-white leading-tight truncate">{penceToPounds(calculateTotalBids())}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 truncate leading-tight">Total Tips</div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-600/30 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-green-300" />
+          <div className="bg-gray-900/80 px-2 py-2 sm:px-4 sm:py-3 rounded-lg border-2 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)] min-w-0">
+            <div className="flex items-center space-x-1.5 sm:space-x-3">
+              <div className="p-1 sm:p-2 bg-green-600/30 rounded-lg shrink-0">
+                <TrendingUp className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-green-300" />
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(calculateAverageTip())}</div>
-                <div className="text-xs text-gray-400">Avg Tip</div>
+              <div className="min-w-0">
+                <div className="text-sm sm:text-2xl font-bold text-white leading-tight truncate">{penceToPounds(calculateAverageTip())}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 truncate leading-tight">Avg Tip</div>
               </div>
             </div>
           </div>
