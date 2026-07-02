@@ -266,7 +266,6 @@ const TuneProfile: React.FC = () => {
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
-  const [topParties, setTopParties] = useState<any[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
 
@@ -309,8 +308,6 @@ const TuneProfile: React.FC = () => {
     if (mediaId) {
       console.log('✅ mediaId exists, calling fetchMediaProfile');
       fetchMediaProfile().then(() => {
-        // Only load top parties and tag rankings after media is loaded
-        loadTopParties();
         loadTagRankings();
       });
     } else {
@@ -1406,31 +1403,6 @@ const TuneProfile: React.FC = () => {
     }
   };
 
-  // Load top parties for this tune
-  const loadTopParties = async () => {
-    if (!media && !mediaId) {
-      console.log('⚠️ No media or mediaId available for top parties');
-      return;
-    }
-    
-    try {
-      console.log('🔍 Loading top parties for media:', mediaId);
-      console.log('🔍 Media object:', media);
-      const response = await mediaAPI.getTopPartiesForMedia(media?._id || mediaId!);
-      console.log('📊 Top parties response:', response);
-      console.log('📊 Parties data:', response.parties);
-      setTopParties(response.parties || []);
-      console.log('✅ Top parties state set:', response.parties?.length || 0, 'parties');
-    } catch (err: any) {
-      console.error('❌ Error loading top parties:', err);
-      console.error('Error response:', err.response);
-      console.error('Error data:', err.response?.data);
-      console.error('Error status:', err.response?.status);
-      // Temporarily show error to user for debugging
-      toast.error(`Top Parties Error: ${err.response?.data?.error || err.message}`);
-    }
-  };
-
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
     if (!media && !mediaId) {
@@ -1559,7 +1531,6 @@ const TuneProfile: React.FC = () => {
       
       // Refresh media data to show updated metrics
       await fetchMediaProfile();
-      await loadTopParties();
       
     } catch (err: any) {
       console.error('Error placing global tip:', err);
