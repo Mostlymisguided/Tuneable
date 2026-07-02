@@ -53,7 +53,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
-import { isMediaPlayable, getSupportMode, enrichMediaWithPlayability, isYouTubeOnly } from '../utils/mediaPlayability';
+import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly } from '../utils/mediaPlayability';
 
 interface Media {
   _id: string;
@@ -1519,8 +1519,8 @@ const TuneProfile: React.FC = () => {
 
     if (!isMediaPlayable(media)) {
       toast.info(
-        isYouTubeOnly(media) || getSupportMode(media) === 'pledge'
-          ? 'This track is not playable yet — pledge to support getting it on Tuneable.'
+        isYouTubeOnly(media) || !isMediaPlayable(media)
+          ? 'This track is not playable yet — tip to support adding audio to Tuneable.'
           : 'Playback is not available for this track yet.'
       );
       return;
@@ -1994,7 +1994,7 @@ const TuneProfile: React.FC = () => {
                   <div className="text-center px-4">
                     <Upload className="h-8 w-8 text-amber-400 mx-auto mb-2" />
                     <p className="text-white text-sm font-semibold">Awaiting upload</p>
-                    <p className="text-gray-300 text-xs mt-1">Pledge to support this tune</p>
+                    <p className="text-gray-300 text-xs mt-1">Tip to support this tune</p>
                   </div>
                 )}
               </div>
@@ -2210,17 +2210,17 @@ const TuneProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* Global Tip / Pledge Section */}
+        {/* Global Tip Section */}
         <div className="mb-6 px-2 md:px-0">
           <div className="max-w-2xl mx-auto">
             <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
               <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
                 <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                {getSupportMode(media) === 'pledge' ? 'Pledge For This Tune' : 'Support This Tune'}
+                Support This Tune
               </h3>
               <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                {getSupportMode(media) === 'pledge'
-                  ? 'Pledge funds help bring this track onto Tuneable when audio is uploaded by the rights holder or a verified contributor.'
+                {!isMediaPlayable(media)
+                  ? 'Tip now to support this track being fully added to Tuneable once audio is uploaded by the rights holder or a verified contributor.'
                   : 'Boost this tune\'s global ranking and support the artist'}
               </p>
               
@@ -2278,10 +2278,10 @@ const TuneProfile: React.FC = () => {
                   ) : (
                     <span>
                       {!user
-                        ? (getSupportMode(media) === 'pledge' ? 'Sign in to Pledge' : 'Sign in to Tip')
+                        ? 'Sign in to Tip'
                         : (isGlobalBidValid
-                          ? `${getSupportMode(media) === 'pledge' ? 'Pledge' : 'Tip'} £${globalBidInput}`
-                          : `Enter ${getSupportMode(media) === 'pledge' ? 'Pledge' : 'Tip'}`)}
+                          ? `Tip £${globalBidInput}`
+                          : 'Enter Tip')}
                     </span>
                   )}
                 </button>
@@ -3953,7 +3953,7 @@ const TuneProfile: React.FC = () => {
         mediaArtist={media?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
-        mode={media ? getSupportMode(media) : 'tip'}
+        isNonPlayable={media ? !isMediaPlayable(media) : false}
       />
 
       {/* Add Link Modal */}

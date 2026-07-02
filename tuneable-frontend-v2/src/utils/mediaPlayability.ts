@@ -2,7 +2,7 @@
  * Client-side playability checks (mirrors tuneable-backend/utils/mediaPlayability.js).
  */
 
-export type SupportMode = 'tip' | 'pledge';
+export type SupportMode = 'tip';
 
 export interface PlayabilityFields {
   isPlayable?: boolean;
@@ -85,8 +85,8 @@ export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
 }
 
 export function getSupportMode(media: MediaLike | null | undefined): SupportMode {
-  if (media?.supportMode) return media.supportMode;
-  return isMediaPlayable(media) ? 'tip' : 'pledge';
+  if (media?.supportMode === 'tip') return 'tip';
+  return 'tip';
 }
 
 export function enrichMediaWithPlayability<T extends MediaLike>(media: T): T & PlayabilityFields {

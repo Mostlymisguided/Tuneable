@@ -4,6 +4,8 @@ import axios from 'axios';
 interface User {
   id: string;
   uuid?: string; // UUIDv7 for external API
+  createdAt?: string;
+  lastLoginAt?: string;
   username: string;
   email: string;
   profilePic?: string;
@@ -57,6 +59,14 @@ interface User {
     soundcloud?: boolean;
     google?: boolean;
     instagram?: boolean;
+  };
+  preferences?: {
+    theme?: string;
+    anonymousMode?: boolean;
+    defaultTip?: number;
+  };
+  onboarding?: {
+    defaultTipPromptSeenAt?: string;
   };
   creatorProfile?: {
     artistName?: string;
@@ -686,7 +696,7 @@ export const mediaAPI = {
 
 // Search API
 export const searchAPI = {
-  search: async (query: string, source: string = 'youtube', pageToken?: string, accessToken?: string, forceExternal?: boolean) => {
+  search: async (query: string, source: string = 'musicbrainz', pageToken?: string, accessToken?: string, forceExternal?: boolean) => {
     const params: any = { query, source, pageToken };
     if (accessToken) {
       params.accessToken = accessToken;
@@ -897,6 +907,18 @@ export const userAPI = {
   getTuneLibraryByUserId: async (userId: string) => {
     const response = await api.get(`/users/${userId}/tune-library`);
     return response.data;
+  },
+
+  getSpotifyStatus: async () => {
+    const response = await api.get('/users/me/spotify-status');
+    return response.data as { connected: boolean };
+  },
+
+  getSpotifyLikedTracks: async (limit = 50) => {
+    const response = await api.get('/users/me/spotify-liked-tracks', {
+      params: { limit }
+    });
+    return response.data as { source: 'spotify'; tracks: any[]; total: number };
   },
 
   // Get user's tip history (all individual bids/tips)

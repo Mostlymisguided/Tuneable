@@ -168,9 +168,47 @@ function parseFeatureToLocation(feature) {
   };
 }
 
+/**
+ * Permanent forward geocode for a free-text place query (batch migrations).
+ */
+async function geocodeQuery(query, options = {}) {
+  const trimmed = typeof query === 'string' ? query.trim() : '';
+  if (!trimmed) {
+    return null;
+  }
+
+  const params = {
+    q: trimmed,
+    autocomplete: false,
+    permanent: true,
+    types: PLACE_TYPES,
+    limit: 1,
+    language: options.language || 'en',
+  };
+
+  if (options.country) {
+    params.country = options.country;
+  }
+  if (options.worldview) {
+    params.worldview = options.worldview;
+  }
+  if (options.proximity) {
+    params.proximity = options.proximity;
+  }
+
+  const data = await forwardGeocode(params);
+  const feature = data.features?.[0];
+  if (!feature) {
+    return null;
+  }
+
+  return parseFeatureToLocation(feature);
+}
+
 module.exports = {
   suggest,
   resolveByMapboxId,
+  geocodeQuery,
   parseFeatureToLocation,
   featureToSuggestion,
 };

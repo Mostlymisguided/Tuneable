@@ -116,7 +116,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
     });
 
     if (!isMediaPlayable(enriched)) {
-      toast.info('This track is not playable yet — visit the tune page to pledge support.');
+      toast.info('This track is not playable yet — visit the tune page to tip support.');
       navigate(`/tune/${mediaId}`);
       return;
     }

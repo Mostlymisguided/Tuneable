@@ -6,6 +6,8 @@ export interface User {
   id: string;
   _id?: string; // MongoDB ObjectId for internal matching
   uuid?: string; // UUIDv7 for external API
+  createdAt?: string;
+  lastLoginAt?: string;
   username: string;
   email: string;
   profilePic?: string;
@@ -78,6 +80,9 @@ export interface User {
         [key: string]: boolean | undefined;
       };
     };
+  };
+  onboarding?: {
+    defaultTipPromptSeenAt?: string;
   };
   creatorProfile?: {
     artistName?: string;

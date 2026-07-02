@@ -1,5 +1,5 @@
 /**
- * Media playability helpers for the YouTube → pledge → upload transition.
+ * Media playability helpers for the metadata/import → upload transition.
  *
  * Playable music requires an uploaded file (sources.upload) and cleared rights.
  * Podcast/spoken content may use other direct audio source keys.
@@ -70,9 +70,7 @@ function isMediaPlayable(media) {
 }
 
 function getSupportMode(media) {
-  if (isMediaPlayable(media)) return 'tip';
-  if (isYouTubeOnly(media)) return 'pledge';
-  return 'pledge';
+  return 'tip';
 }
 
 function enrichMediaWithPlayability(media) {

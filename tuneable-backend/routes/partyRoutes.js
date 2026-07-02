@@ -1693,7 +1693,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
 router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
-        const { url, title, artist, bidAmount, platform, duration, tags, category } = req.body;
+        const { url, title, artist, bidAmount, platform, duration, tags, category, externalIds, coverArt, album, releaseDate, releaseYear } = req.body;
         const userId = req.user._id;
 
         if (!mongoose.isValidObjectId(partyId)) {
@@ -1719,6 +1719,14 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
                     { 'sources.upload': url }
                 ]
             });
+        }
+        if (!existingMedia && externalIds && typeof externalIds === 'object') {
+            const externalLookup = Object.entries(externalIds)
+                .filter(([, value]) => !!value)
+                .map(([key, value]) => ({ [`externalIds.${key}`]: value }));
+            if (externalLookup.length > 0) {
+                existingMedia = await Media.findOne({ $or: externalLookup });
+            }
         }
         if (!existingMedia && title && artist) {
             existingMedia = await Media.findOne({
@@ -1798,6 +1806,15 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             });
         }
 
+        if (!existingMedia && externalIds && typeof externalIds === 'object') {
+            const externalLookup = Object.entries(externalIds)
+                .filter(([, value]) => !!value)
+                .map(([key, value]) => ({ [`externalIds.${key}`]: value }));
+            if (externalLookup.length > 0) {
+                existingMedia = await Media.findOne({ $or: externalLookup });
+            }
+        }
+
         // If not found by URL, try to find by title + artist
         if (!existingMedia) {
             existingMedia = await Media.findOne({
@@ -1818,18 +1835,24 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             console.log(`✅ Using existing media: "${media.title}" (${media._id})`);
         } else {
             // Create new media item
+            const sourcePayload = (platform && url) ? { [platform]: url } : {};
             const mediaData = {
                 title,
                 artist: [{ name: artist, userId: null, verified: false }],
-                coverArt: extractedCoverArt,
+                coverArt: coverArt || extractedCoverArt,
                 duration: extractedDuration,
-                sources: { [platform]: url },
+                sources: sourcePayload,
+                externalIds: externalIds || {},
                 tags: videoTags,
-                category: videoCategory,
+                category: videoCategory || 'Music',
+                album: album || null,
+                releaseDate: releaseDate || null,
+                releaseYear: releaseYear || null,
                 addedBy: userId,
                 globalMediaAggregate: bidAmountPence, // Store in pence (schema grammar)
-                contentType: 'music',
-                contentForm: 'tune'
+                contentType: ['music'],
+                contentForm: ['tune'],
+                mediaType: ['mp3']
             };
 
             // Store original YouTube metadata if this is a YouTube video

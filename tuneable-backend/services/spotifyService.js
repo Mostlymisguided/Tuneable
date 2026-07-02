@@ -30,6 +30,28 @@ async function getSavedShows(accessToken, limit = 50) {
 }
 
 /**
+ * Get saved tracks for a user (paginated)
+ * @param {string} accessToken - User's Spotify OAuth token
+ * @param {number} limit - Max tracks to return overall
+ * @returns {Promise<Array>} Array of saved track wrapper objects
+ */
+async function getSavedTracks(accessToken, limit = 50) {
+  const tracks = [];
+  let url = `${SPOTIFY_API}/me/tracks?limit=${Math.min(limit, 50)}`;
+
+  while (url && tracks.length < limit) {
+    const res = await axios.get(url, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const items = res.data.items || [];
+    tracks.push(...items);
+    url = res.data.next || null;
+  }
+
+  return tracks.slice(0, limit);
+}
+
+/**
  * Get episodes for a show
  * @param {string} accessToken - User's Spotify OAuth token
  * @param {string} showId - Spotify show ID
@@ -100,9 +122,50 @@ function convertEpisodeToOurFormat(episode, show) {
   };
 }
 
+/**
+ * Convert Spotify saved track wrapper into Tuneable search/import format
+ */
+function convertSavedTrackToTuneableFormat(savedTrack) {
+  const track = savedTrack?.track || savedTrack || {};
+  const album = track.album || {};
+  const artistNames = Array.isArray(track.artists)
+    ? track.artists.map(artist => artist?.name).filter(Boolean)
+    : [];
+  const primaryArtist = artistNames[0] || 'Unknown Artist';
+
+  return {
+    id: track.id,
+    title: track.name || 'Untitled Track',
+    artist: primaryArtist,
+    artists: artistNames,
+    coverArt: album.images?.[0]?.url || null,
+    duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : 0,
+    album: album.name || null,
+    releaseDate: album.release_date || null,
+    releaseYear: album.release_date ? Number.parseInt(album.release_date.slice(0, 4), 10) : null,
+    category: 'Music',
+    sources: track.external_urls?.spotify
+      ? { spotify: track.external_urls.spotify }
+      : {},
+    externalIds: {
+      spotify: track.id,
+      ...(track.external_ids?.isrc ? { isrc: track.external_ids.isrc } : {}),
+      ...(album.id ? { spotifyAlbum: album.id } : {}),
+    },
+    isLocal: false,
+    isPlayable: false,
+    supportMode: 'tip',
+    awaitingUpload: true,
+    sourceLabel: 'Spotify Likes',
+    addedAt: savedTrack?.added_at || null,
+  };
+}
+
 module.exports = {
   getSavedShows,
+  getSavedTracks,
   getShowEpisodes,
   convertShowToSeriesFormat,
-  convertEpisodeToOurFormat
+  convertEpisodeToOurFormat,
+  convertSavedTrackToTuneableFormat,
 };

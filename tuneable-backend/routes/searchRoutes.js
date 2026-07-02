@@ -1,6 +1,7 @@
 const express = require('express');
 const NodeCache = require('node-cache');
 const youtubeService = require('../services/youtubeService'); // YouTube API logic
+const musicbrainzService = require('../services/musicbrainzService');
 const Media = require('../models/Media'); // Unified media model
 const { transformResponse } = require('../utils/uuidTransform');
 const { getQuotaStatus, getQuotaHistory, resetQuota } = require('../services/quotaTracker');
@@ -12,7 +13,7 @@ const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
 
 // Search local database first (using Media model)
-const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
+const searchLocalDatabase = async (query, source = 'musicbrainz', limit = 20) => {
     try {
         console.log(`Searching local database for: "${query}" (source: ${source})`);
         
@@ -110,7 +111,7 @@ const searchLocalDatabase = async (query, source = 'youtube', limit = 20) => {
 router.get('/', async (req, res) => {
     console.log('Search route hit');
 
-    const { query, source = 'youtube', pageToken, forceExternal } = req.query;
+    const { query, source = 'musicbrainz', pageToken, forceExternal } = req.query;
 
     if (!query) {
         console.error('Query parameter is missing');
@@ -160,56 +161,37 @@ router.get('/', async (req, res) => {
                 console.log('Searching external APIs...');
             }
             
-            // Check quota before making external API calls
-            if (source === 'youtube' || source === 'mixed') {
-                const quotaStatus = await getQuotaStatus();
-                
-                if (quotaStatus.searchDisabled) {
-                    console.log(`🚫 YouTube search disabled: quota at ${quotaStatus.percentage.toFixed(1)}% (threshold: ${quotaStatus.threshold}%)`);
-                    return res.status(429).json({ 
-                        error: 'YouTube search is temporarily disabled',
-                        message: `YouTube search has been disabled because API quota usage is nearing its limits`,
-                        quotaStatus: {
-                            usage: quotaStatus.usage,
-                            limit: quotaStatus.limit,
-                            percentage: quotaStatus.percentage,
-                            resetTime: quotaStatus.resetTime
-                        },
-                        suggestion: '✨Please try pasting a YouTube URL directly instead✨'
-                    });
-                }
-            }
-            
-            // Step 2: Fall back to external APIs
-            let result;
-
-            if (source === 'youtube' || source === 'mixed') {
-                console.log('Using YouTube service');
-                result = await youtubeService.searchYouTube(query, pageToken);
-            } else {
-                console.error('Invalid source parameter:', source);
-                return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
-            }
-
-            if (source === 'youtube' || source === 'mixed') {
-                console.log(`YouTube service returned ${result?.videos?.length || 0} items for query: "${query}"`);
+            // Step 2: Fall back to external metadata search
+            if (['musicbrainz', 'catalog', 'youtube', 'mixed'].includes(source)) {
+                const offset = Number.parseInt(pageToken, 10) || 0;
+                const result = await musicbrainzService.searchRecordings(query, offset, 20);
+                console.log(`MusicBrainz returned ${result?.tracks?.length || 0} items for query: "${query}"`);
                 formattedResults = {
-                    nextPageToken: result.nextPageToken || null,
-                    videos: result.videos.map(video => ({
-                        id: video.id,
-                        title: video.title,
-                        artist: video.channelTitle || "Unknown Artist",
-                        coverArt: video.coverArt?.includes("http") 
-                            ? video.coverArt 
-                            : (getYouTubeThumbnail(video.id) || DEFAULT_COVER_ART),
-                        duration: video.duration || 111,
-                        sources: { youtube: `https://www.youtube.com/watch?v=${video.id}` },
+                    nextPageToken: result.nextOffset !== null ? String(result.nextOffset) : null,
+                    videos: result.tracks.map(track => ({
+                        id: track.id,
+                        title: track.title,
+                        artist: track.artist,
+                        coverArt: track.coverArt || DEFAULT_COVER_ART,
+                        duration: track.duration || 0,
+                        sources: track.sources || {},
+                        externalIds: track.externalIds || {},
                         tags: [],
-                        category: video.category || 'Unknown',
-                        isLocal: false // Flag to indicate this is from external API
+                        category: track.category || 'Music',
+                        album: track.album || null,
+                        releaseDate: track.releaseDate || null,
+                        releaseYear: track.releaseYear || null,
+                        isLocal: false,
+                        isPlayable: false,
+                        supportMode: 'tip',
+                        awaitingUpload: true,
+                        sourceLabel: 'MusicBrainz',
                     })),
                     source: 'external'
                 };
+            } else {
+                console.error('Invalid source parameter:', source);
+                return res.status(400).json({ error: `Unsupported source parameter: ${source}` });
             }
         }
 

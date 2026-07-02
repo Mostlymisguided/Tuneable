@@ -159,6 +159,9 @@ const userSchema = new mongoose.Schema({
       },
     },
   },
+  onboarding: {
+    defaultTipPromptSeenAt: { type: Date },
+  },
   role: { 
     type: [String], 
     enum: ['user', 'admin', 'creator', 'host', 'moderator', 'partier', 'dj'], 

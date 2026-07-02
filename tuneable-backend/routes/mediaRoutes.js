@@ -2450,35 +2450,61 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         return res.status(400).json({ error: 'External media metadata is required to create a new track.' });
       }
 
-      const { title, artist, sources, coverArt, duration, tags, category } = externalMedia;
+      const { title, artist, sources, coverArt, duration, tags, category, externalIds, album, releaseDate, releaseYear } = externalMedia;
       if (!title || !artist) {
         return res.status(400).json({ error: 'Title and artist are required for new media.' });
       }
 
-      const sourceEntries = sources && typeof sources === 'object' ? Object.entries(sources).filter(([, url]) => !!url) : [];
-      if (sourceEntries.length === 0) {
-        return res.status(400).json({ error: 'At least one media source is required for new media.' });
+      const externalIdEntries = externalIds && typeof externalIds === 'object'
+        ? Object.entries(externalIds).filter(([, value]) => !!value)
+        : [];
+
+      const sourceEntries = sources && typeof sources === 'object'
+        ? Object.entries(sources).filter(([, url]) => !!url)
+        : [];
+
+      if (externalIdEntries.length > 0) {
+        const externalLookup = externalIdEntries.map(([key, value]) => ({ [`externalIds.${key}`]: value }));
+        media = await Media.findOne({ $or: externalLookup });
       }
 
-      const sourcesMap = new Map(sourceEntries);
+      if (!media) {
+        media = await Media.findOne({
+          title,
+          'artist.name': artist
+        });
+      }
 
-      media = new Media({
-        title,
-        artist: [{ name: artist, userId: null, verified: false }],
-        coverArt: coverArt || DEFAULT_COVER_ART,
-        duration: duration || 0,
-        sources: sourcesMap,
-        tags: Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [],
-        category: category || 'Unknown',
-        addedBy: userId,
-        globalMediaAggregate: 0,
-        contentType: ['music'],
-        contentForm: ['tune'],
-        mediaType: ['mp3']
-      });
+      if (!media && sourceEntries.length === 0 && externalIdEntries.length === 0) {
+        return res.status(400).json({ error: 'A music source or catalog identifier is required for new media.' });
+      }
 
-      await media.save();
-      console.log(`✅ Created new media via global bid: "${media.title}" (${media._id})`);
+      if (!media) {
+        const sourcesMap = new Map(sourceEntries);
+        const externalIdsMap = new Map(externalIdEntries);
+
+        media = new Media({
+          title,
+          artist: [{ name: artist, userId: null, verified: false }],
+          coverArt: coverArt || DEFAULT_COVER_ART,
+          duration: duration || 0,
+          sources: sourcesMap,
+          externalIds: externalIdsMap,
+          tags: Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [],
+          category: category || 'Music',
+          album: album || null,
+          releaseDate: releaseDate || null,
+          releaseYear: releaseYear || null,
+          addedBy: userId,
+          globalMediaAggregate: 0,
+          contentType: ['music'],
+          contentForm: ['tune'],
+          mediaType: ['mp3']
+        });
+
+        await media.save();
+        console.log(`✅ Created new media via global bid: "${media.title}" (${media._id})`);
+      }
     }
 
     if (!media) {

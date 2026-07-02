@@ -34,7 +34,6 @@ import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI } from '../lib/api';
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
-import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import TagInputModal from '../components/TagInputModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -221,6 +220,8 @@ const UserProfile: React.FC = () => {
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<any>(null);
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [isImportingSpotifyLikes, setIsImportingSpotifyLikes] = useState(false);
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
@@ -265,6 +266,15 @@ const UserProfile: React.FC = () => {
       instagram: ''
     }
   });
+
+  useEffect(() => {
+    const viewingOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
+    if (!viewingOwnProfile || !showAddTunePanel) return;
+
+    userAPI.getSpotifyStatus()
+      .then((data) => setSpotifyConnected(!!data.connected))
+      .catch(() => setSpotifyConnected(false));
+  }, [showAddTunePanel, currentUser, user]);
   
   // Social media modal state
   const [socialModal, setSocialModal] = useState<{
@@ -734,7 +744,7 @@ const UserProfile: React.FC = () => {
         setAddTuneBidAmounts(newBidAmounts);
       } else {
         // Regular search
-        response = await searchAPI.search(addTuneSearchQuery, 'youtube');
+        response = await searchAPI.search(addTuneSearchQuery, 'musicbrainz');
         
         let databaseResults = [];
         let youtubeResults = [];
@@ -747,7 +757,7 @@ const UserProfile: React.FC = () => {
         
         // If we got local results but want to show YouTube too, fetch YouTube
         if (databaseResults.length > 0 && response.hasMoreExternal) {
-          const youtubeResponse = await searchAPI.search(addTuneSearchQuery, 'youtube', undefined, undefined, true);
+          const youtubeResponse = await searchAPI.search(addTuneSearchQuery, 'musicbrainz', undefined, undefined, true);
           if (youtubeResponse.videos) {
             youtubeResults = youtubeResponse.videos;
           }
@@ -765,11 +775,7 @@ const UserProfile: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Search error:', error);
-      if (error?.response?.status === 429) {
-        toast.error('YouTube search is temporarily disabled due to quota limits');
-      } else {
-        toast.error(error.response?.data?.error || 'Search failed');
-      }
+      toast.error(error.response?.data?.error || 'Search failed');
     } finally {
       setIsSearchingTune(false);
     }
@@ -822,9 +828,10 @@ const UserProfile: React.FC = () => {
               ? { youtube: `https://www.youtube.com/watch?v=${media.id}` }
               : {})
       : {};
+    const externalIds = !isExistingMedia && media.externalIds ? media.externalIds : {};
 
-    if (!isExistingMedia && Object.keys(externalSources).length === 0) {
-      toast.error('Unable to add this tune because no source URL was provided.');
+    if (!isExistingMedia && Object.keys(externalSources).length === 0 && Object.keys(externalIds).length === 0) {
+      toast.error('Unable to add this tune because no source or catalog identifier was provided.');
       return;
     }
 
@@ -840,8 +847,12 @@ const UserProfile: React.FC = () => {
             coverArt: media.coverArt,
             duration: media.duration,
             category: media.category || 'Music',
+            album: media.album || null,
+            releaseDate: media.releaseDate || null,
+            releaseYear: media.releaseYear || null,
             ...(tags.length > 0 && { tags }),
-            sources: externalSources
+            sources: externalSources,
+            externalIds
           }
         : undefined;
 
@@ -883,6 +894,52 @@ const UserProfile: React.FC = () => {
   const startAddTune = async (media: any) => {
     setPendingAddTuneResult(media);
     setShowAddTuneTagModal(true);
+  };
+
+  const handleConnectSpotify = () => {
+    if (!currentUser) {
+      toast.error('Please log in to connect Spotify');
+      navigate('/login');
+      return;
+    }
+
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    const redirectUrl = encodeURIComponent(`${window.location.origin}${window.location.pathname}?view=tune-library`);
+    const token = authToken || localStorage.getItem('token');
+    window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+  };
+
+  const handleImportSpotifyLikes = async () => {
+    if (!currentUser) {
+      toast.error('Please log in to import Spotify likes');
+      navigate('/login');
+      return;
+    }
+
+    if (!spotifyConnected) {
+      handleConnectSpotify();
+      return;
+    }
+
+    setIsImportingSpotifyLikes(true);
+    try {
+      const data = await userAPI.getSpotifyLikedTracks(50);
+      const tracks = data.tracks || [];
+      setAddTuneResults({ database: [], youtube: tracks });
+
+      const newBidAmounts: Record<string, string> = {};
+      tracks.forEach((media: any) => {
+        const avgBid = calculateAverageBid(media);
+        newBidAmounts[media._id || media.id] = Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
+      });
+      setAddTuneBidAmounts(newBidAmounts);
+
+      toast.success(`Loaded ${tracks.length} Spotify liked tracks`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || error?.message || 'Failed to import Spotify likes');
+    } finally {
+      setIsImportingSpotifyLikes(false);
+    }
   };
 
   const getRoleDisplay = (roles: string[]) => {
@@ -1731,9 +1788,6 @@ const UserProfile: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  {/* Quota Warning Banner */}
-                  <QuotaWarningBanner className="mb-4" />
-                    
                   {/* Search Input */}
                   <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
                     <input
@@ -1746,11 +1800,11 @@ const UserProfile: React.FC = () => {
                           handleAddTuneSearch();
                         }
                       }}
-                      placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
+                      placeholder="Search Tuneable and MusicBrainz for tunes..."
                       className="flex-1 bg-gray-900 hover:shadow-2xl rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
                     />
                   </div>
-                  <div className="flex justify-center">
+                  <div className="flex flex-col sm:flex-row justify-center gap-2">
                     <button
                       onClick={handleAddTuneSearch}
                       disabled={isSearchingTune || !addTuneSearchQuery.trim()}
@@ -1762,7 +1816,21 @@ const UserProfile: React.FC = () => {
                         'Search'
                       )}
                     </button>
+                    <button
+                      onClick={handleImportSpotifyLikes}
+                      disabled={isImportingSpotifyLikes}
+                      className="flex py-2 px-4 bg-green-700 hover:bg-green-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base items-center justify-center gap-2"
+                    >
+                      {isImportingSpotifyLikes ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <span>{spotifyConnected ? 'Import Spotify Likes' : 'Connect Spotify'}</span>
+                      )}
+                    </button>
                   </div>
+                  <p className="mt-3 text-xs text-gray-400">
+                    Tunes found in MusicBrainz or Spotify can be tipped into your library now and become playable once audio is uploaded.
+                  </p>
                 </>
               )}
 
@@ -1893,12 +1961,12 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* YouTube Results - only when panel is expanded */}
+              {/* External metadata results - only when panel is expanded */}
               {showAddTunePanel && addTuneResults.youtube.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center mb-2">
                     <Youtube className="h-4 w-4 text-red-400 mr-2" />
-                    <h4 className="text-sm font-semibold text-red-300">From YouTube ({addTuneResults.youtube.length})</h4>
+                    <h4 className="text-sm font-semibold text-red-300">From MusicBrainz / Spotify ({addTuneResults.youtube.length})</h4>
                   </div>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {addTuneResults.youtube.map((mediaItem: any) => {

@@ -43,6 +43,7 @@ const CreatorUpload = lazy(() => import('./pages/CreatorUpload'));
 import CreatorYouTubeImport from './pages/CreatorYouTubeImport';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
+import DefaultTipOnboardingModal from './components/DefaultTipOnboardingModal';
 import Notifications from './pages/Notifications';
 import { AuthDeepLinkListener } from './capacitor/authDeepLink';
 import { getApiOrigin } from './utils/platform';
@@ -141,6 +142,7 @@ const AppContent = () => {
       <AuthDeepLinkListener />
       <div className="min-h-screen">
         <Navbar />
+        <DefaultTipOnboardingModal />
         <main className="pt-16 pb-32">
           <Routes>
             <Route path="/" element={<Navigate to="/party/global?period=all-time" replace />} />

@@ -31,6 +31,8 @@ export interface User {
   id: string;
   _id?: string; // MongoDB ObjectId for internal matching
   uuid?: string; // UUIDv7 for external API
+  createdAt?: string;
+  lastLoginAt?: string;
   username: string;
   email: string;
   profilePic?: string;
@@ -107,6 +109,9 @@ export interface User {
         [key: string]: boolean | undefined;
       };
     };
+  };
+  onboarding?: {
+    defaultTipPromptSeenAt?: string;
   };
   creatorProfile?: {
     artistName?: string;
@@ -284,6 +289,15 @@ export interface SearchResult {
   coverArt: string;
   duration: number;
   sources: Record<string, string>;
+  externalIds?: Record<string, string>;
+  isLocal?: boolean;
+  isPlayable?: boolean;
+  supportMode?: 'tip';
+  awaitingUpload?: boolean;
+  sourceLabel?: string;
+  album?: string | null;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
 }
 
 

@@ -6,7 +6,6 @@ import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucid
 import EpisodeCard from '../components/EpisodeCard';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
-import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 
@@ -18,9 +17,17 @@ interface SearchResult {
   coverArt: string;
   duration: number;
   sources: Record<string, string>;
+  externalIds?: Record<string, string>;
   globalMediaAggregate?: number;
   addedBy?: string;
   isLocal?: boolean;
+  isPlayable?: boolean;
+  supportMode?: 'tip';
+  awaitingUpload?: boolean;
+  sourceLabel?: string;
+  album?: string | null;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
   isPodcast?: boolean;
   podcastAuthor?: string;
   description?: string;
@@ -102,7 +109,7 @@ const SearchPage: React.FC = () => {
     try {
       let response;
       
-      response = await searchAPI.search(query, 'youtube', undefined, undefined, true);
+      response = await searchAPI.search(query, 'musicbrainz', undefined, undefined, true);
       
       // Track the source of results
       setSearchSource(response.source || 'external');
@@ -112,26 +119,10 @@ const SearchPage: React.FC = () => {
       setNextPageToken(response.nextPageToken || null);
       initializeBidAmounts(response.videos);
       
-      toast.info(`Found ${response.videos.length} additional songs from YouTube`);
+      toast.info(`Found ${response.videos.length} additional music metadata matches`);
     } catch (error: any) {
       console.error('Show more error:', error);
-      
-      // Check if search is disabled due to quota
-      if (error?.response?.status === 429) {
-        const errorData = error.response?.data;
-        toast.error(
-          <div>
-            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
-            <div className="text-sm mt-1">{errorData?.message}</div>
-            {errorData?.suggestion && (
-              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
-            )}
-          </div>,
-          { autoClose: 8000 }
-        );
-      } else {
-        toast.error('Failed to load more results. Please try again.');
-      }
+      toast.error('Failed to load more results. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -261,8 +252,8 @@ const SearchPage: React.FC = () => {
         return;
       }
       
-      // Use the unified search API for YouTube (which will search local DB first)
-      response = await searchAPI.search(searchQuery, 'youtube', pageToken);
+      // Use the unified search API (local library first, then MusicBrainz metadata)
+      response = await searchAPI.search(searchQuery, 'musicbrainz', pageToken);
       
       // Track the source of results
       setSearchSource(response.source || 'external');
@@ -277,27 +268,11 @@ const SearchPage: React.FC = () => {
       if (response.source === 'local') {
         toast.info(`Found ${response.videos.length} songs from our database`);
       } else if (response.source === 'external') {
-        toast.info(`Found ${response.videos.length} songs from YouTube`);
+        toast.info(`Found ${response.videos.length} matches from MusicBrainz`);
       }
     } catch (error: any) {
       console.error('Search error:', error);
-      
-      // Check if search is disabled due to quota
-      if (error?.response?.status === 429) {
-        const errorData = error.response?.data;
-        toast.error(
-          <div>
-            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
-            <div className="text-sm mt-1">{errorData?.message}</div>
-            {errorData?.suggestion && (
-              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
-            )}
-          </div>,
-          { autoClose: 8000 }
-        );
-      } else {
-        toast.error('Search failed. Please try again.');
-      }
+      toast.error(error?.response?.data?.error || 'Search failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -495,8 +470,8 @@ const SearchPage: React.FC = () => {
     
     try {
       // Handle regular song - detect platform from available sources
-      let platform = 'youtube';
-      let url = song.sources.youtube;
+      let platform: string | undefined;
+      let url: string | undefined;
       
       // Check for uploaded media first
       if (song.sources.upload) {
@@ -505,6 +480,13 @@ const SearchPage: React.FC = () => {
       } else if (song.sources.youtube) {
         platform = 'youtube';
         url = song.sources.youtube;
+      } else if (song.sources.spotify) {
+        platform = 'spotify';
+        url = song.sources.spotify;
+      } else {
+        const [firstPlatform, firstUrl] = Object.entries(song.sources || {}).find(([, value]) => Boolean(value)) || [];
+        platform = firstPlatform;
+        url = firstUrl;
       }
       
       const response = await partyAPI.addMediaToParty(partyId, {
@@ -517,6 +499,10 @@ const SearchPage: React.FC = () => {
         bidAmount: songBidAmount,
         tags: tags, // Use user-generated tags
         category: song.category || 'Unknown',
+        externalIds: song.externalIds || {},
+        album: song.album || null,
+        releaseDate: song.releaseDate || null,
+        releaseYear: song.releaseYear || null,
       });
       
       if (response.isDuplicate) {
@@ -641,11 +627,6 @@ const SearchPage: React.FC = () => {
           </div>
         )} */}
         
-        {/* Quota Warning Banner */}
-        {activeTab === 'songs' && (
-          <QuotaWarningBanner className="mb-4" />
-        )}
-
         {/* Search Bar */}
         <div className="space-y-2">
           <div className="flex space-x-4">
@@ -654,7 +635,7 @@ const SearchPage: React.FC = () => {
               <input
                 type="text"
                 placeholder={activeTab === 'songs' 
-                  ? 'Search for songs on YouTube or paste a YouTube URL...'
+                  ? 'Search Tuneable and MusicBrainz for tunes...'
                   : podcastSource === 'local' 
                     ? 'Search for podcast episodes in our database...'
                     : podcastSource === 'taddy'
@@ -683,7 +664,7 @@ const SearchPage: React.FC = () => {
             <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
               <Link className="h-3 w-3 text-purple-600 dark:text-purple-400" />
               <span>
-                💡 <strong>Tip:</strong> Paste a YouTube URL directly instead of searching to use 100x fewer API credits!
+                <strong>Tip:</strong> Results not already in Tuneable can still be tipped and added now, then played later once audio is uploaded.
               </span>
             </div>
           )}
@@ -712,7 +693,7 @@ const SearchPage: React.FC = () => {
                       : '🍎 From Apple Podcasts'
                   : searchSource === 'local' 
                     ? '📚 From Database' 
-                    : '🌐 From YouTube'
+                    : '🎼 From MusicBrainz'
                 }
               </div>
             )}
@@ -785,6 +766,14 @@ const SearchPage: React.FC = () => {
                           <span className="text-xs text-gray-500">
                             {formatDuration(song.duration)}
                           </span>
+                          {!song.isLocal && !song.isPlayable && (
+                            <>
+                              <span className="text-xs text-gray-400">•</span>
+                              <span className="text-xs text-amber-600 font-medium">
+                                Awaiting audio
+                              </span>
+                            </>
+                          )}
                           {song.isLocal && song.globalMediaAggregate && (
                             <>
                               <span className="text-xs text-gray-400">•</span>
@@ -867,10 +856,10 @@ const SearchPage: React.FC = () => {
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 mx-auto"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span className="px-2">{isLoading ? 'Searching...' : 'Show More from YouTube'}</span>
+                <span className="px-2">{isLoading ? 'Searching...' : 'Show More from MusicBrainz'}</span>
               </button>
               <p className="text-sm text-gray-500 mt-2">
-                Didn't find what you're looking for? Search YouTube for more results.
+                Didn&apos;t find what you&apos;re looking for? Search more music metadata results.
               </p>
             </div>
           )}

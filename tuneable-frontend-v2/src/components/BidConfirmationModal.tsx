@@ -20,8 +20,7 @@ interface BidConfirmationModalProps {
   isLoading?: boolean;
   party?: Party;
   user?: User | null;
-  /** tip = playable media; pledge = YouTube-only / awaiting upload */
-  mode?: 'tip' | 'pledge';
+  isNonPlayable?: boolean;
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -35,7 +34,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   isLoading = false,
   party,
   user,
-  mode = 'tip',
+  isNonPlayable = false,
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -133,9 +132,8 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   if (!isOpen) return null;
 
   const hasInsufficientFunds = bidAmount > userBalance;
-  const isPledge = mode === 'pledge';
-  const actionLabel = isPledge ? 'Pledge' : 'Tip';
-  const actionLabelLower = actionLabel.toLowerCase();
+  const actionLabel = 'Tip';
+  const actionLabelLower = 'tip';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
@@ -156,16 +154,16 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           <div className="flex items-center space-x-2 mb-1">
             <Music className="h-4 w-4 text-purple-400" />
             <span className="text-sm font-medium text-gray-300">
-              {isPledge ? 'Pledging on:' : 'Tipping on:'}
+              Tipping on:
             </span>
           </div>
           <p className="text-white font-medium">{mediaTitle}</p>
           {mediaArtist && (
             <p className="text-gray-400 text-sm">by {mediaArtist}</p>
           )}
-          {isPledge && (
+          {isNonPlayable && (
             <p className="text-amber-300/90 text-xs mt-2">
-              This track is not playable yet. Your pledge supports bringing it onto Tuneable when audio is uploaded.
+              This track is not playable yet. Your tip adds support now and playback can follow once audio is uploaded.
             </p>
           )}
         </div>

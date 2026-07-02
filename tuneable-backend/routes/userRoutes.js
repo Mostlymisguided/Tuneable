@@ -8,6 +8,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const spotifyService = require('../services/spotifyService');
 
 // Country name to country code mapping
 const countryCodeMap = {
@@ -998,6 +999,44 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   }
 });
 
+// Check whether the authenticated user has Spotify connected
+router.get('/me/spotify-status', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('spotifyId').lean();
+    res.json({ connected: !!user?.spotifyId });
+  } catch (error) {
+    console.error('Error checking Spotify status:', error);
+    res.status(500).json({ error: 'Failed to check Spotify status' });
+  }
+});
+
+// Fetch the authenticated user's Spotify liked tracks as addable Tuneable results
+router.get('/me/spotify-liked-tracks', authMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const user = await User.findById(req.user._id).select('spotifyAccessToken spotifyId');
+
+    if (!user?.spotifyAccessToken) {
+      return res.status(400).json({ error: 'Spotify not connected. Please connect your Spotify account first.' });
+    }
+
+    const savedTracks = await spotifyService.getSavedTracks(user.spotifyAccessToken, limit);
+    const tracks = savedTracks.map(spotifyService.convertSavedTrackToTuneableFormat);
+
+    res.json({
+      source: 'spotify',
+      tracks,
+      total: tracks.length,
+    });
+  } catch (error) {
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Spotify token expired. Please reconnect Spotify.' });
+    }
+    console.error('Error fetching Spotify liked tracks:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch Spotify liked tracks' });
+  }
+});
+
 // Get a user's tune library by userId (public - for viewing other users' profiles)
 // @route   GET /api/users/:userId/tune-library
 // @desc    Get a user's tune library (public profile data)
@@ -1822,7 +1861,7 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { profilePic, homeLocation, secondaryLocation, locations, username, ...updatedFields } = req.body; // Extract username separately for validation
+    const { profilePic, homeLocation, secondaryLocation, locations, username, onboarding, ...updatedFields } = req.body; // Extract special fields separately for validation
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1934,6 +1973,25 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
       
       user.preferences.defaultTip = defaultTip;
+    }
+
+    if (onboarding?.defaultTipPromptSeenAt !== undefined) {
+      if (!user.onboarding) {
+        user.onboarding = {};
+      }
+
+      const seenAt = onboarding.defaultTipPromptSeenAt
+        ? new Date(onboarding.defaultTipPromptSeenAt)
+        : new Date();
+
+      if (Number.isNaN(seenAt.getTime())) {
+        return res.status(400).json({
+          error: 'Invalid onboarding timestamp',
+          field: 'onboarding.defaultTipPromptSeenAt'
+        });
+      }
+
+      user.onboarding.defaultTipPromptSeenAt = seenAt;
     }
 
     // Update other fields (excluding username which is already handled above)

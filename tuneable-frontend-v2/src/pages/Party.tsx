@@ -13,7 +13,6 @@ import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import BidConfirmationModal from '../components/BidConfirmationModal';
-import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
@@ -766,7 +765,7 @@ const Party: React.FC = () => {
           console.log(`📚 Found existing media in database: ${response.videos[0]?.title}`);
         } else if (response.source === 'external' && response.videos) {
           youtubeResults = response.videos;
-          console.log(`🎥 Found new media from YouTube: ${response.videos[0]?.title}`);
+          console.log(`🎼 Found external metadata result: ${response.videos[0]?.title}`);
         }
         
         setAddMediaResults({
@@ -787,12 +786,12 @@ const Party: React.FC = () => {
           if (response.source === 'local') {
             toast.success(`Found "${response.videos[0]?.title}" in our database`);
           } else if (response.source === 'external') {
-            toast.success(`Found "${response.videos[0]?.title}" from YouTube`);
+            toast.success(`Found "${response.videos[0]?.title}" from external metadata`);
           }
         }
       } else {
         // Regular search logic
-        const mediaSource = party?.mediaSource || 'youtube';
+        const mediaSource = 'musicbrainz';
         
         // Search local database first
         console.log('🔍 Searching for new media:', addMediaSearchQuery);
@@ -806,20 +805,20 @@ const Party: React.FC = () => {
         console.log(`📚 Found ${databaseResults.length} results in database`);
       } else if (response.source === 'external' && response.videos) {
         youtubeResults = response.videos;
-        console.log(`🎥 Found ${youtubeResults.length} results from YouTube`);
+        console.log(`🎼 Found ${youtubeResults.length} external metadata results`);
       }
       
-      // If we got local results but want to show YouTube too, fetch YouTube
+      // If we got local results but want to show more external metadata too, fetch those
       if (databaseResults.length > 0 && response.hasMoreExternal) {
-        console.log('🎥 Also fetching YouTube results...');
+        console.log('🎼 Also fetching external metadata results...');
         const youtubeResponse = await searchAPI.search(addMediaSearchQuery, mediaSource, undefined, undefined, true);
         if (youtubeResponse.videos) {
           youtubeResults = youtubeResponse.videos;
           setYoutubeNextPageToken(youtubeResponse.nextPageToken || null);
-          console.log(`🎥 Found ${youtubeResults.length} YouTube results`);
+          console.log(`🎼 Found ${youtubeResults.length} external metadata results`);
         }
       } else if (response.source === 'external') {
-        // Track next page token for YouTube results
+        // Track next page token for external metadata results
         setYoutubeNextPageToken(response.nextPageToken || null);
       }
       
@@ -837,22 +836,7 @@ const Party: React.FC = () => {
     } catch (error: any) {
       console.error('Search error:', error);
       
-      // Check if search is disabled due to quota
-      if (error?.response?.status === 429) {
-        const errorData = error.response?.data;
-        toast.error(
-          <div>
-            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
-            <div className="text-sm mt-1">{errorData?.message}</div>
-            {errorData?.suggestion && (
-              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
-            )}
-          </div>,
-          { autoClose: 8000 }
-        );
-      } else {
-        toast.error('Search failed. Please try again.');
-      }
+      toast.error(error?.response?.data?.error || 'Search failed. Please try again.');
     } finally {
       setIsSearchingNewMedia(false);
     }
@@ -863,7 +847,7 @@ const Party: React.FC = () => {
     
     setIsLoadingMoreYouTube(true);
     try {
-      const mediaSource = party?.mediaSource || 'youtube';
+      const mediaSource = 'musicbrainz';
       const response = await searchAPI.search(addMediaSearchQuery, mediaSource, youtubeNextPageToken, undefined, true);
       
       if (response.videos) {
@@ -885,27 +869,11 @@ const Party: React.FC = () => {
         });
         setNewMediaBidAmounts(newBidAmounts);
         
-        console.log(`✅ Loaded ${response.videos.length} more YouTube results`);
+        console.log(`✅ Loaded ${response.videos.length} more external metadata results`);
       }
     } catch (error: any) {
       console.error('Error loading more YouTube results:', error);
-      
-      // Check if search is disabled due to quota
-      if (error?.response?.status === 429) {
-        const errorData = error.response?.data;
-        toast.error(
-          <div>
-            <div className="font-semibold">{errorData?.error || 'YouTube search is temporarily disabled'}</div>
-            <div className="text-sm mt-1">{errorData?.message}</div>
-            {errorData?.suggestion && (
-              <div className="text-sm mt-1 text-blue-300">{errorData.suggestion}</div>
-            )}
-          </div>,
-          { autoClose: 8000 }
-        );
-      } else {
-        toast.error('Failed to load more results');
-      }
+      toast.error(error?.response?.data?.error || 'Failed to load more results');
     } finally {
       setIsLoadingMoreYouTube(false);
     }
@@ -1058,12 +1026,15 @@ const Party: React.FC = () => {
       title: currentPendingMedia?.title || 'Unknown',
       artist: currentPendingMedia?.artist || null,
       sources: currentPendingMedia?.sources || null,
+      externalIds: currentPendingMedia?.externalIds || {},
+      coverArt: currentPendingMedia?.coverArt || null,
       duration: currentPendingMedia?.duration || null,
       category: currentPendingMedia?.category || 'Music',
+      album: currentPendingMedia?.album || null,
+      releaseDate: currentPendingMedia?.releaseDate || null,
+      releaseYear: currentPendingMedia?.releaseYear || null,
       bids: currentPendingMedia?.bids || []
     };
-    const currentParty = party;
-    
     // Don't close modal immediately - let it close after async operation completes
     // This prevents React from trying to re-render with inconsistent state
     
@@ -1234,26 +1205,24 @@ const Party: React.FC = () => {
         
         try {
           setProgress?.('processing');
-          // Get the appropriate URL based on media source
-          const mediaSource = currentParty?.mediaSource || 'youtube';
-          let url = '';
-          
-          if ((mediaSource === 'youtube' || mediaSource === 'mixed') && safePendingMedia.sources?.youtube) {
-            url = safePendingMedia.sources.youtube;
-          } else if (safePendingMedia.sources) {
-            // Fallback to first available source
-            url = Object.values(safePendingMedia.sources)[0] as string;
-          }
+          const sourceEntry = Object.entries(safePendingMedia.sources || {}).find(([, value]) => Boolean(value));
+          const platform = sourceEntry?.[0];
+          const url = sourceEntry?.[1] || '';
           
           const response = await partyAPI.addMediaToParty(partyId, {
             url,
             title: safePendingMedia.title,
             artist: safePendingMedia.artist,
             bidAmount,
-            platform: mediaSource,
+            platform,
             duration: safePendingMedia.duration,
             tags: tags, // Use user-provided tags from modal
-            category: safePendingMedia.category || 'Music'
+            category: safePendingMedia.category || 'Music',
+            externalIds: safePendingMedia.externalIds || {},
+            coverArt: safePendingMedia.coverArt,
+            album: safePendingMedia.album,
+            releaseDate: safePendingMedia.releaseDate,
+            releaseYear: safePendingMedia.releaseYear,
           });
           
           // Optimistically update user balance from response
@@ -1345,26 +1314,24 @@ const Party: React.FC = () => {
     }
     
     try {
-      // Get the appropriate URL based on media source
-      const mediaSource = party?.mediaSource || 'youtube';
-      let url = '';
-      
-      if ((mediaSource === 'youtube' || mediaSource === 'mixed') && pendingMedia.sources?.youtube) {
-        url = pendingMedia.sources.youtube;
-      } else if (pendingMedia.sources) {
-        // Fallback to first available source
-        url = Object.values(pendingMedia.sources)[0] as string;
-      }
+      const sourceEntry = Object.entries(pendingMedia.sources || {}).find(([, value]) => Boolean(value));
+      const platform = sourceEntry?.[0];
+      const url = sourceEntry?.[1] || '';
       
       await partyAPI.addMediaToParty(partyId, {
         url,
         title: pendingMedia.title,
         artist: pendingMedia.artist,
         bidAmount,
-        platform: mediaSource,
+        platform,
         duration: pendingMedia.duration,
         tags: tags, // Use user-provided tags from modal
-        category: pendingMedia.category || 'Music'
+        category: pendingMedia.category || 'Music',
+        externalIds: pendingMedia.externalIds || {},
+        coverArt: pendingMedia.coverArt,
+        album: pendingMedia.album,
+        releaseDate: pendingMedia.releaseDate,
+        releaseYear: pendingMedia.releaseYear,
       });
       
       toast.success(`Added ${pendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
@@ -2058,7 +2025,7 @@ const Party: React.FC = () => {
     });
     
     if (displayMedia.length === 0) {
-      toast.info('No playable tracks in this list — pledge on tracks awaiting upload or wait for audio to be added.');
+      toast.info('No playable tracks in this list — tip on tracks awaiting upload or wait for audio to be added.');
       return;
     }
     
@@ -2133,7 +2100,7 @@ const Party: React.FC = () => {
     });
     
     if (displayMedia.length === 0) {
-      toast.info('No playable tracks in this list — pledge on tracks awaiting upload or wait for audio to be added.');
+      toast.info('No playable tracks in this list — tip on tracks awaiting upload or wait for audio to be added.');
       return;
     }
     
@@ -2616,9 +2583,6 @@ const Party: React.FC = () => {
                           </div>
                         ) : (
                           <>
-                        {/* Quota Warning Banner */}
-                        <QuotaWarningBanner className="mb-4" />
-                        
                         {/* Search Input */}
                         <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
                           <input
@@ -3020,12 +2984,12 @@ const Party: React.FC = () => {
                           </div>
                         )}
 
-                        {/* YouTube Results */}
+                        {/* External metadata results */}
                         {addMediaResults.youtube.length > 0 && (
                           <div>
                             <div className="flex items-center mb-2">
                               <Youtube className="h-4 w-4 text-red-400 mr-2" />
-                              <h4 className="text-sm font-semibold text-red-300">From YouTube ({addMediaResults.youtube.length})</h4>
+                              <h4 className="text-sm font-semibold text-red-300">From MusicBrainz / Spotify ({addMediaResults.youtube.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                               {addMediaResults.youtube.map((mediaItem: any) => {
@@ -3131,7 +3095,7 @@ const Party: React.FC = () => {
                               })}
                             </div>
                             
-                            {/* Show More Button for YouTube */}
+                            {/* Show More Button for external metadata */}
                             {youtubeNextPageToken && (
                               <div className="mt-8 text-center">
                                 <button
@@ -3145,7 +3109,7 @@ const Party: React.FC = () => {
                                       <span>Loading...</span>
                                     </span>
                                   ) : (
-                                    'Show More YouTube Results'
+                                    'Show More Results'
                                   )}
                                 </button>
                               </div>
@@ -3153,7 +3117,7 @@ const Party: React.FC = () => {
                           </div>
                         )}
 
-                        {/* No Results Message - Only show after database/YouTube search has been performed */}
+                        {/* No Results Message - Only show after database/external search has been performed */}
                         {!isSearchingNewMedia && hasSearchedDatabase && addMediaSearchQuery && addMediaResults.database.length === 0 && addMediaResults.youtube.length === 0 && (
                           <div className="text-center py-8">
                             <Music className="h-12 w-12 text-gray-500 mx-auto mb-3" />
