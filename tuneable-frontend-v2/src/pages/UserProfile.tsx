@@ -37,7 +37,7 @@ import ReportModal from '../components/ReportModal';
 import TagInputModal from '../components/TagInputModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
+import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, poundsToPence } from '../utils/currency';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
@@ -166,7 +166,7 @@ const UserProfile: React.FC = () => {
   const { user: currentUser, token: authToken, handleOAuthCallback } = useAuth();
   
   // Web player store for playing media
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -1049,11 +1049,85 @@ const UserProfile: React.FC = () => {
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)
       setCurrentMedia(allFormattedMedia[index], index);
+      play();
       setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
     } catch (error) {
       console.error('Error loading media for playback:', error);
       toast.error('Failed to load media for playback');
+    }
+  };
+
+  const formatLibraryEpisode = (libItem: LibraryItem, media: any): PodcastPlayerEpisode => {
+    let sources: Record<string, string> = {};
+    if (media.sources) {
+      if (Array.isArray(media.sources)) {
+        for (const source of media.sources) {
+          if (source?.platform && source?.url) {
+            sources[source.platform] = source.url;
+          }
+        }
+      } else if (typeof media.sources === 'object') {
+        sources = media.sources;
+      }
+    }
+
+    return {
+      _id: libItem.mediaId,
+      id: libItem.mediaUuid || libItem.mediaId,
+      title: libItem.title,
+      duration: libItem.duration ?? media.duration,
+      coverArt: libItem.coverArt ?? media.coverArt,
+      podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
+      podcastTitle: libItem.artist,
+      sources,
+    };
+  };
+
+  // Handle playing episodes from Podcast Library with auto-transition
+  const handlePlayPodcastLibrary = async (item: LibraryItem, index: number, list?: LibraryItem[]) => {
+    try {
+      const sortedLibrary = list ?? getSortedPodcastLibrary();
+
+      const allEpisodePromises = sortedLibrary.map(async (libItem) => {
+        const mediaId = libItem.mediaUuid || libItem.mediaId;
+        const mediaData = await mediaAPI.getProfile(mediaId);
+        const media = mediaData.media || mediaData;
+        return formatLibraryEpisode(libItem, media);
+      });
+
+      const allEpisodes = await Promise.all(allEpisodePromises);
+      const playableEpisodes = allEpisodes.filter((episode) => getEpisodeAudioUrl(episode));
+
+      if (playableEpisodes.length === 0) {
+        toast.info('No playable episodes in this list.');
+        return;
+      }
+
+      const clickedEpisode = allEpisodes[index];
+      const queueIndex = playableEpisodes.findIndex(
+        (episode) => (episode._id || episode.id) === (clickedEpisode?._id || clickedEpisode?.id)
+      );
+
+      if (queueIndex === -1) {
+        toast.error('No playable audio for this episode');
+        return;
+      }
+
+      const { setQueue: setPodcastQueue, setCurrentEpisode, play: playPodcast } = usePodcastPlayerStore.getState();
+      const webPlayer = useWebPlayerStore.getState();
+      webPlayer.pause();
+      webPlayer.setCurrentMedia(null, 0);
+      webPlayer.setQueue([]);
+      webPlayer.setGlobalPlayerActive(false);
+
+      setPodcastQueue(playableEpisodes);
+      setCurrentEpisode(playableEpisodes[queueIndex], queueIndex);
+      playPodcast();
+      toast.success(`Now playing: ${item.title}`);
+    } catch (error) {
+      console.error('Error loading podcast episode for playback:', error);
+      toast.error('Failed to load episode for playback');
     }
   };
 
@@ -2322,7 +2396,7 @@ const UserProfile: React.FC = () => {
                 type="button"
                 onClick={() => {
                   const sorted = getSortedPodcastLibrary();
-                  if (sorted.length > 0) handlePlayLibrary(sorted[0], 0, sorted);
+                  if (sorted.length > 0) handlePlayPodcastLibrary(sorted[0], 0, sorted);
                 }}
                 disabled={isLoadingLibrary || getSortedPodcastLibrary().length === 0}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
@@ -2455,7 +2529,7 @@ const UserProfile: React.FC = () => {
                     {getSortedPodcastLibrary().map((item, index) => (
                       <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlayLibrary(item, index, getSortedPodcastLibrary())}>
+                          <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlayPodcastLibrary(item, index, getSortedPodcastLibrary())}>
                             {item.coverArt ? (
                               <img 
                                 src={item.coverArt} 

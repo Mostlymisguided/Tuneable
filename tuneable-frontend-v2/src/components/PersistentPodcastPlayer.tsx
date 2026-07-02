@@ -92,7 +92,7 @@ const PersistentPodcastPlayer: React.FC = () => {
     };
 
     el.onended = () => {
-      usePodcastPlayerStore.getState().pause();
+      usePodcastPlayerStore.getState().next();
     };
 
     el.load();

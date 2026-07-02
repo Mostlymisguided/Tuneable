@@ -21,6 +21,8 @@ const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
 
 interface PodcastPlayerState {
   currentEpisode: PodcastPlayerEpisode | null;
+  currentEpisodeIndex: number;
+  queue: PodcastPlayerEpisode[];
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -28,10 +30,12 @@ interface PodcastPlayerState {
   isMuted: boolean;
   playbackRate: number;
 
-  setCurrentEpisode: (episode: PodcastPlayerEpisode | null) => void;
+  setCurrentEpisode: (episode: PodcastPlayerEpisode | null, index?: number) => void;
+  setQueue: (queue: PodcastPlayerEpisode[]) => void;
   play: () => void;
   pause: () => void;
   togglePlayPause: () => void;
+  next: () => void;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   seekTo: (time: number) => void;
@@ -46,8 +50,10 @@ export { PLAYBACK_SPEEDS };
 
 export const usePodcastPlayerStore = create<PodcastPlayerState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       currentEpisode: null,
+      currentEpisodeIndex: 0,
+      queue: [],
       isPlaying: false,
       currentTime: 0,
       duration: 0,
@@ -55,9 +61,12 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       isMuted: false,
       playbackRate: 1,
 
-      setCurrentEpisode: (episode) => {
+      setQueue: (queue) => set({ queue }),
+
+      setCurrentEpisode: (episode, index = 0) => {
         set({
           currentEpisode: episode,
+          currentEpisodeIndex: index,
           isPlaying: false,
           currentTime: 0,
           duration: 0,
@@ -67,6 +76,35 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       play: () => set({ isPlaying: true }),
       pause: () => set({ isPlaying: false }),
       togglePlayPause: () => set((s) => ({ isPlaying: !s.isPlaying })),
+
+      next: () => {
+        const { queue, currentEpisodeIndex } = get();
+        if (queue.length === 0) {
+          set({ isPlaying: false });
+          return;
+        }
+
+        const nextIndex = currentEpisodeIndex + 1;
+        if (nextIndex >= queue.length) {
+          set({
+            currentEpisode: null,
+            currentEpisodeIndex: 0,
+            queue: [],
+            isPlaying: false,
+            currentTime: 0,
+            duration: 0,
+          });
+          return;
+        }
+
+        set({
+          currentEpisode: queue[nextIndex],
+          currentEpisodeIndex: nextIndex,
+          isPlaying: true,
+          currentTime: 0,
+          duration: 0,
+        });
+      },
 
       setCurrentTime: (time) => set({ currentTime: time }),
       setDuration: (duration) => set({ duration }),
@@ -87,6 +125,8 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       clear: () => {
         set({
           currentEpisode: null,
+          currentEpisodeIndex: 0,
+          queue: [],
           isPlaying: false,
           currentTime: 0,
           duration: 0,

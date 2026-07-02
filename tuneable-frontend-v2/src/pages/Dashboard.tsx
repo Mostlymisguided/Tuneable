@@ -51,7 +51,7 @@ const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setCurrentMedia, setQueue, setGlobalPlayerActive } = useWebPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
   const [isLoadingInvited, setIsLoadingInvited] = useState(false);
   const [tuneLibrary, setTuneLibrary] = useState<LibraryItem[]>([]);
@@ -588,6 +588,7 @@ Join here: ${inviteLink}`.trim();
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)
       setCurrentMedia(allFormattedMedia[index], index);
+      play();
       setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
     } catch (error) {
