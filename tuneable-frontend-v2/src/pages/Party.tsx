@@ -3131,63 +3131,6 @@ const Party: React.FC = () => {
                   </div>
                 )}
 
-                {/* Queue search: filter by tag, artist, title as you type; Enter adds term as pill */}
-                {!showVetoed && (
-                  <div className="mb-4 md:mb-6">
-                    <div className="w-full max-w-2xl mx-auto">
-                      <div className="relative flex items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
-                        <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
-                        <input
-                          type="text"
-                          value={queueSearchInput}
-                          onChange={(e) => setQueueSearchInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const raw = queueSearchInput.trim();
-                              if (!raw) return;
-                              if (!queueSearchTerms.includes(raw)) {
-                                setQueueSearchTerms([...queueSearchTerms, raw]);
-                              }
-                              setQueueSearchInput('');
-                            }
-                          }}
-                          placeholder="Search by tag, artist, title… (Enter adds filter)"
-                          className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none"
-                          aria-label="Search queue by tag, artist, or title"
-                        />
-                      </div>
-                      {queueSearchTerms.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {queueSearchTerms.map((term) => (
-                            <span
-                              key={term}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-600/80 text-white"
-                            >
-                              {term}
-                              <button
-                                type="button"
-                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => t !== term))}
-                                className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
-                                aria-label={`Remove filter ${term}`}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </span>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => setQueueSearchTerms([])}
-                            className="px-3 py-1.5 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
-                          >
-                            Clear all
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* Location filter - global party only; above tag filter */}
                 {!showVetoed && isGlobalParty && (
                   <div className="mb-4 md:mb-6">
@@ -3240,7 +3183,7 @@ const Party: React.FC = () => {
                   </div>
                 )}
 
-                {/* Tag filter - hidden by default, "Filter by Tag" reveals tag cloud; directly above time sorting */}
+                {/* Tag filter - hidden by default, "Filter by Tag" reveals tag cloud */}
                 {!showVetoed && (
                   <div className="mb-4 md:mb-6">
                     {!showTagFilterCloud ? (
@@ -3335,6 +3278,63 @@ const Party: React.FC = () => {
                         )}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Queue search: filter by tag, artist, title as you type; Enter adds term as pill */}
+                {!showVetoed && (
+                  <div className="mb-4 md:mb-6">
+                    <div className="w-full max-w-2xl mx-auto">
+                      <div className="relative flex items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
+                        <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
+                        <input
+                          type="text"
+                          value={queueSearchInput}
+                          onChange={(e) => setQueueSearchInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const raw = queueSearchInput.trim();
+                              if (!raw) return;
+                              if (!queueSearchTerms.includes(raw)) {
+                                setQueueSearchTerms([...queueSearchTerms, raw]);
+                              }
+                              setQueueSearchInput('');
+                            }
+                          }}
+                          placeholder="Search by tag, artist, title… (Enter adds filter)"
+                          className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none"
+                          aria-label="Search queue by tag, artist, or title"
+                        />
+                      </div>
+                      {queueSearchTerms.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {queueSearchTerms.map((term) => (
+                            <span
+                              key={term}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-600/80 text-white"
+                            >
+                              {term}
+                              <button
+                                type="button"
+                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => t !== term))}
+                                className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
+                                aria-label={`Remove filter ${term}`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setQueueSearchTerms([])}
+                            className="px-3 py-1.5 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
