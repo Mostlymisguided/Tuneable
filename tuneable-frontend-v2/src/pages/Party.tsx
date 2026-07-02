@@ -16,7 +16,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 // MediaLeaderboard kept in codebase for potential future use
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Youtube, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -2847,7 +2847,7 @@ const Party: React.FC = () => {
                         {addMediaResults.youtube.length > 0 && (
                           <div>
                             <div className="flex items-center mb-2">
-                              <Youtube className="h-4 w-4 text-red-400 mr-2" />
+                              <Music className="h-4 w-4 text-green-400 mr-2" />
                               <h4 className="text-sm font-semibold text-red-300">From MusicBrainz / Spotify ({addMediaResults.youtube.length})</h4>
                             </div>
                             <div className="space-y-2 max-h-64 overflow-y-auto">

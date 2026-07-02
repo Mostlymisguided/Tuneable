@@ -1965,7 +1965,7 @@ const UserProfile: React.FC = () => {
               {showAddTunePanel && addTuneResults.youtube.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center mb-2">
-                    <Youtube className="h-4 w-4 text-red-400 mr-2" />
+                    <Music className="h-4 w-4 text-green-400 mr-2" />
                     <h4 className="text-sm font-semibold text-red-300">From MusicBrainz / Spotify ({addTuneResults.youtube.length})</h4>
                   </div>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
