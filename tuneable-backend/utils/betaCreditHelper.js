@@ -50,7 +50,7 @@ const giveBetaSignupCredit = async (user) => {
         paymentMethod: 'beta',
         balanceBefore: balanceBefore,
         balanceAfter: user.balance,
-        description: 'Beta signup credit (£1.11)',
+        description: 'Welcome credit (£1.11)',
         username: user.username
       });
       console.log(`✅ Created wallet transaction record for beta credit: ${user.username}`);
@@ -64,8 +64,8 @@ const giveBetaSignupCredit = async (user) => {
       await notificationService.createNotification({
         userId: user._id,
         type: 'admin_announcement',
-        title: 'Beta Wallet Credit Added',
-        message: 'You have been gifted £1.11 credit as a beta user',
+        title: 'Welcome Credit Added',
+        message: "Thanks for joining early — we've added £1.11 to your wallet to get you started.",
         link: '/wallet',
         linkText: 'View Wallet',
         groupKey: `beta_signup_credit_${user._id}`

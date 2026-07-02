@@ -2733,7 +2733,7 @@ const UserProfile: React.FC = () => {
                     <option value="topup">Top-up</option>
                     <option value="refund">Refund</option>
                     <option value="adjustment">Adjustment</option>
-                    <option value="beta_credit">Beta Credit</option>
+                    <option value="beta_credit">Welcome Credit</option>
                     <option value="gift">Gift</option>
                   </select>
                 </div>
@@ -2800,7 +2800,7 @@ const UserProfile: React.FC = () => {
                           }`}>
                             {tx.type === 'topup' ? 'Top-up' :
                              tx.type === 'refund' ? 'Refund' :
-                             tx.type === 'beta_credit' ? 'Beta Credit' :
+                             tx.type === 'beta_credit' ? 'Welcome Credit' :
                              tx.type === 'adjustment' ? 'Adjustment' :
                              tx.type === 'gift' ? 'Gift' : tx.type}
                           </span>
