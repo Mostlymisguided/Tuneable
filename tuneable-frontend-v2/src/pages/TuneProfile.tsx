@@ -2194,8 +2194,8 @@ const TuneProfile: React.FC = () => {
           </div>
         </div>
 
-        {/* Share Button - Centered below header */}
-        <div className="flex justify-center mb-6" ref={shareDropdownRef}>
+        {/* Share + Add to Party - Centered below header */}
+        <div className="flex justify-center gap-3 mb-6" ref={shareDropdownRef}>
             {isMobile ? (
               <button
                 onClick={handleNativeShare}
@@ -2274,6 +2274,14 @@ const TuneProfile: React.FC = () => {
                 )}
               </div>
             )}
+            <button
+              type="button"
+              onClick={handleOpenAddToPartyModal}
+              className="px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center space-x-2 text-sm md:text-base"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add to Party</span>
+            </button>
           </div>
 
         {/* Tab Navigation - Only show when in edit mode */}
