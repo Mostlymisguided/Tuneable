@@ -22,7 +22,13 @@ import TopSupporters from '../components/TopSupporters';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
-import { isLocationMatch, formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
+import {
+  isLocationMatch,
+  formatLocation,
+  getCountryPickFromLocation,
+  countryPickToResolvedLocation,
+  type ResolvedLocation,
+} from '../utils/locationHelpers';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
@@ -75,6 +81,23 @@ const TIME_PERIOD_OPTIONS = [
 function formatTimePeriodLabel(period: string): string {
   return TIME_PERIOD_OPTIONS.find((p) => p.key === period)?.label
     ?? period.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+function getPeriodStartDate(period: string): Date | null {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  switch (period) {
+    case 'today':
+      return new Date(now - day);
+    case 'this-week':
+      return new Date(now - 7 * day);
+    case 'this-month':
+      return new Date(now - 28 * day);
+    case 'this-year':
+      return new Date(now - 365 * day);
+    default:
+      return null;
+  }
 }
 
 /** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
@@ -1406,6 +1429,72 @@ const Party: React.FC = () => {
       .sort((a, b) => b.total - a.total || b.count - a.count)
       .slice(0, 30);
   }, [party]);
+
+  // Top countries by tip volume (global party location quick picks)
+  const topLocations = useMemo(() => {
+    if (!party || !isGlobalParty) {
+      return [] as Array<{ pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }>;
+    }
+
+    const startDate = getPeriodStartDate(selectedTimePeriod);
+    const counts: Record<string, { pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }> = {};
+    const media = getPartyMedia().filter((it: any) => it.status === 'active');
+
+    for (const item of media) {
+      const m = item.mediaId || item;
+      const bids: any[] = item.partyBids || m.bids || [];
+
+      for (const bid of bids) {
+        if (bid.status === 'vetoed') continue;
+        if (startDate) {
+          const created = bid.createdAt ? new Date(bid.createdAt) : null;
+          if (!created || created < startDate) continue;
+        }
+
+        const countryPick = getCountryPickFromLocation(bid.userId?.homeLocation);
+        if (!countryPick?.placeId) continue;
+
+        const key = countryPick.placeId;
+        const amount = typeof bid.amount === 'number' ? bid.amount : 0;
+        if (!counts[key]) counts[key] = { pick: countryPick, total: 0, count: 0 };
+        counts[key].total += amount;
+        counts[key].count += 1;
+      }
+    }
+
+    return Object.values(counts)
+      .sort((a, b) => b.total - a.total || b.count - a.count);
+  }, [party, isGlobalParty, selectedTimePeriod]);
+
+  const locationQuickPicks = useMemo(() => {
+    const maxPicks = isMobile ? 5 : 6;
+    const userPick = getCountryPickFromLocation(user?.homeLocation);
+    const picks: Array<{
+      placeId: string;
+      country: string;
+      countryCode: string;
+      display: string;
+      total: number;
+      isUser: boolean;
+    }> = [];
+
+    if (userPick) {
+      const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
+      picks.push({
+        ...userPick,
+        total: userStats?.total ?? 0,
+        isUser: true,
+      });
+    }
+
+    for (const { pick, total } of topLocations) {
+      if (picks.length >= maxPicks) break;
+      if (picks.some((p) => p.placeId === pick.placeId)) continue;
+      picks.push({ ...pick, total, isUser: false });
+    }
+
+    return picks;
+  }, [topLocations, user?.homeLocation, isMobile]);
 
   // Selected tag filters derived from queueSearchTerms
   const selectedTagFilters = useMemo(() => {
@@ -3216,13 +3305,24 @@ const Party: React.FC = () => {
                             <MapPin className="h-4 w-4 mr-2 text-purple-400" />
                             Filter by Location
                           </h3>
-                          <button
-                            type="button"
-                            onClick={() => setShowLocationFilter(false)}
-                            className="text-sm text-gray-400 hover:text-white"
-                          >
-                            Hide
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {selectedLocation?.placeId && (
+                              <button
+                                type="button"
+                                onClick={() => handleLocationFilterChange(null)}
+                                className="text-sm text-purple-300 hover:text-white"
+                              >
+                                Clear
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setShowLocationFilter(false)}
+                              className="text-sm text-gray-400 hover:text-white"
+                            >
+                              Hide
+                            </button>
+                          </div>
                         </div>
                         <p className="text-xs text-gray-400 mb-3">
                           Show tunes ranked by tips from supporters in this place and anywhere within it.
@@ -3232,6 +3332,49 @@ const Party: React.FC = () => {
                           onChange={handleLocationFilterChange}
                           placeholder="Search city, town, or region…"
                         />
+                        {locationQuickPicks.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-xs text-gray-500 mb-2">
+                              Popular locations · {formatTimePeriodLabel(selectedTimePeriod).toLowerCase()}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {locationQuickPicks.map((loc) => {
+                                const selected = selectedLocation?.placeId === loc.placeId;
+                                return (
+                                  <button
+                                    key={loc.placeId}
+                                    type="button"
+                                    onClick={() =>
+                                      handleLocationFilterChange(
+                                        selected ? null : countryPickToResolvedLocation(loc)
+                                      )
+                                    }
+                                    className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                                      selected
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
+                                    }`}
+                                    title={
+                                      loc.total > 0
+                                        ? `${penceToPounds(loc.total)} in tips`
+                                        : loc.isUser
+                                          ? 'Your home country'
+                                          : undefined
+                                    }
+                                  >
+                                    {loc.country}
+                                    {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
+                                    {loc.total > 0 && (
+                                      <span className="ml-2 text-[10px] opacity-70">
+                                        {penceToPounds(loc.total)}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                         {selectedLocation?.placeId && (
                           <p className="text-xs text-purple-300 mt-2">
                             Showing tips from {formatLocation(selectedLocation)} and below

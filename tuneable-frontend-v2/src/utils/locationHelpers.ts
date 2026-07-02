@@ -19,6 +19,59 @@ export interface Location {
 
 export type ResolvedLocation = MapboxLocationFields & Location;
 
+export interface CountryLocationPick {
+  placeId: string;
+  country: string;
+  countryCode: string;
+  display: string;
+}
+
+/**
+ * Extract country-level Mapbox place from a resolved or home location.
+ */
+export function getCountryPickFromLocation(
+  location: (MapboxLocationFields & Location) | null | undefined
+): CountryLocationPick | null {
+  if (!location) return null;
+
+  if (location.featureType === 'country' && location.placeId) {
+    const name = location.country || location.label || location.display || 'Country';
+    return {
+      placeId: location.placeId,
+      country: name,
+      countryCode: location.countryCode || '',
+      display: name,
+    };
+  }
+
+  const countryAncestor = location.ancestors?.find((a) => a.placetype === 'country');
+  if (countryAncestor?.placeId) {
+    const name = countryAncestor.label || location.country || 'Country';
+    return {
+      placeId: countryAncestor.placeId,
+      country: name,
+      countryCode: countryAncestor.countryCode || location.countryCode || '',
+      display: name,
+    };
+  }
+
+  return null;
+}
+
+/** Build a minimal ResolvedLocation for country-level Tunefeed filtering. */
+export function countryPickToResolvedLocation(pick: CountryLocationPick): ResolvedLocation {
+  return {
+    placeProvider: 'mapbox',
+    placeId: pick.placeId,
+    featureType: 'country',
+    country: pick.country,
+    countryCode: pick.countryCode,
+    display: pick.display,
+    label: pick.country,
+    ancestorIds: [pick.placeId],
+  };
+}
+
 /**
  * Check if user location matches party location filter
  */
