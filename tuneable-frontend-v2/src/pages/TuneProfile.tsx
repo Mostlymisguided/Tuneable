@@ -39,7 +39,6 @@ import {
   Instagram
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
-import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -283,9 +282,8 @@ const TuneProfile: React.FC = () => {
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
 
-  // Collapsible sections: Top Fans, Top Tips, Tag Rankings
+  // Collapsible sections: Top Fans, Tag Rankings
   const [showTopFans, setShowTopFans] = useState(false);
-  const [showTopTips, setShowTopTips] = useState(false);
   const [showTagRankings, setShowTagRankings] = useState(false);
 
   // Share functionality state
@@ -2175,14 +2173,6 @@ const TuneProfile: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Top Tip - Hidden on mobile */}
-                <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-yellow-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Top Tip</div>
-                  <div className="text-lg font-bold text-yellow-400">
-                    {penceToPounds(media.globalMediaBidTop)}
-                  </div>
-                </div>
-                
                 {/* Average Tip - Hidden on mobile */}
                 <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-blue-500/50">
                   <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Avg Tip</div>
@@ -2440,27 +2430,6 @@ const TuneProfile: React.FC = () => {
             {showTopFans && (
               <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
                 <TopSupporters bids={media.bids} maxDisplay={10} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Top Tips - collapsible */}
-        {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
-            <button
-              onClick={() => setShowTopTips(!showTopTips)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            >
-              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400 flex-shrink-0" />
-                {showTopTips ? 'Top Tips' : 'Show Top Tips'}
-              </span>
-              {showTopTips ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-            </button>
-            {showTopTips && (
-              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <TopBidders bids={media.bids} maxDisplay={5} />
               </div>
             )}
           </div>
@@ -3839,7 +3808,7 @@ const TuneProfile: React.FC = () => {
             </div>
             
             <p className="text-gray-300 mb-6">
-              Join Tuneable as a creator to claim your music, earn directly from fan bids, 
+              Join Tuneable as a creator to claim your music, earn directly from fan tips, 
               and connect with your audience in a revolutionary new way.
             </p>
             
@@ -3847,7 +3816,7 @@ const TuneProfile: React.FC = () => {
               <h3 className="text-white font-semibold mb-2">Creator Benefits:</h3>
               <ul className="text-gray-300 text-sm space-y-1">
                 <li>✓ Claim ownership of your tracks</li>
-                <li>✓ Earn directly from fan bids</li>
+                <li>✓ Earn directly from fan tips</li>
                 <li>✓ Access to creator analytics</li>
                 <li>✓ Verify your identity with badges</li>
                 <li>✓ Connect with your biggest fans</li>

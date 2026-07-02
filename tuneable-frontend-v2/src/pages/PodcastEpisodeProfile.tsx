@@ -4019,7 +4019,7 @@ const PodcastEpisodeProfile: React.FC = () => {
             </div>
             
             <p className="text-gray-300 mb-6">
-              Join Tuneable as a creator to claim your music, earn directly from fan bids, 
+              Join Tuneable as a creator to claim your music, earn directly from fan tips, 
               and connect with your audience in a revolutionary new way.
             </p>
             
@@ -4027,7 +4027,7 @@ const PodcastEpisodeProfile: React.FC = () => {
               <h3 className="text-white font-semibold mb-2">Creator Benefits:</h3>
               <ul className="text-gray-300 text-sm space-y-1">
                 <li>✓ Claim ownership of your tracks</li>
-                <li>✓ Earn directly from fan bids</li>
+                <li>✓ Earn directly from fan tips</li>
                 <li>✓ Access to creator analytics</li>
                 <li>✓ Verify your identity with badges</li>
                 <li>✓ Connect with your biggest fans</li>
