@@ -2173,6 +2173,14 @@ const TuneProfile: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* Top Tip - Hidden on mobile */}
+                <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-yellow-500/50">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Top Tip</div>
+                  <div className="text-lg font-bold text-yellow-400">
+                    {penceToPounds(media.globalMediaBidTop)}
+                  </div>
+                </div>
+                
                 {/* Average Tip - Hidden on mobile */}
                 <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-blue-500/50">
                   <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Avg Tip</div>
