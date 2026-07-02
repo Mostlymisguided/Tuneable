@@ -8,7 +8,6 @@ import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI, searchAPI, locationAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import BidModal from '../components/BidModal';
-// import PartyQueueSearch from '../components/PartyQueueSearch'; // Commented out for now
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
@@ -161,10 +160,9 @@ const Party: React.FC = () => {
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
     getTagTermsFromSearchParams(searchParams, partyId === 'global')
   );
-  // Live-typing queue search (filters as you type; Enter adds to queueSearchTerms as pill)
-  const [queueSearchInput, setQueueSearchInput] = useState('');
-  const [showAddTunesPanel, setShowAddTunesPanel] = useState(false);
-  const [addMediaSearchQuery, setAddMediaSearchQuery] = useState('');
+  // Unified search: live-filters queue; Enter / "Search library" queries Tuneable + external sources
+  const [searchQuery, setSearchQuery] = useState('');
+  const [lastLibrarySearchQuery, setLastLibrarySearchQuery] = useState('');
   const [addMediaResults, setAddMediaResults] = useState<{
     database: any[];
     youtube: any[];
@@ -579,14 +577,15 @@ const Party: React.FC = () => {
     }
   }, [party, user, partyId, currentPartyId, currentMedia, setQueue, setCurrentMedia, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
-  // Clear database search flag and results when search query is cleared
+  // Clear library search results when search query is cleared
   useEffect(() => {
-    if (!addMediaSearchQuery.trim()) {
+    if (!searchQuery.trim()) {
       setHasSearchedDatabase(false);
+      setLastLibrarySearchQuery('');
       setAddMediaResults({ database: [], youtube: [] });
       setYoutubeNextPageToken(null);
     }
-  }, [addMediaSearchQuery]);
+  }, [searchQuery]);
 
   // Update WebPlayer queue when sorting or tag filtering changes
   useEffect(() => {
@@ -655,7 +654,7 @@ const Party: React.FC = () => {
         }
       }
     }
-  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, setQueue, setCurrentMedia, currentMedia]);
+  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, setQueue, setCurrentMedia, currentMedia]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -773,8 +772,17 @@ const Party: React.FC = () => {
   };
 
   // Inline add media search functions
+  const clearSearchState = () => {
+    setSearchQuery('');
+    setLastLibrarySearchQuery('');
+    setHasSearchedDatabase(false);
+    setAddMediaResults({ database: [], youtube: [] });
+    setYoutubeNextPageToken(null);
+  };
+
   const handleAddMediaSearch = async () => {
-    if (!addMediaSearchQuery.trim()) return;
+    const query = searchQuery.trim();
+    if (!query) return;
     
     // Check if user is logged in - redirect to registration if not
     if (!user) {
@@ -785,14 +793,15 @@ const Party: React.FC = () => {
     }
     
     setIsSearchingNewMedia(true);
-    setHasSearchedDatabase(true); // Mark that we've performed a database/YouTube search
+    setHasSearchedDatabase(true);
+    setLastLibrarySearchQuery(query);
     try {
       let response;
       
       // Check if it's a YouTube URL
-      if (isYouTubeUrl(addMediaSearchQuery)) {
+      if (isYouTubeUrl(query)) {
         console.log('🎥 Detected YouTube URL, processing...');
-        response = await searchAPI.searchByYouTubeUrl(addMediaSearchQuery);
+        response = await searchAPI.searchByYouTubeUrl(query);
         console.log('🎥 YouTube URL response:', response);
         
         // Handle YouTube URL response
@@ -833,8 +842,8 @@ const Party: React.FC = () => {
         const mediaSource = 'musicbrainz';
         
         // Search local database first
-        console.log('🔍 Searching for new media:', addMediaSearchQuery);
-        response = await searchAPI.search(addMediaSearchQuery, mediaSource);
+        console.log('🔍 Searching for new media:', query);
+        response = await searchAPI.search(query, mediaSource);
       
       let databaseResults = [];
       let youtubeResults = [];
@@ -850,7 +859,7 @@ const Party: React.FC = () => {
       // If we got local results but want to show more external metadata too, fetch those
       if (databaseResults.length > 0 && response.hasMoreExternal) {
         console.log('🎼 Also fetching external metadata results...');
-        const youtubeResponse = await searchAPI.search(addMediaSearchQuery, mediaSource, undefined, undefined, true);
+        const youtubeResponse = await searchAPI.search(query, mediaSource, undefined, undefined, true);
         if (youtubeResponse.videos) {
           youtubeResults = youtubeResponse.videos;
           setYoutubeNextPageToken(youtubeResponse.nextPageToken || null);
@@ -882,12 +891,12 @@ const Party: React.FC = () => {
   };
 
   const handleLoadMoreYouTube = async () => {
-    if (!youtubeNextPageToken || !addMediaSearchQuery) return;
+    if (!youtubeNextPageToken || !lastLibrarySearchQuery) return;
     
     setIsLoadingMoreYouTube(true);
     try {
       const mediaSource = 'musicbrainz';
-      const response = await searchAPI.search(addMediaSearchQuery, mediaSource, youtubeNextPageToken, undefined, true);
+      const response = await searchAPI.search(lastLibrarySearchQuery, mediaSource, youtubeNextPageToken, undefined, true);
       
       if (response.videos) {
         // Append new results to existing YouTube results
@@ -1291,8 +1300,7 @@ const Party: React.FC = () => {
           }
           
           // Clear search immediately
-          setAddMediaSearchQuery('');
-          setAddMediaResults({ database: [], youtube: [] });
+          clearSearchState();
           
           // Refresh party in background (don't block UI)
           setProgress?.('updating');
@@ -1376,8 +1384,7 @@ const Party: React.FC = () => {
       toast.success(`Added ${pendingMedia.title} to party with a £${bidAmount.toFixed(2)} tip!`);
       
       // Clear search and refresh party
-      setAddMediaSearchQuery('');
-      setAddMediaResults({ database: [], youtube: [] });
+      clearSearchState();
       setShowTagModal(false);
       setPendingMedia(null);
       fetchPartyDetails();
@@ -1602,11 +1609,9 @@ const Party: React.FC = () => {
       });
     }
     
-    // REMOVED: Real-time search filter from addMediaSearchQuery
-    // Queue now remains whole, matching items appear in search results
-    
+    // Live searchQuery filters the queue below; library results use explicit Search library / Enter
     // Apply search filter: stored terms (pills) + current typing (live filter)
-    const liveTerm = queueSearchInput.trim();
+    const liveTerm = searchQuery.trim();
     const allTerms = liveTerm ? [...queueSearchTerms, liveTerm] : queueSearchTerms;
     
     if (allTerms.length > 0) {
@@ -1651,32 +1656,6 @@ const Party: React.FC = () => {
     }
     
     return media;
-  };
-
-  // Get filtered queue items for search results (real-time search)
-  const getFilteredQueueForSearch = () => {
-    if (!addMediaSearchQuery.trim()) return [];
-    
-    let media;
-    if (selectedTimePeriod === 'all-time') {
-      media = getPartyMedia().filter((item: any) => item.status === 'active');
-    } else {
-      media = sortedMedia.filter((item: any) => item.status === 'active');
-    }
-    
-    const searchQuery = addMediaSearchQuery.toLowerCase();
-    return media.filter((item: any) => {
-      const mediaItem = item.mediaId || item;
-      const title = (mediaItem.title || '').toLowerCase();
-      const artist = Array.isArray(mediaItem.artist) 
-        ? mediaItem.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
-        : (mediaItem.artist || '').toLowerCase();
-      const category = (mediaItem.category || '').toLowerCase();
-      
-      return title.includes(searchQuery) || 
-             artist.includes(searchQuery) || 
-             category.includes(searchQuery);
-    });
   };
 
   // Helper function to calculate average bid for media (returns in pounds)
@@ -2661,316 +2640,88 @@ const Party: React.FC = () => {
         <div className="lg:col-span-2">
           
           <div className="space-y-3">
-            {getPartyMedia().length > 0 ? (
+            {party ? (
               <div className="space-y-6">
-                {/* Party Queue Search - MOVED ABOVE SORT BY TIME AND COMMENTED OUT */}
-                {!showVetoed && party && (
-                  <div className="mb-6">
-                    {/* COMMENTED OUT FOR NOW
-                    <PartyQueueSearch
-                      onSearchTermsChange={setQueueSearchTerms}
-                    />
-                    */}
-                  </div>
-                )}
-
-                {/* Inline Add Media Search Panel - Collapsed by default, expand with "Add Tunes" */}
+                {/* Unified search: live-filters queue; Enter / Search library adds from Tuneable + external */}
                 {!showVetoed && party && (
                   <div className="mb-4 md:mb-6">
-                    <div className="justify-center text-center rounded-lg">
-                        {!showAddTunesPanel ? (
-                          <div className="flex justify-center">
-                            <button
-                              type="button"
-                              onClick={() => setShowAddTunesPanel(true)}
-                              className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
-                            >
-                              <Plus className="h-4 w-4 text-purple-400" />
-                              Add Tunes
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                        {/* Search Input */}
-                        <div className="flex flex-col sm:flex-row justify-center gap-2 mb-4">
+                    <div className="w-full max-w-2xl mx-auto">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex flex-1 items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
+                          <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
                           <input
                             type="text"
-                            value={addMediaSearchQuery}
-                            onChange={(e) => setAddMediaSearchQuery(e.target.value)}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
                                 handleAddMediaSearch();
                               }
                             }}
-                            placeholder="Paste a YouTube URL or Search for Tunes in our Library..."
-                            className="flex-1 bg-gray-900 rounded-xl p-2 sm:p-3 text-slate placeholder-gray-400 focus:outline-none focus:border-purple-500 text-sm sm:text-base"
+                            placeholder="Filter queue by title, artist, tag… or paste YouTube URL"
+                            className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm sm:text-base"
+                            aria-label="Search tunes in party or library"
                           />
-                         
                         </div>
-                        <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={handleAddMediaSearch}
+                          disabled={isSearchingNewMedia || !searchQuery.trim()}
+                          className="px-4 py-2.5 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors text-sm sm:text-base flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                          {isSearchingNewMedia ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            'Search library'
+                          )}
+                        </button>
+                      </div>
+                      {searchQuery.trim() && getDisplayMedia().length > 0 && (
+                        <p className="text-xs text-purple-300 mt-2 text-center">
+                          {getDisplayMedia().length} tune{getDisplayMedia().length !== 1 ? 's' : ''} in party match — scroll down to tip
+                        </p>
+                      )}
+                      {searchQuery.trim() && getDisplayMedia().length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
+                        <p className="text-xs text-gray-400 mt-2 text-center">
+                          No matches in party — press Enter or Search library to find new tunes
+                        </p>
+                      )}
+                      {queueSearchTerms.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {queueSearchTerms.map((term) => (
+                            <span
+                              key={term}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                                term.startsWith('#')
+                                  ? 'bg-blue-700/80 text-blue-100'
+                                  : 'bg-purple-600/80 text-white'
+                              }`}
+                            >
+                              {term}
+                              <button
+                                type="button"
+                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => t !== term))}
+                                className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
+                                aria-label={`Remove filter ${term}`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          ))}
                           <button
-                            onClick={handleAddMediaSearch}
-                            disabled={isSearchingNewMedia || !addMediaSearchQuery.trim()}
-                            className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                            type="button"
+                            onClick={() => setQueueSearchTerms([])}
+                            className="px-3 py-1.5 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
                           >
-                            {isSearchingNewMedia ? (
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                            ) : (
-                              'Search'
-                            )}
+                            Clear filters
                           </button>
                         </div>
-                          </>
-                        )}
+                      )}
+                    </div>
 
-                        {/* Queue Results and search results - only when Add Tunes panel is expanded */}
-                        {showAddTunesPanel && (
-                        <>
-                        {/* Queue Results - Real-time search from party queue */}
-                        {addMediaSearchQuery.trim() && getFilteredQueueForSearch().length > 0 && (
-                          <div className="mb-6">
-                            <div className="flex items-center mb-4">
-                              <Music className="h-4 w-4 text-purple-400 mr-2" />
-                              <h4 className="text-sm font-semibold text-purple-300">From Party Queue ({getFilteredQueueForSearch().length})</h4>
-                            </div>
-                            <div className="space-y-3">
-                              {getFilteredQueueForSearch().map((item: any, index: number) => {
-                                // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
-                                const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
-                                // Ensure artists array is set for ClickableArtistDisplay
-                                // Backend sends both 'artist' (string for backward compat) and 'artists' (array with userIds)
-                                const mediaData = {
-                                  ...rawMediaData,
-                                  // Prioritize 'artists' from backend (full array with userIds)
-                                  artists: Array.isArray(rawMediaData.artists) ? rawMediaData.artists : 
-                                          // Fallback: if 'artist' is an array (Mongoose document), use it
-                                          (Array.isArray(rawMediaData.artist) ? rawMediaData.artist : []),
-                                  // Keep 'artist' for backward compatibility (may be string or array)
-                                  artist: rawMediaData.artist,
-                                  featuring: Array.isArray(rawMediaData.featuring) ? rawMediaData.featuring : [],
-                                  creatorDisplay: rawMediaData.creatorDisplay
-                                };
-                                const isAdmin = user?.role?.includes('admin');
-                                return (
-                                  <div
-                                    key={`queue-search-${mediaData.id || mediaData._id}-${index}`}
-                                    className="card flex flex-col md:flex-row md:items-center hover:border-white relative p-1.5 md:p-4 md:pt-4"
-                                  >
-                                    {/* Action Button - Top Right (opens modal with available actions) */}
-                                    {(isHost || isAdmin || getUserBid(item)) && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleActionButtonClick(item);
-                                        }}
-                                        className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white transition-colors"
-                                        title="Actions"
-                                      >
-                                        <X className="h-3 w-3 md:h-4 md:w-4" />
-                                      </button>
-                                    )}
-                                    
-                                    {/* Mobile-only wrapper for thumbnail + details side by side */}
-                                    <div className="flex flex-row md:contents items-start gap-2 mb-1 md:mb-0">
-                                      {/* Media Thumbnail with Overlays */}
-                                      <div 
-                                        className="relative w-32 h-32 cursor-pointer group flex-shrink-0"
-                                        onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-                                      >
-                                        <img
-                                          src={mediaData.coverArt || DEFAULT_COVER_ART}
-                                          alt={mediaData.title || 'Unknown Media'}
-                                          className="w-full h-full rounded object-cover"
-                                          width="192"
-                                          height="192"
-                                        />
-                                        
-                                        {/* Play Icon Overlay */}
-                                        <div 
-                                          className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            // Find the actual index in the full queue for playing
-                                            const queueIndex = getDisplayMedia().findIndex((queueItem: any) => {
-                                              const queueMediaData = selectedTimePeriod === 'all-time' ? (queueItem.mediaId || queueItem) : queueItem;
-                                              return (queueMediaData.id || queueMediaData._id) === (mediaData.id || mediaData._id);
-                                            });
-                                            if (queueIndex !== -1) {
-                                              handlePlayMedia(getDisplayMedia()[queueIndex], queueIndex);
-                                            }
-                                          }}
-                                        >
-                                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
-                                            <Play className="h-5 w-5 md:h-6 md:w-6 text-white" />
-                                          </div>
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Media Details */}
-                                      <div className="flex-1 min-w-0 md:ml-4">
-                                        <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 md:space-x-2">
-                                          <h4 
-                                            className="font-medium text-white text-sm md:text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
-                                            onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-                                          >
-                                            {mediaData.title || 'Unknown Media'}
-                                          </h4>
-                                          <span className="hidden md:inline text-gray-400">•</span>
-                                          <span className="text-gray-300 text-sm md:text-lg truncate font-light">
-                                            <ClickableArtistDisplay media={mediaData} />
-                                          </span>
-                                          <div className="flex items-center space-x-1 md:ml-2">
-                                            <Clock className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
-                                            <span className="text-xs md:text-sm text-gray-300">{formatDuration(mediaData.duration)}</span>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Mini Supporters Bar - shows top supporters for this media */}
-                                        <div className="md:mt-0">
-                                          <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
-                                        </div>
-                                        
-                                        {/* Tags Display */}
-                                        {mediaData.tags && mediaData.tags.length > 0 && (
-                                          <div className="mt-2 flex">
-                                            <div className="flex flex-wrap gap-1">
-                                              {mediaData.tags.slice(0, window.innerWidth < 640 ? 3 : 5).map((tag: string, tagIndex: number) => (
-                                                <Link
-                                                  key={tagIndex}
-                                                  to={`/tune/${mediaData._id || mediaData.id}`}
-                                                  className="px-2 py-1 bg-purple-800 hover:bg-purple-500 text-white text-xs rounded-full transition-colors no-underline"
-                                                >
-                                                  #{tag}
-                                                </Link>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {/* Action Buttons */}
-                                    <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
-                                      <div className="flex items-center justify-center space-x-2">
-                                        {/* Metrics Display */}
-                                        <div className="flex flex-row md:flex-col items-center md:items-end space-x-2 md:space-x-0 md:space-y-1 bg-slate-900/20 px-2 py-2 rounded-lg">
-                                          <div className="text-center p-1 md:p-2">
-                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Tip Total">
-                                              <Coins className="h-3 w-3 md:h-4 md:w-4" />
-                                            </div>
-                                            <div className="text-xs md:text-lg text-gray-300">
-                                              {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
-                                            </div>
-                                          </div>
-                                          <div className="text-center p-1 md:p-2">
-                                            <div className="flex items-center justify-center text-xs text-gray-300 tracking-wide" title="Average Tip">
-                                              <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
-                                            </div>
-                                            <div className="text-xs md:text-lg text-gray-300">
-                                              £{calculateAverageBid(mediaData, item).toFixed(2)}
-                                            </div>
-                                          </div>
-                                        </div>
-                                        {/* Inline tipping controls (API still expects bid terminology) */}
-                                        <div className="flex flex-row items-center space-x-1 md:space-x-2">
-                                          {/* Input group with +/- buttons */}
-                                          <div className="flex-col flex justify-center items-center space-x-1">
-                                          <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                const mediaId = mediaData._id || mediaData.id;
-                                                const avgBid = calculateAverageBid(mediaData, item);
-                                                const defaultBid = Math.max(getDefaultBidAmount(mediaData), avgBid || 0);
-                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
-                                                const newAmount = current + 0.01;
-                                                setQueueBidAmounts({
-                                                  ...queueBidAmounts,
-                                                  [mediaId]: newAmount.toFixed(2)
-                                                });
-                                              }}
-                                              disabled={isBidding}
-                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-tr-xl text-black transition-colors flex items-center justify-center"
-                                            >
-                                              <Plus className="h-3 w-3 md:h-4 md:w-4" />
-                                            </button>
-                                            <input
-                                              type="number"
-                                              step="0.01"
-                                              min={getEffectiveMinimumBid(mediaData)}
-                                              value={queueBidAmounts[mediaData._id || mediaData.id] ?? (() => {
-                                                const avgBid = calculateAverageBid(mediaData, item);
-                                                return Math.max(getDefaultBidAmount(mediaData), avgBid || 0).toFixed(2);
-                                              })()}
-                                              onChange={(e) => setQueueBidAmounts({
-                                                ...queueBidAmounts,
-                                                [mediaData._id || mediaData.id]: e.target.value
-                                              })}
-                                              className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1 md:py-2 text-gray text-center text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                              onClick={(e) => e.stopPropagation()}
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                const mediaId = mediaData._id || mediaData.id;
-                                                const avgBid = calculateAverageBid(mediaData, item);
-                                                const minBid = getEffectiveMinimumBid(mediaData);
-                                                const defaultBid = Math.max(getDefaultBidAmount(mediaData), avgBid || 0);
-                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
-                                                const newAmount = Math.max(minBid, current - 0.01);
-                                                setQueueBidAmounts({
-                                                  ...queueBidAmounts,
-                                                  [mediaId]: newAmount.toFixed(2)
-                                                });
-                                              }}
-                                              disabled={isBidding || (() => {
-                                                const mediaId = mediaData._id || mediaData.id;
-                                                const minBid = getEffectiveMinimumBid(mediaData);
-                                                const defaultBid = getDefaultBidAmount(mediaData);
-                                                const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
-                                                return current <= minBid;
-                                              })()}
-                                              className="px-5 py-1 md:px-5 md:py-1.5 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-xl rounded-br-xl text-black transition-colors flex items-center justify-center"
-                                            >
-                                              <Minus className="h-3 w-3 md:h-4 md:w-4" />
-                                            </button>
-                                          </div>
-                                          {/* Tip Button */}
-                                          <button
-                                            onClick={() => handleInlineBid(item)}
-                                            disabled={isBidding}
-                                            className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap flex items-center justify-center gap-2"
-                                          >
-                                            {isBidding ? (
-                                              <>
-                                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                                                <span>Placing Tip...</span>
-                                              </>
-                                            ) : (
-                                              (() => {
-                                                const mediaId = mediaData._id || mediaData.id;
-                                                // Use same calculation logic as input field
-                                                const avgBid = calculateAverageBid(mediaData, item);
-                                                const defaultBid = Math.max(getDefaultBidAmount(mediaData), avgBid || 0);
-                                                const raw = queueBidAmounts[mediaId] ?? defaultBid.toFixed(2);
-                                                const parsed = parseFloat(raw);
-                                                if (!Number.isFinite(parsed)) {
-                                                  return 'Send Tip';
-                                                }
-                                                return `Tip £${parsed.toFixed(2)}`;
-                                              })()
-                                            )}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                    {(hasSearchedDatabase || addMediaResults.database.length > 0 || addMediaResults.youtube.length > 0) && (
+                      <div className="mt-4 max-w-2xl mx-auto">
 
                         {/* Database Results */}
                         {addMediaResults.database.length > 0 && (
@@ -3226,16 +2977,15 @@ const Party: React.FC = () => {
                         )}
 
                         {/* No Results Message - Only show after database/external search has been performed */}
-                        {!isSearchingNewMedia && hasSearchedDatabase && addMediaSearchQuery && addMediaResults.database.length === 0 && addMediaResults.youtube.length === 0 && (
+                        {!isSearchingNewMedia && hasSearchedDatabase && lastLibrarySearchQuery && addMediaResults.database.length === 0 && addMediaResults.youtube.length === 0 && (
                           <div className="text-center py-8">
                             <Music className="h-12 w-12 text-gray-500 mx-auto mb-3" />
-                            <p className="text-gray-400">No media found for "{addMediaSearchQuery}"</p>
+                            <p className="text-gray-400">No media found for "{lastLibrarySearchQuery}"</p>
                             <p className="text-gray-500 text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
-                        </>
-                        )}
                       </div>
+                    )}
                   </div>
                 )}
 
@@ -3500,63 +3250,6 @@ const Party: React.FC = () => {
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Queue search: filter by tag, artist, title as you type; Enter adds term as pill */}
-                {!showVetoed && (
-                  <div className="mb-4 md:mb-6">
-                    <div className="w-full max-w-2xl mx-auto">
-                      <div className="relative flex items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
-                        <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
-                        <input
-                          type="text"
-                          value={queueSearchInput}
-                          onChange={(e) => setQueueSearchInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const raw = queueSearchInput.trim();
-                              if (!raw) return;
-                              if (!queueSearchTerms.includes(raw)) {
-                                setQueueSearchTerms([...queueSearchTerms, raw]);
-                              }
-                              setQueueSearchInput('');
-                            }
-                          }}
-                          placeholder="Search by tag, artist, title… (Enter adds filter)"
-                          className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none"
-                          aria-label="Search queue by tag, artist, or title"
-                        />
-                      </div>
-                      {queueSearchTerms.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {queueSearchTerms.map((term) => (
-                            <span
-                              key={term}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-600/80 text-white"
-                            >
-                              {term}
-                              <button
-                                type="button"
-                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => t !== term))}
-                                className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
-                                aria-label={`Remove filter ${term}`}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </span>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => setQueueSearchTerms([])}
-                            className="px-3 py-1.5 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
-                          >
-                            Clear all
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
 
@@ -3971,19 +3664,16 @@ const Party: React.FC = () => {
                     )}
                   </div>
                 )}
+
+                {!showVetoed && getPartyMedia().length === 0 && (
+                  <div className="text-center py-8">
+                    <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No tunes in queue yet</p>
+                    <p className="text-gray-600 text-sm mt-2">Use the search bar above to find tunes and tip them into the party</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No Tunes in queue</p>
-                <button
-                  onClick={() => handleNavigateWithWarning(`/search?partyId=${partyId}`, 'navigate to search page')}
-                  className="btn-primary mt-4"
-                >
-                  Add First Tune
-                </button>
-              </div>
-            )}
+            ) : null}
 
             {/* Previously Played Songs - Only show for live parties */}
             {/* NOTE: This section is for future live jukebox feature. MVP uses remote parties only. */}
