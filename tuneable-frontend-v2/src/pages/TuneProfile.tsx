@@ -2060,16 +2060,6 @@ const TuneProfile: React.FC = () => {
                   <span className="sm:hidden">Edit</span>
                 </button>
               )}
-              {canReplaceAudio() && !isEditMode && (
-                <button
-                  onClick={(e) => handleAttachAudioClick(e, true)}
-                  className="px-3 md:px-4 py-2 bg-amber-600/40 hover:bg-amber-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
-                >
-                  <Upload className="h-4 w-4" />
-                  <span className="hidden sm:inline">Replace MP3</span>
-                  <span className="sm:hidden">Replace</span>
-                </button>
-              )}
               {/* Exit Edit Mode Button - Only show if in edit mode */}
               {canEditTune() && isEditMode && (
                 <button
@@ -3798,6 +3788,29 @@ const TuneProfile: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {canReplaceAudio() && (
+                  <div>
+                    <label className="block text-white font-medium mb-2">Audio file</label>
+                    {normalizeSources(media.sources).upload && (
+                      <div className="mb-2 text-sm text-gray-400 break-all">
+                        Current: {normalizeSources(media.sources).upload}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => handleAttachAudioClick(e, true)}
+                      disabled={isAttachingAudio}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>Replace MP3</span>
+                    </button>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Upload a new MP3 to replace the current audio file used for playback.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
