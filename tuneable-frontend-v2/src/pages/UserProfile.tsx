@@ -1809,7 +1809,7 @@ const UserProfile: React.FC = () => {
                     <button
                       onClick={handleAddTuneSearch}
                       disabled={isSearchingTune || !addTuneSearchQuery.trim()}
-                      className="flex py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                      className="inline-flex self-center items-center justify-center py-2 px-4 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                     >
                       {isSearchingTune ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
