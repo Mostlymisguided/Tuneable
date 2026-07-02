@@ -10,7 +10,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
-const { createMediaUpload, createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
@@ -343,7 +343,6 @@ const normalizeLanguageInput = (value) => {
 };
 
 // Configure media upload
-const mediaUpload = createMediaUpload();
 const coverArtUpload = createCoverArtUpload();
 
 // Create a custom multer configuration that handles both files
@@ -389,6 +388,22 @@ const coverArtUploadSingle = multer({
       return cb(new Error('Only image files are allowed for cover art'));
     }
   }
+});
+
+// Memory storage for attach-upload (needs buffer for manual R2 PutObject)
+const attachAudioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /mp3/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    return cb(new Error('Only MP3 files are allowed'));
+  },
 });
 
 // @route   POST /api/media/upload
@@ -763,7 +778,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 // @route   POST /api/media/:mediaId/attach-upload
 // @desc    Attach an MP3 to existing media (e.g. YouTube catalog entry) and enable playback
 // @access  Private (admin, media editor, or uploader with rights confirmation)
-router.post('/:mediaId/attach-upload', authMiddleware, mediaUpload.single('audioFile'), async (req, res) => {
+router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.single('audioFile'), async (req, res) => {
   try {
     const { mediaId } = req.params;
     const userId = req.user._id;
@@ -772,6 +787,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, mediaUpload.single('audio
       rightsConfirmed,
       uploaderRole = 'owner',
       rightsDisclaimer,
+      replaceExisting,
     } = req.body;
 
     if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
@@ -782,6 +798,11 @@ router.post('/:mediaId/attach-upload', authMiddleware, mediaUpload.single('audio
     if (!audioFile) {
       return res.status(400).json({ error: 'MP3 audio file is required' });
     }
+    if (!audioFile.buffer?.length) {
+      return res.status(400).json({ error: 'Uploaded audio file is empty' });
+    }
+
+    console.log(`🎵 attach-upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
 
     let media;
     if (mediaId.includes('-')) {
@@ -801,7 +822,9 @@ router.post('/:mediaId/attach-upload', authMiddleware, mediaUpload.single('audio
       return res.status(403).json({ error: 'Not authorized to attach audio to this media' });
     }
 
-    if (media.sources?.get?.('upload') || media.sources?.upload) {
+    const hasExistingUpload = !!(media.sources?.get?.('upload') || media.sources?.upload);
+    const allowReplace = replaceExisting === 'true' || replaceExisting === true;
+    if (hasExistingUpload && !(allowReplace && canAttach)) {
       return res.status(409).json({ error: 'This media already has an uploaded audio file' });
     }
 
@@ -828,6 +851,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, mediaUpload.single('audio
         Key: audioKey,
         Body: audioFile.buffer,
         ContentType: 'audio/mpeg',
+        ContentDisposition: 'inline',
         ACL: 'public-read',
         CacheControl: 'public, max-age=31536000',
       }));

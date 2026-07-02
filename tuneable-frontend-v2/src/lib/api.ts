@@ -564,7 +564,7 @@ export const mediaAPI = {
   attachUpload: async (
     mediaId: string,
     audioFile: File,
-    options?: { uploaderRole?: 'owner' | 'third_party'; rightsDisclaimer?: string }
+    options?: { uploaderRole?: 'owner' | 'third_party'; rightsDisclaimer?: string; replaceExisting?: boolean }
   ) => {
     const formData = new FormData();
     formData.append('audioFile', audioFile);
@@ -574,6 +574,9 @@ export const mediaAPI = {
     }
     if (options?.rightsDisclaimer) {
       formData.append('rightsDisclaimer', options.rightsDisclaimer);
+    }
+    if (options?.replaceExisting) {
+      formData.append('replaceExisting', 'true');
     }
     const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

@@ -52,7 +52,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
-import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly } from '../utils/mediaPlayability';
+import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly, normalizeSources } from '../utils/mediaPlayability';
 
 interface Media {
   _id: string;
@@ -298,6 +298,7 @@ const TuneProfile: React.FC = () => {
   // Attach audio to catalog entry (awaiting upload)
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [showAttachAudioModal, setShowAttachAudioModal] = useState(false);
+  const [attachAudioReplace, setAttachAudioReplace] = useState(false);
   const [attachAudioFile, setAttachAudioFile] = useState<File | null>(null);
   const [attachAudioRightsConfirmed, setAttachAudioRightsConfirmed] = useState(false);
   const [attachAudioDisclaimer, setAttachAudioDisclaimer] = useState('');
@@ -391,6 +392,13 @@ const TuneProfile: React.FC = () => {
 
   const canAttachAudio = () => {
     if (!user || !media || isMediaPlayable(media)) return false;
+    return canEditTune() || isAdminOrCreator(user);
+  };
+
+  const canReplaceAudio = () => {
+    if (!user || !media) return false;
+    const sources = normalizeSources(media.sources);
+    if (!sources.upload) return false;
     return canEditTune() || isAdminOrCreator(user);
   };
 
@@ -1159,14 +1167,15 @@ const TuneProfile: React.FC = () => {
     coverArtFileInputRef.current?.click();
   };
 
-  const handleAttachAudioClick = (e: React.MouseEvent) => {
+  const handleAttachAudioClick = (e: React.MouseEvent, replace = false) => {
     e.stopPropagation();
     if (!user) {
       toast.info('Please log in to upload audio');
       navigate('/login');
       return;
     }
-    if (!canAttachAudio()) return;
+    if (replace ? !canReplaceAudio() : !canAttachAudio()) return;
+    setAttachAudioReplace(replace);
     setShowAttachAudioModal(true);
   };
 
@@ -1191,6 +1200,7 @@ const TuneProfile: React.FC = () => {
 
   const closeAttachAudioModal = () => {
     setShowAttachAudioModal(false);
+    setAttachAudioReplace(false);
     setAttachAudioFile(null);
     setAttachAudioRightsConfirmed(false);
     setAttachAudioDisclaimer('');
@@ -1217,19 +1227,22 @@ const TuneProfile: React.FC = () => {
       const response = await mediaAPI.attachUpload(
         media?._id || mediaId,
         attachAudioFile,
-        isContributor
-          ? {
-              uploaderRole: 'third_party',
-              rightsDisclaimer: attachAudioDisclaimer.trim(),
-            }
-          : { uploaderRole: 'owner' }
+        {
+          ...(isContributor
+            ? {
+                uploaderRole: 'third_party' as const,
+                rightsDisclaimer: attachAudioDisclaimer.trim(),
+              }
+            : { uploaderRole: 'owner' as const }),
+          ...(attachAudioReplace ? { replaceExisting: true } : {}),
+        }
       );
       if (response.media) {
         setMedia(enrichMediaWithPlayability(response.media));
       } else {
         await fetchMediaProfile();
       }
-      toast.success('Audio uploaded — this tune is now playable!');
+      toast.success(attachAudioReplace ? 'Audio replaced — playback updated' : 'Audio uploaded — this tune is now playable!');
       closeAttachAudioModal();
     } catch (err: any) {
       console.error('Error attaching audio:', err);
@@ -2045,6 +2058,16 @@ const TuneProfile: React.FC = () => {
                 >
                   <span className="hidden sm:inline">Edit Tune</span>
                   <span className="sm:hidden">Edit</span>
+                </button>
+              )}
+              {canReplaceAudio() && !isEditMode && (
+                <button
+                  onClick={(e) => handleAttachAudioClick(e, true)}
+                  className="px-3 md:px-4 py-2 bg-amber-600/40 hover:bg-amber-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="hidden sm:inline">Replace MP3</span>
+                  <span className="sm:hidden">Replace</span>
                 </button>
               )}
               {/* Exit Edit Mode Button - Only show if in edit mode */}
@@ -4185,7 +4208,11 @@ const TuneProfile: React.FC = () => {
           <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl md:text-2xl font-bold text-white">
-                {isContributorAudioUpload() ? 'Upload on behalf' : 'Upload audio'}
+                {attachAudioReplace
+                  ? 'Replace MP3'
+                  : isContributorAudioUpload()
+                    ? 'Upload on behalf'
+                    : 'Upload audio'}
               </h2>
               <button
                 onClick={closeAttachAudioModal}
@@ -4197,9 +4224,11 @@ const TuneProfile: React.FC = () => {
             </div>
 
             <p className="text-gray-300 text-sm mb-4">
-              {isContributorAudioUpload()
-                ? `Attach an MP3 for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
-                : `Attach your MP3 for "${media.title}". This will make the tune playable on Tuneable.`}
+              {attachAudioReplace
+                ? `Replace the MP3 for "${media.title}". The previous file will no longer be used for playback.`
+                : isContributorAudioUpload()
+                  ? `Attach an MP3 for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
+                  : `Attach your MP3 for "${media.title}". This will make the tune playable on Tuneable.`}
             </p>
 
             {isContributorAudioUpload() && (
