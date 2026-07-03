@@ -787,7 +787,7 @@ const Party: React.FC = () => {
     
     if (!user) {
       toast.info('Please sign in to search for tunes');
-      navigate(redirectToLogin());
+      redirectToLogin();
       return;
     }
     
@@ -959,7 +959,7 @@ const Party: React.FC = () => {
   const handleAddMediaToParty = async (media: any) => {
     if (!user) {
       toast.info('Please sign in to add media to parties');
-      navigate(redirectToLogin());
+      redirectToLogin();
       return;
     }
     if (!partyId) return;
@@ -1037,7 +1037,7 @@ const Party: React.FC = () => {
     // Check if user is logged in
     if (!user) {
       toast.info('Please sign in to place tips');
-      navigate(redirectToLogin());
+      redirectToLogin();
       setIsBidding(false);
       return;
     }
@@ -1760,7 +1760,7 @@ const Party: React.FC = () => {
     // Check if user is logged in
     if (!user) {
       toast.info('Please sign in to place tips');
-      navigate(redirectToLogin());
+      redirectToLogin();
       return;
     }
     
@@ -2036,7 +2036,7 @@ const Party: React.FC = () => {
       
       if (error.response?.status === 401) {
         toast.info('Please sign in to place tips');
-        navigate(redirectToLogin());
+        redirectToLogin();
         setBidModalOpen(false);
         setSelectedMedia(null);
         return;

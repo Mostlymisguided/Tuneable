@@ -14,7 +14,7 @@ import {
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { userAPI } from '../lib/api';
-import { penceToPounds } from '../utils/currency';
+import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 
 type MatchStatus = 'in_library' | 'on_catalog' | 'new';
@@ -141,7 +141,7 @@ const LibraryImport: React.FC = () => {
     }, 0);
   }, [selectedItems, tipAmounts, bulkTip]);
 
-  const userBalance = summary?.userBalance ?? (user?.balance != null ? penceToPounds(user.balance) : 0);
+  const userBalance = summary?.userBalance ?? (user?.balance != null ? penceToPoundsNumber(user.balance) : 0);
   const canAfford = totalCost <= userBalance + 0.0001;
 
   const toggleAll = (selected: boolean) => {
