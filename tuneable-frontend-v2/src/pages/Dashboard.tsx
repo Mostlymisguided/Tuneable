@@ -2394,7 +2394,7 @@ Join here: ${inviteLink}`.trim();
         </div>
         
         {!showAddTunePanel ? (
-          <div className="flex justify-center">
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
             <button
               type="button"
               onClick={() => setShowAddTunePanel(true)}
@@ -2403,6 +2403,13 @@ Join here: ${inviteLink}`.trim();
               <Plus className="h-4 w-4 text-purple-400" />
               Add Tune
             </button>
+            <Link
+              to="/import"
+              className="px-4 py-2 rounded-lg bg-purple-900/50 hover:bg-purple-800/60 border border-purple-700 text-purple-100 font-medium transition-colors text-sm sm:text-base flex items-center justify-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Import Spotify Likes
+            </Link>
           </div>
         ) : (
           <>

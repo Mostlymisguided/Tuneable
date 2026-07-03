@@ -1,7 +1,8 @@
 /**
  * Media playability helpers for the metadata/import → upload transition.
  *
- * Playable music requires an uploaded file (sources.upload) and cleared rights.
+ * Playable music requires an uploaded file (sources.upload) and either cleared
+ * rights or pending library-import rights (tips held in escrow until claimed).
  * Podcast/spoken content may use other direct audio source keys.
  */
 
@@ -64,6 +65,17 @@ function isMediaPlayable(media) {
 
   if (isPodcastLike(media)) {
     return hasDirectAudioSource(sources);
+  }
+
+  if (isPodcastLike(media)) {
+    return hasDirectAudioSource(sources);
+  }
+
+  if (media.rightsStatus === 'disputed') {
+    return false;
+  }
+  if (media.rightsStatus === 'pending') {
+    return !!sources.upload;
   }
 
   return !!(sources.upload && (media.rightsCleared ?? true));

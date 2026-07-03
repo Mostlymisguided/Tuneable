@@ -14,6 +14,7 @@ export interface PlayabilityFields {
 type MediaLike = PlayabilityFields & {
   sources?: Record<string, string> | Array<{ platform?: string; url?: string; youtube?: string }> | null;
   rightsCleared?: boolean;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
   contentForm?: string | string[];
 };
 
@@ -79,6 +80,17 @@ export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
 
   if (isPodcastLike(media)) {
     return hasDirectAudioSource(sources);
+  }
+
+  if (isPodcastLike(media)) {
+    return hasDirectAudioSource(sources);
+  }
+
+  if (media.rightsStatus === 'disputed') {
+    return false;
+  }
+  if (media.rightsStatus === 'pending') {
+    return !!sources.upload;
   }
 
   return !!(sources.upload && (media.rightsCleared ?? true));

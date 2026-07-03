@@ -29,6 +29,7 @@ import CreateParty from './pages/CreateParty';
 import Payment from './pages/Payment';
 import Search from './pages/Search';
 import Wallet from './pages/Wallet';
+import LibraryImport from './pages/LibraryImport';
 import Podcasts from './pages/Podcasts';
 import PodcastSearch from './pages/PodcastSearch';
 import TuneProfile from './pages/TuneProfile';
@@ -252,6 +253,14 @@ const AppContent = () => {
               element={
                 <ProtectedRoute>
                   <Wallet />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/import" 
+              element={
+                <ProtectedRoute>
+                  <LibraryImport />
                 </ProtectedRoute>
               } 
             />

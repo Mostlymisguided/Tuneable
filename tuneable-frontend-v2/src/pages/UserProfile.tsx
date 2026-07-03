@@ -222,7 +222,6 @@ const UserProfile: React.FC = () => {
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [isImportingSpotifyLikes, setIsImportingSpotifyLikes] = useState(false);
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
@@ -910,7 +909,7 @@ const UserProfile: React.FC = () => {
     window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
   };
 
-  const handleImportSpotifyLikes = async () => {
+  const handleImportSpotifyLikes = () => {
     if (!currentUser) {
       toast.error('Please log in to import Spotify likes');
       navigate('/login');
@@ -922,25 +921,7 @@ const UserProfile: React.FC = () => {
       return;
     }
 
-    setIsImportingSpotifyLikes(true);
-    try {
-      const data = await userAPI.getSpotifyLikedTracks(50);
-      const tracks = data.tracks || [];
-      setAddTuneResults({ database: [], youtube: tracks });
-
-      const newBidAmounts: Record<string, string> = {};
-      tracks.forEach((media: any) => {
-        const avgBid = calculateAverageBid(media);
-        newBidAmounts[media._id || media.id] = Math.max(getDefaultBidAmount(media), avgBid || 0).toFixed(2);
-      });
-      setAddTuneBidAmounts(newBidAmounts);
-
-      toast.success(`Loaded ${tracks.length} Spotify liked tracks`);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || error?.message || 'Failed to import Spotify likes');
-    } finally {
-      setIsImportingSpotifyLikes(false);
-    }
+    navigate('/import');
   };
 
   const getRoleDisplay = (roles: string[]) => {
@@ -1893,14 +1874,9 @@ const UserProfile: React.FC = () => {
                     </button>
                     <button
                       onClick={handleImportSpotifyLikes}
-                      disabled={isImportingSpotifyLikes}
-                      className="flex py-2 px-4 bg-green-700 hover:bg-green-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-sm sm:text-base items-center justify-center gap-2"
+                      className="flex py-2 px-4 bg-green-700 hover:bg-green-600 text-white rounded-lg font-medium transition-colors text-sm sm:text-base items-center justify-center gap-2"
                     >
-                      {isImportingSpotifyLikes ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <span>{spotifyConnected ? 'Import Spotify Likes' : 'Connect Spotify'}</span>
-                      )}
+                      <span>{spotifyConnected ? 'Import Spotify Likes' : 'Connect Spotify'}</span>
                     </button>
                   </div>
                   <p className="mt-3 text-xs text-gray-400">

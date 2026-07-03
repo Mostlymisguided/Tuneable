@@ -1037,6 +1037,52 @@ router.get('/me/spotify-liked-tracks', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/me/import/spotify/preview
+// @desc    Preview Spotify likes import with catalog match + cost estimate
+// @access  Private
+router.get('/me/import/spotify/preview', authMiddleware, async (req, res) => {
+  try {
+    const limit = req.query.limit;
+    const libraryImportService = require('../services/libraryImportService');
+    const preview = await libraryImportService.previewSpotifyImport(req.user._id, limit);
+    res.json(preview);
+  } catch (error) {
+    const status = error.status || 500;
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Spotify token expired. Please reconnect Spotify.' });
+    }
+    console.error('Spotify import preview error:', error);
+    res.status(status).json({
+      error: error.message || 'Failed to preview import',
+      details: error.details,
+    });
+  }
+});
+
+// @route   POST /api/users/me/import/spotify/execute
+// @desc    Batch tip + import selected Spotify likes
+// @access  Private
+router.post('/me/import/spotify/execute', authMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportService = require('../services/libraryImportService');
+    const results = await libraryImportService.executeSpotifyImport(req.user._id, { items, defaultTip });
+    res.json({
+      success: true,
+      ...results,
+      totalSpent: results.totalSpentPence / 100,
+      updatedBalance: results.updatedBalance / 100,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    console.error('Spotify import execute error:', error);
+    res.status(status).json({
+      error: error.message || 'Failed to execute import',
+      details: error.details,
+    });
+  }
+});
+
 // Get a user's tune library by userId (public - for viewing other users' profiles)
 // @route   GET /api/users/:userId/tune-library
 // @desc    Get a user's tune library (public profile data)

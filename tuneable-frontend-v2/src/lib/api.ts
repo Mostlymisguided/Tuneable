@@ -924,6 +924,35 @@ export const userAPI = {
     return response.data as { source: 'spotify'; tracks: any[]; total: number };
   },
 
+  previewSpotifyImport: async (limit = 50) => {
+    const response = await api.get('/users/me/import/spotify/preview', { params: { limit } });
+    return response.data;
+  },
+
+  executeSpotifyImport: async (
+    items: Array<{
+      key: string;
+      title?: string;
+      selected?: boolean;
+      mediaId?: string;
+      amount: number;
+      externalMedia?: Record<string, unknown>;
+      skipIfInLibrary?: boolean;
+    }>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/spotify/execute', { items, defaultTip });
+    return response.data as {
+      success: boolean;
+      tipped: number;
+      skipped: number;
+      failed: number;
+      totalSpent: number;
+      updatedBalance: number;
+      items: Array<{ key: string; title: string; status: string; error?: string }>;
+    };
+  },
+
   // Get user's tip history (all individual bids/tips)
   getTipHistory: async (params?: {
     partyId?: string;

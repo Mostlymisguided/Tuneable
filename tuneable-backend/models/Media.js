@@ -345,8 +345,16 @@ const mediaSchema = new mongoose.Schema({
   
   // Rights confirmation fields
   rightsCleared: { type: Boolean, default: false },
+  rightsStatus: {
+    type: String,
+    enum: ['cleared', 'pending', 'disputed'],
+    default: 'cleared',
+    index: true,
+  },
   rightsConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   rightsConfirmedAt: { type: Date },
+  importSource: { type: String, default: null }, // e.g. rekordbox, itunes_library
+  importedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   
   playCount: { type: Number, default: 0 },
   popularity: { type: Number, default: 0 },

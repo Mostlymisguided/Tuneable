@@ -46,6 +46,25 @@ class ArtistEscrowService {
       
       // Calculate artist share (70% of bid amount)
       const artistSharePence = Math.round(validatedAmount * ARTIST_SHARE_PERCENTAGE);
+
+      const rightsPending = media.rightsStatus === 'pending' && !media.rightsCleared;
+
+      // Pending library imports: full artist share goes to escrow until rights holder claims
+      if (rightsPending) {
+        await this._allocateToUnknownArtist(media, bidId, artistSharePence, 100);
+        const tuneableFeePence = validatedAmount - artistSharePence;
+        return {
+          allocated: true,
+          artistShare: artistSharePence,
+          tuneableFee: tuneableFeePence,
+          allocations: [{
+            type: 'unknown',
+            amount: artistSharePence,
+            percentage: 100,
+            reason: 'rights_pending',
+          }],
+        };
+      }
       
       // If no media owners, skip allocation (revenue goes to platform)
       if (!media.mediaOwners || media.mediaOwners.length === 0) {
