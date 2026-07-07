@@ -491,6 +491,7 @@ export const mediaAPI = {
   getMediaByGear: async (params: {
     gear: string;
     gearType?: 'daw' | 'plugin' | 'hardware';
+    gearSlug?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -499,7 +500,7 @@ export const mediaAPI = {
     const response = await api.get('/media', { params });
     return response.data;
   },
-  
+
   getPublicMedia: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
     const response = await api.get('/media/public', { params });
     return response.data;
@@ -734,6 +735,36 @@ export const searchAPI = {
   // Get quota status
   getQuotaStatus: async () => {
     const response = await api.get('/search/quota-status');
+    return response.data;
+  },
+};
+
+// Production gear catalog API
+export const gearAPI = {
+  getProfile: async (
+    slug: string,
+    params?: { page?: number; limit?: number; type?: 'daw' | 'plugin' | 'hardware'; refresh?: boolean }
+  ) => {
+    const response = await api.get(`/gear/${encodeURIComponent(slug)}/profile`, { params });
+    return response.data;
+  },
+
+  search: async (params?: {
+    search?: string;
+    type?: 'daw' | 'plugin' | 'hardware';
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/gear', { params });
+    return response.data;
+  },
+
+  getRankings: async (params?: {
+    type?: 'daw' | 'plugin' | 'hardware';
+    sortBy?: 'mediaCount' | 'aggregate';
+    limit?: number;
+  }) => {
+    const response = await api.get('/gear/rankings', { params });
     return response.data;
   },
 };

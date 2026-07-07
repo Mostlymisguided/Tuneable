@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Disc3, Cpu, Piano } from 'lucide-react';
 import {
   hasProductionStack,
+  getGearProfilePath,
   DAW_ROLE_LABELS,
   PLUGIN_CATEGORY_LABELS,
   PLUGIN_ROLE_LABELS,
@@ -27,9 +28,6 @@ const chipClass =
   'inline-flex items-center gap-1.5 rounded-full bg-gray-800 border border-gray-700 px-3 py-1 text-sm text-gray-200 hover:border-purple-500/60 hover:text-purple-200 transition-colors no-underline';
 const metaClass = 'text-xs text-gray-400';
 
-const gearUrl = (name: string, type: 'daw' | 'plugin' | 'hardware') =>
-  `/gear/${encodeURIComponent(name)}?type=${type}`;
-
 const ProductionStackDisplay: React.FC<ProductionStackDisplayProps> = ({ stack, className = '' }) => {
   if (!hasProductionStack(stack)) return null;
 
@@ -47,7 +45,7 @@ const ProductionStackDisplay: React.FC<ProductionStackDisplayProps> = ({ stack, 
           </div>
           <div className="flex flex-wrap gap-2">
             {daws.map((d, i) => (
-              <Link key={i} to={gearUrl(d.name, 'daw')} className={chipClass}>
+              <Link key={i} to={getGearProfilePath(d, 'daw')} className={chipClass}>
                 <span className="font-medium">{d.name}</span>
                 {d.version && <span className={metaClass}>v{d.version}</span>}
                 {d.role && <span className={metaClass}>· {DAW_ROLE_LABELS[d.role as DawRole] || d.role}</span>}
@@ -65,7 +63,7 @@ const ProductionStackDisplay: React.FC<ProductionStackDisplayProps> = ({ stack, 
           </div>
           <div className="flex flex-wrap gap-2">
             {plugins.map((p, i) => (
-              <Link key={i} to={gearUrl(p.name, 'plugin')} className={chipClass}>
+              <Link key={i} to={getGearProfilePath(p, 'plugin')} className={chipClass}>
                 <span className="font-medium">{p.name}</span>
                 {p.manufacturer && <span className={metaClass}>{p.manufacturer}</span>}
                 {p.category && (
@@ -88,7 +86,7 @@ const ProductionStackDisplay: React.FC<ProductionStackDisplayProps> = ({ stack, 
           </div>
           <div className="flex flex-wrap gap-2">
             {hardware.map((h, i) => (
-              <Link key={i} to={gearUrl(h.name, 'hardware')} className={chipClass}>
+              <Link key={i} to={getGearProfilePath(h, 'hardware')} className={chipClass}>
                 <span className="font-medium">{h.name}</span>
                 {h.manufacturer && <span className={metaClass}>{h.manufacturer}</span>}
                 {h.category && (

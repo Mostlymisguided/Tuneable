@@ -37,6 +37,8 @@ export interface DawEntry {
   name: string;
   version?: string;
   role?: DawRole | null;
+  gearId?: string | null;
+  slug?: string | null;
 }
 
 export interface PluginEntry {
@@ -44,6 +46,8 @@ export interface PluginEntry {
   manufacturer?: string;
   category?: PluginCategory;
   role?: PluginRole | null;
+  gearId?: string | null;
+  slug?: string | null;
 }
 
 export interface HardwareEntry {
@@ -51,6 +55,8 @@ export interface HardwareEntry {
   manufacturer?: string;
   category?: HardwareCategory;
   role?: HardwareRole | null;
+  gearId?: string | null;
+  slug?: string | null;
 }
 
 export interface ProductionStack {
@@ -263,4 +269,26 @@ export function hasProductionStack(stack?: ProductionStack | null): boolean {
       (stack.hardware?.length || 0) >
     0
   );
+}
+
+export type GearType = 'daw' | 'plugin' | 'hardware';
+
+/** URL-safe slug (matches backend Gear.slug generation) */
+export function slugifyGearName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Path to a gear profile page — prefers canonical slug when available */
+export function getGearProfilePath(
+  entry: { name: string; slug?: string | null },
+  type: GearType
+): string {
+  if (entry.slug) return `/gear/${entry.slug}`;
+  const slug = slugifyGearName(entry.name);
+  if (slug) return `/gear/${slug}`;
+  return `/gear/${encodeURIComponent(entry.name)}?type=${type}`;
 }

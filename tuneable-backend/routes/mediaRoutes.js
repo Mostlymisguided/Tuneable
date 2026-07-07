@@ -18,6 +18,12 @@ const MetadataExtractor = require('../utils/metadataExtractor');
 const { canUploadMedia, canEditMedia, isAdmin } = require('../utils/permissionHelpers');
 const { getCanonicalTag } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const {
+  attachGearIdsToProductionStack,
+  refreshGearStats,
+  buildMediaGearQuery,
+} = require('../services/gearService');
+const Gear = require('../models/Gear');
 
 /**
  * Capitalize the first letter of each word in a tag (title case)
@@ -233,6 +239,23 @@ const buildAiUsage = (aiUsed, aiTools, aiNotes) => {
     tools,
     notes: notes || ''
   };
+};
+
+/** Collect unique gear ObjectIds from a production stack for stats refresh */
+const collectGearIdsFromStack = (stack) => {
+  const ids = new Set();
+  if (!stack) return ids;
+  ['daws', 'plugins', 'hardware'].forEach((key) => {
+    (stack[key] || []).forEach((entry) => {
+      if (entry?.gearId) ids.add(entry.gearId.toString());
+    });
+  });
+  return ids;
+};
+
+const refreshGearStatsForStack = async (stack) => {
+  const ids = collectGearIdsFromStack(stack);
+  await Promise.all([...ids].map((id) => refreshGearStats(id)));
 };
 
 // Parses/normalizes the productionStack payload (daws, plugins, hardware).
@@ -692,6 +715,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     // Generate creatorDisplay from parsed arrays
     const creatorDisplay = formatCreatorDisplay(artistArray, featuringArray);
     
+    const parsedProductionStack = parseProductionStack(productionStack);
+    const stackWithGear = await attachGearIdsToProductionStack(parsedProductionStack, {
+      createIfMissing: true,
+    });
+    
     // Process release date and year
     const finalReleaseDate = releaseDate ? new Date(releaseDate) : (mappedMetadata.releaseDate || null);
     const finalReleaseYear = extractReleaseYear(finalReleaseDate, releaseYear ? parseInt(releaseYear) : null);
@@ -769,7 +797,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       aiUsage: buildAiUsage(aiUsed, aiTools, aiNotes),
 
       // Production equipment / gear (structured)
-      productionStack: parseProductionStack(productionStack),
+      productionStack: stackWithGear,
 
       // Rights confirmation (assumed true when uploaded via checkbox)
       rightsCleared: true,
@@ -795,6 +823,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     });
     
     await media.save();
+    await refreshGearStatsForStack(media.productionStack);
     
     // Process cover art file if provided
     if (coverArtFile) {
@@ -1059,7 +1088,8 @@ router.get('/', async (req, res) => {
       creator,
       search,
       gear,
-      gearType // optional: 'daw' | 'plugin' | 'hardware' to scope the gear match
+      gearType, // optional: 'daw' | 'plugin' | 'hardware' to scope the gear match
+      gearSlug, // optional: canonical catalog slug (preferred over gear name)
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1083,9 +1113,21 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Filter by production gear (DAW / plugin / hardware) name.
-    // Case-insensitive exact match against the indexed productionStack name fields.
-    if (gear && typeof gear === 'string' && gear.trim()) {
+    // Filter by production gear — prefer catalog slug, else name match on productionStack
+    if (gearSlug && typeof gearSlug === 'string' && gearSlug.trim()) {
+      const gearDoc = await Gear.findBySlug(gearSlug.trim());
+      if (gearDoc) {
+        const gearQuery = buildMediaGearQuery(gearDoc);
+        if (gearQuery.$or) {
+          query.$and = [...(query.$and || []), { $or: gearQuery.$or }];
+        }
+        if (gearQuery.status) {
+          query.status = gearQuery.status;
+        }
+      } else {
+        query._id = { $in: [] };
+      }
+    } else if (gear && typeof gear === 'string' && gear.trim()) {
       const gearRegex = new RegExp(`^${escapeRegex(gear.trim())}$`, 'i');
       const typeToPath = {
         daw: 'productionStack.daws.name',
@@ -2284,7 +2326,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
         plugins: media.productionStack.plugins || [],
         hardware: media.productionStack.hardware || []
       } : { daws: [], plugins: [], hardware: [] };
-      const newStack = parseProductionStack(req.body.productionStack);
+      const newStack = await attachGearIdsToProductionStack(
+        parseProductionStack(req.body.productionStack),
+        { createIfMissing: true }
+      );
 
       if (JSON.stringify(oldStack) !== JSON.stringify(newStack)) {
         changes.push({ field: 'productionStack', oldValue: oldStack, newValue: newStack });
@@ -2306,6 +2351,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     
     await media.save();
+    if (req.body.productionStack !== undefined) {
+      await refreshGearStatsForStack(media.productionStack);
+    }
     
     // Return media with ObjectId directly
     res.json({ 

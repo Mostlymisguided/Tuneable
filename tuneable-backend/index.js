@@ -29,6 +29,7 @@ const creatorRoutes = require('./routes/creatorRoutes'); // Import creator appli
 const reportRoutes = require('./routes/reportRoutes'); // Report routes
 const emailRoutes = require('./routes/emailRoutes'); // Email routes
 const labelRoutes = require('./routes/labelRoutes'); // Import label routes
+const gearRoutes = require('./routes/gearRoutes'); // Production gear catalog
 const collectiveRoutes = require('./routes/collectiveRoutes'); // Import collective routes
 const notificationRoutes = require('./routes/notificationRoutes'); // Import notification routes
 
@@ -644,6 +645,7 @@ app.use('/api/creator', creatorRoutes); // Creator application routes
 app.use('/api/reports', reportRoutes); // Report routes
 app.use('/api/email', emailRoutes); // Email routes
 app.use('/api/labels', labelRoutes); // Label routes
+app.use('/api/gear', gearRoutes); // Production gear catalog
 app.use('/api/collectives', collectiveRoutes); // Collective routes
 app.use('/api/notifications', notificationRoutes); // Notification routes
 app.use('/api/locations', require('./routes/locationRoutes')); // Mapbox location suggest/resolve

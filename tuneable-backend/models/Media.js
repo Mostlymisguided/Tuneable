@@ -224,6 +224,8 @@ const mediaSchema = new mongoose.Schema({
         enum: ['primary', 'mix', 'master', 'collab', null],
         default: null
       },
+      gearId: { type: mongoose.Schema.Types.ObjectId, ref: 'Gear', default: null },
+      slug: { type: String, default: null }, // denormalized catalog slug for links
       _id: false
     }],
     plugins: [{
@@ -239,6 +241,8 @@ const mediaSchema = new mongoose.Schema({
         enum: ['instrument', 'sound_design', 'mix', 'master', 'processing', null],
         default: null
       },
+      gearId: { type: mongoose.Schema.Types.ObjectId, ref: 'Gear', default: null },
+      slug: { type: String, default: null },
       _id: false
     }],
     hardware: [{
@@ -254,6 +258,8 @@ const mediaSchema = new mongoose.Schema({
         enum: ['instrument', 'control', 'recording', 'monitoring', 'processing', null],
         default: null
       },
+      gearId: { type: mongoose.Schema.Types.ObjectId, ref: 'Gear', default: null },
+      slug: { type: String, default: null },
       _id: false
     }]
   },
@@ -590,6 +596,9 @@ mediaSchema.index({ "aiUsage.disclosure": 1 }); // Index for disclosure level fi
 mediaSchema.index({ "productionStack.daws.name": 1 }); // Index for DAW-based discovery
 mediaSchema.index({ "productionStack.plugins.name": 1 }); // Index for plugin-based discovery
 mediaSchema.index({ "productionStack.hardware.name": 1 }); // Index for hardware/gear discovery
+mediaSchema.index({ "productionStack.daws.gearId": 1 });
+mediaSchema.index({ "productionStack.plugins.gearId": 1 });
+mediaSchema.index({ "productionStack.hardware.gearId": 1 });
 mediaSchema.index({ "producer.collectiveId": 1 }); // Index for Collective references in producer
 mediaSchema.index({ "featuring.collectiveId": 1 }); // Index for Collective references in featuring
 // Note: Other creator roles (songwriter, composer, host, guest, etc.) also support collectiveId but indexes are optional for now
