@@ -903,6 +903,39 @@ async function fetchTuneLibraryForUser(user) {
         bidCountLookup[item._id.toString()] = item.totalBidCount;
       }
     });
+
+    // Fetch active bids per media for supporters bar in tune library UI
+    const bidsByMedia = {};
+    try {
+      const allBids = await Bid.find({
+        mediaId: { $in: mediaIds },
+        status: 'active',
+      })
+        .populate('userId', 'username profilePic uuid _id')
+        .select('mediaId userId amount createdAt status')
+        .lean();
+
+      for (const bid of allBids) {
+        const mid = bid.mediaId?.toString();
+        if (!mid) continue;
+        if (!bidsByMedia[mid]) bidsByMedia[mid] = [];
+        bidsByMedia[mid].push({
+          userId: bid.userId
+            ? {
+                _id: bid.userId._id?.toString(),
+                uuid: bid.userId.uuid,
+                username: bid.userId.username,
+                profilePic: bid.userId.profilePic,
+              }
+            : undefined,
+          amount: bid.amount,
+          createdAt: bid.createdAt,
+          status: bid.status,
+        });
+      }
+    } catch (bidsError) {
+      console.error('Error fetching bids for tune library:', bidsError);
+    }
     
     // Build library items (use Media when found, else fallback to bid denormalized data)
     const library = Object.values(mediaAggregates)
@@ -962,7 +995,8 @@ async function fetchTuneLibraryForUser(user) {
             bidCount: aggregate.bidCount || 0,
             tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,
             lastBidAt: aggregate.lastBidAt,
-            firstBidAt: aggregate.firstBidAt
+            firstBidAt: aggregate.firstBidAt,
+            bids: bidsByMedia[aggregate.mediaId] || [],
           };
         } catch (buildError) {
           console.error('Error building library item for mediaId:', aggregate.mediaId, buildError);

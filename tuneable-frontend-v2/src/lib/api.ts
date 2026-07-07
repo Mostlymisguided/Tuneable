@@ -578,7 +578,14 @@ export const mediaAPI = {
   attachUpload: async (
     mediaId: string,
     audioFile: File,
-    options?: { uploaderRole?: 'owner' | 'third_party'; rightsDisclaimer?: string; replaceExisting?: boolean }
+    options?: {
+      uploaderRole?: 'owner' | 'third_party';
+      rightsDisclaimer?: string;
+      replaceExisting?: boolean;
+      bpm?: string | number;
+      key?: string;
+      libraryXmlFile?: File;
+    }
   ) => {
     const formData = new FormData();
     formData.append('audioFile', audioFile);
@@ -592,10 +599,76 @@ export const mediaAPI = {
     if (options?.replaceExisting) {
       formData.append('replaceExisting', 'true');
     }
+    if (options?.bpm != null && options.bpm !== '') {
+      formData.append('bpm', String(options.bpm));
+    }
+    if (options?.key) {
+      formData.append('key', options.key);
+    }
+    if (options?.libraryXmlFile) {
+      formData.append('libraryXmlFile', options.libraryXmlFile);
+    }
     const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
+  },
+
+  parseLibraryXml: async (libraryXmlFile: File) => {
+    const formData = new FormData();
+    formData.append('libraryXmlFile', libraryXmlFile);
+    const response = await api.post('/media/library-xml/parse', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data as {
+      source: 'rekordbox' | 'itunes';
+      trackCount: number;
+      hasKeyData: boolean;
+      message?: string;
+      tracks: Array<{
+        basename: string | null;
+        title: string;
+        artist: string;
+        album?: string;
+        bpm: number | null;
+        key: string | null;
+        duration?: number | null;
+        genre?: string;
+      }>;
+    };
+  },
+
+  previewLibraryXmlEnrichment: async (
+    libraryXmlFile: File,
+    scope: 'mine' | 'all' = 'mine',
+    limit = 500,
+  ) => {
+    const formData = new FormData();
+    formData.append('libraryXmlFile', libraryXmlFile);
+    formData.append('scope', scope);
+    formData.append('limit', String(limit));
+    const response = await api.post('/media/library-xml/enrich/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  executeLibraryXmlEnrichment: async (
+    updates: Array<{
+      mediaId: string;
+      title?: string;
+      bpm?: number | null;
+      key?: string | null;
+      rekordboxTrackId?: string | null;
+    }>,
+  ) => {
+    const response = await api.post('/media/library-xml/enrich/execute', { updates });
+    return response.data as {
+      updated: number;
+      skipped: number;
+      failed: number;
+      items: Array<{ mediaId: string; title?: string; status: string; error?: string }>;
+    };
   },
 
   updateMedia: async (mediaId: string, updates: {

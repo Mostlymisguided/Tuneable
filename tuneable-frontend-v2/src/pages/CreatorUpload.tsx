@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building, Bot, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
-import { labelAPI, emailAPI } from '../lib/api';
+import { labelAPI, emailAPI, mediaAPI } from '../lib/api';
 import axios from 'axios';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -37,13 +37,59 @@ const createArtistEntry = (name: string = '', overrides: Partial<ArtistEntry> = 
   ...overrides
 });
 
+type LibraryTrack = {
+  basename: string | null;
+  title: string;
+  artist: string;
+  album?: string;
+  bpm: number | null;
+  key: string | null;
+  duration?: number | null;
+  genre?: string;
+};
+
+const normalizeLibraryText = (value?: string | null) =>
+  (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const lookupLibraryTrack = (
+  tracks: LibraryTrack[],
+  filename: string,
+  title?: string,
+  artist?: string,
+): LibraryTrack | null => {
+  if (!tracks.length) return null;
+
+  const basename = filename.split(/[/\\]/).pop()?.toLowerCase() || '';
+  const byBasename = tracks.find((track) => track.basename === basename);
+  if (byBasename) return byBasename;
+
+  const titleKey = normalizeLibraryText(title);
+  const artistKey = normalizeLibraryText(artist);
+  if (!titleKey) return null;
+
+  const exact = tracks.find(
+    (track) => normalizeLibraryText(track.title) === titleKey
+      && normalizeLibraryText(track.artist) === artistKey,
+  );
+  if (exact) return exact;
+
+  return tracks.find((track) => normalizeLibraryText(track.title) === titleKey) || null;
+};
+
 const CreatorUpload: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const libraryXmlInputRef = useRef<HTMLInputElement>(null);
   const { extractMetadata, isExtracting, extractedMetadata, error: metadataError, warnings } = useMetadataExtraction();
   
   const [file, setFile] = useState<File | null>(null);
+  const [libraryXmlFile, setLibraryXmlFile] = useState<File | null>(null);
+  const [libraryTracks, setLibraryTracks] = useState<LibraryTrack[]>([]);
+  const [librarySource, setLibrarySource] = useState<'rekordbox' | 'itunes' | null>(null);
+  const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
+  const [isParsingLibrary, setIsParsingLibrary] = useState(false);
+  const [libraryMatchLabel, setLibraryMatchLabel] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
@@ -169,6 +215,74 @@ const CreatorUpload: React.FC = () => {
     await extractMetadata(selectedFile);
   };
 
+  const applyLibraryMatch = useCallback((selectedFile: File, title?: string, artist?: string) => {
+    const match = lookupLibraryTrack(libraryTracks, selectedFile.name, title, artist);
+    if (!match) {
+      setLibraryMatchLabel(null);
+      return null;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      title: prev.title || match.title || prev.title,
+      artistName: prev.artistName || match.artist || prev.artistName,
+      album: prev.album || match.album || prev.album,
+      genre: prev.genre || match.genre || prev.genre,
+      duration: prev.duration || (match.duration ? secondsToMMSS(match.duration) : prev.duration),
+      bpm: prev.bpm || (match.bpm != null ? String(match.bpm) : prev.bpm),
+      key: prev.key || match.key || prev.key,
+    }));
+    setLibraryMatchLabel(`${match.title || selectedFile.name}${match.bpm ? ` · ${match.bpm} BPM` : ''}${match.key ? ` · ${match.key}` : ''}`);
+    return match;
+  }, [libraryTracks]);
+
+  const handleLibraryXmlSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedXml = event.target.files?.[0];
+    if (!selectedXml) return;
+
+    if (!selectedXml.name.toLowerCase().endsWith('.xml')) {
+      toast.error('Please select a Rekordbox or iTunes Library.xml file');
+      return;
+    }
+
+    const maxXmlSize = 100 * 1024 * 1024;
+    if (selectedXml.size > maxXmlSize) {
+      toast.error('Library XML must be less than 100MB');
+      return;
+    }
+
+    setIsParsingLibrary(true);
+    try {
+      const parsed = await mediaAPI.parseLibraryXml(selectedXml);
+      setLibraryXmlFile(selectedXml);
+      setLibraryTracks(parsed.tracks || []);
+      setLibrarySource(parsed.source);
+      setLibraryMessage(parsed.message || null);
+      toast.success(`Loaded ${parsed.trackCount} tracks from ${parsed.source === 'rekordbox' ? 'Rekordbox' : 'iTunes'}`);
+
+      if (file) {
+        applyLibraryMatch(
+          file,
+          formData.title || extractedMetadata?.title || undefined,
+          formData.artistName || extractedMetadata?.artist || undefined,
+        );
+      }
+    } catch (error: any) {
+      console.error('Library XML parse error:', error);
+      toast.error(error?.response?.data?.error || 'Failed to parse library XML');
+      setLibraryXmlFile(null);
+      setLibraryTracks([]);
+      setLibrarySource(null);
+      setLibraryMessage(null);
+      setLibraryMatchLabel(null);
+    } finally {
+      setIsParsingLibrary(false);
+      if (libraryXmlInputRef.current) {
+        libraryXmlInputRef.current.value = '';
+      }
+    }
+  };
+
   // Auto-populate form when metadata is extracted
   useEffect(() => {
     if (extractedMetadata) {
@@ -192,6 +306,15 @@ const CreatorUpload: React.FC = () => {
       }));
     }
   }, [extractedMetadata]);
+
+  useEffect(() => {
+    if (!file || !libraryTracks.length) return;
+    applyLibraryMatch(
+      file,
+      extractedMetadata?.title || undefined,
+      extractedMetadata?.artist || undefined,
+    );
+  }, [file, libraryTracks, extractedMetadata, applyLibraryMatch]);
 
   // Debounced label search function
   const searchLabels = useCallback(async (query: string) => {
@@ -454,6 +577,7 @@ const CreatorUpload: React.FC = () => {
       if (formData.producer) uploadData.append('producer', formData.producer);
       if (formData.label) uploadData.append('label', formData.label);
       if (formData.language) uploadData.append('language', formData.language);
+      if (libraryXmlFile) uploadData.append('libraryXmlFile', libraryXmlFile);
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const token = localStorage.getItem('token');
@@ -567,6 +691,77 @@ const CreatorUpload: React.FC = () => {
               type="file"
               accept=".mp3,audio/mpeg"
               onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+
+          <div className="mb-8">
+            <label className="block text-white font-semibold mb-4 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-purple-400" />
+              DJ Library XML (optional)
+            </label>
+            <p className="text-gray-400 text-sm mb-4">
+              Load a Rekordbox export or iTunes <code className="text-purple-300">Library.xml</code> to auto-fill BPM and key.
+              Rekordbox includes both; iTunes provides BPM only.
+            </p>
+
+            <div
+              onClick={() => libraryXmlInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                libraryXmlFile
+                  ? 'border-blue-500/50 bg-blue-900/10'
+                  : 'border-gray-600/50 bg-gray-900/20 hover:border-purple-500/40 hover:bg-purple-900/10'
+              }`}
+            >
+              {isParsingLibrary ? (
+                <div className="flex items-center justify-center gap-3 text-blue-300">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Parsing library XML...
+                </div>
+              ) : libraryXmlFile ? (
+                <div>
+                  <CheckCircle className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                  <p className="text-white font-medium">{libraryXmlFile.name}</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {libraryTracks.length} tracks loaded
+                    {librarySource ? ` from ${librarySource === 'rekordbox' ? 'Rekordbox' : 'iTunes'}` : ''}
+                  </p>
+                  {libraryMatchLabel && (
+                    <p className="text-green-300 text-sm mt-2">Matched: {libraryMatchLabel}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLibraryXmlFile(null);
+                      setLibraryTracks([]);
+                      setLibrarySource(null);
+                      setLibraryMessage(null);
+                      setLibraryMatchLabel(null);
+                    }}
+                    className="mt-3 text-red-400 hover:text-red-300 text-sm"
+                  >
+                    Remove library XML
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-white font-medium">Click to load Rekordbox or iTunes XML</p>
+                  <p className="text-gray-400 text-sm">Max 100MB</p>
+                </div>
+              )}
+            </div>
+
+            {libraryMessage && (
+              <p className="text-amber-200 text-sm mt-3">{libraryMessage}</p>
+            )}
+
+            <input
+              ref={libraryXmlInputRef}
+              type="file"
+              accept=".xml,text/xml,application/xml"
+              onChange={(e) => void handleLibraryXmlSelect(e)}
               className="hidden"
             />
           </div>
@@ -993,7 +1188,7 @@ const CreatorUpload: React.FC = () => {
               <div className="flex items-center space-x-2 mb-4">
                 <Zap className="h-5 w-5 text-purple-400" />
                 <h3 className="text-lg font-semibold text-white">Enhanced Metadata</h3>
-                <span className="text-sm text-gray-400">(Auto-populated from file)</span>
+                <span className="text-sm text-gray-400">(Auto-populated from file or library XML)</span>
               </div>
 
               {/* Technical Metadata */}

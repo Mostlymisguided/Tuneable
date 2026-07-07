@@ -15,6 +15,11 @@ const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const MetadataExtractor = require('../utils/metadataExtractor');
+const {
+  parseLibraryXmlContent,
+  lookupTrackInLibrary,
+  resolveBpmKey,
+} = require('../utils/libraryXml');
 const { canUploadMedia, canEditMedia, isAdmin } = require('../utils/permissionHelpers');
 const { getCanonicalTag } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
@@ -496,7 +501,7 @@ const mixedUpload = multer({
   storage: multer.memoryStorage(),
   limits: { 
     fileSize: 50 * 1024 * 1024, // 50MB max
-    files: 2 // Max 2 files (audio + cover art)
+    files: 3 // audio + cover art + optional library XML
   },
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'audioFile') {
@@ -517,6 +522,12 @@ const mixedUpload = multer({
       } else {
         return cb(new Error('Only image files are allowed for cover art'));
       }
+    } else if (file.fieldname === 'libraryXmlFile') {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ext === '.xml' || file.mimetype === 'text/xml' || file.mimetype === 'application/xml') {
+        return cb(null, true);
+      }
+      return cb(new Error('Only XML files are allowed for library metadata'));
     } else {
       return cb(new Error('Invalid field name'));
     }
@@ -541,6 +552,14 @@ const attachAudioUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'libraryXmlFile') {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ext === '.xml' || file.mimetype === 'text/xml' || file.mimetype === 'application/xml') {
+        return cb(null, true);
+      }
+      return cb(new Error('Only XML files are allowed for library metadata'));
+    }
+
     const allowedTypes = /mp3/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
@@ -552,12 +571,145 @@ const attachAudioUpload = multer({
   },
 });
 
+const libraryXmlUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.xml' || file.mimetype === 'text/xml' || file.mimetype === 'application/xml') {
+      return cb(null, true);
+    }
+    return cb(new Error('Only XML library export files are allowed'));
+  },
+});
+
+async function lookupLibraryMetadataFromUpload(libraryXmlFile, { filename, title, artist }) {
+  if (!libraryXmlFile?.buffer?.length) return null;
+  try {
+    const parsed = await parseLibraryXmlContent(libraryXmlFile.buffer.toString('utf8'));
+    return lookupTrackInLibrary(parsed.tracks, { filename, title, artist });
+  } catch (error) {
+    console.warn('Library XML lookup skipped:', error.message);
+    return null;
+  }
+}
+
+// @route   POST /api/media/library-xml/parse
+// @desc    Parse Rekordbox or iTunes Library.xml for BPM/key enrichment
+// @access  Private (verified creators and admins)
+router.post('/library-xml/parse', authMiddleware, libraryXmlUpload.single('libraryXmlFile'), async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (!canUploadMedia(user)) {
+      return res.status(403).json({ error: 'Only verified creators and admins can parse library XML' });
+    }
+
+    const xmlFile = req.file;
+    if (!xmlFile?.buffer?.length) {
+      return res.status(400).json({ error: 'libraryXmlFile is required' });
+    }
+
+    const parsed = await parseLibraryXmlContent(xmlFile.buffer.toString('utf8'));
+    const tracks = parsed.tracks.map((track) => ({
+      basename: track.basename,
+      title: track.title,
+      artist: track.artist,
+      album: track.album,
+      bpm: track.bpm,
+      key: track.key,
+      duration: track.duration,
+      genre: track.genre,
+    }));
+
+    res.json({
+      source: parsed.source,
+      trackCount: parsed.trackCount,
+      tracks,
+      hasKeyData: tracks.some((track) => !!track.key),
+      message: parsed.source === 'itunes'
+        ? 'iTunes Library.xml provides BPM only (no musical key field).'
+        : 'Rekordbox XML loaded — BPM and key available where analyzed.',
+    });
+  } catch (error) {
+    console.error('Library XML parse error:', error);
+    res.status(400).json({ error: error.message || 'Failed to parse library XML' });
+  }
+});
+
+// @route   POST /api/media/library-xml/enrich/preview
+// @desc    Preview BPM/key backfill from Rekordbox/iTunes XML against catalog media
+// @access  Private (creators: own media; admins: full catalog with scope=all)
+router.post('/library-xml/enrich/preview', authMiddleware, libraryXmlUpload.single('libraryXmlFile'), async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (!canUploadMedia(user)) {
+      return res.status(403).json({ error: 'Only verified creators and admins can enrich library metadata' });
+    }
+
+    const xmlFile = req.file;
+    if (!xmlFile?.buffer?.length) {
+      return res.status(400).json({ error: 'libraryXmlFile is required' });
+    }
+
+    const scope = req.body.scope === 'all' ? 'all' : 'mine';
+    const limit = req.body.limit ? parseInt(req.body.limit, 10) : 500;
+
+    const {
+      previewLibraryXmlEnrichment,
+    } = require('../services/libraryXmlEnrichmentService');
+
+    const preview = await previewLibraryXmlEnrichment(xmlFile.buffer.toString('utf8'), {
+      user,
+      scope,
+      limit,
+    });
+
+    res.json(preview);
+  } catch (error) {
+    console.error('Library XML enrich preview error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to preview enrichment' });
+  }
+});
+
+// @route   POST /api/media/library-xml/enrich/execute
+// @desc    Apply BPM/key backfill to matched media (only fills empty fields)
+// @access  Private (creators: own media; admins: any media)
+router.post('/library-xml/enrich/execute', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (!canUploadMedia(user)) {
+      return res.status(403).json({ error: 'Only verified creators and admins can enrich library metadata' });
+    }
+
+    const { updates } = req.body;
+    const {
+      executeLibraryXmlEnrichment,
+    } = require('../services/libraryXmlEnrichmentService');
+
+    const results = await executeLibraryXmlEnrichment(updates, { user });
+    res.json(results);
+  } catch (error) {
+    console.error('Library XML enrich execute error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to apply enrichment' });
+  }
+});
+
 // @route   POST /api/media/upload
 // @desc    Upload media file (MP3) - Creator/Admin only
 // @access  Private (Verified creators and admins)
 router.post('/upload', authMiddleware, mixedUpload.fields([
   { name: 'audioFile', maxCount: 1 },
-  { name: 'coverArtFile', maxCount: 1 }
+  { name: 'coverArtFile', maxCount: 1 },
+  { name: 'libraryXmlFile', maxCount: 1 },
 ]), async (req, res) => {
   try {
     const userId = req.user._id;
@@ -619,7 +771,15 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       aiUsed,
       aiTools,
       aiNotes,
-      productionStack
+      productionStack,
+      bpm,
+      key,
+      isrc,
+      upc,
+      lyrics,
+      composer,
+      producer,
+      label,
     } = req.body;
     
     // Upload audio file to R2 manually
@@ -679,6 +839,31 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     // Map extracted metadata to Media model format
     const mappedMetadata = extractedMetadata ? 
       MetadataExtractor.mapToMediaModel(extractedMetadata, userId) : {};
+
+    const libraryXmlFile = req.files?.libraryXmlFile?.[0] || null;
+    const libraryMatch = await lookupLibraryMetadataFromUpload(libraryXmlFile, {
+      filename: audioFile.originalname,
+      title: finalTitle,
+      artist: finalArtistName,
+    });
+    const resolvedMeta = resolveBpmKey({
+      bodyBpm: bpm,
+      bodyKey: key,
+      libraryMatch,
+      extracted: extractedMetadata,
+    });
+    const finalIsrc = isrc || mappedMetadata.isrc || null;
+    const finalUpc = upc || mappedMetadata.upc || null;
+    const finalLyrics = lyrics || mappedMetadata.lyrics || null;
+    const finalComposer = composer
+      ? [{ name: composer, userId: null, verified: false }]
+      : (mappedMetadata.composer || []);
+    const finalProducer = producer
+      ? [{ name: producer, userId: null, verified: false }]
+      : (mappedMetadata.producer || []);
+    const finalLabel = label
+      ? [{ name: label, labelId: null, verified: false }]
+      : (mappedMetadata.label || []);
     
     const userIdString = userId?.toString();
     
@@ -749,10 +934,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       featuring: featuringArray.length > 0 ? featuringArray : (mappedMetadata.featuring || []),
       
       // Additional creators from metadata
-      producer: mappedMetadata.producer || [],
+      producer: finalProducer,
       songwriter: mappedMetadata.songwriter || [],
-      composer: mappedMetadata.composer || [],
-      label: mappedMetadata.label || [],
+      composer: finalComposer,
+      label: finalLabel,
       
       // Display field for UI
       creatorDisplay: creatorDisplay,
@@ -764,11 +949,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       explicit: finalExplicit,
       
       // Advanced metadata
-      bpm: mappedMetadata.bpm || null,
-      key: mappedMetadata.key || null,
-      isrc: mappedMetadata.isrc || null,
-      upc: mappedMetadata.upc || null,
-      lyrics: mappedMetadata.lyrics || null,
+      bpm: resolvedMeta.bpm,
+      key: resolvedMeta.key,
+      isrc: finalIsrc,
+      upc: finalUpc,
+      lyrics: finalLyrics,
       
       // Content classification
       genres: finalGenres,
@@ -914,7 +1099,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 // @route   POST /api/media/:mediaId/attach-upload
 // @desc    Attach an MP3 to existing media (e.g. YouTube catalog entry) and enable playback
 // @access  Private (admin, media editor, or uploader with rights confirmation)
-router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.single('audioFile'), async (req, res) => {
+router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields([
+  { name: 'audioFile', maxCount: 1 },
+  { name: 'libraryXmlFile', maxCount: 1 },
+]), async (req, res) => {
   try {
     const { mediaId } = req.params;
     const userId = req.user._id;
@@ -924,13 +1112,15 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.single(
       uploaderRole = 'owner',
       rightsDisclaimer,
       replaceExisting,
+      bpm,
+      key,
     } = req.body;
 
     if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
       return res.status(400).json({ error: 'Rights confirmation is required' });
     }
 
-    const audioFile = req.file;
+    const audioFile = req.files?.audioFile?.[0];
     if (!audioFile) {
       return res.status(400).json({ error: 'MP3 audio file is required' });
     }
@@ -1040,8 +1230,33 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.single(
     if (audioFile.buffer) {
       try {
         const extracted = await MetadataExtractor.extractFromBuffer(audioFile.buffer, audioFile.originalname);
+        const libraryXmlFile = req.files?.libraryXmlFile?.[0] || null;
+        const libraryMatch = await lookupLibraryMetadataFromUpload(libraryXmlFile, {
+          filename: audioFile.originalname,
+          title: media.title,
+          artist: media.artist?.[0]?.name || '',
+        });
+        const resolvedMeta = resolveBpmKey({
+          bodyBpm: bpm,
+          bodyKey: key,
+          libraryMatch,
+          extracted,
+        });
+
         if (extracted?.duration && !media.duration) {
           media.duration = extracted.duration;
+        }
+        if (resolvedMeta.bpm && !media.bpm) {
+          media.bpm = resolvedMeta.bpm;
+        }
+        if (resolvedMeta.key && !media.key) {
+          media.key = resolvedMeta.key;
+        }
+        if (extracted?.bitrate && !media.bitrate) {
+          media.bitrate = extracted.bitrate;
+        }
+        if (extracted?.sampleRate && !media.sampleRate) {
+          media.sampleRate = extracted.sampleRate;
         }
       } catch (metaErr) {
         console.warn('attach-upload metadata extraction skipped:', metaErr.message);

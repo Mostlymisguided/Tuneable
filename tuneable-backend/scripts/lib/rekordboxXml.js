@@ -1,21 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const xml2js = require('xml2js');
-
-/**
- * Decode Rekordbox Location URI to local filesystem path.
- * e.g. file://localhost/Users/me/track.mp3 → /Users/me/track.mp3
- */
-function decodeRekordboxLocation(location) {
-  if (!location || typeof location !== 'string') return null;
-  let decoded = decodeURIComponent(location.trim());
-  decoded = decoded.replace(/^file:\/\/localhost/i, '');
-  // Windows paths sometimes appear as /C:/Users/...
-  if (/^\/[A-Za-z]:/.test(decoded)) {
-    decoded = decoded.slice(1);
-  }
-  return path.normalize(decoded);
-}
+const {
+  decodeRekordboxLocation,
+  parseRekordboxXmlContent,
+} = require('../../utils/libraryXml');
 
 function asArray(value) {
   if (!value) return [];
@@ -31,43 +20,20 @@ function normalizePlaylistName(name) {
  */
 async function parseRekordboxXml(xmlPath) {
   const xml = fs.readFileSync(xmlPath, 'utf8');
-  const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
-  const doc = await parser.parseStringPromise(xml);
-  const root = doc.DJ_PLAYLISTS;
-  if (!root) {
-    throw new Error('Not a Rekordbox DJ_PLAYLISTS XML file');
-  }
-
-  const collectionTracks = asArray(root.COLLECTION?.TRACK).map((track) => {
-    const filePath = decodeRekordboxLocation(track.Location);
-    return {
-      trackId: String(track.TrackID || ''),
-      name: track.Name || '',
-      artist: track.Artist || '',
-      album: track.Album || '',
-      genre: track.Genre || '',
-      bpm: track.AverageBpm ? parseFloat(track.AverageBpm) : null,
-      key: track.Tonality || track.Key || null,
-      rating: track.Rating ? parseInt(track.Rating, 10) : 0,
-      playCount: track.PlayCount ? parseInt(track.PlayCount, 10) : 0,
-      comments: track.Comments || '',
-      label: track.Label || '',
-      mix: track.Mix || '',
-      totalTime: track.TotalTime ? parseInt(track.TotalTime, 10) : null,
-      year: track.Year ? parseInt(track.Year, 10) : null,
-      bitrate: track.BitRate ? parseInt(track.BitRate, 10) : null,
-      sampleRate: track.SampleRate ? parseInt(track.SampleRate, 10) : null,
-      dateAdded: track.DateAdded || null,
-      filePath,
-      fileExists: filePath ? fs.existsSync(filePath) : false,
-    };
-  });
+  const collectionTracks = await parseRekordboxXmlContent(xml);
 
   const trackById = new Map();
   const trackByPath = new Map();
   for (const track of collectionTracks) {
     if (track.trackId) trackById.set(track.trackId, track);
     if (track.filePath) trackByPath.set(path.normalize(track.filePath), track);
+  }
+
+  const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
+  const doc = await parser.parseStringPromise(xml);
+  const root = doc.DJ_PLAYLISTS;
+  if (!root) {
+    throw new Error('Not a Rekordbox DJ_PLAYLISTS XML file');
   }
 
   const playlists = [];
@@ -117,8 +83,6 @@ async function listPlaylists(xmlPath) {
 
 /**
  * Resolve tracks for named playlists (case-insensitive match on name or fullPath).
- * @param {string} xmlPath
- * @param {string[]} playlistNames - e.g. ["House", "Favourites/Warm Up"]
  */
 async function getTracksFromPlaylists(xmlPath, playlistNames) {
   const { playlists } = await parseRekordboxXml(xmlPath);

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Play, X, Clock, Heart } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
+import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
@@ -28,23 +29,6 @@ function formatDuration(duration: number | string | undefined) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function TagList({ tags, mediaData, limit }: { tags: string[]; mediaData: any; limit: number }) {
-  if (!tags.length) return null;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {tags.slice(0, limit).map((tag: string, tagIndex: number) => (
-        <Link
-          key={tagIndex}
-          to={`/tune/${mediaData._id || mediaData.id}`}
-          className="px-2 py-0.5 bg-purple-700/60 hover:bg-purple-500 text-white text-[10px] rounded-full transition-colors no-underline"
-        >
-          #{tag}
-        </Link>
-      ))}
-    </div>
-  );
 }
 
 export interface QueueMediaCardProps {
@@ -162,7 +146,11 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
             </p>
             {tags.length > 0 && (
               <div className="hidden md:block mt-1">
-                <TagList tags={tags} mediaData={mediaData} limit={5} />
+                <TagList
+                  tags={tags}
+                  mediaId={mediaData.uuid || mediaData._id || mediaData.id}
+                  limit={5}
+                />
               </div>
             )}
           </div>
@@ -171,7 +159,11 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         {/* Tags — own line on mobile, aligned with supporters bar */}
         {tags.length > 0 && (
           <div className="md:hidden mt-1">
-            <TagList tags={tags} mediaData={mediaData} limit={3} />
+            <TagList
+              tags={tags}
+              mediaId={mediaData.uuid || mediaData._id || mediaData.id}
+              limit={3}
+            />
           </div>
         )}
 

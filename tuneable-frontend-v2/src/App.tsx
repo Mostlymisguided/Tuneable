@@ -43,6 +43,7 @@ import Admin from './pages/Admin';
 import CreatorRegister from './pages/CreatorRegister';
 const CreatorUpload = lazy(() => import('./pages/CreatorUpload'));
 import CreatorYouTubeImport from './pages/CreatorYouTubeImport';
+import LibraryEnrich from './pages/LibraryEnrich';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 import DefaultTipOnboardingModal from './components/DefaultTipOnboardingModal';
@@ -240,6 +241,14 @@ const AppContent = () => {
                   <CreatorYouTubeImport />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/creator/library-enrich"
+              element={
+                <ProtectedRoute>
+                  <LibraryEnrich />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/artist-escrow" 

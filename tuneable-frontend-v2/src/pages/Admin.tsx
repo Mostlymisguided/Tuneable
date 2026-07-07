@@ -27,6 +27,7 @@ import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
+import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
 import IssueWarningModal from '../components/IssueWarningModal';
 import InviteReferrals from '../components/InviteReferrals';
 import UserTopUpModal from '../components/UserTopUpModal';
@@ -3754,11 +3755,13 @@ const Admin: React.FC = () => {
         {activeTab === 'settings' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">System Settings</h2>
-            
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Configuration</h3>
-              <p className="text-gray-400">System settings and configuration options will be available here.</p>
-            </div>
+
+            <LibraryXmlEnrich
+              scope="all"
+              allowScopeToggle
+              title="Library XML Backfill"
+              description="Cross-check Rekordbox or iTunes Library.xml against the production catalog and fill in missing BPM and key fields. Existing values are never overwritten."
+            />
           </div>
         )}
 

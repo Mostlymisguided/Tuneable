@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Play, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight, Youtube, Loader2 } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight, Youtube, Loader2 } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -18,22 +18,7 @@ import CreatorProfilePrompts from '../components/CreatorProfilePrompts';
 import UserProfilePrompts from '../components/UserProfilePrompts';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
-
-interface LibraryItem {
-  mediaId: string;
-  mediaUuid: string;
-  title: string;
-  artist: string;
-  coverArt?: string;
-  duration?: number;
-  bpm?: number;
-  globalMediaAggregate: number;
-  globalMediaAggregateAvg: number;
-  globalUserMediaAggregate: number;
-  bidCount: number;
-  tuneBytesEarned: number;
-  lastBidAt: string;
-}
+import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 
 interface SearchResult {
   _id?: string;
@@ -59,7 +44,6 @@ const Dashboard: React.FC = () => {
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
-  const [showAllLibrary, setShowAllLibrary] = useState(false);
   const [isCreatorBannerDismissed, setIsCreatorBannerDismissed] = useState(false);
   
   // Increase tip modal (Dashboard tune library)
@@ -499,14 +483,6 @@ Join here: ${inviteLink}`.trim();
           aValue = a.duration || 0;
           bValue = b.duration || 0;
           break;
-        case 'globalMediaAggregateAvg':
-          aValue = a.globalMediaAggregateAvg || 0;
-          bValue = b.globalMediaAggregateAvg || 0;
-          break;
-        case 'globalUserMediaAggregate':
-          aValue = a.globalUserMediaAggregate || 0;
-          bValue = b.globalUserMediaAggregate || 0;
-          break;
         case 'tuneBytesEarned':
           aValue = a.tuneBytesEarned || 0;
           bValue = b.tuneBytesEarned || 0;
@@ -522,15 +498,6 @@ Join here: ${inviteLink}`.trim();
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  };
-
-  const getSortIcon = (field: string) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 text-gray-400" />;
-    }
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="h-4 w-4 ml-1 text-purple-400" />
-      : <ArrowDown className="h-4 w-4 ml-1 text-purple-400" />;
   };
 
   const formatDuration = (seconds?: number) => {
@@ -1056,6 +1023,13 @@ Join here: ${inviteLink}`.trim();
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                         <h3 className="text-lg font-semibold text-white">My Media</h3>
                         <div className="flex flex-col sm:flex-row gap-2">
+                          <Link
+                            to="/creator/library-enrich"
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600/90 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium"
+                          >
+                            <Music className="h-4 w-4 flex-shrink-0" />
+                            Enrich from XML
+                          </Link>
                           <Link
                             to="/creator/import-youtube"
                             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
@@ -2876,155 +2850,16 @@ Join here: ${inviteLink}`.trim();
             <p className="text-sm mt-2">Start tipping on tunes to build your library!</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-800">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Artwork
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
-                    onClick={() => handleSort('title')}
-                  >
-                    <div className="flex items-center">
-                      Title
-                      {getSortIcon('title')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
-                    onClick={() => handleSort('artist')}
-                  >
-                    <div className="flex items-center">
-                      Artist
-                      {getSortIcon('artist')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
-                    onClick={() => handleSort('duration')}
-                  >
-                    <div className="flex items-center">
-                      Duration
-                      {getSortIcon('duration')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
-                    onClick={() => handleSort('globalMediaAggregateAvg')}
-                  >
-                    <div className="flex items-center">
-                      Avg Tip
-                      {getSortIcon('globalMediaAggregateAvg')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
-                    onClick={() => handleSort('globalUserMediaAggregate')}
-                  >
-                    <div className="flex items-center">
-                      Your Tip
-                      {getSortIcon('globalUserMediaAggregate')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
-                    onClick={() => handleSort('tuneBytesEarned')}
-                  >
-                    <div className="flex items-center">
-                      TuneBytes
-                      {getSortIcon('tuneBytesEarned')}
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {(showAllLibrary ? getSortedLibrary() : getSortedLibrary().slice(0, 5)).map((item) => {
-                  // Find the actual index in the full sorted library
-                  const sortedLibrary = getSortedLibrary();
-                  const actualIndex = sortedLibrary.findIndex(libItem => libItem.mediaId === item.mediaId);
-                  return (
-                    <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="relative w-12 h-12 group cursor-pointer" onClick={() => handlePlay(item, actualIndex)}>
-                        {item.coverArt ? (
-                          <img 
-                            src={item.coverArt} 
-                            alt={item.title}
-                            className="w-full h-full rounded object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-700 rounded flex items-center justify-center">
-                            <Music className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors shadow-lg">
-                            <Play className="h-4 w-4 text-white ml-0.5" fill="currentColor" />
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={() => navigate(`/tune/${item.mediaId || item.mediaUuid}`)}
-                        className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
-                      >
-                        {item.title}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">
-                        <ClickableArtistDisplay media={item} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">{penceToPounds(item.globalMediaAggregateAvg)}</div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-green-400">{penceToPounds(item.globalUserMediaAggregate)}</div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-yellow-400">{item.tuneBytesEarned.toFixed(1)}</div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={() => handleOpenTipModal(item)}
-                        className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
-                        title="Increase tip"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Tip
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {getSortedLibrary().length > 5 && (
-              <div className="flex justify-center pt-4">
-                <button
-                  onClick={() => setShowAllLibrary(!showAllLibrary)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-                >
-                  <span>{showAllLibrary ? 'Show Less' : `Show More (${getSortedLibrary().length - 5} more)`}</span>
-                  {showAllLibrary ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
+          <TuneLibraryTable
+            items={getSortedLibrary()}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onPlay={handlePlay}
+            onTip={handleOpenTipModal}
+            showTipButton
+            initialVisibleCount={5}
+          />
         )}
 
       {/* Create Label Modal */}
