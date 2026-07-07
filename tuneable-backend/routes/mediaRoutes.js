@@ -170,6 +170,73 @@ const parseArtistsPayload = (input) => {
     .filter(Boolean);
 };
 
+// Enum allow-lists mirror the Media schema for productionStack
+const PRODUCTION_STACK_ENUMS = {
+  dawRole: ['primary', 'mix', 'master', 'collab'],
+  pluginCategory: ['synth', 'sampler', 'drum_machine', 'fx', 'eq', 'compressor', 'reverb', 'delay', 'mastering', 'utility', 'other'],
+  pluginRole: ['instrument', 'sound_design', 'mix', 'master', 'processing'],
+  hardwareCategory: ['synth', 'drum_machine', 'sampler', 'controller', 'interface', 'outboard', 'monitor', 'mic', 'other'],
+  hardwareRole: ['instrument', 'control', 'recording', 'monitoring', 'processing']
+};
+
+// Parses/normalizes the productionStack payload (daws, plugins, hardware).
+// Accepts a JSON string or object; drops entries without a name and coerces
+// invalid enum values to safe defaults so bad client input never 500s.
+const parseProductionStack = (input) => {
+  const empty = { daws: [], plugins: [], hardware: [] };
+  if (!input) return empty;
+
+  let parsed = input;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (error) {
+      console.warn('Unable to parse productionStack payload:', error.message);
+      return empty;
+    }
+  }
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return empty;
+  }
+
+  const cleanName = (v) => (typeof v === 'string' ? v.trim() : '');
+  const cleanStr = (v) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s || undefined;
+  };
+  const inEnum = (v, list, fallback = undefined) => (list.includes(v) ? v : fallback);
+
+  const daws = Array.isArray(parsed.daws) ? parsed.daws : [];
+  const plugins = Array.isArray(parsed.plugins) ? parsed.plugins : [];
+  const hardware = Array.isArray(parsed.hardware) ? parsed.hardware : [];
+
+  return {
+    daws: daws
+      .map(d => d && cleanName(d.name) ? {
+        name: cleanName(d.name),
+        version: cleanStr(d.version),
+        role: inEnum(d.role, PRODUCTION_STACK_ENUMS.dawRole, null)
+      } : null)
+      .filter(Boolean),
+    plugins: plugins
+      .map(p => p && cleanName(p.name) ? {
+        name: cleanName(p.name),
+        manufacturer: cleanStr(p.manufacturer),
+        category: inEnum(p.category, PRODUCTION_STACK_ENUMS.pluginCategory, 'other'),
+        role: inEnum(p.role, PRODUCTION_STACK_ENUMS.pluginRole, null)
+      } : null)
+      .filter(Boolean),
+    hardware: hardware
+      .map(h => h && cleanName(h.name) ? {
+        name: cleanName(h.name),
+        manufacturer: cleanStr(h.manufacturer),
+        category: inEnum(h.category, PRODUCTION_STACK_ENUMS.hardwareCategory, 'other'),
+        role: inEnum(h.role, PRODUCTION_STACK_ENUMS.hardwareRole, null)
+      } : null)
+      .filter(Boolean)
+  };
+};
+
 const LANGUAGE_NAMES = {
   en: 'English',
   es: 'Spanish',
@@ -472,7 +539,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       language,
       aiUsed,
       aiDisclosure,
-      aiTools
+      aiTools,
+      productionStack
     } = req.body;
     
     // Upload audio file to R2 manually
@@ -663,7 +731,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
           return [];
         })()
       },
-      
+
+      // Production equipment / gear (structured)
+      productionStack: parseProductionStack(productionStack),
+
       // Rights confirmation (assumed true when uploaded via checkbox)
       rightsCleared: true,
       rightsConfirmedBy: userId,
@@ -2080,6 +2151,45 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
     
+    // Composer field (string -> array of subdocuments) - mirrors producer handling
+    if (req.body.composer !== undefined) {
+      if (typeof req.body.composer === 'string' && req.body.composer.trim()) {
+        media.composer = [{
+          name: req.body.composer.trim(),
+          userId: null,
+          verified: false
+        }];
+      } else if (req.body.composer === '') {
+        media.composer = [];
+      }
+    }
+
+    // encodedBy (DAW/encoder string, freeform)
+    if (req.body.encodedBy !== undefined) {
+      const newEncodedBy = typeof req.body.encodedBy === 'string' && req.body.encodedBy.trim()
+        ? req.body.encodedBy.trim()
+        : null;
+      if (media.encodedBy !== newEncodedBy) {
+        changes.push({ field: 'encodedBy', oldValue: media.encodedBy, newValue: newEncodedBy });
+        media.encodedBy = newEncodedBy;
+      }
+    }
+
+    // Production stack (daws, plugins, hardware) - structured gear metadata
+    if (req.body.productionStack !== undefined) {
+      const oldStack = media.productionStack ? {
+        daws: media.productionStack.daws || [],
+        plugins: media.productionStack.plugins || [],
+        hardware: media.productionStack.hardware || []
+      } : { daws: [], plugins: [], hardware: [] };
+      const newStack = parseProductionStack(req.body.productionStack);
+
+      if (JSON.stringify(oldStack) !== JSON.stringify(newStack)) {
+        changes.push({ field: 'productionStack', oldValue: oldStack, newValue: newStack });
+        media.productionStack = newStack;
+      }
+    }
+
     // Add to edit history if there are changes
     if (changes.length > 0) {
       // Ensure editHistory array exists

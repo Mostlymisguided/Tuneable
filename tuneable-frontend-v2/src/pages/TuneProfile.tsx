@@ -36,7 +36,8 @@ import {
   Twitter,
   Facebook,
   Linkedin,
-  Instagram
+  Instagram,
+  SlidersHorizontal
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import TopSupporters from '../components/TopSupporters';
@@ -53,6 +54,9 @@ import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly, normalizeSources } from '../utils/mediaPlayability';
+import ProductionStackEditor from '../components/ProductionStackEditor';
+import ProductionStackDisplay from '../components/ProductionStackDisplay';
+import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 
 interface Media {
   _id: string;
@@ -81,6 +85,8 @@ interface Media {
   pitch?: number;
   key?: string;
   elements?: string[];
+  encodedBy?: string | null;
+  productionStack?: ProductionStack;
   tags?: string[];
   category?: string;
   timeSignature?: string;
@@ -234,6 +240,8 @@ const TuneProfile: React.FC = () => {
     pitch: 440,
     timeSignature: '',
     elements: [] as string[],
+    encodedBy: '',
+    productionStack: EMPTY_PRODUCTION_STACK as ProductionStack,
     coverArt: '',
     minimumBid: null as number | null,
     primaryLocation: null as {
@@ -797,6 +805,12 @@ const TuneProfile: React.FC = () => {
         pitch: media.pitch || 440,
         timeSignature: media.timeSignature || '',
         elements: media.elements || [],
+        encodedBy: media.encodedBy || '',
+        productionStack: {
+          daws: media.productionStack?.daws || [],
+          plugins: media.productionStack?.plugins || [],
+          hardware: media.productionStack?.hardware || [],
+        },
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
         primaryLocation: (() => {
@@ -1814,6 +1828,7 @@ const TuneProfile: React.FC = () => {
     { label: 'Time Signature', value: media.timeSignature, icon: Music },
     { label: 'Bitrate', value: media.bitrate ? `${media.bitrate} kbps` : null, icon: Headphones },
     { label: 'Elements', value: media.elements, icon: Tag },
+    { label: 'Encoded By', value: media.encodedBy, icon: SlidersHorizontal },
   ];
 
   const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
@@ -2350,6 +2365,19 @@ const TuneProfile: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Production Stack Section */}
+        {hasProductionStack(media.productionStack) && (
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <SlidersHorizontal className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
+              Production Stack
+            </h2>
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <ProductionStackDisplay stack={media.productionStack} />
+            </div>
+          </div>
+        )}
 
         {/* Collectives Section - Above label, below metrics */}
         {(() => {
@@ -2994,6 +3022,33 @@ const TuneProfile: React.FC = () => {
                 <p className="text-xs text-gray-400 mt-1">
                       Enter musical elements/instruments separated by commas. Press Enter or click away to save.
                 </p>
+              </div>
+
+              {/* Encoded By (DAW/encoder) */}
+              <div>
+                <label className="block text-white font-medium mb-2">Encoded By (DAW / encoder)</label>
+                <input
+                  type="text"
+                  value={editForm.encodedBy}
+                  onChange={(e) => setEditForm({ ...editForm, encodedBy: e.target.value })}
+                  className="input"
+                  placeholder="e.g., Logic Pro, LAME 3.100"
+                />
+              </div>
+
+              {/* Production Stack */}
+              <div>
+                <label className="block text-white font-medium mb-2 flex items-center">
+                  <SlidersHorizontal className="h-4 w-4 mr-2 text-purple-400" />
+                  Production Stack
+                </label>
+                <p className="text-xs text-gray-400 mb-3">
+                  Credit the DAWs, plugins, and hardware used on this track. Start typing for suggestions.
+                </p>
+                <ProductionStackEditor
+                  value={editForm.productionStack}
+                  onChange={(stack) => setEditForm({ ...editForm, productionStack: stack })}
+                />
               </div>
 
               {/* Release Date */}

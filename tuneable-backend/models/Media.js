@@ -209,7 +209,53 @@ const mediaSchema = new mongoose.Schema({
   timeSignature: { type: String, default: '4/4' },
   bitrate: { type: Number },
   sampleRate: { type: Number },
-  elements: { type: [String], default: [] }, // Instrument/element tags
+  elements: { type: [String], default: [] }, // Instrument/element tags (musical content, e.g. "vocals", "808s")
+  encodedBy: { type: String, default: null }, // Encoder/DAW string from ID3 (e.g. "Logic Pro", "LAME")
+
+  // Production equipment / gear (structured; mirrors aiUsage.tools pattern)
+  // Keeps production TOOLS separate from musical elements above.
+  productionStack: {
+    daws: [{
+      name: { type: String, required: true }, // e.g. "Ableton Live"
+      version: { type: String }, // e.g. "12.1" (optional)
+      role: {
+        type: String,
+        enum: ['primary', 'mix', 'master', 'collab', null],
+        default: null
+      },
+      _id: false
+    }],
+    plugins: [{
+      name: { type: String, required: true }, // e.g. "Serum"
+      manufacturer: { type: String }, // e.g. "Xfer Records"
+      category: {
+        type: String,
+        enum: ['synth', 'sampler', 'drum_machine', 'fx', 'eq', 'compressor', 'reverb', 'delay', 'mastering', 'utility', 'other'],
+        default: 'other'
+      },
+      role: {
+        type: String,
+        enum: ['instrument', 'sound_design', 'mix', 'master', 'processing', null],
+        default: null
+      },
+      _id: false
+    }],
+    hardware: [{
+      name: { type: String, required: true }, // e.g. "Moog Subsequent 37"
+      manufacturer: { type: String }, // e.g. "Moog"
+      category: {
+        type: String,
+        enum: ['synth', 'drum_machine', 'sampler', 'controller', 'interface', 'outboard', 'monitor', 'mic', 'other'],
+        default: 'other'
+      },
+      role: {
+        type: String,
+        enum: ['instrument', 'control', 'recording', 'monitoring', 'processing', null],
+        default: null
+      },
+      _id: false
+    }]
+  },
   
   // Technical metadata (video/image-specific)
   resolution: { type: String }, // e.g., "1920x1080"
@@ -540,6 +586,9 @@ mediaSchema.index({ "label.labelId": 1 }); // Index for Label model references
 mediaSchema.index({ "artist.collectiveId": 1 }); // Index for Collective references in artist
 mediaSchema.index({ "aiUsage.used": 1 }); // Index for AI usage filtering
 mediaSchema.index({ "aiUsage.disclosure": 1 }); // Index for disclosure level filtering
+mediaSchema.index({ "productionStack.daws.name": 1 }); // Index for DAW-based discovery
+mediaSchema.index({ "productionStack.plugins.name": 1 }); // Index for plugin-based discovery
+mediaSchema.index({ "productionStack.hardware.name": 1 }); // Index for hardware/gear discovery
 mediaSchema.index({ "producer.collectiveId": 1 }); // Index for Collective references in producer
 mediaSchema.index({ "featuring.collectiveId": 1 }); // Index for Collective references in featuring
 // Note: Other creator roles (songwriter, composer, host, guest, etc.) also support collectiveId but indexes are optional for now

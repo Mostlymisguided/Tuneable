@@ -1,5 +1,7 @@
 // Simple types file to avoid module resolution issues
 
+import type { ProductionStack } from './data/gear';
+
 // Invite code interface (defined early for use in User interface)
 export interface InviteCode {
   _id: string;
@@ -227,6 +229,8 @@ export interface Media {
   bitrate?: number;
   sampleRate?: number;
   elements?: string[];
+  encodedBy?: string | null;
+  productionStack?: ProductionStack;
   rightsHolder?: string;
   
   // Video/Image metadata

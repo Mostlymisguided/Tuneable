@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building, Bot, Plus, X } from 'lucide-react';
+import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building, Bot, Plus, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
 import { labelAPI, emailAPI } from '../lib/api';
 import axios from 'axios';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
+import ProductionStackEditor from '../components/ProductionStackEditor';
+import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -78,6 +80,7 @@ const CreatorUpload: React.FC = () => {
     aiDisclosure: 'none' as 'none' | 'partial' | 'full',
     aiTools: [] as Array<{ category: string; name: string; provider: string }>
   });
+  const [productionStack, setProductionStack] = useState<ProductionStack>(EMPTY_PRODUCTION_STACK);
   const [useMultipleArtists, setUseMultipleArtists] = useState(false);
   const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>(() => [
     createArtistEntry(
@@ -419,6 +422,17 @@ const CreatorUpload: React.FC = () => {
       if (formData.aiTools.length > 0) {
         uploadData.append('aiTools', JSON.stringify(formData.aiTools.filter(tool => tool.name && tool.provider)));
       }
+
+      // Production stack (only send entries that have a name)
+      if (hasProductionStack(productionStack)) {
+        const cleanedStack = {
+          daws: productionStack.daws.filter(d => d.name.trim()),
+          plugins: productionStack.plugins.filter(p => p.name.trim()),
+          hardware: productionStack.hardware.filter(h => h.name.trim()),
+        };
+        uploadData.append('productionStack', JSON.stringify(cleanedStack));
+      }
+
       // Add cover art file if selected
       if (coverArtFile) {
         uploadData.append('coverArtFile', coverArtFile);
@@ -1066,6 +1080,18 @@ const CreatorUpload: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Production Stack Section */}
+            <div className="border-t border-gray-600 pt-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <SlidersHorizontal className="h-5 w-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">Production Stack</h3>
+              </div>
+              <p className="text-sm text-gray-400 mb-4">
+                Optional: credit the DAWs, plugins, and hardware you used to make this track. Start typing for suggestions, or enter your own.
+              </p>
+              <ProductionStackEditor value={productionStack} onChange={setProductionStack} disabled={isUploading} />
             </div>
 
             {/* Explicit Content */}
