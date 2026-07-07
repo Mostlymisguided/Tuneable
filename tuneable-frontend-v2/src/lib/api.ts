@@ -486,6 +486,19 @@ export const mediaAPI = {
     const response = await api.get('/media', { params });
     return response.data;
   },
+
+  // Discover media by production gear (DAW / plugin / hardware) name
+  getMediaByGear: async (params: {
+    gear: string;
+    gearType?: 'daw' | 'plugin' | 'hardware';
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/media', { params });
+    return response.data;
+  },
   
   getPublicMedia: async (params?: { sortBy?: string; filterBy?: string; limit?: number }) => {
     const response = await api.get('/media/public', { params });

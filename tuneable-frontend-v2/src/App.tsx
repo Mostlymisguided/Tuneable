@@ -33,6 +33,7 @@ import LibraryImport from './pages/LibraryImport';
 import Podcasts from './pages/Podcasts';
 import PodcastSearch from './pages/PodcastSearch';
 import TuneProfile from './pages/TuneProfile';
+import GearProfile from './pages/GearProfile';
 import PodcastEpisodeProfile from './pages/PodcastEpisodeProfile';
 import PodcastSeriesProfile from './pages/PodcastSeriesProfile';
 import UserProfile from './pages/UserProfile';
@@ -197,6 +198,10 @@ const AppContent = () => {
                   <Search />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/gear/:gearName" 
+              element={<GearProfile />} 
             />
             <Route 
               path="/podcasts" 

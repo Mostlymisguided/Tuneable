@@ -170,6 +170,9 @@ const parseArtistsPayload = (input) => {
     .filter(Boolean);
 };
 
+// Escapes user input for safe use inside a RegExp (prevents ReDoS / injection)
+const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Enum allow-lists mirror the Media schema for productionStack
 const PRODUCTION_STACK_ENUMS = {
   dawRole: ['primary', 'mix', 'master', 'collab'],
@@ -1021,7 +1024,9 @@ router.get('/', async (req, res) => {
       sortOrder = 'desc',
       genre,
       creator,
-      search
+      search,
+      gear,
+      gearType // optional: 'daw' | 'plugin' | 'hardware' to scope the gear match
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1043,6 +1048,32 @@ router.get('/', async (req, res) => {
         { 'artist.name': { $regex: search, $options: 'i' } },
         { creatorNames: { $regex: search, $options: 'i' } }
       ];
+    }
+
+    // Filter by production gear (DAW / plugin / hardware) name.
+    // Case-insensitive exact match against the indexed productionStack name fields.
+    if (gear && typeof gear === 'string' && gear.trim()) {
+      const gearRegex = new RegExp(`^${escapeRegex(gear.trim())}$`, 'i');
+      const typeToPath = {
+        daw: 'productionStack.daws.name',
+        plugin: 'productionStack.plugins.name',
+        hardware: 'productionStack.hardware.name'
+      };
+      const scopedPath = typeToPath[gearType];
+      if (scopedPath) {
+        query[scopedPath] = gearRegex;
+      } else {
+        query.$and = [
+          ...(query.$and || []),
+          {
+            $or: [
+              { 'productionStack.daws.name': gearRegex },
+              { 'productionStack.plugins.name': gearRegex },
+              { 'productionStack.hardware.name': gearRegex }
+            ]
+          }
+        ];
+      }
     }
 
     // Build sort object
