@@ -120,7 +120,7 @@ interface PartyProps {
   headerVariant?: 1 | 2;
 }
 
-const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
+const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const { partyId } = useParams<{ partyId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateBalance } = useAuth();
@@ -456,21 +456,21 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
       .then((response) => {
         if (!cancelled) {
           setSelectedLocation(response.location as ResolvedLocation);
-          setShowLocationFilter(true);
+          if (headerVariant === 1) setShowLocationFilter(true);
         }
       })
       .catch((error) => {
         console.error('Failed to resolve location from URL:', error);
         if (!cancelled) {
           setSelectedLocation({ placeId: locationPlaceIdFromUrl, display: locationPlaceIdFromUrl });
-          setShowLocationFilter(true);
+          if (headerVariant === 1) setShowLocationFilter(true);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [locationPlaceIdFromUrl, isGlobalParty]);
+  }, [locationPlaceIdFromUrl, isGlobalParty, headerVariant]);
 
   const handleLocationFilterChange = (location: ResolvedLocation | null) => {
     setSelectedLocation(location);
@@ -2462,19 +2462,21 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
         <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
           Voted From
         </p>
-        <h1 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300 drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)]">
-          {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Earth'}
-        </h1>
         <button
           type="button"
           onClick={() => setShowLocationFilter((open) => !open)}
-          className="mt-3 inline-flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors"
+          className="group"
         >
-          <MapPin className="h-3.5 w-3.5 text-purple-400" />
-          {selectedLocation?.placeId ? 'Change location' : 'Choose a location'}
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showLocationFilter ? 'rotate-180' : ''}`} />
+          <h1 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300 drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)] group-hover:from-purple-200 group-hover:to-purple-200 transition-colors">
+            {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Earth'}
+          </h1>
+          <span className="mt-3 inline-flex items-center gap-2 text-xs sm:text-sm text-gray-400 group-hover:text-white transition-colors">
+            <MapPin className="h-3.5 w-3.5 text-purple-400" />
+            {selectedLocation?.placeId ? 'Change location' : 'Choose a location'}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showLocationFilter ? 'rotate-180' : ''}`} />
+          </span>
         </button>
-        {locationQuickPicks.length > 0 && (
+        {!showLocationFilter && locationQuickPicks.length > 0 && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button
               type="button"
@@ -2514,7 +2516,52 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
       )}
 
       {/* Location filter panel (global party hero) */}
-      {isGlobalParty && showLocationFilter && (
+      {isGlobalParty && showLocationFilter && headerVariant === 2 && (
+        <div className="max-w-xl mx-auto px-3 sm:px-6 mb-3 text-center">
+          <LocationAutocomplete
+            value={selectedLocation}
+            onChange={handleLocationFilterChange}
+            placeholder="Search city, town, or region…"
+          />
+          {locationQuickPicks.length > 0 && (
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleLocationFilterChange(null)}
+                className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                  !selectedLocation?.placeId
+                    ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
+                    : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                }`}
+              >
+                Earth
+              </button>
+              {locationQuickPicks.map((loc) => {
+                const selected = selectedLocation?.placeId === loc.placeId;
+                return (
+                  <button
+                    key={loc.placeId}
+                    type="button"
+                    onClick={() =>
+                      handleLocationFilterChange(selected ? null : countryPickToResolvedLocation(loc))
+                    }
+                    className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                      selected
+                        ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
+                        : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                    }`}
+                    title={loc.total > 0 ? `${penceToPounds(loc.total)} in tips` : loc.isUser ? 'Your home country' : undefined}
+                  >
+                    {loc.country}
+                    {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      {isGlobalParty && showLocationFilter && headerVariant === 1 && (
         <div className="max-w-2xl mx-auto px-3 sm:px-6 mb-3">
           <div className="card p-3 md:p-6">
             <div className="flex items-center justify-between mb-3">

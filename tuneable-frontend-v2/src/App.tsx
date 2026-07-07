@@ -176,7 +176,7 @@ const AppContent = () => {
             />
             <Route 
               path="/party/:partyId" 
-              element={<Party />} 
+              element={<Party headerVariant={2} />} 
             />
             <Route 
               path="/party-v2/:partyId" 
