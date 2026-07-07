@@ -179,6 +179,10 @@ const AppContent = () => {
               element={<Party />} 
             />
             <Route 
+              path="/party-v2/:partyId" 
+              element={<Party headerVariant={2} />} 
+            />
+            <Route 
               path="/create-party" 
               element={
                 <AdminRoute>

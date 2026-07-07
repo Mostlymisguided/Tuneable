@@ -114,7 +114,12 @@ function getTagTermsFromSearchParams(params: URLSearchParams, isGlobal: boolean)
     .map((c: string) => '#' + c);
 }
 
-const Party: React.FC = () => {
+interface PartyProps {
+  /** Global-party header layout: 1 = hero pill (default), 2 = editorial */
+  headerVariant?: 1 | 2;
+}
+
+const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
   const { partyId } = useParams<{ partyId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateBalance } = useAuth();
@@ -211,6 +216,7 @@ const Party: React.FC = () => {
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showTopFansPanel, setShowTopFansPanel] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
 
@@ -2412,15 +2418,188 @@ const Party: React.FC = () => {
     <div className="min-h-screen ">
       
 
-      {/* Party Header */}
-      <div className="justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
+      {/* Party Header — Variant 1: hero pill (default) */}
+      {(!isGlobalParty || headerVariant === 1) && (
+      <div className="justify-center text-center px-3 sm:px-6 pt-4 sm:pt-6 pb-2">
         <h1 className="inline-block text-xl sm:text-3xl font-bold text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 shadow-lg">
-          {isGlobalParty ? 'Top Music' : party.name}
+          {isGlobalParty ? 'Global Tunes' : party.name}
         </h1>
+        {isGlobalParty && (
+          <div className="mt-3 sm:mt-4 flex flex-col items-center gap-2">
+            <p className="text-sm sm:text-base text-gray-300">
+              The World&apos;s Best Music
+            </p>
+            <p className="text-sm sm:text-base text-gray-300">
+              Voted From
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowLocationFilter((open) => !open)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm sm:text-base font-medium transition-colors ${
+                showLocationFilter || selectedLocation?.placeId
+                  ? 'bg-purple-600/90 text-white ring-1 ring-purple-400/50'
+                  : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+              }`}
+            >
+              <MapPin className="h-4 w-4 text-purple-300 flex-shrink-0" />
+              {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Earth'}
+              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showLocationFilter ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        )}
       </div>
+      )}
 
-      {/* Share Button - Dropdown Menu (admin only) */}
-      {user?.role?.includes('admin') && (
+      {/* Party Header — Variant 2: editorial, quick-picks always visible */}
+      {isGlobalParty && headerVariant === 2 && (
+      <div className="text-center px-3 sm:px-6 pt-6 sm:pt-10 pb-3">
+        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
+          The World&apos;s Best Music
+        </p>
+        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
+          Voted From
+        </p>
+        <h1 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300 drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)]">
+          {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Earth'}
+        </h1>
+        <button
+          type="button"
+          onClick={() => setShowLocationFilter((open) => !open)}
+          className="mt-3 inline-flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          <MapPin className="h-3.5 w-3.5 text-purple-400" />
+          {selectedLocation?.placeId ? 'Change location' : 'Choose a location'}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showLocationFilter ? 'rotate-180' : ''}`} />
+        </button>
+        {locationQuickPicks.length > 0 && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleLocationFilterChange(null)}
+              className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                !selectedLocation?.placeId
+                  ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
+                  : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+              }`}
+            >
+              Earth
+            </button>
+            {locationQuickPicks.map((loc) => {
+              const selected = selectedLocation?.placeId === loc.placeId;
+              return (
+                <button
+                  key={loc.placeId}
+                  type="button"
+                  onClick={() =>
+                    handleLocationFilterChange(selected ? null : countryPickToResolvedLocation(loc))
+                  }
+                  className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                    selected
+                      ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
+                      : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                  }`}
+                  title={loc.total > 0 ? `${penceToPounds(loc.total)} in tips` : loc.isUser ? 'Your home country' : undefined}
+                >
+                  {loc.country}
+                  {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Location filter panel (global party hero) */}
+      {isGlobalParty && showLocationFilter && (
+        <div className="max-w-2xl mx-auto px-3 sm:px-6 mb-3">
+          <div className="card p-3 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <MapPin className="h-4 w-4 mr-2 text-purple-400" />
+                Filter by Location
+              </h3>
+              <div className="flex items-center gap-2">
+                {selectedLocation?.placeId && (
+                  <button
+                    type="button"
+                    onClick={() => handleLocationFilterChange(null)}
+                    className="text-sm text-purple-300 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowLocationFilter(false)}
+                  className="text-sm text-gray-400 hover:text-white"
+                >
+                  Hide
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Show tunes ranked by tips from supporters in this place and anywhere within it.
+            </p>
+            <LocationAutocomplete
+              value={selectedLocation}
+              onChange={handleLocationFilterChange}
+              placeholder="Search city, town, or region…"
+            />
+            {locationQuickPicks.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-500 mb-2">
+                  Popular locations · {formatTimePeriodLabel(selectedTimePeriod).toLowerCase()}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {locationQuickPicks.map((loc) => {
+                    const selected = selectedLocation?.placeId === loc.placeId;
+                    return (
+                      <button
+                        key={loc.placeId}
+                        type="button"
+                        onClick={() =>
+                          handleLocationFilterChange(
+                            selected ? null : countryPickToResolvedLocation(loc)
+                          )
+                        }
+                        className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                          selected
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
+                        }`}
+                        title={
+                          loc.total > 0
+                            ? `${penceToPounds(loc.total)} in tips`
+                            : loc.isUser
+                              ? 'Your home country'
+                              : undefined
+                        }
+                      >
+                        {loc.country}
+                        {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
+                        {loc.total > 0 && (
+                          <span className="ml-2 text-[10px] opacity-70">
+                            {penceToPounds(loc.total)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {selectedLocation?.placeId && (
+              <p className="text-xs text-purple-300 mt-2">
+                Showing tips from {formatLocation(selectedLocation)} and below
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Share Button - hidden for now */}
+      {false && user?.role?.includes('admin') && (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 p-2">
         <div className="flex justify-center">
           <div className="relative">
@@ -2508,16 +2687,16 @@ const Party: React.FC = () => {
       </div>
       )}
       
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:justify-center sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-gray-900/80 px-2 py-2 sm:px-4 sm:py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] min-w-0">
-            <div className="flex items-center space-x-1.5 sm:space-x-3">
-              <div className="p-1 sm:p-2 bg-purple-600/30 rounded-lg shrink-0">
-                <Music className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-purple-300" />
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
+        <div className="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:justify-center sm:gap-2 mb-3 sm:mb-4 max-w-md sm:max-w-none mx-auto">
+          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-purple-500/40 min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-0.5 sm:p-1 bg-purple-600/30 rounded shrink-0">
+                <Music className="h-3 w-3 sm:h-4 sm:w-4 text-purple-300" />
                 </div>
               <div className="min-w-0">
-                <div className="text-sm sm:text-2xl font-bold text-white leading-tight">{getDisplayMedia().length}</div>
-                <div className="text-[10px] sm:text-xs text-gray-400 truncate leading-tight">
+                <div className="text-xs sm:text-lg font-bold text-white leading-tight">{getDisplayMedia().length}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">
                   <span className="sm:hidden">{selectedTimePeriod === 'all-time' ? 'Tunes' : 'Queue'}</span>
                   <span className="hidden sm:inline">
                     {selectedTimePeriod === 'all-time' ? 'Tunes' : `${selectedTimePeriod.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Queue`}
@@ -2540,31 +2719,32 @@ const Party: React.FC = () => {
             </div>
           </div>
           )}
-          <div className="bg-gray-900/80 px-2 py-2 sm:px-4 sm:py-3 rounded-lg border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.3)] min-w-0">
-            <div className="flex items-center space-x-1.5 sm:space-x-3">
-              <div className="p-1 sm:p-2 bg-yellow-600/30 rounded-lg shrink-0">
-                <Coins className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-yellow-300" />
+          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-yellow-500/40 min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-0.5 sm:p-1 bg-yellow-600/30 rounded shrink-0">
+                <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-300" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm sm:text-2xl font-bold text-white leading-tight truncate">{penceToPounds(calculateTotalBids())}</div>
-                <div className="text-[10px] sm:text-xs text-gray-400 truncate leading-tight">Total Tips</div>
+                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(calculateTotalBids())}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Total Tips</div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-900/80 px-2 py-2 sm:px-4 sm:py-3 rounded-lg border-2 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)] min-w-0">
-            <div className="flex items-center space-x-1.5 sm:space-x-3">
-              <div className="p-1 sm:p-2 bg-green-600/30 rounded-lg shrink-0">
-                <TrendingUp className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-green-300" />
+          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-green-500/40 min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-0.5 sm:p-1 bg-green-600/30 rounded shrink-0">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-300" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm sm:text-2xl font-bold text-white leading-tight truncate">{penceToPounds(calculateAverageTip())}</div>
-                <div className="text-[10px] sm:text-xs text-gray-400 truncate leading-tight">Avg Tip</div>
+                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(calculateAverageTip())}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Avg Tip</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Top Fans - collapsed by default, expand with button */}
+        {/* Top Fans - hidden for now */}
+        {false && (
         <div className="max-w-7xl mx-auto flex justify-center">
           <div className="w-full max-w-xl">
             {!showTopFansPanel ? (
@@ -2614,6 +2794,7 @@ const Party: React.FC = () => {
             )}
           </div>
         </div>
+        )}
 
 
         {/* Wallet Balance removed per product update */}
@@ -2625,8 +2806,187 @@ const Party: React.FC = () => {
           <div className="space-y-3">
             {party ? (
               <div className="space-y-6">
+                {/* Queue filters: tag, time, search — trigger row + collapsible panels */}
+                {!showVetoed && (
+                  <div className="mb-4 md:mb-6">
+                    <div className="flex flex-wrap justify-center items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowTagFilterCloud((open) => !open)}
+                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                          showTagFilterCloud ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                        }`}
+                      >
+                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        Tag
+                        {selectedTagFilters.length > 0 ? (
+                          <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
+                            ({selectedTagFilters.map((t) => `#${t}`).join(', ')})
+                          </span>
+                        ) : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTimeFilter((open) => !open)}
+                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                          showTimeFilter ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                        }`}
+                      >
+                        <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        Time
+                        <span className="text-xs text-purple-300 font-normal">
+                          ({formatTimePeriodLabel(selectedTimePeriod)})
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowSearchPanel((open) => !open)}
+                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                          showSearchPanel ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                        }`}
+                      >
+                        <Search className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        Search
+                        {searchQuery.trim() ? (
+                          <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
+                            ({searchQuery.trim()})
+                          </span>
+                        ) : null}
+                      </button>
+                    </div>
+                    {getDisplayMedia().length > 0 && (
+                      <div className="flex justify-center mt-2 sm:mt-3">
+                        <button
+                          type="button"
+                          onClick={handlePlayQueue}
+                          className="px-3 sm:px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 shadow-lg"
+                          title={`Play ${getDisplayMedia().length} track${getDisplayMedia().length !== 1 ? 's' : ''} from the top`}
+                        >
+                          <Play className="h-4 w-4" />
+                          Play
+                        </button>
+                      </div>
+                    )}
+
+                    {showTagFilterCloud && (
+                      <div className="card p-3 md:p-6 mt-3">
+                        <div className="flex items-center justify-between mb-1 md:mb-3">
+                          <h3 className="text-lg font-semibold text-white flex items-center">
+                            <Tag className="h-4 w-4 mr-2 text-purple-400" />
+                            Top Tags
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            {queueSearchTerms.some((t) => t.startsWith('#')) && (
+                              <button
+                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => !t.startsWith('#')))}
+                                className="text-sm text-purple-300 hover:text-white"
+                              >
+                                Clear tags
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setShowTagFilterCloud(false)}
+                              className="text-sm text-gray-400 hover:text-white"
+                            >
+                              Hide
+                            </button>
+                          </div>
+                        </div>
+                        {topTags.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
+                              const hash = `#${tag}`;
+                              const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
+                              const weight = Math.max(0.75, Math.min(1.25, total / 50));
+                              const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
+
+                              return (
+                                <button
+                                  key={tag}
+                                  onClick={() =>
+                                    setQueueSearchTerms((prev) =>
+                                      selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
+                                    )
+                                  }
+                                  className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
+                                    selected
+                                      ? 'bg-purple-600 text-white'
+                                      : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
+                                  }`}
+                                  title={`${penceToPounds(total)} total across queued tunes`}
+                                >
+                                  #{tag}
+                                  <span className="ml-2 text-[10px] opacity-70">{penceToPounds(total)}</span>
+                                </button>
+                              );
+                            })}
+                            {topTags.length > (isMobile ? 6 : 10) && (
+                              <div className="w-full flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setTopTagsExpanded((e) => !e)}
+                                  className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
+                                  aria-expanded={topTagsExpanded}
+                                >
+                                  {topTagsExpanded ? (
+                                    <>
+                                      <Minus className="w-3 h-3" />
+                                      Show less
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="w-3 h-3" />
+                                      Show More
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-gray-400 text-sm">No tags in this party yet.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {showTimeFilter && (
+                      <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-lg font-semibold text-white flex items-center">
+                            <Clock className="h-4 w-4 mr-2 text-purple-400" />
+                            Sort by Time
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setShowTimeFilter(false)}
+                            className="text-sm text-gray-400 hover:text-white"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                        <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
+                          {TIME_PERIOD_OPTIONS.map((period) => (
+                            <button
+                              key={period.key}
+                              onClick={() => handleTimePeriodChange(period.key)}
+                              className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
+                                selectedTimePeriod === period.key
+                                  ? 'bg-purple-700 text-white'
+                                  : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                              }`}
+                            >
+                              {period.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Unified search: live-filters queue; Enter / Search library adds from Tuneable + external */}
-                {!showVetoed && party && (
+                {showSearchPanel && !showVetoed && party && (
                   <div className="mb-4 md:mb-6">
                     <div className="w-full max-w-2xl mx-auto">
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -2967,270 +3327,6 @@ const Party: React.FC = () => {
                             <p className="text-gray-500 text-sm mt-1">Try a different search term</p>
                           </div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Queue filters: location, tag, time — trigger row + collapsible panels */}
-                {!showVetoed && (
-                  <div className="mb-4 md:mb-6">
-                    <div className="flex flex-wrap justify-center items-center gap-2">
-                      {isGlobalParty && (
-                        <button
-                          type="button"
-                          onClick={() => setShowLocationFilter((open) => !open)}
-                          className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-                            showLocationFilter ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
-                          }`}
-                        >
-                          <MapPin className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                          Location
-                          {selectedLocation?.placeId ? (
-                            <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
-                              ({formatLocation(selectedLocation)})
-                            </span>
-                          ) : null}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowTagFilterCloud((open) => !open)}
-                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-                          showTagFilterCloud ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
-                        }`}
-                      >
-                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        Tag
-                        {selectedTagFilters.length > 0 ? (
-                          <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
-                            ({selectedTagFilters.map((t) => `#${t}`).join(', ')})
-                          </span>
-                        ) : null}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowTimeFilter((open) => !open)}
-                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-                          showTimeFilter ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
-                        }`}
-                      >
-                        <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        Time
-                        <span className="text-xs text-purple-300 font-normal">
-                          ({formatTimePeriodLabel(selectedTimePeriod)})
-                        </span>
-                      </button>
-                      {getDisplayMedia().length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handlePlayQueue}
-                          className="px-3 sm:px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 shadow-lg"
-                          title={`Play ${getDisplayMedia().length} track${getDisplayMedia().length !== 1 ? 's' : ''} from the top`}
-                        >
-                          <Play className="h-4 w-4" />
-                          Play
-                        </button>
-                      )}
-                    </div>
-
-                    {showLocationFilter && isGlobalParty && (
-                      <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-lg font-semibold text-white flex items-center">
-                            <MapPin className="h-4 w-4 mr-2 text-purple-400" />
-                            Filter by Location
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            {selectedLocation?.placeId && (
-                              <button
-                                type="button"
-                                onClick={() => handleLocationFilterChange(null)}
-                                className="text-sm text-purple-300 hover:text-white"
-                              >
-                                Clear
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setShowLocationFilter(false)}
-                              className="text-sm text-gray-400 hover:text-white"
-                            >
-                              Hide
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-400 mb-3">
-                          Show tunes ranked by tips from supporters in this place and anywhere within it.
-                        </p>
-                        <LocationAutocomplete
-                          value={selectedLocation}
-                          onChange={handleLocationFilterChange}
-                          placeholder="Search city, town, or region…"
-                        />
-                        {locationQuickPicks.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-xs text-gray-500 mb-2">
-                              Popular locations · {formatTimePeriodLabel(selectedTimePeriod).toLowerCase()}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {locationQuickPicks.map((loc) => {
-                                const selected = selectedLocation?.placeId === loc.placeId;
-                                return (
-                                  <button
-                                    key={loc.placeId}
-                                    type="button"
-                                    onClick={() =>
-                                      handleLocationFilterChange(
-                                        selected ? null : countryPickToResolvedLocation(loc)
-                                      )
-                                    }
-                                    className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                                      selected
-                                        ? 'bg-purple-600 text-white'
-                                        : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
-                                    }`}
-                                    title={
-                                      loc.total > 0
-                                        ? `${penceToPounds(loc.total)} in tips`
-                                        : loc.isUser
-                                          ? 'Your home country'
-                                          : undefined
-                                    }
-                                  >
-                                    {loc.country}
-                                    {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
-                                    {loc.total > 0 && (
-                                      <span className="ml-2 text-[10px] opacity-70">
-                                        {penceToPounds(loc.total)}
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        {selectedLocation?.placeId && (
-                          <p className="text-xs text-purple-300 mt-2">
-                            Showing tips from {formatLocation(selectedLocation)} and below
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {showTagFilterCloud && (
-                      <div className="card p-3 md:p-6 mt-3">
-                        <div className="flex items-center justify-between mb-1 md:mb-3">
-                          <h3 className="text-lg font-semibold text-white flex items-center">
-                            <Tag className="h-4 w-4 mr-2 text-purple-400" />
-                            Top Tags
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            {queueSearchTerms.some((t) => t.startsWith('#')) && (
-                              <button
-                                onClick={() => setQueueSearchTerms(queueSearchTerms.filter((t) => !t.startsWith('#')))}
-                                className="text-sm text-purple-300 hover:text-white"
-                              >
-                                Clear tags
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setShowTagFilterCloud(false)}
-                              className="text-sm text-gray-400 hover:text-white"
-                            >
-                              Hide
-                            </button>
-                          </div>
-                        </div>
-                        {topTags.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
-                              const hash = `#${tag}`;
-                              const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
-                              const weight = Math.max(0.75, Math.min(1.25, total / 50));
-                              const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
-
-                              return (
-                                <button
-                                  key={tag}
-                                  onClick={() =>
-                                    setQueueSearchTerms((prev) =>
-                                      selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
-                                    )
-                                  }
-                                  className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
-                                    selected
-                                      ? 'bg-purple-600 text-white'
-                                      : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
-                                  }`}
-                                  title={`${penceToPounds(total)} total across queued tunes`}
-                                >
-                                  #{tag}
-                                  <span className="ml-2 text-[10px] opacity-70">{penceToPounds(total)}</span>
-                                </button>
-                              );
-                            })}
-                            {topTags.length > (isMobile ? 6 : 10) && (
-                              <div className="w-full flex justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setTopTagsExpanded((e) => !e)}
-                                  className="rounded-full px-3 py-1 text-xs bg-gray-600 text-gray-200 hover:bg-gray-500 transition-colors inline-flex items-center gap-1"
-                                  aria-expanded={topTagsExpanded}
-                                >
-                                  {topTagsExpanded ? (
-                                    <>
-                                      <Minus className="w-3 h-3" />
-                                      Show less
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="w-3 h-3" />
-                                      Show More
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-gray-400 text-sm">No tags in this party yet.</p>
-                        )}
-                      </div>
-                    )}
-
-                    {showTimeFilter && (
-                      <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-lg font-semibold text-white flex items-center">
-                            <Clock className="h-4 w-4 mr-2 text-purple-400" />
-                            Sort by Time
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={() => setShowTimeFilter(false)}
-                            className="text-sm text-gray-400 hover:text-white"
-                          >
-                            Hide
-                          </button>
-                        </div>
-                        <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
-                          {TIME_PERIOD_OPTIONS.map((period) => (
-                            <button
-                              key={period.key}
-                              onClick={() => handleTimePeriodChange(period.key)}
-                              className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
-                                selectedTimePeriod === period.key
-                                  ? 'bg-purple-700 text-white'
-                                  : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
-                              }`}
-                            >
-                              {period.label}
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     )}
                   </div>

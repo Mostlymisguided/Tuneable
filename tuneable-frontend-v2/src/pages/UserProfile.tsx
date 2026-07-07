@@ -44,6 +44,7 @@ import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
+import { normalizeSources } from '../utils/mediaPlayability';
 
 interface LibraryItem {
   mediaId: string;
@@ -993,19 +994,9 @@ const UserProfile: React.FC = () => {
         const mediaData = await mediaAPI.getProfile(mediaId);
         const media = mediaData.media || mediaData;
         
-        // Format sources
-        let sources: any = {};
-        if (media.sources) {
-          if (Array.isArray(media.sources)) {
-            for (const source of media.sources) {
-              if (source?.platform === 'youtube' && source?.url) {
-                sources.youtube = source.url;
-              }
-            }
-          } else if (typeof media.sources === 'object') {
-            sources = media.sources;
-          }
-        }
+        // Preserve every source (esp. the `upload` audio the player needs);
+        // previously this only copied `youtube`, so the player had nothing to play.
+        const sources = normalizeSources(media.sources);
         
         return {
           id: libItem.mediaUuid || libItem.mediaId,

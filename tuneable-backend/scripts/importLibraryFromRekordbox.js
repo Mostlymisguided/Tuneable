@@ -57,6 +57,7 @@ const limit = argValue('--limit') ? parseInt(argValue('--limit'), 10) : null;
 const partyLocation = argValue('--party-location') || 'Library Import';
 const createUnmatched = !args.includes('--no-create-unmatched');
 const createParties = !args.includes('--no-create-parties');
+const minBitrate = argValue('--min-bitrate') ? parseInt(argValue('--min-bitrate'), 10) : 0;
 
 if (!xmlPath) {
   console.error(`Usage: node importLibraryFromRekordbox.js --xml /path/to/export.xml [options]
@@ -69,6 +70,7 @@ Options:
   --user-id OBJECTID            Importing user
   --limit N                     Max tracks to process
   --party-location "City"       Location for created parties
+  --min-bitrate N               Reject tracks below N kbps (e.g. 320)
   --no-create-unmatched         Skip creating new Media for unmatched files
   --no-create-parties           Skip creating Tuneable parties from playlists
 `);
@@ -173,15 +175,33 @@ async function main() {
     skipped: 0,
     unmatched: 0,
     partyAdds: 0,
+    lowBitrate: 0,
     errors: 0,
   };
+
+  if (minBitrate > 0) {
+    console.log(`Bitrate gate: rejecting tracks below ${minBitrate}kbps\n`);
+  }
 
   const musicRoot = path.dirname(toProcess[0]?.filePath || '/');
 
   for (const track of toProcess) {
     const filePath = track.filePath;
     const label = `"${track.name || path.basename(filePath)}" by ${track.artist || '?'}`;
-    const { candidates } = await buildGuessFromFile(filePath, musicRoot, track);
+    const { candidates, id3 } = await buildGuessFromFile(filePath, musicRoot, track);
+
+    if (minBitrate > 0) {
+      const kbps = track.bitrate || (id3.bitrate ? Math.round(id3.bitrate) : null);
+      if (kbps != null && kbps < minBitrate) {
+        stats.lowBitrate++;
+        console.log(`  ✗ LOW BITRATE ${kbps}kbps < ${minBitrate}: ${path.basename(filePath)}`);
+        continue;
+      }
+      if (kbps == null) {
+        console.warn(`  ? bitrate unknown, allowing: ${path.basename(filePath)}`);
+      }
+    }
+
     const match = findBestCatalogMatch(candidates, indexes);
 
     if (match) {
@@ -253,6 +273,9 @@ async function main() {
   console.log('\n--- Summary ---');
   console.log(`Tracks in playlists: ${tracks.length}`);
   console.log(`MP3 processed:       ${toProcess.length}`);
+  if (minBitrate > 0) {
+    console.log(`Rejected < ${minBitrate}kbps:   ${stats.lowBitrate}`);
+  }
   if (dryRun) {
     console.log('(dry run — no changes made)');
   }

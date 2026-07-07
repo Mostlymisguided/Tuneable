@@ -32,9 +32,10 @@ async function readId3(filePath) {
       duration: Math.floor(meta.format.duration || 0),
       bpm: meta.common.bpm || null,
       key: meta.common.key || null,
+      bitrate: meta.format.bitrate ? Math.round(meta.format.bitrate / 1000) : null,
     };
   } catch {
-    return { artist: '', title: '', duration: 0, bpm: null, key: null };
+    return { artist: '', title: '', duration: 0, bpm: null, key: null, bitrate: null };
   }
 }
 

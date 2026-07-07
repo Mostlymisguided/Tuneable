@@ -110,13 +110,20 @@ class MetadataExtractor {
       const artwork = artworkArray[0];
       console.log(`🖼️ Processing artwork: ${artwork.type} (${artwork.format})`);
       
+      // artwork.format is a MIME type (e.g. "image/jpeg") — map to a real extension
+      const mime = (artwork.format || 'image/jpeg').toLowerCase();
+      const ext = mime.includes('png') ? 'png'
+        : mime.includes('webp') ? 'webp'
+        : mime.includes('gif') ? 'gif'
+        : 'jpg';
+
       // Generate unique filename
       const timestamp = Date.now();
       const hash = crypto.createHash('md5').update(artwork.data).digest('hex').substring(0, 8);
-      const filename = `artwork-${mediaId}-${timestamp}-${hash}.${artwork.format.toLowerCase()}`;
+      const filename = `artwork-${mediaId}-${timestamp}-${hash}.${ext}`;
       
       // Save artwork to R2 or local storage
-      const artworkUrl = await this.saveArtworkToStorage(artwork.data, filename);
+      const artworkUrl = await this.saveArtworkToStorage(artwork.data, filename, mime);
       
       console.log(`✅ Artwork saved: ${artworkUrl}`);
       return artworkUrl;
@@ -133,7 +140,7 @@ class MetadataExtractor {
    * @param {string} filename - Filename for the artwork
    * @returns {Promise<string>} URL of saved artwork
    */
-  static async saveArtworkToStorage(imageBuffer, filename) {
+  static async saveArtworkToStorage(imageBuffer, filename, contentType = 'image/jpeg') {
     try {
       const { isR2Configured, getPublicUrl } = require('./r2Upload');
       
@@ -156,7 +163,7 @@ class MetadataExtractor {
           Bucket: process.env.R2_BUCKET_NAME,
           Key: key,
           Body: imageBuffer,
-          ContentType: 'image/jpeg',
+          ContentType: contentType,
           ACL: 'public-read',
           CacheControl: 'public, max-age=31536000'
         });
