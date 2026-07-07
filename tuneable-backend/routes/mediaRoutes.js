@@ -182,6 +182,59 @@ const PRODUCTION_STACK_ENUMS = {
   hardwareRole: ['instrument', 'control', 'recording', 'monitoring', 'processing']
 };
 
+const AI_TOOL_CATEGORIES = ['generation', 'enhancement', 'mixing', 'mastering', 'composition', 'lyrics', 'other'];
+
+// Parses AI tool entries from upload/edit payloads.
+const parseAiTools = (input) => {
+  if (!input) return [];
+  let parsed = input;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (error) {
+      console.warn('Unable to parse aiTools payload:', error.message);
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const cleanName = (v) => (typeof v === 'string' ? v.trim() : '');
+  const cleanStr = (v) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s || undefined;
+  };
+  const inEnum = (v, list, fallback = 'other') => (list.includes(v) ? v : fallback);
+
+  return parsed
+    .map((tool) => {
+      const name = cleanName(tool?.name);
+      if (!name) return null;
+      return {
+        category: inEnum(tool.category, AI_TOOL_CATEGORIES),
+        name,
+        provider: cleanStr(tool.provider) || ''
+      };
+    })
+    .filter(Boolean);
+};
+
+// Builds aiUsage with auto-derived disclosure (no manual dropdown).
+const buildAiUsage = (aiUsed, aiTools, aiNotes) => {
+  const used = aiUsed === 'true' || aiUsed === true;
+  const tools = parseAiTools(aiTools);
+  const notes = typeof aiNotes === 'string' ? aiNotes.trim() : '';
+  let disclosure = 'none';
+  if (used) {
+    disclosure = tools.length > 0 ? 'full' : 'partial';
+  }
+  return {
+    used,
+    disclosure,
+    tools,
+    notes: notes || ''
+  };
+};
+
 // Parses/normalizes the productionStack payload (daws, plugins, hardware).
 // Accepts a JSON string or object; drops entries without a name and coerces
 // invalid enum values to safe defaults so bad client input never 500s.
@@ -541,8 +594,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       coverArt,
       language,
       aiUsed,
-      aiDisclosure,
       aiTools,
+      aiNotes,
       productionStack
     } = req.body;
     
@@ -712,28 +765,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       addedBy: userId,
       uploadedAt: new Date(),
       
-      // AI Usage fields
-      aiUsage: {
-        used: aiUsed === 'true' || aiUsed === true,
-        disclosure: aiDisclosure || 'none',
-        tools: (() => {
-          try {
-            if (aiTools) {
-              const parsed = typeof aiTools === 'string' ? JSON.parse(aiTools) : aiTools;
-              if (Array.isArray(parsed)) {
-                return parsed.filter(tool => tool.name && tool.provider).map(tool => ({
-                  category: tool.category || 'other',
-                  name: tool.name,
-                  provider: tool.provider
-                }));
-              }
-            }
-          } catch (e) {
-            console.error('Error parsing AI tools:', e);
-          }
-          return [];
-        })()
-      },
+      // AI Usage fields (disclosure auto-derived from used + tools)
+      aiUsage: buildAiUsage(aiUsed, aiTools, aiNotes),
 
       // Production equipment / gear (structured)
       productionStack: parseProductionStack(productionStack),
@@ -2203,6 +2236,44 @@ router.put('/:id', authMiddleware, async (req, res) => {
       if (media.encodedBy !== newEncodedBy) {
         changes.push({ field: 'encodedBy', oldValue: media.encodedBy, newValue: newEncodedBy });
         media.encodedBy = newEncodedBy;
+      }
+    }
+
+    // AI usage (used flag, tools, notes — disclosure auto-derived)
+    if (
+      req.body.aiUsed !== undefined ||
+      req.body.aiTools !== undefined ||
+      req.body.aiNotes !== undefined ||
+      req.body.aiUsage !== undefined
+    ) {
+      const current = media.aiUsage || { used: false, disclosure: 'none', tools: [], notes: '' };
+      const usedInput = req.body.aiUsed !== undefined
+        ? req.body.aiUsed
+        : req.body.aiUsage?.used !== undefined
+          ? req.body.aiUsage.used
+          : current.used;
+      const toolsInput = req.body.aiTools !== undefined
+        ? req.body.aiTools
+        : req.body.aiUsage?.tools !== undefined
+          ? req.body.aiUsage.tools
+          : current.tools;
+      const notesInput = req.body.aiNotes !== undefined
+        ? req.body.aiNotes
+        : req.body.aiUsage?.notes !== undefined
+          ? req.body.aiUsage.notes
+          : current.notes;
+
+      const newAiUsage = buildAiUsage(usedInput, toolsInput, notesInput);
+      const oldAiUsage = {
+        used: !!current.used,
+        disclosure: current.disclosure || 'none',
+        tools: current.tools || [],
+        notes: current.notes || ''
+      };
+
+      if (JSON.stringify(oldAiUsage) !== JSON.stringify(newAiUsage)) {
+        changes.push({ field: 'aiUsage', oldValue: oldAiUsage, newValue: newAiUsage });
+        media.aiUsage = newAiUsage;
       }
     }
 

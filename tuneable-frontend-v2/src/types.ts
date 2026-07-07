@@ -1,6 +1,7 @@
 // Simple types file to avoid module resolution issues
 
 import type { ProductionStack } from './data/gear';
+import type { AiUsage } from './data/aiTools';
 
 // Invite code interface (defined early for use in User interface)
 export interface InviteCode {
@@ -231,6 +232,7 @@ export interface Media {
   elements?: string[];
   encodedBy?: string | null;
   productionStack?: ProductionStack;
+  aiUsage?: AiUsage;
   rightsHolder?: string;
   
   // Video/Image metadata

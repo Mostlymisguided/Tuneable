@@ -173,7 +173,8 @@ const mediaSchema = new mongoose.Schema({
       name: { type: String }, // e.g., "ChatGPT", "Stable Diffusion", "LANDR"
       provider: { type: String }, // e.g., "OpenAI", "Stability AI", "LANDR"
       _id: false
-    }]
+    }],
+    notes: { type: String, default: '' } // Freeform context (e.g. reference-only use)
   },
   
   // Technical metadata (music-specific)

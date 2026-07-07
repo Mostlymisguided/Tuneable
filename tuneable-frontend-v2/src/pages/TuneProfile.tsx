@@ -37,7 +37,8 @@ import {
   Facebook,
   Linkedin,
   Instagram,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Bot
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import TopSupporters from '../components/TopSupporters';
@@ -56,7 +57,10 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly, normalizeSources } from '../utils/mediaPlayability';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
+import AiToolsEditor from '../components/AiToolsEditor';
+import AiToolsDisplay from '../components/AiToolsDisplay';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
+import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 
 interface Media {
   _id: string;
@@ -87,6 +91,7 @@ interface Media {
   elements?: string[];
   encodedBy?: string | null;
   productionStack?: ProductionStack;
+  aiUsage?: AiUsage;
   tags?: string[];
   category?: string;
   timeSignature?: string;
@@ -242,6 +247,7 @@ const TuneProfile: React.FC = () => {
     elements: [] as string[],
     encodedBy: '',
     productionStack: EMPTY_PRODUCTION_STACK as ProductionStack,
+    aiUsage: { ...EMPTY_AI_USAGE } as AiUsage,
     coverArt: '',
     minimumBid: null as number | null,
     primaryLocation: null as {
@@ -810,6 +816,12 @@ const TuneProfile: React.FC = () => {
           daws: media.productionStack?.daws || [],
           plugins: media.productionStack?.plugins || [],
           hardware: media.productionStack?.hardware || [],
+        },
+        aiUsage: {
+          used: media.aiUsage?.used || false,
+          disclosure: media.aiUsage?.disclosure || 'none',
+          tools: media.aiUsage?.tools || [],
+          notes: media.aiUsage?.notes || '',
         },
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
@@ -1943,7 +1955,15 @@ const TuneProfile: React.FC = () => {
             
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
-              <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2">
+                <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left">{media.title}</h1>
+                {hasAiUsage(media.aiUsage) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 text-xs font-medium">
+                    <Bot className="h-3.5 w-3.5" />
+                    AI-assisted
+                  </span>
+                )}
+              </div>
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
                 <ClickableArtistDisplay media={media} />
               </div>
@@ -2375,6 +2395,19 @@ const TuneProfile: React.FC = () => {
             </h2>
             <div className="card bg-black/20 rounded-lg p-4 md:p-6">
               <ProductionStackDisplay stack={media.productionStack} />
+            </div>
+          </div>
+        )}
+
+        {/* AI Usage Section */}
+        {hasAiUsage(media.aiUsage) && (
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
+              <Bot className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
+              AI Usage
+            </h2>
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <AiToolsDisplay aiUsage={media.aiUsage} />
             </div>
           </div>
         )}
@@ -3048,6 +3081,21 @@ const TuneProfile: React.FC = () => {
                 <ProductionStackEditor
                   value={editForm.productionStack}
                   onChange={(stack) => setEditForm({ ...editForm, productionStack: stack })}
+                />
+              </div>
+
+              {/* AI Usage */}
+              <div>
+                <label className="block text-white font-medium mb-2 flex items-center">
+                  <Bot className="h-4 w-4 mr-2 text-purple-400" />
+                  AI Usage Disclosure
+                </label>
+                <p className="text-xs text-gray-400 mb-3">
+                  Disclose if and how AI was used in creating this track.
+                </p>
+                <AiToolsEditor
+                  value={editForm.aiUsage}
+                  onChange={(aiUsage) => setEditForm({ ...editForm, aiUsage })}
                 />
               </div>
 
