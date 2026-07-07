@@ -1678,8 +1678,10 @@ const PodcastEpisodeProfile: React.FC = () => {
     setShowBidConfirmationModal(true);
   };
 
-  const handleConfirmGlobalBid = async (_tags: string[]) => {
+  const handleConfirmGlobalBid = async (_tags: string[], amount: number) => {
     if (!user || !mediaId) return;
+
+    const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : parsedGlobalBidAmount;
 
     setShowBidConfirmationModal(false);
     setIsPlacingGlobalBid(true);
@@ -1687,9 +1689,9 @@ const PodcastEpisodeProfile: React.FC = () => {
     try {
       // For now, tags are only supported for external media
       // TODO: Update backend to accept tags for existing media bids
-      await mediaAPI.placeGlobalBid(mediaId, parsedGlobalBidAmount);
+      await mediaAPI.placeGlobalBid(mediaId, bidAmount);
       
-      toast.success(`Placed £${parsedGlobalBidAmount.toFixed(2)} tip on "${media?.title}"!`);
+      toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
       
       // Refresh media data to show updated metrics
       await fetchMediaProfile();
@@ -4138,6 +4140,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         onClose={() => setShowBidConfirmationModal(false)}
         onConfirm={handleConfirmGlobalBid}
         bidAmount={parsedGlobalBidAmount}
+        minTip={minimumBid}
         mediaTitle={media?.title || 'Unknown'}
         mediaArtist={Array.isArray(media?.artist) 
           ? media.artist.map((a: any) => a.name || a).join(', ')

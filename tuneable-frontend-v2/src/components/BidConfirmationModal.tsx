@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Music, Tag, AlertCircle, Loader2, MapPin } from 'lucide-react';
+import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/locationHelpers';
 import { partyAPI } from '../lib/api';
@@ -12,7 +12,7 @@ type ProgressStep = 'placing' | 'processing' | 'updating' | null;
 interface BidConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (tags: string[], setProgress?: (step: ProgressStep) => void) => void;
+  onConfirm: (tags: string[], amount: number, setProgress?: (step: ProgressStep) => void) => void;
   bidAmount: number;
   mediaTitle: string;
   mediaArtist?: string;
@@ -21,6 +21,12 @@ interface BidConfirmationModalProps {
   party?: Party;
   user?: User | null;
   isNonPlayable?: boolean;
+  /** Minimum allowed tip (pounds). Defaults to 0.01. */
+  minTip?: number;
+  /** Average tip on this media (pounds). Shown as a shortcut chip when provided. */
+  avgTip?: number;
+  /** Highest tip on this media across all parties (pounds). Shown as a shortcut chip when provided. */
+  topTip?: number;
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -35,9 +41,13 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   party,
   user,
   isNonPlayable = false,
+  minTip = 0.01,
+  avgTip,
+  topTip,
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [amountInput, setAmountInput] = useState('');
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
   const [progressStep, setProgressStep] = useState<ProgressStep>(null);
   const navigate = useNavigate();
@@ -74,6 +84,28 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
       setProgressStep(null);
     }
   }, [isOpen]);
+
+  // Seed the editable amount from the incoming default whenever the modal opens
+  // (or the target media / default changes while open).
+  useEffect(() => {
+    if (isOpen) {
+      setAmountInput(bidAmount.toFixed(2));
+    }
+  }, [isOpen, bidAmount]);
+
+  const parsedAmount = parseFloat(amountInput);
+  const effectiveAmount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
+  const isAmountValid = Number.isFinite(parsedAmount) && parsedAmount >= minTip;
+
+  const adjustAmount = (delta: number) => {
+    const current = Number.isFinite(parsedAmount) ? parsedAmount : minTip;
+    const next = Math.max(minTip, current + delta);
+    setAmountInput(next.toFixed(2));
+  };
+
+  const setAmountTo = (value: number) => {
+    setAmountInput(Math.max(minTip, value).toFixed(2));
+  };
 
   const handleAddTag = () => {
     const input = tagInput.trim();
@@ -117,7 +149,8 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   };
 
   const handleSubmit = () => {
-    onConfirm(tags, setProgressStep);
+    if (!isAmountValid) return;
+    onConfirm(tags, effectiveAmount, setProgressStep);
     setTags([]);
     setTagInput('');
   };
@@ -131,7 +164,12 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const hasInsufficientFunds = bidAmount > userBalance;
+  const hasInsufficientFunds = effectiveAmount > userBalance;
+  const statChips: { label: string; value: number }[] = [
+    { label: 'Min', value: minTip },
+    ...(typeof avgTip === 'number' && avgTip > 0 ? [{ label: 'Avg', value: avgTip }] : []),
+    ...(typeof topTip === 'number' && topTip > 0 ? [{ label: 'Top', value: topTip }] : []),
+  ];
   const actionLabel = 'Tip';
   const actionLabelLower = 'tip';
 
@@ -168,12 +206,68 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           )}
         </div>
 
-        {/* Bid Amount Summary */}
+        {/* Tip Amount Entry */}
         <div className="mb-4 p-4 bg-purple-900/30 rounded-lg border border-purple-600">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-300">Your {actionLabel} Amount:</span>
-            <span className="text-2xl font-bold text-purple-400">£{bidAmount.toFixed(2)}</span>
+          <span className="text-sm text-gray-300">Your {actionLabel} Amount</span>
+
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => adjustAmount(-0.01)}
+              disabled={isLoading || effectiveAmount <= minTip}
+              aria-label="Decrease tip"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center">
+              <span className="text-2xl font-bold text-purple-400">£</span>
+              <input
+                type="number"
+                step="0.01"
+                min={minTip}
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                disabled={isLoading}
+                className="w-24 bg-transparent text-2xl font-bold text-purple-400 text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => adjustAmount(0.01)}
+              disabled={isLoading}
+              aria-label="Increase tip"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
+
+          {/* Tip stat shortcuts */}
+          {statChips.length > 0 && (
+            <div className="mt-4 flex items-center justify-center flex-wrap gap-2">
+              {statChips.map(({ label, value }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setAmountTo(value)}
+                  disabled={isLoading}
+                  title={`Set ${actionLabelLower} to £${value.toFixed(2)}`}
+                  className="px-3 py-1 rounded-full bg-purple-800/50 border border-purple-500/40 text-xs text-purple-200 hover:bg-purple-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {label} £{value.toFixed(2)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!isAmountValid && (
+            <p className="mt-3 text-xs text-red-400 text-center">
+              Minimum {actionLabelLower} is £{minTip.toFixed(2)}
+            </p>
+          )}
         </div>
 
         {/* Insufficient Funds Warning */}
@@ -183,7 +277,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             <div className="flex-1">
               <p className="text-sm font-medium text-red-300">Insufficient Funds</p>
               <p className="text-xs text-red-400 mt-1">
-                You need £{bidAmount.toFixed(2)} but only have £{userBalance.toFixed(2)}
+                You need £{effectiveAmount.toFixed(2)} but only have £{userBalance.toFixed(2)}
               </p>
             </div>
           </div>
@@ -288,7 +382,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             type="button"
             onClick={handleSubmit}
             className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            disabled={isLoading || hasInsufficientFunds}
+            disabled={isLoading || hasInsufficientFunds || !isAmountValid}
           >
             {isLoading ? (
               <>

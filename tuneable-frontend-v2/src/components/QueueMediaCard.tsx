@@ -1,10 +1,9 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Play, X, Clock, Coins, TrendingUp, Loader2, Minus, Plus } from 'lucide-react';
+import { Play, X, Clock, Heart } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import { DEFAULT_COVER_ART } from '../constants';
-import { penceToPounds } from '../utils/currency';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
 export function normalizeQueueMediaData(rawMediaData: any) {
@@ -37,14 +36,9 @@ export interface QueueMediaCardProps {
   mediaData: ReturnType<typeof normalizeQueueMediaData>;
   showActions: boolean;
   isBidding: boolean;
-  queueBidAmounts: Record<string, string>;
-  setQueueBidAmounts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   onActionClick: (item: any) => void;
   onPlay: (item: any, index: number) => void;
-  onInlineBid: (item: any) => void;
-  calculateAverageBid: (mediaData: any, partyMediaEntry?: any) => number;
-  getDefaultBidAmount: (media?: any) => number;
-  getEffectiveMinimumBid: (media?: any) => number;
+  onTip: (item: any) => void;
 }
 
 const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
@@ -53,43 +47,11 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   mediaData,
   showActions,
   isBidding,
-  queueBidAmounts,
-  setQueueBidAmounts,
   onActionClick,
   onPlay,
-  onInlineBid,
-  calculateAverageBid,
-  getDefaultBidAmount,
-  getEffectiveMinimumBid,
+  onTip,
 }) => {
   const navigate = useNavigate();
-  const mediaId = mediaData._id || mediaData.id;
-
-  const getBidAmount = () => {
-    const avgBid = calculateAverageBid(mediaData, item);
-    return Math.max(getDefaultBidAmount(mediaData), avgBid || 0);
-  };
-
-  const updateBidAmount = (delta: number) => {
-    const minBid = getEffectiveMinimumBid(mediaData);
-    const defaultBid = getBidAmount();
-    const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
-    const newAmount = Math.max(minBid, current + delta);
-    setQueueBidAmounts((prev) => ({ ...prev, [mediaId]: newAmount.toFixed(2) }));
-  };
-
-  const isAtMinimum = () => {
-    const defaultBid = getDefaultBidAmount(mediaData);
-    const current = parseFloat(queueBidAmounts[mediaId] ?? defaultBid.toFixed(2));
-    return current <= getEffectiveMinimumBid(mediaData);
-  };
-
-  const tipButtonLabel = (() => {
-    const raw = queueBidAmounts[mediaId] ?? getBidAmount().toFixed(2);
-    const parsed = parseFloat(raw);
-    if (!Number.isFinite(parsed)) return 'Send Tip';
-    return `Tip £${parsed.toFixed(2)}`;
-  })();
 
   return (
     <div
@@ -173,101 +135,20 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
-        <div className="flex items-center justify-center space-x-2">
-          <div className="flex flex-row md:flex-col items-center gap-2 md:gap-1 px-2 py-1.5 rounded-lg bg-purple-900/40 border border-purple-500/40">
-            <div className="text-center p-0.5">
-              <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Tip Total">
-                <Coins className="h-3 w-3 md:h-4 md:w-4" />
-              </div>
-              <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
-                {penceToPounds(typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0)}
-              </div>
-            </div>
-            <div className="text-center p-0.5">
-              <div className="flex items-center justify-center text-[9px] md:text-xs text-gray-300 tracking-wide" title="Average Tip">
-                <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
-              </div>
-              <div className="text-[9px] md:text-xs md:text-lg text-gray-300">
-                £{calculateAverageBid(mediaData, item).toFixed(2)}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-row items-center space-x-1 md:space-x-2">
-            <div className="flex flex-row md:flex-col items-center space-x-0 md:space-y-0.5">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateBidAmount(0.01);
-                }}
-                disabled={isBidding}
-                className="hidden md:inline px-4 py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-tl-lg text-black transition-colors flex items-center justify-center"
-              >
-                <Plus className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateBidAmount(-0.01);
-                }}
-                disabled={isBidding || isAtMinimum()}
-                className="md:hidden px-1.5 py-1.5 md:px-6 md:py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-bl-lg text-black transition-colors flex items-center justify-center"
-              >
-                <Minus className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
-              <input
-                type="number"
-                step="0.01"
-                min={getEffectiveMinimumBid(mediaData)}
-                value={queueBidAmounts[mediaId] ?? getBidAmount().toFixed(2)}
-                onChange={(e) =>
-                  setQueueBidAmounts((prev) => ({ ...prev, [mediaId]: e.target.value }))
-                }
-                className="w-16 md:w-20 bg-gray-900 rounded px-1.5 md:px-2 py-1 md:py-1.5 text-center text-gray text-xs md:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                onClick={(e) => e.stopPropagation()}
-              />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateBidAmount(-0.01);
-                }}
-                disabled={isBidding || isAtMinimum()}
-                className="hidden md:inline px-1.5 py-2 md:px-4 md:py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-bl-lg rounded-br-lg text-black transition-colors flex items-center justify-center"
-              >
-                <Minus className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateBidAmount(0.01);
-                }}
-                disabled={isBidding}
-                className="md:hidden px-1.5 py-1.5 md:px-2 md:py-1 bg-white hover:bg-gray-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-br-lg text-black transition-colors flex items-center justify-center"
-              >
-                <Plus className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
-            </div>
-            <button
-              onClick={() => onInlineBid(item)}
-              disabled={isBidding}
-              className="px-2 md:px-4 py-1.5 md:py-2 bg-purple-800 hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap flex items-center justify-center gap-2"
-            >
-              {isBidding ? (
-                <>
-                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                  <span>Placing Tip...</span>
-                </>
-              ) : (
-                tipButtonLabel
-              )}
-            </button>
-          </div>
-        </div>
+      <div className="flex items-center justify-end md:justify-center md:ml-auto flex-shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onTip(item);
+          }}
+          disabled={isBidding}
+          title="Send a tip"
+          aria-label="Send a tip"
+          className="group flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <Heart className="h-5 w-5 md:h-6 md:w-6 transition-transform group-hover:scale-110" />
+        </button>
       </div>
     </div>
   );

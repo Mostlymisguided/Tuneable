@@ -1029,7 +1029,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
     setValidationDuration(0);
   };
 
-  const handleBidConfirmation = async (tags: string[], setProgress?: (step: 'placing' | 'processing' | 'updating' | null) => void) => {
+  const handleBidConfirmation = async (tags: string[], bidAmountOverride: number, setProgress?: (step: 'placing' | 'processing' | 'updating' | null) => void) => {
     // ✅ Early return if already bidding - prevent double-clicks
     if (isBidding) {
       console.log('Already processing a tip, please wait...');
@@ -1097,30 +1097,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
           return;
         }
         
-        // Calculate bid amount (UI presents this as a tip)
-        let bidAmount = getDefaultBidAmount();
+        // Amount comes from the confirmation modal (UI presents this as a tip)
+        const bidAmount = bidAmountOverride;
         const minBid = getEffectiveMinimumBid(safePendingMedia);
-        
-        try {
-          const rawQueueBid = queueBidAmounts[mediaId];
-          if (rawQueueBid && typeof rawQueueBid === 'string') {
-            const parsed = parseFloat(rawQueueBid);
-            if (Number.isFinite(parsed) && parsed > 0) {
-              bidAmount = parsed;
-            } else {
-              // Calculate default
-              const avgBid = calculateAverageBid(safePendingMedia);
-              bidAmount = Math.max(getDefaultBidAmount(safePendingMedia), avgBid || 0);
-            }
-          } else {
-            // Calculate default
-            const avgBid = calculateAverageBid(safePendingMedia);
-            bidAmount = Math.max(getDefaultBidAmount(safePendingMedia), avgBid || 0);
-          }
-        } catch (e) {
-          console.error('Error calculating bid amount:', e);
-          bidAmount = getDefaultBidAmount(safePendingMedia);
-        }
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
           toast.error(`Minimum tip is £${minBid.toFixed(2)}`);
@@ -1231,8 +1210,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
       
       // Handle adding new media to party
       if (!currentIsInlineBid && safePendingMedia) {
-        const rawNewMediaBid = newMediaBidAmounts[safePendingMedia._id || safePendingMedia.id] ?? '';
-        const bidAmount = parseFloat(rawNewMediaBid);
+        const bidAmount = bidAmountOverride;
         const minBid = getEffectiveMinimumBid(safePendingMedia);
 
         if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
@@ -1738,6 +1716,31 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
       return getDefaultBidAmount(pendingMedia);
     }
   }, [pendingMedia, isInlineBid, party, queueBidAmounts, newMediaBidAmounts, calculateAverageBid, showBidConfirmationModal]);
+
+  // Tip stats shown as shortcuts in the confirmation modal.
+  // avg/top only make sense for media already in the queue (inline tips).
+  const confirmationTipStats = useMemo(() => {
+    const minTip = getEffectiveMinimumBid(pendingMedia);
+    if (!isInlineBid || !pendingMedia) {
+      return { minTip, avgTip: undefined as number | undefined, topTip: undefined as number | undefined };
+    }
+    let avgTip: number | undefined;
+    let topTip: number | undefined;
+    try {
+      const avg = calculateAverageBid(pendingMedia);
+      avgTip = avg > 0 ? avg : undefined;
+      const bids = Array.isArray(pendingMedia?.bids) ? pendingMedia.bids : [];
+      const amounts = bids
+        .map((b: any) => (typeof b?.amount === 'number' ? b.amount : 0))
+        .filter((a: number) => a > 0);
+      if (amounts.length > 0) {
+        topTip = penceToPoundsNumber(Math.max(...amounts));
+      }
+    } catch (e) {
+      console.error('Error computing tip stats:', e);
+    }
+    return { minTip, avgTip, topTip };
+  }, [pendingMedia, isInlineBid, calculateAverageBid]);
 
   // Calculate user balance safely
   const confirmationUserBalance = useMemo(() => {
@@ -3386,14 +3389,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
                             mediaData={mediaData}
                             showActions={isHost || isAdmin || !!getUserBid(item)}
                             isBidding={isBidding}
-                            queueBidAmounts={queueBidAmounts}
-                            setQueueBidAmounts={setQueueBidAmounts}
                             onActionClick={handleActionButtonClick}
                             onPlay={handlePlayMedia}
-                            onInlineBid={handleInlineBid}
-                            calculateAverageBid={calculateAverageBid}
-                            getDefaultBidAmount={getDefaultBidAmount}
-                            getEffectiveMinimumBid={getEffectiveMinimumBid}
+                            onTip={handleInlineBid}
                           />
                         );
                       })
@@ -3620,9 +3618,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
               console.error('Error closing modal:', e);
             }
           }}
-          onConfirm={(tags, setProgress) => {
+          onConfirm={(tags, amount, setProgress) => {
             try {
-              handleBidConfirmation(tags, setProgress);
+              handleBidConfirmation(tags, amount, setProgress);
             } catch (e) {
               console.error('Error in onConfirm:', e);
               toast.error('An error occurred. Please try again.');
@@ -3635,6 +3633,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 1 }) => {
             }
           }}
           bidAmount={confirmationBidAmount}
+          minTip={confirmationTipStats.minTip}
+          avgTip={confirmationTipStats.avgTip}
+          topTip={confirmationTipStats.topTip}
           mediaTitle={pendingMedia?.title || 'Unknown'}
           mediaArtist={Array.isArray(pendingMedia?.artist) 
             ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'
