@@ -15,6 +15,7 @@ interface PlayerMedia {
   addedBy: any;
   totalBidValue: number;
   featuring?: any[];
+  sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
 }
 
 interface TopBidder {

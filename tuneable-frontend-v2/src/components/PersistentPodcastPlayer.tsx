@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { useAuth } from '../contexts/AuthContext';
+import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import { DEFAULT_COVER_ART } from '../constants';
 import { Play, Pause, Volume2, VolumeX, X } from 'lucide-react';
 
@@ -23,6 +25,7 @@ const SkipForward15Icon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const PersistentPodcastPlayer: React.FC = () => {
+  const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
 
@@ -47,6 +50,16 @@ const PersistentPodcastPlayer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const audioUrl = getEpisodeAudioUrl(currentEpisode);
+  const { markCompleted } = useListeningHistoryTracker({
+    mediaId: currentEpisode?._id || currentEpisode?.id || null,
+    title: currentEpisode?.title,
+    artist: currentEpisode?.podcastTitle,
+    coverArt: currentEpisode?.coverArt || currentEpisode?.podcastSeries?.coverArt,
+    currentTime,
+    duration,
+    sourceType: (currentEpisode?.sourceType || 'direct') as any,
+    enabled: !!user && !!currentEpisode,
+  });
 
   const resolveFullUrl = (url: string): string => {
     if (url.startsWith('http')) return url;
@@ -92,6 +105,7 @@ const PersistentPodcastPlayer: React.FC = () => {
     };
 
     el.onended = () => {
+      markCompleted();
       usePodcastPlayerStore.getState().next();
     };
 

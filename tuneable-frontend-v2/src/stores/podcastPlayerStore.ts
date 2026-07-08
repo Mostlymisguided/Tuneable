@@ -15,6 +15,7 @@ export interface PodcastPlayerEpisode {
   /** Fallbacks for search/external results */
   audioUrl?: string;
   enclosure?: { url?: string };
+  sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
 }
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;

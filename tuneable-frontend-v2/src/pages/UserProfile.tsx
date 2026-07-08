@@ -140,6 +140,46 @@ interface UserStats {
   uniqueSongsCount: number;
 }
 
+interface PlaybackQueueItem {
+  index: number;
+  addedAt: string;
+  sourceType: string;
+  note?: string;
+  mediaId: string;
+  mediaUuid: string;
+  title: string;
+  artist: string;
+  coverArt?: string;
+  duration?: number;
+  tags?: string[];
+  contentForm?: string[];
+  sources?: Record<string, string>;
+}
+
+interface ListeningHistoryItem {
+  _id: string;
+  uuid: string;
+  sessionId: string;
+  sourceType: string;
+  startedAt: string;
+  lastPlayedAt: string;
+  completedAt?: string | null;
+  lastPositionSeconds: number;
+  listenDurationSeconds: number;
+  completionPercent: number;
+  status: 'in_progress' | 'partial' | 'completed';
+  media: {
+    _id: string;
+    uuid?: string | null;
+    title: string;
+    artist: string;
+    coverArt?: string;
+    duration?: number;
+    tags?: string[];
+    contentForm?: string[];
+  };
+}
+
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
@@ -165,6 +205,13 @@ const UserProfile: React.FC = () => {
     limit: 50
   });
   const [tipHistoryPagination, setTipHistoryPagination] = useState<any>(null);
+
+  const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueueItem[]>([]);
+  const [isLoadingPlaybackQueue, setIsLoadingPlaybackQueue] = useState(false);
+  const [listeningHistory, setListeningHistory] = useState<ListeningHistoryItem[]>([]);
+  const [isLoadingListeningHistory, setIsLoadingListeningHistory] = useState(false);
+  const [listeningHistoryPagination, setListeningHistoryPagination] = useState<any>(null);
+  const [listeningHistoryStatus, setListeningHistoryStatus] = useState<'' | 'in_progress' | 'partial' | 'completed'>('');
   
   // Wallet history state
   const [walletHistory, setWalletHistory] = useState<any[]>([]);
@@ -213,7 +260,7 @@ const UserProfile: React.FC = () => {
   const rawViewTab = searchParams.get('view');
   const viewTab = (rawViewTab === 'podcast-library'
     ? 'tune-library'
-    : (rawViewTab as 'tip-history' | 'wallet-history' | 'tune-library')) || 'tune-library';
+    : (rawViewTab as 'tip-history' | 'wallet-history' | 'tune-library' | 'queue' | 'listening-history')) || 'tune-library';
   
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -384,6 +431,41 @@ const UserProfile: React.FC = () => {
     }
   };
 
+  const loadPlaybackQueue = async () => {
+    if (!isOwnProfile) return;
+
+    try {
+      setIsLoadingPlaybackQueue(true);
+      const response = await userAPI.getPlaybackQueue();
+      setPlaybackQueue(response.queue || []);
+    } catch (err: any) {
+      console.error('Error loading playback queue:', err);
+      toast.error('Failed to load playback queue');
+    } finally {
+      setIsLoadingPlaybackQueue(false);
+    }
+  };
+
+  const loadListeningHistory = async () => {
+    if (!isOwnProfile) return;
+
+    try {
+      setIsLoadingListeningHistory(true);
+      const response = await userAPI.getListeningHistory({
+        status: listeningHistoryStatus || undefined,
+        page: 1,
+        limit: 50,
+      });
+      setListeningHistory(response.history || []);
+      setListeningHistoryPagination(response.pagination || null);
+    } catch (err: any) {
+      console.error('Error loading listening history:', err);
+      toast.error('Failed to load listening history');
+    } finally {
+      setIsLoadingListeningHistory(false);
+    }
+  };
+
   // Settings handlers
   const handleSettingsClick = () => {
     setSearchParams({ settings: 'true', tab: 'profile' });
@@ -393,7 +475,7 @@ const UserProfile: React.FC = () => {
     setSearchParams({ settings: 'true', tab });
   };
 
-  const handleViewTabChange = (tab: 'tip-history' | 'wallet-history' | 'tune-library') => {
+  const handleViewTabChange = (tab: 'tip-history' | 'wallet-history' | 'tune-library' | 'queue' | 'listening-history') => {
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
       newParams.set('view', tab);
@@ -602,6 +684,18 @@ const UserProfile: React.FC = () => {
       loadTipHistory();
     }
   }, [viewTab, isOwnProfile, isSettingsMode, tipHistoryFilters]);
+
+  useEffect(() => {
+    if (viewTab === 'queue' && isOwnProfile && !isSettingsMode) {
+      loadPlaybackQueue();
+    }
+  }, [viewTab, isOwnProfile, isSettingsMode]);
+
+  useEffect(() => {
+    if (viewTab === 'listening-history' && isOwnProfile && !isSettingsMode) {
+      loadListeningHistory();
+    }
+  }, [viewTab, isOwnProfile, isSettingsMode, listeningHistoryStatus]);
 
   const loadWalletHistory = async () => {
     if (!isOwnProfile) return;
@@ -993,7 +1087,8 @@ const UserProfile: React.FC = () => {
           globalMediaAggregate: libItem.globalMediaAggregate,
           bids: [],
           addedBy: null,
-          totalBidValue: libItem.globalMediaAggregate
+          totalBidValue: libItem.globalMediaAggregate,
+          sourceType: 'library'
         } as any;
       });
       
@@ -1037,6 +1132,7 @@ const UserProfile: React.FC = () => {
       podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
       podcastTitle: libItem.artist,
       sources,
+      sourceType: 'library',
     };
   };
 
@@ -1103,6 +1199,148 @@ const UserProfile: React.FC = () => {
       const list = getSortedLibrary().filter((i) => !isPodcastItem(i));
       const index = list.findIndex((i) => i.mediaId === item.mediaId);
       handlePlayLibrary(item, Math.max(index, 0), list);
+    }
+  };
+
+  const isPodcastQueueItem = (item: PlaybackQueueItem) => {
+    const cf = item.contentForm;
+    return cf && (Array.isArray(cf) ? cf.includes('podcastepisode') : cf === 'podcastepisode');
+  };
+
+  const handleAddLibraryItemToQueue = async (item: LibraryItem) => {
+    try {
+      await userAPI.addToPlaybackQueue({
+        mediaId: item.mediaUuid || item.mediaId,
+        sourceType: 'library',
+      });
+      toast.success(`Added "${item.title}" to your queue`);
+      if (viewTab === 'queue') {
+        await loadPlaybackQueue();
+      }
+    } catch (error: any) {
+      console.error('Error adding item to queue:', error);
+      toast.error(error.response?.data?.error || 'Failed to add item to queue');
+    }
+  };
+
+  const handleRemoveQueueItem = async (item: PlaybackQueueItem) => {
+    try {
+      await userAPI.removeFromPlaybackQueue(item.mediaUuid || item.mediaId);
+      setPlaybackQueue((prev) => prev.filter((queued) => queued.mediaId !== item.mediaId));
+      toast.success(`Removed "${item.title}" from your queue`);
+    } catch (error: any) {
+      console.error('Error removing item from queue:', error);
+      toast.error(error.response?.data?.error || 'Failed to remove item from queue');
+    }
+  };
+
+  const handleClearQueue = async () => {
+    try {
+      await userAPI.clearPlaybackQueue();
+      setPlaybackQueue([]);
+      toast.success('Queue cleared');
+    } catch (error: any) {
+      console.error('Error clearing queue:', error);
+      toast.error(error.response?.data?.error || 'Failed to clear queue');
+    }
+  };
+
+  const handlePlayQueueItem = async (item: PlaybackQueueItem) => {
+    try {
+      const queueItems = [...playbackQueue];
+
+      if (isPodcastQueueItem(item)) {
+        const podcastItems = queueItems.filter(isPodcastQueueItem);
+        const episodes = await Promise.all(
+          podcastItems.map(async (queueItem) => {
+            const mediaData = await mediaAPI.getProfile(queueItem.mediaUuid || queueItem.mediaId);
+            const media = mediaData.media || mediaData;
+            return formatLibraryEpisode(
+              {
+                mediaId: queueItem.mediaId,
+                mediaUuid: queueItem.mediaUuid,
+                title: queueItem.title,
+                artist: queueItem.artist,
+                coverArt: queueItem.coverArt,
+                duration: queueItem.duration,
+                contentForm: queueItem.contentForm,
+                tags: queueItem.tags,
+                globalMediaAggregate: 0,
+                globalMediaAggregateAvg: 0,
+                globalUserMediaAggregate: 0,
+                bidCount: 0,
+                tuneBytesEarned: 0,
+                lastBidAt: queueItem.addedAt,
+              },
+              media
+            );
+          })
+        );
+
+        const playableEpisodes = episodes
+          .map((episode) => ({ ...episode, sourceType: 'user_queue' as const }))
+          .filter((episode) => getEpisodeAudioUrl(episode));
+
+        const queueIndex = playableEpisodes.findIndex(
+          (episode) => (episode._id || episode.id) === item.mediaId
+            || (episode._id || episode.id) === item.mediaUuid
+        );
+
+        if (queueIndex === -1) {
+          toast.error('No playable audio for this episode');
+          return;
+        }
+
+        const { setQueue: setPodcastQueue, setCurrentEpisode, play: playPodcast } = usePodcastPlayerStore.getState();
+        const webPlayer = useWebPlayerStore.getState();
+        webPlayer.pause();
+        webPlayer.setCurrentMedia(null, 0);
+        webPlayer.setQueue([]);
+        webPlayer.setGlobalPlayerActive(false);
+
+        setPodcastQueue(playableEpisodes);
+        setCurrentEpisode(playableEpisodes[queueIndex], queueIndex);
+        playPodcast();
+      } else {
+        const musicItems = queueItems.filter((queueItem) => !isPodcastQueueItem(queueItem));
+        const allFormattedMedia = await Promise.all(
+          musicItems.map(async (queueItem) => {
+            const mediaData = await mediaAPI.getProfile(queueItem.mediaUuid || queueItem.mediaId);
+            const media = mediaData.media || mediaData;
+
+            return {
+              id: queueItem.mediaUuid || queueItem.mediaId,
+              _id: queueItem.mediaId,
+              title: queueItem.title,
+              artist: queueItem.artist,
+              duration: queueItem.duration ?? media.duration,
+              coverArt: queueItem.coverArt,
+              sources: normalizeSources(media.sources),
+              globalMediaAggregate: 0,
+              bids: [],
+              addedBy: null,
+              totalBidValue: 0,
+              sourceType: 'user_queue' as const,
+            } as any;
+          })
+        );
+
+        const queueIndex = allFormattedMedia.findIndex(
+          (queueItem) => (queueItem._id || queueItem.id) === item.mediaId
+            || (queueItem._id || queueItem.id) === item.mediaUuid
+        );
+
+        usePodcastPlayerStore.getState().clear();
+        setQueue(allFormattedMedia);
+        setCurrentMedia(allFormattedMedia[Math.max(queueIndex, 0)], Math.max(queueIndex, 0));
+        play();
+        setGlobalPlayerActive(true);
+      }
+
+      toast.success(`Now playing: ${item.title}`);
+    } catch (error) {
+      console.error('Error playing queue item:', error);
+      toast.error('Failed to play queued item');
     }
   };
 
@@ -1788,6 +2026,26 @@ const UserProfile: React.FC = () => {
                 Tip History
               </button>
               <button
+                onClick={() => handleViewTabChange('queue')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'queue'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Queue
+              </button>
+              <button
+                onClick={() => handleViewTabChange('listening-history')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  viewTab === 'listening-history'
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Listening History
+              </button>
+              <button
                 onClick={() => handleViewTabChange('wallet-history')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   viewTab === 'wallet-history'
@@ -2154,7 +2412,9 @@ const UserProfile: React.FC = () => {
                 onSort={handleLibrarySort}
                 onPlay={(item) => handlePlayLibraryItem(item)}
                 onTip={handleOpenLibraryTipModal}
+                onQueue={handleAddLibraryItemToQueue}
                 showTipButton={!!isOwnProfile}
+                showQueueButton={!!isOwnProfile}
                 artistColumnLabel="Artist / Show"
                 itemPath={(item) =>
                   isPodcastItem(item)
@@ -2162,6 +2422,213 @@ const UserProfile: React.FC = () => {
                     : `/tune/${item.mediaId || item.mediaUuid}`
                 }
               />
+            )}
+          </div>
+        ) : viewTab === 'queue' ? (
+          <div className="space-y-6">
+            <div className="card flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <Music2 className="h-6 w-6 text-purple-400 mr-2" />
+                <h2 className="text-2xl font-semibold text-white">Queue</h2>
+                <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+                  {playbackQueue.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => playbackQueue[0] && handlePlayQueueItem(playbackQueue[0])}
+                  disabled={isLoadingPlaybackQueue || playbackQueue.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                >
+                  <Play className="h-4 w-4" fill="currentColor" />
+                  Play Queue
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearQueue}
+                  disabled={isLoadingPlaybackQueue || playbackQueue.length === 0}
+                  className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:cursor-not-allowed text-gray-200 font-medium transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {isLoadingPlaybackQueue ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-400 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-400">Loading queue...</p>
+              </div>
+            ) : playbackQueue.length === 0 ? (
+              <div className="text-center py-12">
+                <Music2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">Your queue is empty</h3>
+                <p className="text-gray-400">Add tunes from your library to build an upcoming queue.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {playbackQueue.map((item, index) => (
+                  <div key={`${item.mediaId}-${index}`} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-8 text-sm font-semibold text-purple-300 text-center">
+                        {index + 1}
+                      </div>
+                      <img
+                        src={item.coverArt || DEFAULT_COVER_ART}
+                        alt={item.title}
+                        className="w-14 h-14 rounded-lg object-cover cursor-pointer"
+                        onClick={() => navigate(
+                          isPodcastQueueItem(item)
+                            ? `/podcasts/${item.mediaUuid || item.mediaId}`
+                            : `/tune/${item.mediaUuid || item.mediaId}`
+                        )}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate(
+                              isPodcastQueueItem(item)
+                                ? `/podcasts/${item.mediaUuid || item.mediaId}`
+                                : `/tune/${item.mediaUuid || item.mediaId}`
+                            )}
+                            className="text-left text-white font-semibold truncate hover:text-purple-300 transition-colors"
+                          >
+                            {item.title}
+                          </button>
+                          <span className="text-xs px-2 py-0.5 rounded bg-gray-700/60 text-gray-200">
+                            {item.sourceType.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 truncate">{item.artist}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Added {new Date(item.addedAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-sm text-gray-400 hidden md:block">
+                        {formatDuration(item.duration)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePlayQueueItem(item)}
+                          className="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
+                        >
+                          Play
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQueueItem(item)}
+                          className="w-10 h-10 rounded-full bg-gray-800 hover:bg-red-600/80 text-gray-300 hover:text-white transition-colors flex items-center justify-center"
+                          title="Remove from queue"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : viewTab === 'listening-history' ? (
+          <div className="space-y-6">
+            <div className="card bg-black/20 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap gap-4 items-center">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Status</label>
+                  <select
+                    value={listeningHistoryStatus}
+                    onChange={(e) => setListeningHistoryStatus(e.target.value as any)}
+                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="completed">Completed</option>
+                    <option value="partial">Partial</option>
+                    <option value="in_progress">In Progress</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {isLoadingListeningHistory ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-400 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-400">Loading listening history...</p>
+              </div>
+            ) : listeningHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">No listening history yet</h3>
+                <p className="text-gray-400">Play something to start building your history.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {listeningHistory.map((entry) => {
+                  const isPodcast = Array.isArray(entry.media.contentForm)
+                    ? entry.media.contentForm.includes('podcastepisode')
+                    : entry.media.contentForm === 'podcastepisode';
+                  const path = isPodcast
+                    ? `/podcasts/${entry.media.uuid || entry.media._id}`
+                    : `/tune/${entry.media.uuid || entry.media._id}`;
+                  return (
+                    <div key={entry._id} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
+                      <div className="flex items-start gap-4">
+                        <img
+                          src={entry.media.coverArt || DEFAULT_COVER_ART}
+                          alt={entry.media.title}
+                          className="w-16 h-16 rounded-lg object-cover cursor-pointer"
+                          onClick={() => navigate(path)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => navigate(path)}
+                              className="text-left text-lg font-semibold text-white hover:text-purple-300 transition-colors truncate"
+                            >
+                              {entry.media.title}
+                            </button>
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              entry.status === 'completed'
+                                ? 'bg-green-600/30 text-green-200'
+                                : entry.status === 'partial'
+                                  ? 'bg-yellow-600/30 text-yellow-200'
+                                  : 'bg-blue-600/30 text-blue-200'
+                            }`}>
+                              {entry.status.replace('_', ' ')}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-xs bg-gray-700/60 text-gray-200">
+                              {entry.sourceType.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-400 truncate">{entry.media.artist}</p>
+                          <div className="mt-3 h-2 w-full rounded-full bg-gray-800 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-purple-600 to-purple-400"
+                              style={{ width: `${Math.max(0, Math.min(100, entry.completionPercent || 0))}%` }}
+                            />
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+                            <span>Last played {new Date(entry.lastPlayedAt).toLocaleString()}</span>
+                            <span>Listened {formatDuration(entry.listenDurationSeconds)}</span>
+                            <span>{Math.round(entry.completionPercent || 0)}% complete</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {listeningHistoryPagination && listeningHistoryPagination.totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-6">
+                <span className="text-gray-400 text-sm">
+                  Showing {listeningHistoryPagination.total} sessions
+                </span>
+              </div>
             )}
           </div>
         ) : viewTab === 'tip-history' ? (

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-react';
 import { partyAPI } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
 import {
@@ -28,6 +30,7 @@ interface PlayerMedia {
   bids: any[];
   addedBy: any;
   totalBidValue: number;
+  sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
 }
 
 interface MP3PlayerProps {
@@ -35,6 +38,7 @@ interface MP3PlayerProps {
 }
 
 const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
+  const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -57,6 +61,17 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     queue,
     currentMediaIndex
   } = useWebPlayerStore();
+
+  const { markCompleted } = useListeningHistoryTracker({
+    mediaId: media?._id || media?.id || null,
+    title: media?.title,
+    artist: media?.artist,
+    coverArt: media?.coverArt,
+    currentTime,
+    duration,
+    sourceType: (media?.sourceType || (currentPartyId ? 'party' : 'direct')) as any,
+    enabled: !!user && !!media,
+  });
 
 
   // Simple approach - MP3Player handles audio, PersistentWebPlayer handles YouTube
@@ -158,6 +173,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           : (media as any).artist?.[0]?.name || 'Unknown Artist';
 
         setNativeAudioEndedCallback(() => {
+          markCompleted();
           if (currentPartyId && media?._id && isHost) {
             partyAPI.completeMedia(currentPartyId, media._id)
               .then(() => next())
@@ -213,6 +229,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
         audioRef.current.onended = () => {
           console.log('MP3Player: Audio ended');
+          markCompleted();
           
           if (currentPartyId && media?._id && isHost) {
             partyAPI.completeMedia(currentPartyId, media._id)

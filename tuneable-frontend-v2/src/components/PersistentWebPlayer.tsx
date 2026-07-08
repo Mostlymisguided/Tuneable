@@ -6,6 +6,7 @@ import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize } from '
 import type { YTPlayer } from '../types/youtube';
 import { partyAPI } from '../lib/api';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
+import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import { type YouTubePlayerRef } from './YouTubePlayer';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 
@@ -151,6 +152,17 @@ const PersistentWebPlayer: React.FC = () => {
     setDuration,
     setQueue,
   } = useWebPlayerStore();
+
+  const { markCompleted } = useListeningHistoryTracker({
+    mediaId: currentMedia?._id || currentMedia?.id || null,
+    title: currentMedia?.title,
+    artist: currentMedia?.artist,
+    coverArt: currentMedia?.coverArt,
+    currentTime,
+    duration,
+    sourceType: (currentMedia?.sourceType || (currentPartyId ? 'party' : 'unknown')) as any,
+    enabled: !!user && !!currentMedia && playerType === 'youtube',
+  });
 
   const handleGlobalKeydown = useCallback((event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
@@ -464,6 +476,7 @@ const PersistentWebPlayer: React.FC = () => {
               onStateChange: (event: any) => {
                 console.log('YouTube player state changed:', event.data);
                 if (event.data === window.YT.PlayerState.ENDED) {
+                  markCompleted();
                   if (currentPartyId && currentMedia?.id && isHost) {
                     console.log('Notifying backend that media completed');
                     partyAPI.completeMedia(currentPartyId, currentMedia.id)

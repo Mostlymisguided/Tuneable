@@ -1023,6 +1023,75 @@ export const userAPI = {
     return response.data;
   },
 
+  // Get authenticated user's personal playback queue
+  getPlaybackQueue: async () => {
+    const response = await api.get('/users/me/queue');
+    return response.data as {
+      queue: Array<{
+        index: number;
+        addedAt: string;
+        sourceType: string;
+        note?: string;
+        mediaId: string;
+        mediaUuid: string;
+        title: string;
+        artist: string;
+        coverArt?: string;
+        duration?: number;
+        tags?: string[];
+        contentForm?: string[];
+        sources?: Record<string, string>;
+      }>;
+      total: number;
+    };
+  },
+
+  addToPlaybackQueue: async (payload: { mediaId: string; sourceType?: string; note?: string }) => {
+    const response = await api.post('/users/me/queue', payload);
+    return response.data;
+  },
+
+  reorderPlaybackQueue: async (mediaIds: string[]) => {
+    const response = await api.post('/users/me/queue/reorder', { mediaIds });
+    return response.data;
+  },
+
+  removeFromPlaybackQueue: async (mediaId: string) => {
+    const response = await api.delete(`/users/me/queue/${mediaId}`);
+    return response.data;
+  },
+
+  clearPlaybackQueue: async () => {
+    const response = await api.delete('/users/me/queue');
+    return response.data;
+  },
+
+  trackListeningHistory: async (payload: {
+    mediaId: string;
+    sessionId: string;
+    sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+    startedAt?: string;
+    currentTime?: number;
+    duration?: number;
+    completed?: boolean;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string;
+  }) => {
+    const response = await api.post('/users/me/listening-history/track', payload);
+    return response.data;
+  },
+
+  getListeningHistory: async (params?: {
+    status?: 'in_progress' | 'partial' | 'completed';
+    sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/users/me/listening-history', { params });
+    return response.data;
+  },
+
   // Get another user's tune library by userId (for viewing their profile)
   getTuneLibraryByUserId: async (userId: string) => {
     const response = await api.get(`/users/${userId}/tune-library`);

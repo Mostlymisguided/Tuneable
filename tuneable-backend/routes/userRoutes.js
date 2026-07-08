@@ -218,6 +218,8 @@ const countryCodeMap = {
 }; // Added geoip-lite
 const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
+const Media = require('../models/Media');
+const ListeningHistory = require('../models/ListeningHistory');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
@@ -1017,6 +1019,73 @@ async function fetchTuneLibraryForUser(user) {
     return { library, total: library.length };
 }
 
+function formatMediaArtist(media) {
+  if (!media) return 'Unknown Artist';
+  if (media.creatorDisplay) return media.creatorDisplay;
+  if (Array.isArray(media.artist) && media.artist.length > 0) {
+    return media.artist
+      .map((artist) => (typeof artist === 'string' ? artist : artist?.name))
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (typeof media.artist === 'string' && media.artist.trim()) {
+    return media.artist;
+  }
+  return 'Unknown Artist';
+}
+
+async function resolveMediaByIdentifier(identifier) {
+  if (!identifier) return null;
+  if (mongoose.Types.ObjectId.isValid(identifier)) {
+    const byId = await Media.findById(identifier);
+    if (byId) return byId;
+  }
+  return Media.findOne({ uuid: identifier });
+}
+
+async function buildPlaybackQueueResponse(user) {
+  const queueEntries = Array.isArray(user?.playbackQueue) ? user.playbackQueue : [];
+  if (queueEntries.length === 0) {
+    return { queue: [], total: 0 };
+  }
+
+  const mediaIds = queueEntries
+    .map((entry) => entry.mediaId)
+    .filter(Boolean)
+    .map((mediaId) => mediaId.toString());
+
+  const mediaDocs = await Media.find({ _id: { $in: mediaIds } })
+    .select('title artist creatorDisplay coverArt duration uuid _id tags contentForm sources')
+    .lean();
+
+  const mediaLookup = new Map(mediaDocs.map((media) => [media._id.toString(), media]));
+
+  const queue = queueEntries
+    .map((entry, index) => {
+      const media = mediaLookup.get(entry.mediaId?.toString());
+      if (!media) return null;
+
+      return {
+        index,
+        addedAt: entry.addedAt,
+        sourceType: entry.sourceType || 'unknown',
+        note: entry.note || '',
+        mediaId: media._id.toString(),
+        mediaUuid: media.uuid || media._id.toString(),
+        title: media.title || 'Unknown Title',
+        artist: formatMediaArtist(media),
+        coverArt: media.coverArt || null,
+        duration: media.duration || null,
+        tags: media.tags || [],
+        contentForm: media.contentForm || [],
+        sources: media.sources || {},
+      };
+    })
+    .filter(Boolean);
+
+  return { queue, total: queue.length };
+}
+
 // Get user's tune library (authenticated user - /me)
 // @route   GET /api/users/me/tune-library
 // @desc    Get the authenticated user's tune library
@@ -1030,6 +1099,296 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching tune library:', error);
     res.status(500).json({ error: 'Error fetching tune library', details: error.message });
+  }
+});
+
+// Get authenticated user's playback queue
+router.get('/me/queue', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('playbackQueue');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const result = await buildPlaybackQueueResponse(user);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching playback queue:', error);
+    res.status(500).json({ error: 'Error fetching playback queue', details: error.message });
+  }
+});
+
+// Add media to authenticated user's playback queue
+router.post('/me/queue', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId, sourceType = 'unknown', note = '' } = req.body || {};
+    const media = await resolveMediaByIdentifier(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (!Array.isArray(user.playbackQueue)) {
+      user.playbackQueue = [];
+    }
+
+    const existingIndex = user.playbackQueue.findIndex(
+      (entry) => entry.mediaId?.toString() === media._id.toString()
+    );
+
+    if (existingIndex >= 0) {
+      user.playbackQueue.splice(existingIndex, 1);
+    }
+
+    user.playbackQueue.push({
+      mediaId: media._id,
+      addedAt: new Date(),
+      sourceType,
+      note,
+    });
+
+    await user.save();
+    const result = await buildPlaybackQueueResponse(user);
+    res.status(existingIndex >= 0 ? 200 : 201).json({
+      success: true,
+      message: existingIndex >= 0 ? 'Media moved to end of queue' : 'Media added to queue',
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error adding media to playback queue:', error);
+    res.status(500).json({ error: 'Error adding media to playback queue', details: error.message });
+  }
+});
+
+// Reorder authenticated user's playback queue
+router.post('/me/queue/reorder', authMiddleware, async (req, res) => {
+  try {
+    const { mediaIds } = req.body || {};
+    if (!Array.isArray(mediaIds) || mediaIds.length === 0) {
+      return res.status(400).json({ error: 'mediaIds must be a non-empty array' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const currentQueue = Array.isArray(user.playbackQueue) ? user.playbackQueue : [];
+    const normalizedIncoming = mediaIds.map((id) => String(id));
+    const existingEntries = new Map(
+      currentQueue.map((entry) => [entry.mediaId?.toString(), entry.toObject ? entry.toObject() : entry])
+    );
+
+    if (normalizedIncoming.length !== currentQueue.length) {
+      return res.status(400).json({ error: 'mediaIds length must match current queue length' });
+    }
+
+    const allKnown = normalizedIncoming.every((id) => existingEntries.has(id));
+    const noDuplicates = new Set(normalizedIncoming).size === normalizedIncoming.length;
+    if (!allKnown || !noDuplicates) {
+      return res.status(400).json({ error: 'mediaIds must contain each queued media exactly once' });
+    }
+
+    user.playbackQueue = normalizedIncoming.map((id) => {
+      const existing = existingEntries.get(id);
+      return {
+        mediaId: existing.mediaId,
+        addedAt: existing.addedAt || new Date(),
+        sourceType: existing.sourceType || 'unknown',
+        note: existing.note || '',
+      };
+    });
+
+    await user.save();
+    const result = await buildPlaybackQueueResponse(user);
+    res.json({ success: true, message: 'Queue reordered', ...result });
+  } catch (error) {
+    console.error('Error reordering playback queue:', error);
+    res.status(500).json({ error: 'Error reordering playback queue', details: error.message });
+  }
+});
+
+// Remove media from authenticated user's playback queue
+router.delete('/me/queue/:mediaId', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const resolvedMedia = await resolveMediaByIdentifier(mediaId);
+    const resolvedId = resolvedMedia?._id?.toString();
+
+    user.playbackQueue = (user.playbackQueue || []).filter((entry) => {
+      const entryId = entry.mediaId?.toString();
+      return entryId !== mediaId && entryId !== resolvedId;
+    });
+
+    await user.save();
+    const result = await buildPlaybackQueueResponse(user);
+    res.json({ success: true, message: 'Media removed from queue', ...result });
+  } catch (error) {
+    console.error('Error removing media from playback queue:', error);
+    res.status(500).json({ error: 'Error removing media from playback queue', details: error.message });
+  }
+});
+
+// Clear authenticated user's playback queue
+router.delete('/me/queue', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.playbackQueue = [];
+    await user.save();
+    res.json({ success: true, message: 'Queue cleared', queue: [], total: 0 });
+  } catch (error) {
+    console.error('Error clearing playback queue:', error);
+    res.status(500).json({ error: 'Error clearing playback queue', details: error.message });
+  }
+});
+
+// Track a listening history session
+router.post('/me/listening-history/track', authMiddleware, async (req, res) => {
+  try {
+    const {
+      mediaId,
+      sessionId,
+      sourceType = 'unknown',
+      startedAt,
+      currentTime = 0,
+      duration = 0,
+      completed = false,
+      mediaTitle,
+      mediaArtist,
+      mediaCoverArt,
+    } = req.body || {};
+
+    if (!mediaId || !sessionId) {
+      return res.status(400).json({ error: 'mediaId and sessionId are required' });
+    }
+
+    const media = await resolveMediaByIdentifier(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const now = new Date();
+    const numericPosition = Math.max(0, Number(currentTime) || 0);
+    const numericDuration = Math.max(0, Number(duration) || Number(media.duration) || 0);
+    const completionPercent = numericDuration > 0
+      ? Math.min(100, Math.round((numericPosition / numericDuration) * 1000) / 10)
+      : 0;
+
+    const existing = await ListeningHistory.findOne({ userId: req.user._id, sessionId });
+    const derivedCompleted = completed === true || completionPercent >= 90;
+    const listenDurationSeconds = Math.max(
+      numericPosition,
+      existing?.listenDurationSeconds || 0
+    );
+
+    const history = await ListeningHistory.findOneAndUpdate(
+      { userId: req.user._id, sessionId },
+      {
+        $setOnInsert: {
+          userId: req.user._id,
+          mediaId: media._id,
+          sessionId,
+          startedAt: startedAt ? new Date(startedAt) : now,
+        },
+        $set: {
+          mediaId: media._id,
+          sourceType,
+          mediaTitle: mediaTitle || media.title || '',
+          mediaArtist: mediaArtist || formatMediaArtist(media),
+          mediaCoverArt: mediaCoverArt || media.coverArt || '',
+          mediaDuration: numericDuration,
+          lastPlayedAt: now,
+          lastPositionSeconds: numericPosition,
+          listenDurationSeconds,
+          completionPercent,
+          status: derivedCompleted ? 'completed' : (listenDurationSeconds > 0 ? 'partial' : 'in_progress'),
+          completedAt: derivedCompleted ? (existing?.completedAt || now) : null,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    res.json({ success: true, history });
+  } catch (error) {
+    console.error('Error tracking listening history:', error);
+    res.status(500).json({ error: 'Error tracking listening history', details: error.message });
+  }
+});
+
+// Get authenticated user's listening history
+router.get('/me/listening-history', authMiddleware, async (req, res) => {
+  try {
+    const { status, sourceType, page = 1, limit = 50 } = req.query;
+
+    const query = { userId: req.user._id };
+    if (status) query.status = status;
+    if (sourceType) query.sourceType = sourceType;
+
+    const pageNumber = Math.max(1, parseInt(page, 10) || 1);
+    const limitNumber = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const total = await ListeningHistory.countDocuments(query);
+    const items = await ListeningHistory.find(query)
+      .populate('mediaId', 'title artist creatorDisplay coverArt duration uuid _id tags contentForm')
+      .sort({ lastPlayedAt: -1 })
+      .skip(skip)
+      .limit(limitNumber)
+      .lean();
+
+    const history = items.map((entry) => {
+      const media = entry.mediaId && typeof entry.mediaId === 'object' ? entry.mediaId : null;
+      return {
+        _id: entry._id,
+        uuid: entry.uuid,
+        sessionId: entry.sessionId,
+        sourceType: entry.sourceType,
+        startedAt: entry.startedAt,
+        lastPlayedAt: entry.lastPlayedAt,
+        completedAt: entry.completedAt,
+        lastPositionSeconds: entry.lastPositionSeconds || 0,
+        listenDurationSeconds: entry.listenDurationSeconds || 0,
+        completionPercent: entry.completionPercent || 0,
+        status: entry.status,
+        media: media ? {
+          _id: media._id,
+          uuid: media.uuid,
+          title: media.title,
+          artist: formatMediaArtist(media),
+          coverArt: media.coverArt,
+          duration: media.duration,
+          tags: media.tags || [],
+          contentForm: media.contentForm || [],
+        } : {
+          _id: entry.mediaId,
+          uuid: null,
+          title: entry.mediaTitle,
+          artist: entry.mediaArtist,
+          coverArt: entry.mediaCoverArt,
+          duration: entry.mediaDuration,
+          tags: [],
+          contentForm: [],
+        },
+      };
+    });
+
+    res.json({
+      history,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        totalPages: Math.ceil(total / limitNumber),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching listening history:', error);
+    res.status(500).json({ error: 'Error fetching listening history', details: error.message });
   }
 });
 

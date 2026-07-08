@@ -277,6 +277,19 @@ const userSchema = new mongoose.Schema({
     partyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', required: true },
     followedAt: { type: Date, default: Date.now }
   }],
+
+  // Personal playback queue (small, mutable state kept on the user document)
+  playbackQueue: [{
+    mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', required: true },
+    addedAt: { type: Date, default: Date.now },
+    sourceType: {
+      type: String,
+      enum: ['library', 'search', 'profile', 'party', 'direct', 'unknown'],
+      default: 'unknown'
+    },
+    note: { type: String, default: '' },
+    _id: false
+  }],
   
   // Tag rankings - cached top tags by bid aggregate (performance optimization)
   tagRankings: [{
@@ -450,6 +463,7 @@ userSchema.virtual('primaryInviteCode').get(function() {
 // Indexes
 // Index for invite code lookups
 userSchema.index({ 'personalInviteCodes.code': 1 });
+userSchema.index({ 'playbackQueue.mediaId': 1 });
 // Note: personalInviteCode already has unique: true which creates an index automatically
 
 //comment to check debug restart

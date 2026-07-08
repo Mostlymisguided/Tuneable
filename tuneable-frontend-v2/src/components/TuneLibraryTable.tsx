@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Music, Podcast, Play, Heart, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { Music, Podcast, Play, Heart, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import MiniSupportersBar from './MiniSupportersBar';
@@ -41,7 +41,9 @@ export interface TuneLibraryTableProps {
   onSort: (field: string) => void;
   onPlay: (item: LibraryItem, index: number) => void;
   onTip?: (item: LibraryItem) => void;
+  onQueue?: (item: LibraryItem) => void;
   showTipButton?: boolean;
+  showQueueButton?: boolean;
   artistColumnLabel?: string;
   artworkIcon?: 'music' | 'podcast';
   itemPath?: (item: LibraryItem) => string;
@@ -62,7 +64,9 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
   onSort,
   onPlay,
   onTip,
+  onQueue,
   showTipButton = false,
+  showQueueButton = false,
   artistColumnLabel = 'Artist',
   artworkIcon = 'music',
   itemPath,
@@ -224,16 +228,31 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  {showTipButton && onTip ? (
-                    <button
-                      type="button"
-                      onClick={() => onTip(item)}
-                      title="Send a tip"
-                      aria-label="Send a tip"
-                      className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-colors"
-                    >
-                      <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
-                    </button>
+                  {showTipButton && (onTip || onQueue) ? (
+                    <div className="flex items-center gap-2">
+                      {showQueueButton && onQueue && (
+                        <button
+                          type="button"
+                          onClick={() => onQueue(item)}
+                          title="Add to queue"
+                          aria-label="Add to queue"
+                          className="group flex items-center justify-center w-10 h-10 rounded-full bg-gray-900/60 border border-gray-600 text-gray-200 hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-colors"
+                        >
+                          <Plus className="h-5 w-5 transition-transform group-hover:scale-110" />
+                        </button>
+                      )}
+                      {onTip && (
+                        <button
+                          type="button"
+                          onClick={() => onTip(item)}
+                          title="Send a tip"
+                          aria-label="Send a tip"
+                          className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-colors"
+                        >
+                          <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <button
                       onClick={() => navigate(resolvePath(item))}
