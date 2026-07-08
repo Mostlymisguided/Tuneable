@@ -28,6 +28,7 @@ const {
   refreshGearStats,
   buildMediaGearQuery,
 } = require('../services/gearService');
+const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService');
 const Gear = require('../models/Gear');
 
 /**
@@ -1814,6 +1815,41 @@ router.get('/:mediaId/profile', async (req, res) => {
   } catch (error) {
     console.error('Error fetching media profile:', error);
     res.status(500).json({ error: 'Error fetching media profile', details: error.message });
+  }
+});
+
+// @route   GET /api/media/:mediaId/related-playlists
+// @desc    Get related recommendations and fan-driven picks for a media item
+// @access  Public
+router.get('/:mediaId/related-playlists', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { relatedLimit = 12, fansLimit = 8 } = req.query;
+
+    let resolvedMediaId = mediaId;
+    if (!isValidObjectId(mediaId)) {
+      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
+      if (!mediaByUuid) {
+        return res.status(404).json({ error: 'Media not found' });
+      }
+      resolvedMediaId = mediaByUuid._id;
+    }
+
+    const playlists = await getRelatedPlaylistsForMedia(resolvedMediaId, {
+      relatedLimit: Math.min(Math.max(parseInt(relatedLimit, 10) || 12, 1), 24),
+      fansAlsoTipLimit: Math.min(Math.max(parseInt(fansLimit, 10) || 8, 1), 16),
+    });
+
+    res.json({
+      sourceMediaId: resolvedMediaId,
+      sourceTitle: playlists.source?.title || null,
+      sourceTags: playlists.source?.tags || [],
+      relatedMedia: playlists.relatedMedia,
+      fansAlsoTip: playlists.fansAlsoTip,
+    });
+  } catch (error) {
+    console.error('Error fetching related playlists:', error);
+    res.status(500).json({ error: 'Failed to fetch related playlists', details: error.message });
   }
 });
 

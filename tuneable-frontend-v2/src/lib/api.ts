@@ -777,6 +777,12 @@ export const mediaAPI = {
     return response.data;
   },
 
+  // Get related playlist rails for media
+  getRelatedPlaylists: async (mediaId: string, params?: { relatedLimit?: number; fansLimit?: number }) => {
+    const response = await api.get(`/media/${mediaId}/related-playlists`, { params });
+    return response.data;
+  },
+
   // Report a media item (legacy - use reportAPI.reportMedia instead)
   reportMedia: async (mediaId: string, reportData: { category: string; description: string; contactEmail?: string }) => {
     const response = await api.post(`/reports/media/${mediaId}/report`, reportData);

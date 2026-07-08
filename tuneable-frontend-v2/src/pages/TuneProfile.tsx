@@ -159,6 +159,36 @@ interface Comment {
   updatedAt: string;
 }
 
+interface RecommendedMediaItem {
+  _id: string;
+  uuid: string;
+  title: string;
+  artist: string;
+  coverArt?: string | null;
+  duration?: number;
+  globalMediaAggregate?: number;
+  tags?: string[];
+  sharedTags?: string[];
+  reasons?: string[];
+  score?: number;
+  sources?: Record<string, string>;
+  contentType?: string[];
+  contentForm?: string[];
+  creatorDisplay?: string | null;
+  fanContext?: {
+    user?: {
+      _id: string;
+      username: string;
+      profilePic?: string | null;
+      uuid?: string | null;
+    } | null;
+    totalAmount?: number;
+    bidCount?: number;
+    sourceSupportTotal?: number;
+    sourceSupportBidCount?: number;
+  } | null;
+}
+
 const createArtistEntry = (name: string = '', overrides: Partial<ArtistEntry> = {}): ArtistEntry => ({
   id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
   name,
@@ -281,6 +311,9 @@ const TuneProfile: React.FC = () => {
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
+  const [relatedMedia, setRelatedMedia] = useState<RecommendedMediaItem[]>([]);
+  const [fansAlsoTip, setFansAlsoTip] = useState<RecommendedMediaItem[]>([]);
+  const [isLoadingRelatedPlaylists, setIsLoadingRelatedPlaylists] = useState(false);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
 
   // Report modal state
@@ -289,6 +322,8 @@ const TuneProfile: React.FC = () => {
   // Collapsible sections: Top Fans, Tag Rankings
   const [showTopFans, setShowTopFans] = useState(false);
   const [showTagRankings, setShowTagRankings] = useState(false);
+  const [showRelatedMedia, setShowRelatedMedia] = useState(true);
+  const [showFansAlsoTip, setShowFansAlsoTip] = useState(false);
 
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
@@ -323,6 +358,7 @@ const TuneProfile: React.FC = () => {
       console.log('✅ mediaId exists, calling fetchMediaProfile');
       fetchMediaProfile().then(() => {
         loadTagRankings();
+        loadRelatedPlaylists();
       });
     } else {
       console.log('❌ No mediaId provided');
@@ -1449,6 +1485,26 @@ const TuneProfile: React.FC = () => {
     }
   };
 
+  const loadRelatedPlaylists = async () => {
+    if (!mediaId) return;
+
+    try {
+      setIsLoadingRelatedPlaylists(true);
+      const response = await mediaAPI.getRelatedPlaylists(mediaId, {
+        relatedLimit: 12,
+        fansLimit: 8,
+      });
+      setRelatedMedia(response.relatedMedia || []);
+      setFansAlsoTip(response.fansAlsoTip || []);
+    } catch (err) {
+      console.error('❌ Error loading related playlists:', err);
+      setRelatedMedia([]);
+      setFansAlsoTip([]);
+    } finally {
+      setIsLoadingRelatedPlaylists(false);
+    }
+  };
+
   // Handle play button click
   const handlePlaySong = () => {
     if (!media) return;
@@ -1514,6 +1570,45 @@ const TuneProfile: React.FC = () => {
     setCurrentPartyId(null); // Not in a party context
     
     toast.success(`Now playing: ${media.title}`);
+  };
+
+  const handlePlayRecommendedMedia = (item: RecommendedMediaItem) => {
+    if (!item) return;
+
+    const enriched = enrichMediaWithPlayability({
+      sources: item.sources || {},
+      contentForm: item.contentForm,
+      contentType: item.contentType,
+    } as any);
+
+    if (!isMediaPlayable(enriched)) {
+      toast.info('This track is not playable yet — opening the tune page instead.');
+      navigate(`/tune/${item._id || item.uuid}`);
+      return;
+    }
+
+    usePodcastPlayerStore.getState().clear();
+
+    const playableItem = {
+      id: item._id || item.uuid,
+      _id: item._id,
+      title: item.title,
+      artist: item.artist,
+      duration: item.duration || 0,
+      coverArt: item.coverArt || DEFAULT_COVER_ART,
+      sources: item.sources || {},
+      globalMediaAggregate: item.globalMediaAggregate || 0,
+      bids: [],
+      addedBy: null,
+      totalBidValue: item.globalMediaAggregate || 0,
+    };
+
+    setQueue([playableItem as any]);
+    setCurrentMedia(playableItem as any, 0);
+    play();
+    setGlobalPlayerActive(true);
+    setCurrentPartyId(null);
+    toast.success(`Now playing: ${item.title}`);
   };
 
   // Handle global bid (chart support)
@@ -1844,6 +1939,83 @@ const TuneProfile: React.FC = () => {
   ];
 
   const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
+
+  const renderRecommendationCards = (items: RecommendedMediaItem[], variant: 'related' | 'fans') => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+      {items.map((item) => (
+        <div
+          key={`${variant}-${item._id}`}
+          className="rounded-lg border border-purple-500/20 bg-black/20 p-4 hover:border-purple-500/40 transition-all"
+        >
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
+              className="flex-shrink-0"
+            >
+              <img
+                src={item.coverArt || DEFAULT_COVER_ART}
+                alt={item.title}
+                className="h-16 w-16 rounded-lg object-cover bg-black/30"
+              />
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
+                    className="block text-left text-white font-semibold hover:text-purple-300 transition-colors truncate"
+                  >
+                    {item.title}
+                  </button>
+                  <div className="text-sm text-gray-300 truncate">{item.artist}</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handlePlayRecommendedMedia(item)}
+                  className="inline-flex items-center justify-center rounded-full bg-purple-600 hover:bg-purple-700 text-white h-9 w-9 transition-colors"
+                  aria-label={`Play ${item.title}`}
+                >
+                  <Play className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {item.sharedTags?.slice(0, 3).map((tag) => (
+                  <span key={`${item._id}-${tag}`} className="rounded-full bg-purple-500/20 px-2 py-1 text-purple-200">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-3 space-y-1 text-xs text-gray-300">
+                {item.reasons?.slice(0, 2).map((reason) => (
+                  <div key={`${item._id}-${reason}`}>{reason}</div>
+                ))}
+                {variant === 'fans' && item.fanContext?.user?.username && (
+                  <div className="text-pink-300">
+                    Picked via top fan {item.fanContext.user.username}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <span className="text-green-300 font-medium">
+                  {penceToPounds(item.globalMediaAggregate || 0)}
+                </span>
+                <span className="text-gray-400">
+                  {item.duration ? formatDuration(item.duration) : '0:00'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -2332,6 +2504,57 @@ const TuneProfile: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Related playlist rails */}
+        {(isLoadingRelatedPlaylists || relatedMedia.length > 0 || fansAlsoTip.length > 0) && (
+          <div className="mb-8 px-2 md:px-0 space-y-6">
+            <div className="flex flex-col items-center">
+              <button
+                onClick={() => setShowRelatedMedia(!showRelatedMedia)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+              >
+                <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                  <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-cyan-300 flex-shrink-0" />
+                  {showRelatedMedia ? 'Related Tunes' : 'Show Related Tunes'}
+                </span>
+                {showRelatedMedia ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+              </button>
+              {showRelatedMedia && (
+                <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                  <p className="text-sm text-gray-300 mb-4">
+                    Closely related tracks, prioritising shared tags before tip totals.
+                  </p>
+                  {isLoadingRelatedPlaylists ? (
+                    <div className="text-gray-400 text-sm">Loading related tunes...</div>
+                  ) : renderRecommendationCards(relatedMedia, 'related')}
+                </div>
+              )}
+            </div>
+
+            {fansAlsoTip.length > 0 && (
+              <div className="flex flex-col items-center">
+                <button
+                  onClick={() => setShowFansAlsoTip(!showFansAlsoTip)}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+                >
+                  <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                    <Users className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-300 flex-shrink-0" />
+                    {showFansAlsoTip ? 'Fans Also Tip' : 'Show Fans Also Tip'}
+                  </span>
+                  {showFansAlsoTip ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+                </button>
+                {showFansAlsoTip && (
+                  <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                    <p className="text-sm text-gray-300 mb-4">
+                      One-hop picks taken from this tune&apos;s strongest supporters, while still requiring tag overlap.
+                    </p>
+                    {renderRecommendationCards(fansAlsoTip, 'fans')}
+                  </div>
+                )}
               </div>
             )}
           </div>
