@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
-import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize, Heart } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
-import { partyAPI } from '../lib/api';
+import { mediaAPI, partyAPI } from '../lib/api';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import { type YouTubePlayerRef } from './YouTubePlayer';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
+import LibraryTipModal from './LibraryTipModal';
+import { poundsToPence } from '../utils/currency';
+import { toast } from 'react-toastify';
 
 // Helper function to format time (seconds to MM:SS)
 const formatTime = (seconds: number): string => {
@@ -74,11 +77,14 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 
 const PersistentWebPlayer: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [playerType, setPlayerType] = useState<'youtube' | null>(null);
+  const [isTipModalOpen, setIsTipModalOpen] = useState(false);
+  const [isPlacingTip, setIsPlacingTip] = useState(false);
   // Function to open YouTube player in fullscreen
   const openYouTubeFullscreen = () => {
     if (playerType === 'youtube') {
@@ -665,6 +671,50 @@ const PersistentWebPlayer: React.FC = () => {
     handleSeek(newTime);
   };
 
+  const handleOpenTipModal = () => {
+    if (!currentMedia) {
+      return;
+    }
+    if (!user) {
+      toast.info('Please log in to place a tip');
+      navigate('/login');
+      return;
+    }
+    setIsTipModalOpen(true);
+  };
+
+  const handlePlaceTip = async (amount: number) => {
+    if (!currentMedia || !user) {
+      return;
+    }
+    const minimumBid = currentMedia.minimumBid ?? 0.01;
+    if (isNaN(amount) || amount < minimumBid) {
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+    if ((user as any)?.balance < poundsToPence(amount)) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
+    const mediaId = currentMedia._id || currentMedia.id;
+    if (!mediaId) {
+      return;
+    }
+
+    setIsPlacingTip(true);
+    try {
+      await mediaAPI.placeGlobalBid(mediaId, amount);
+      toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
+      setIsTipModalOpen(false);
+    } catch (error: any) {
+      console.error('Error placing bid from web player:', error);
+      toast.error(error.response?.data?.error || 'Failed to place tip');
+    } finally {
+      setIsPlacingTip(false);
+    }
+  };
+
   // Don't render if player is not globally active
   if (!isGlobalPlayerActive) {
     return null;
@@ -809,6 +859,15 @@ const PersistentWebPlayer: React.FC = () => {
             {/* Playback Controls */}
             <div className="flex items-center space-x-2">
               <button
+                onClick={handleOpenTipModal}
+                disabled={!currentMedia}
+                className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={currentMedia ? 'Send a tip' : 'No media playing'}
+                aria-label="Send a tip"
+              >
+                <Heart className="h-3 w-3 md:h-4 md:w-4" />
+              </button>
+              <button
                   onClick={() => previous()}
                 disabled={currentMediaIndex === 0 || !currentMedia}
                   className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -934,6 +993,19 @@ const PersistentWebPlayer: React.FC = () => {
           border-color: #6b7280;
         }
       `}</style>
+
+      <LibraryTipModal
+        item={isTipModalOpen && currentMedia ? {
+          mediaId: currentMedia._id || currentMedia.id,
+          title: currentMedia.title,
+          artist: currentMedia.artist,
+        } : null}
+        defaultAmount={user?.preferences?.defaultTip || 0.11}
+        minimumBid={currentMedia?.minimumBid || 0.01}
+        isSubmitting={isPlacingTip}
+        onClose={() => setIsTipModalOpen(false)}
+        onConfirm={handlePlaceTip}
+      />
     </>
   );
 };
