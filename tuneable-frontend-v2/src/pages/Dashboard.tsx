@@ -7,7 +7,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
-import { penceToPounds, poundsToPence } from '../utils/currency';
+import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
@@ -19,7 +19,7 @@ import UserProfilePrompts from '../components/UserProfilePrompts';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
-import LibraryTipModal from '../components/LibraryTipModal';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 
 interface SearchResult {
   _id?: string;
@@ -67,6 +67,15 @@ const Dashboard: React.FC = () => {
   // Helper function to get user's default tip amount
   const getUserDefaultTip = (): number => {
     return user?.preferences?.defaultTip || 0.11;
+  };
+
+  const getLibraryTopTip = (item: LibraryItem | null): number | undefined => {
+    if (!item?.bids?.length) return undefined;
+    const amounts = item.bids
+      .map((bid) => bid.amount)
+      .filter((amount): amount is number => typeof amount === 'number' && amount > 0);
+    if (amounts.length === 0) return undefined;
+    return Math.max(...amounts) / 100;
   };
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
@@ -572,7 +581,7 @@ Join here: ${inviteLink}`.trim();
     setLibraryItemToTip(item);
   };
 
-  const handlePlaceLibraryTip = async (amount: number) => {
+  const handlePlaceLibraryTip = async (tags: string[], amount: number) => {
     if (!libraryItemToTip || !user) return;
     if (isNaN(amount) || amount < minimumBid) {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
@@ -586,7 +595,7 @@ Join here: ${inviteLink}`.trim();
     if (!mediaId) return;
     setIsPlacingLibraryTip(true);
     try {
-      await mediaAPI.placeGlobalBid(mediaId, amount);
+      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
       toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
       setLibraryItemToTip(null);
       const data = await userAPI.getTuneLibrary();
@@ -2884,13 +2893,18 @@ Join here: ${inviteLink}`.trim();
         duration={validationDuration}
       />
 
-      <LibraryTipModal
-        item={libraryItemToTip}
-        defaultAmount={getUserDefaultTip()}
-        minimumBid={minimumBid}
-        isSubmitting={isPlacingLibraryTip}
+      <BidConfirmationModal
+        isOpen={!!libraryItemToTip}
         onClose={() => setLibraryItemToTip(null)}
         onConfirm={handlePlaceLibraryTip}
+        bidAmount={Math.max(minimumBid, getUserDefaultTip())}
+        minTip={minimumBid}
+        avgTip={libraryItemToTip ? libraryItemToTip.globalMediaAggregateAvg / 100 : undefined}
+        topTip={getLibraryTopTip(libraryItemToTip)}
+        mediaTitle={libraryItemToTip?.title || 'Unknown'}
+        mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isPlacingLibraryTip}
       />
 
       <TagInputModal

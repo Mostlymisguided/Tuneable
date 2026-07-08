@@ -1,11 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-react';
-import { partyAPI } from '../lib/api';
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Heart } from 'lucide-react';
+import { mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
+import BidConfirmationModal from './BidConfirmationModal';
+import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { toast } from 'react-toastify';
 import {
   isNativeAudioPlatform,
   loadNativeTrack,
@@ -31,6 +35,7 @@ interface PlayerMedia {
   addedBy: any;
   totalBidValue: number;
   sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+  minimumBid?: number;
 }
 
 interface MP3PlayerProps {
@@ -39,12 +44,15 @@ interface MP3PlayerProps {
 
 const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTipModalOpen, setIsTipModalOpen] = useState(false);
+  const [isPlacingTip, setIsPlacingTip] = useState(false);
   
   // Get state from store
   const { 
@@ -424,6 +432,64 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     handleSeek(newTime);
   };
 
+  const getAverageTip = () => {
+    const avg = (media as any)?.globalMediaAggregateAvg;
+    return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
+  };
+
+  const getTopTip = () => {
+    const bids = Array.isArray((media as any)?.bids) ? (media as any).bids : [];
+    const amounts = bids
+      .map((bid: any) => bid?.amount)
+      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
+    if (amounts.length === 0) return undefined;
+    return Math.max(...amounts) / 100;
+  };
+
+  const handleOpenTipModal = () => {
+    if (!media) {
+      return;
+    }
+    if (!user) {
+      toast.info('Please log in to place a tip');
+      navigate('/login');
+      return;
+    }
+    setIsTipModalOpen(true);
+  };
+
+  const handlePlaceTip = async (tags: string[], amount: number) => {
+    if (!media || !user) {
+      return;
+    }
+    const minimumBid = media.minimumBid ?? 0.01;
+    if (isNaN(amount) || amount < minimumBid) {
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+    if ((user as any)?.balance < poundsToPence(amount)) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
+    const mediaId = media._id || media.id;
+    if (!mediaId) {
+      return;
+    }
+
+    setIsPlacingTip(true);
+    try {
+      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
+      toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
+      setIsTipModalOpen(false);
+    } catch (error: any) {
+      console.error('MP3Player: Error placing tip:', error);
+      toast.error(error.response?.data?.error || 'Failed to place tip');
+    } finally {
+      setIsPlacingTip(false);
+    }
+  };
+
   const formatTime = (seconds: number): string => {
     if (!seconds || isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
@@ -517,6 +583,16 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
             {/* Controls */}
             <div className="flex items-center space-x-3">
+              <button
+                onClick={handleOpenTipModal}
+                disabled={!media}
+                className="p-2 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={media ? 'Send a tip' : 'No media playing'}
+                aria-label="Send a tip"
+              >
+                <Heart className="w-4 h-4" />
+              </button>
+
               {/* Previous Button */}
               <button
                 onClick={previous}
@@ -578,6 +654,20 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           </div>
         </div>
       </div>
+
+      <BidConfirmationModal
+        isOpen={isTipModalOpen}
+        onClose={() => setIsTipModalOpen(false)}
+        onConfirm={handlePlaceTip}
+        bidAmount={Math.max(media.minimumBid || 0.01, user?.preferences?.defaultTip || 0.11)}
+        minTip={media.minimumBid || 0.01}
+        avgTip={getAverageTip()}
+        topTip={getTopTip()}
+        mediaTitle={media.title}
+        mediaArtist={media.artist}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isPlacingTip}
+      />
     </div>
   );
 };

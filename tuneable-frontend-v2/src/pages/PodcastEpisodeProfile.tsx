@@ -1678,7 +1678,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     setShowBidConfirmationModal(true);
   };
 
-  const handleConfirmGlobalBid = async (_tags: string[], amount: number) => {
+  const handleConfirmGlobalBid = async (tags: string[], amount: number) => {
     if (!user || !mediaId) return;
 
     const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : parsedGlobalBidAmount;
@@ -1687,9 +1687,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     setIsPlacingGlobalBid(true);
 
     try {
-      // For now, tags are only supported for external media
-      // TODO: Update backend to accept tags for existing media bids
-      await mediaAPI.placeGlobalBid(mediaId, bidAmount);
+      await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags);
       
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
       

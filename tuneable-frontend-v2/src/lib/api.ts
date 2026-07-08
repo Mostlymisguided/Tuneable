@@ -759,8 +759,10 @@ export const mediaAPI = {
     category?: string;
     tags?: string[];
     sources: Record<string, string>;
-  }) => {
-    const payload = externalMedia ? { amount, externalMedia } : { amount };
+  }, tags?: string[]) => {
+    const payload = externalMedia
+      ? { amount, externalMedia }
+      : { amount, ...(tags && tags.length > 0 ? { tags } : {}) };
     const response = await api.post(`/media/${mediaId}/global-bid`, payload);
     return response.data;
   },

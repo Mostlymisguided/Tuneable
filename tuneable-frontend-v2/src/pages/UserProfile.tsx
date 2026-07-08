@@ -35,14 +35,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
-import { penceToPounds, poundsToPence } from '../utils/currency';
+import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import { normalizeSources } from '../utils/mediaPlayability';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
-import LibraryTipModal from '../components/LibraryTipModal';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -781,6 +781,15 @@ const UserProfile: React.FC = () => {
     return media.globalMediaAggregateAvg / 100; // Convert from pence to pounds
   };
 
+  const getTopTip = (media: any): number | undefined => {
+    if (!media?.bids?.length) return undefined;
+    const amounts = media.bids
+      .map((bid: any) => bid.amount)
+      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
+    if (amounts.length === 0) return undefined;
+    return Math.max(...amounts) / 100;
+  };
+
   // Add tune search handler
   const handleAddTuneSearch = async () => {
     if (!addTuneSearchQuery.trim()) return;
@@ -1034,7 +1043,7 @@ const UserProfile: React.FC = () => {
   };
 
   // Place additional tip on a library item (tune or podcast)
-  const handlePlaceLibraryTip = async (amount: number) => {
+  const handlePlaceLibraryTip = async (tags: string[], amount: number) => {
     if (!libraryItemToTip || !currentUser) return;
     if (isNaN(amount) || amount < 0.01) {
       toast.error('Enter at least £0.01');
@@ -1044,7 +1053,7 @@ const UserProfile: React.FC = () => {
     if (!mediaId) return;
     setIsPlacingLibraryTip(true);
     try {
-      await mediaAPI.placeGlobalBid(mediaId, amount);
+      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
       toast.success(`Added £${amount.toFixed(2)} tip on "${libraryItemToTip.title}"`);
       setLibraryItemToTip(null);
       await loadTuneLibrary();
@@ -3960,13 +3969,18 @@ const UserProfile: React.FC = () => {
         onClose={() => setIsCollectiveModalOpen(false)}
         onSuccess={handleCollectiveLinked}
       />
-      <LibraryTipModal
-        item={libraryItemToTip}
-        defaultAmount={currentUser?.preferences?.defaultTip || 0.11}
-        minimumBid={0.01}
-        isSubmitting={isPlacingLibraryTip}
+      <BidConfirmationModal
+        isOpen={!!libraryItemToTip}
         onClose={() => setLibraryItemToTip(null)}
         onConfirm={handlePlaceLibraryTip}
+        bidAmount={currentUser?.preferences?.defaultTip || 0.11}
+        minTip={0.01}
+        avgTip={libraryItemToTip ? calculateAverageBid(libraryItemToTip) : undefined}
+        topTip={getTopTip(libraryItemToTip)}
+        mediaTitle={libraryItemToTip?.title || 'Unknown'}
+        mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
+        userBalance={penceToPoundsNumber((currentUser as any)?.balance)}
+        isLoading={isPlacingLibraryTip}
       />
 
       {/* Tag Input Modal for Add Tune */}

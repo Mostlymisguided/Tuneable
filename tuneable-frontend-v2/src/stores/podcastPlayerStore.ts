@@ -8,8 +8,10 @@ export interface PodcastPlayerEpisode {
   title: string;
   duration?: number;
   coverArt?: string;
+  artist?: string;
   podcastSeries?: { _id: string; title?: string; coverArt?: string };
   podcastTitle?: string;
+  minimumBid?: number;
   /** sources.audio_direct or sources.audio; object or Map-like. */
   sources?: Record<string, string> | { get?(k: string): string | undefined };
   /** Fallbacks for search/external results */

@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
 import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import { DEFAULT_COVER_ART } from '../constants';
-import { Play, Pause, Volume2, VolumeX, X } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, X, Heart } from 'lucide-react';
+import { mediaAPI } from '../lib/api';
+import BidConfirmationModal from './BidConfirmationModal';
+import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { toast } from 'react-toastify';
 
 /** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */
 const SkipBack15Icon: React.FC<{ className?: string }> = ({ className }) => (
@@ -26,6 +30,7 @@ const SkipForward15Icon: React.FC<{ className?: string }> = ({ className }) => (
 
 const PersistentPodcastPlayer: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
 
@@ -48,6 +53,8 @@ const PersistentPodcastPlayer: React.FC = () => {
 
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTipModalOpen, setIsTipModalOpen] = useState(false);
+  const [isPlacingTip, setIsPlacingTip] = useState(false);
 
   const audioUrl = getEpisodeAudioUrl(currentEpisode);
   const { markCompleted } = useListeningHistoryTracker({
@@ -176,6 +183,64 @@ const PersistentPodcastPlayer: React.FC = () => {
     handleSeek(parseFloat(e.target.value));
   };
 
+  const getAverageTip = () => {
+    const avg = (currentEpisode as any)?.globalMediaAggregateAvg;
+    return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
+  };
+
+  const getTopTip = () => {
+    const bids = Array.isArray((currentEpisode as any)?.bids) ? (currentEpisode as any).bids : [];
+    const amounts = bids
+      .map((bid: any) => bid?.amount)
+      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
+    if (amounts.length === 0) return undefined;
+    return Math.max(...amounts) / 100;
+  };
+
+  const handleOpenTipModal = () => {
+    if (!currentEpisode) {
+      return;
+    }
+    if (!user) {
+      toast.info('Please log in to place a tip');
+      navigate('/login');
+      return;
+    }
+    setIsTipModalOpen(true);
+  };
+
+  const handlePlaceTip = async (tags: string[], amount: number) => {
+    if (!currentEpisode || !user) {
+      return;
+    }
+    const minimumBid = currentEpisode.minimumBid ?? 0.01;
+    if (isNaN(amount) || amount < minimumBid) {
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+    if ((user as any)?.balance < poundsToPence(amount)) {
+      toast.error('Insufficient balance');
+      return;
+    }
+
+    const mediaId = currentEpisode._id || currentEpisode.id;
+    if (!mediaId) {
+      return;
+    }
+
+    setIsPlacingTip(true);
+    try {
+      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
+      toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
+      setIsTipModalOpen(false);
+    } catch (error: any) {
+      console.error('PersistentPodcastPlayer: Error placing tip:', error);
+      toast.error(error.response?.data?.error || 'Failed to place tip');
+    } finally {
+      setIsPlacingTip(false);
+    }
+  };
+
   const formatTime = (s: number): string => {
     if (!s || isNaN(s)) return '0:00';
     const m = Math.floor(s / 60);
@@ -264,6 +329,16 @@ const PersistentPodcastPlayer: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleOpenTipModal}
+                disabled={!currentEpisode}
+                className="w-9 h-9 rounded-full bg-purple-900/40 border border-purple-500/40 hover:bg-purple-600 hover:text-white hover:border-purple-500 flex items-center justify-center text-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={currentEpisode ? 'Send a tip' : 'No episode playing'}
+                aria-label="Send a tip"
+              >
+                <Heart className="w-4 h-4" />
+              </button>
+
               <button
                 onClick={skipBack}
                 disabled={!isPlayerReady}
@@ -359,6 +434,20 @@ const PersistentPodcastPlayer: React.FC = () => {
           box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
       `}</style>
+
+      <BidConfirmationModal
+        isOpen={isTipModalOpen}
+        onClose={() => setIsTipModalOpen(false)}
+        onConfirm={handlePlaceTip}
+        bidAmount={Math.max(currentEpisode?.minimumBid || 0.01, user?.preferences?.defaultTip || 0.11)}
+        minTip={currentEpisode?.minimumBid || 0.01}
+        avgTip={getAverageTip()}
+        topTip={getTopTip()}
+        mediaTitle={currentEpisode?.title || 'Unknown'}
+        mediaArtist={currentEpisode?.artist || currentEpisode?.podcastTitle || currentEpisode?.podcastSeries?.title || 'Unknown show'}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isPlacingTip}
+      />
     </>
   );
 };

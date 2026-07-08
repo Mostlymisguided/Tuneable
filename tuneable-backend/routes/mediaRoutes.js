@@ -2936,7 +2936,7 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
 router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
   try {
     const { mediaId } = req.params;
-    const { amount, externalMedia } = req.body;
+    const { amount, externalMedia, tags } = req.body;
     const userId = req.user._id;
 
     // Validate amount
@@ -3044,6 +3044,31 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
 
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (media && Array.isArray(tags) && tags.length > 0) {
+      const normalizedTags = tags
+        .map(tag => capitalizeTag(tag))
+        .filter(tag => typeof tag === 'string' && tag.trim().length > 0);
+
+      if (normalizedTags.length > 0) {
+        const existingTags = Array.isArray(media.tags) ? media.tags : [];
+        const existingTagSet = new Set(existingTags.map(tag => String(tag).toLowerCase()));
+        let didAddTag = false;
+
+        normalizedTags.forEach(tag => {
+          if (!existingTagSet.has(tag.toLowerCase())) {
+            existingTagSet.add(tag.toLowerCase());
+            existingTags.push(tag);
+            didAddTag = true;
+          }
+        });
+
+        if (didAddTag) {
+          media.tags = existingTags;
+          await media.save();
+        }
+      }
     }
 
     // Get Global Party using new system

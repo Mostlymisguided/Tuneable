@@ -9,8 +9,8 @@ import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import { type YouTubePlayerRef } from './YouTubePlayer';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
-import LibraryTipModal from './LibraryTipModal';
-import { poundsToPence } from '../utils/currency';
+import BidConfirmationModal from './BidConfirmationModal';
+import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { toast } from 'react-toastify';
 
 // Helper function to format time (seconds to MM:SS)
@@ -671,6 +671,20 @@ const PersistentWebPlayer: React.FC = () => {
     handleSeek(newTime);
   };
 
+  const getCurrentMediaAverageTip = () => {
+    const avg = (currentMedia as any)?.globalMediaAggregateAvg;
+    return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
+  };
+
+  const getCurrentMediaTopTip = () => {
+    const bids = Array.isArray((currentMedia as any)?.bids) ? (currentMedia as any).bids : [];
+    const amounts = bids
+      .map((bid: any) => bid?.amount)
+      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
+    if (amounts.length === 0) return undefined;
+    return Math.max(...amounts) / 100;
+  };
+
   const handleOpenTipModal = () => {
     if (!currentMedia) {
       return;
@@ -683,7 +697,7 @@ const PersistentWebPlayer: React.FC = () => {
     setIsTipModalOpen(true);
   };
 
-  const handlePlaceTip = async (amount: number) => {
+  const handlePlaceTip = async (tags: string[], amount: number) => {
     if (!currentMedia || !user) {
       return;
     }
@@ -704,7 +718,7 @@ const PersistentWebPlayer: React.FC = () => {
 
     setIsPlacingTip(true);
     try {
-      await mediaAPI.placeGlobalBid(mediaId, amount);
+      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
       toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
       setIsTipModalOpen(false);
     } catch (error: any) {
@@ -994,17 +1008,18 @@ const PersistentWebPlayer: React.FC = () => {
         }
       `}</style>
 
-      <LibraryTipModal
-        item={isTipModalOpen && currentMedia ? {
-          mediaId: currentMedia._id || currentMedia.id,
-          title: currentMedia.title,
-          artist: currentMedia.artist,
-        } : null}
-        defaultAmount={user?.preferences?.defaultTip || 0.11}
-        minimumBid={currentMedia?.minimumBid || 0.01}
-        isSubmitting={isPlacingTip}
+      <BidConfirmationModal
+        isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
+        bidAmount={Math.max(currentMedia?.minimumBid || 0.01, user?.preferences?.defaultTip || 0.11)}
+        minTip={currentMedia?.minimumBid || 0.01}
+        avgTip={getCurrentMediaAverageTip()}
+        topTip={getCurrentMediaTopTip()}
+        mediaTitle={currentMedia?.title || 'Unknown'}
+        mediaArtist={currentMedia?.artist || 'Unknown Artist'}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isPlacingTip}
       />
     </>
   );
