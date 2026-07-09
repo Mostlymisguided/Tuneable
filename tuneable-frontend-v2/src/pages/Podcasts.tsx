@@ -5,14 +5,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI } from '../lib/api';
 import BidModal from '../components/BidModal';
 import TopSupporters from '../components/TopSupporters';
+import PodcastChartHero from '../components/PodcastChartHero';
+import PodcastQueueMediaCard from '../components/PodcastQueueMediaCard';
+import PodcastSeriesStrip from '../components/PodcastSeriesStrip';
 import { 
   TrendingUp, 
-  Filter, 
   Clock, 
-  Play, 
-  Calendar,
   Music,
-  X,
   Search,
   Link as LinkIcon,
   Loader,
@@ -20,8 +19,6 @@ import {
   Copy,
   Check,
   ChevronDown,
-  Plus,
-  Minus,
   Twitter,
   Facebook,
   Linkedin,
@@ -32,8 +29,6 @@ import {
   Award
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
-import { DEFAULT_COVER_ART } from '../constants';
-import { stripHtml } from '../utils/stripHtml';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 
@@ -92,6 +87,20 @@ interface PodcastEpisode {
   }>;
 }
 
+const EPISODE_PAGE_SIZE = 10;
+
+const TIME_RANGE_OPTIONS = [
+  { key: 'all', label: 'All Time' },
+  { key: 'year', label: 'This Year' },
+  { key: 'month', label: 'This Month' },
+  { key: 'week', label: 'This Week' },
+  { key: 'day', label: 'Today' },
+] as const;
+
+function formatTimeRangeLabel(range: string): string {
+  return TIME_RANGE_OPTIONS.find((p) => p.key === range)?.label ?? range;
+}
+
 const Podcasts: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,7 +119,10 @@ const Podcasts: React.FC = () => {
     genres: [] as string[],
     tags: [] as string[]
   });
-  const [showFilters, setShowFilters] = useState(false);
+  const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
+  const [showTimeFilter, setShowTimeFilter] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
+  const [visibleEpisodeCount, setVisibleEpisodeCount] = useState(EPISODE_PAGE_SIZE);
   
   // Tag filtering state (for top tags click functionality)
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -122,7 +134,6 @@ const Podcasts: React.FC = () => {
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showSearchSection, setShowSearchSection] = useState(false);
   const [showImportSection, setShowImportSection] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [isImportingSpotify, setIsImportingSpotify] = useState(false);
@@ -151,10 +162,6 @@ const Podcasts: React.FC = () => {
   const [avgTip, setAvgTip] = useState(0);
   const [topTip, setTopTip] = useState(0);
 
-  // Top Podcast Episodes
-  const [topPodcastEpisodes, setTopPodcastEpisodes] = useState<PodcastEpisode[]>([]);
-  const [isLoadingTopEpisodes, setIsLoadingTopEpisodes] = useState(true);
-
   // Top Podcast Series
   const [topPodcastSeries, setTopPodcastSeries] = useState<Array<{
     _id: string;
@@ -169,6 +176,7 @@ const Podcasts: React.FC = () => {
 
   useEffect(() => {
     fetchChart();
+    setVisibleEpisodeCount(EPISODE_PAGE_SIZE);
   }, [filters]);
 
   // Fetch Spotify connection status when user is logged in
@@ -210,7 +218,6 @@ const Podcasts: React.FC = () => {
   }, [searchParams, handleOAuthCallback, refreshUser, setSearchParams]);
 
   useEffect(() => {
-    fetchTopEpisodes();
     fetchTopSeries();
   }, []);
 
@@ -289,27 +296,6 @@ const Podcasts: React.FC = () => {
       toast.error('Failed to load podcast chart');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchTopEpisodes = async () => {
-    setIsLoadingTopEpisodes(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/top-episodes?limit=10`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch top podcast episodes');
-      }
-
-      const data = await response.json();
-      setTopPodcastEpisodes(data.episodes || []);
-    } catch (error: any) {
-      console.error('Error fetching top podcast episodes:', error);
-      // Don't show toast error for this - it's not critical
-    } finally {
-      setIsLoadingTopEpisodes(false);
     }
   };
 
@@ -844,40 +830,6 @@ const Podcasts: React.FC = () => {
     }
   };
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'N/A';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${seconds % 60}`;
-  };
-
-  const formatDate = (dateString?: string | Date | null, publishedAt?: string | Date | null) => {
-    // Prefer releaseDate, fallback to publishedAt
-    const dateValue = dateString || publishedAt;
-    
-    if (!dateValue) return 'Unknown';
-    
-    // Handle Date objects
-    let date: Date;
-    if (dateValue instanceof Date) {
-      date = dateValue;
-    } else if (typeof dateValue === 'string') {
-      date = new Date(dateValue);
-    } else {
-      return 'Unknown';
-    }
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      return 'Unknown';
-    }
-    
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
   const { setCurrentEpisode, play } = usePodcastPlayerStore();
 
   const handleEpisodeClick = (episode: PodcastEpisode) => {
@@ -889,7 +841,7 @@ const Podcasts: React.FC = () => {
 
   const [fetchingPlayId, setFetchingPlayId] = useState<string | null>(null);
 
-  const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
+  const handleQueuePlay = async (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
     const ep = {
       _id: episode._id,
@@ -903,24 +855,22 @@ const Podcasts: React.FC = () => {
       audioUrl: episode.audioUrl,
       enclosure: episode.enclosure,
     };
-    if (!getEpisodeAudioUrl(ep)) {
+    if (getEpisodeAudioUrl(ep)) {
+      setCurrentEpisode(ep);
+      play();
+      toast.success(`Now playing: ${episode.title}`);
+      return;
+    }
+    const id = episode._id || episode.id;
+    if (!id) {
       toast.error('No playable audio for this episode');
       return;
     }
-    setCurrentEpisode(ep);
-    play();
-    toast.success(`Now playing: ${episode.title}`);
-  };
-
-  const handlePlayTopEpisode = async (episode: PodcastEpisode, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const id = episode._id || episode.id;
-    if (!id) return;
     setFetchingPlayId(id);
     const toastId = toast.loading('Loading episode...');
     try {
       const { media } = await mediaAPI.getProfile(id);
-      const ep = {
+      const loaded = {
         _id: media._id,
         id: media.uuid,
         title: media.title,
@@ -929,11 +879,11 @@ const Podcasts: React.FC = () => {
         podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
         sources: media.sources,
       };
-      if (!getEpisodeAudioUrl(ep)) {
+      if (!getEpisodeAudioUrl(loaded)) {
         toast.error('No playable audio for this episode');
         return;
       }
-      setCurrentEpisode(ep);
+      setCurrentEpisode(loaded);
       play();
       toast.success(`Now playing: ${media.title}`);
     } catch (err: any) {
@@ -1023,14 +973,12 @@ const Podcasts: React.FC = () => {
     }
   };
 
-  const clearFilters = () => {
-    setFilters({
-      category: '',
-      genre: '',
-      tag: '',
-      timeRange: 'all',
-      sortBy: 'globalMediaAggregate'
-    });
+  const handleCategoryChange = (category: string) => {
+    setFilters((prev) => ({ ...prev, category }));
+  };
+
+  const handleTimeRangeChange = (timeRange: string) => {
+    setFilters((prev) => ({ ...prev, timeRange }));
   };
 
   const hasActiveFilters = filters.category || filters.genre || filters.tag || filters.timeRange !== 'all';
@@ -1163,583 +1111,201 @@ const Podcasts: React.FC = () => {
     return out;
   }, [displayEpisodes, selectedTagFilters]);
 
+  const visibleEpisodes = showSearchResults
+    ? displayEpisodes
+    : displayEpisodes.slice(0, visibleEpisodeCount);
+
+  const canPlayEpisode = (episode: PodcastEpisode) => {
+    if (!user) return false;
+    if (
+      getEpisodeAudioUrl({
+        title: episode.title,
+        _id: episode._id,
+        id: episode.id,
+        sources: episode.sources,
+        audioUrl: episode.audioUrl,
+        enclosure: episode.enclosure,
+      })
+    ) {
+      return true;
+    }
+    return !!(episode._id || episode.id);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 text-white">
-      {/* Header */}
-      <div className="justify-center text-center px-3 sm:px-6 py-4 sm:py-6">
-        <h1 className="inline-block text-xl sm:text-3xl font-bold text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 shadow-lg">
-          Podcast Chart
-        </h1>
-      </div>
+      <PodcastChartHero
+        categories={availableFilters.categories}
+        selectedCategory={filters.category}
+        onCategoryChange={handleCategoryChange}
+      />
 
-      {/* Share Button */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 p-2">
-        <div className="flex justify-center">
-          <div className="relative" ref={shareDropdownRef}>
-            {isMobile && 'share' in navigator ? (
-              <button
-                onClick={handleNativeShare}
-                className="px-4 py-2 rounded-lg bg-gray-900/80 hover:bg-gray-800 border border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.3)] flex items-center gap-2 transition-colors"
-              >
-                <Share2 className="h-4 w-4 text-white" />
-                <span className="text-sm font-semibold text-white">Share</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={() => setShowShareDropdown(!showShareDropdown)}
-                  className="px-4 py-2 rounded-lg bg-gray-900/80 hover:bg-gray-800 border border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.3)] flex items-center gap-2 transition-colors"
-                >
-                  <Share2 className="h-4 w-4 text-purple-300" />
-                  <span className="text-sm font-semibold text-white">Share</span>
-                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                {showShareDropdown && (
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50">
-                    <div className="py-2">
-                      <button
-                        onClick={() => { handleShare('twitter'); setShowShareDropdown(false); }}
-                        className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors"
-                      >
-                        <Twitter className="h-4 w-4 text-blue-400" />
-                        <span className="text-sm text-white">Twitter/X</span>
-                      </button>
-                      <button
-                        onClick={() => { handleShare('facebook'); setShowShareDropdown(false); }}
-                        className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors"
-                      >
-                        <Facebook className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm text-white">Facebook</span>
-                      </button>
-                      <button
-                        onClick={() => { handleShare('linkedin'); setShowShareDropdown(false); }}
-                        className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors"
-                      >
-                        <Linkedin className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm text-white">LinkedIn</span>
-                      </button>
-                      <div className="border-t border-gray-700 my-1"></div>
-                      <button
-                        onClick={() => { handleCopyLink(); setShowShareDropdown(false); }}
-                        className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors"
-                      >
-                        {copySuccess ? (
-                          <Check className="h-4 w-4 text-green-400" />
-                        ) : (
-                          <Copy className="h-4 w-4 text-gray-400" />
-                        )}
-                        <span className="text-sm text-white">{copySuccess ? 'Copied!' : 'Copy Link'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Metrics */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-600/30 rounded-lg">
-                <Coins className="h-5 w-5 text-purple-300" />
+      {/* Compact metrics */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
+        <div className="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:justify-center sm:gap-2 mb-3 sm:mb-4 max-w-md sm:max-w-none mx-auto">
+          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-purple-500/40 min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-0.5 sm:p-1 bg-purple-600/30 rounded shrink-0">
+                <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-purple-300" />
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(totalTips)}</div>
-                <div className="text-xs text-gray-400">Total Tips</div>
+              <div className="min-w-0">
+                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(totalTips)}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Total Tips</div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-600/30 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-purple-300" />
+          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-green-500/40 min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-0.5 sm:p-1 bg-green-600/30 rounded shrink-0">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-300" />
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(avgTip)}</div>
-                <div className="text-xs text-gray-400">Avg Tip</div>
+              <div className="min-w-0">
+                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(avgTip)}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Avg Tip</div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-900/80 px-4 py-3 rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-600/30 rounded-lg">
-                <Award className="h-5 w-5 text-purple-300" />
+          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-yellow-500/40 min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-0.5 sm:p-1 bg-yellow-600/30 rounded shrink-0">
+                <Award className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-300" />
               </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{penceToPounds(topTip)}</div>
-                <div className="text-xs text-gray-400">Top Tip</div>
+              <div className="min-w-0">
+                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(topTip)}</div>
+                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Top Tip</div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Top Podcast Episodes */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 flex items-center">
-          <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
-          Top Podcast Episodes
-        </h2>
-        
-        {isLoadingTopEpisodes ? (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-          </div>
-        ) : topPodcastEpisodes.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-400">No episodes found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {topPodcastEpisodes.map((episode, index) => (
-              <div
-                key={episode._id || episode.id}
-                onClick={() => handleEpisodeClick(episode)}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50 cursor-pointer"
-              >
-                {/* Rank */}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-purple-400 font-bold text-lg">#{index + 1}</span>
-                  <span className="text-purple-300 text-sm font-semibold">
-                    {penceToPounds(episode.globalMediaAggregate || 0)}
-                  </span>
-                </div>
-                
-                {/* Cover Art with Play overlay */}
-                <div className="relative group mb-3">
-                  <img
-                    src={episode.coverArt || episode.podcastSeries?.coverArt || episode.podcastImage || DEFAULT_COVER_ART}
-                    alt={episode.title}
-                    className="w-full aspect-square rounded-lg object-cover"
-                  />
-                  {user && (
-                    <button
-                      type="button"
-                      onClick={(e) => handlePlayTopEpisode(episode, e)}
-                      disabled={!!fetchingPlayId}
-                      className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto disabled:opacity-70"
-                      aria-label="Play episode"
-                    >
-                      {fetchingPlayId === (episode._id || episode.id) ? (
-                        <div className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center">
-                          <Loader className="w-6 h-6 text-gray-900 animate-spin" />
-                        </div>
-                      ) : (
-                        <span className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center shadow-lg">
-                          <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </div>
-                
-                {/* Title */}
-                <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2">
-                  {episode.title}
-                </h3>
-                
-                {/* Podcast Series Title */}
-                {(episode.podcastSeries || episode.podcastTitle) && (
-                  <p className="text-purple-300 text-xs line-clamp-1">
-                    {episode.podcastSeries?.title || episode.podcastTitle}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Top Podcast Series */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 flex items-center">
-          <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
-          Top Podcast Series
-        </h2>
-        
-        {isLoadingTopSeries ? (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-          </div>
-        ) : topPodcastSeries.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-400">No podcast series found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {topPodcastSeries.map((series, index) => (
-              <div
-                key={series._id}
-                onClick={() => navigate(`/podcast/${series._id}`)}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50 cursor-pointer"
-              >
-                {/* Rank */}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-purple-400 font-bold text-lg">#{index + 1}</span>
-                  <span className="text-purple-300 text-sm font-semibold">
-                    {penceToPounds(series.totalGlobalMediaAggregate)}
-                  </span>
-                </div>
-                
-                {/* Cover Art */}
-                <img
-                  src={series.coverArt || DEFAULT_COVER_ART}
-                  alt={series.title}
-                  className="w-full aspect-square rounded-lg object-cover mb-3"
-                />
-                
-                {/* Title */}
-                <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2">
-                  {series.title}
-                </h3>
-                
-                {/* Episode Count */}
-                <p className="text-gray-400 text-xs">
-                  {series.episodeCount} {series.episodeCount === 1 ? 'episode' : 'episodes'}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
-        {/* Search/Import Panel - Collapsible */}
-        <div className="mb-6 flex flex-col items-center">
-          <button
-            onClick={() => setShowSearchSection(!showSearchSection)}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 border border-purple-500/30 transition-colors"
-          >
-            <span className="flex items-center text-xl font-bold text-white">
-              <Search className="h-5 w-5 mr-2 text-purple-400 flex-shrink-0" />
-              {showSearchSection ? 'Search for Podcast Episodes' : 'Search For Podcasts'}
-            </span>
-            {showSearchSection ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-          </button>
-          {showSearchSection && (
-        <div className="mt-3 w-full bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 border border-purple-500/30">
-          <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Search for Podcast Episodes</h3>
-          
-          {/* Search */}
-          <div className="mb-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <Search className="h-5 w-5 text-purple-400" />
-              <h4 className="text-sm font-medium text-gray-300">Search Episodes</h4>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Search podcast episodes..."
-                  className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-              <button
-                onClick={handleSearch}
-                disabled={isSearching || !searchQuery.trim()}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
-              >
-                {isSearching ? (
-                  <>
-                    <Loader className="h-5 w-5 animate-spin" />
-                    <span>Searching...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-5 w-5" />
-                    <span>Search</span>
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowImportSection(!showImportSection)}
-                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center space-x-2"
-              >
-                <LinkIcon className="h-5 w-5 text-purple-400" />
-                <span className="text-sm font-medium text-white">Import from URL/RSS Feed</span>
-                <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showImportSection ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* Import Options - Collapsible */}
-          {showImportSection && (
-            <div className="mt-3 space-y-4">
-              {/* URL Import */}
-              <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Import from URL</h4>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    value={linkUrl}
-                    onChange={(e) => setLinkUrl(e.target.value)}
-                    placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
-                    className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleImportLink}
-                    disabled={isImportingLink || !linkUrl.trim()}
-                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
-                  >
-                    {isImportingLink ? (
-                      <>
-                        <Loader className="h-5 w-5 animate-spin" />
-                        <span>Importing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <LinkIcon className="h-5 w-5" />
-                        <span>Import</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Spotify Import */}
-              <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Import from Spotify</h4>
-                <p className="text-xs text-gray-400 mb-2">
-                  Connect your Spotify account and import your saved podcast subscriptions.
-                </p>
-                <button
-                  onClick={handleImportFromSpotify}
-                  disabled={isImportingSpotify || !user}
-                  className="px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
-                >
-                  {isImportingSpotify ? (
-                    <>
-                      <Loader className="h-5 w-5 animate-spin" />
-                      <span>Importing...</span>
-                    </>
-                  ) : spotifyConnected ? (
-                    <>
-                      <Music2 className="h-5 w-5" />
-                      <span>Import My Spotify Podcasts</span>
-                    </>
-                  ) : (
-                    <>
-                      <Music2 className="h-5 w-5" />
-                      <span>Connect Spotify & Import</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* OPML Import */}
-              <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Import from OPML</h4>
-                <p className="text-xs text-gray-400 mb-2">
-                  Export subscriptions from Overcast, Pocket Casts, Castro, etc. and upload the OPML file.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <label className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-gray-700 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-600 transition-colors">
-                    <Upload className="h-5 w-5 text-purple-400" />
-                    <span className="text-sm text-gray-300 truncate">
-                      {opmlFile ? opmlFile.name : 'Choose OPML file...'}
-                    </span>
-                    <input
-                      type="file"
-                      accept=".opml,.xml"
-                      className="hidden"
-                      onChange={(e) => setOpmlFile(e.target.files?.[0] || null)}
-                    />
-                  </label>
-                  <button
-                    onClick={handleImportOpml}
-                    disabled={isImportingOpml || !opmlFile || !user}
-                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
-                  >
-                    {isImportingOpml ? (
-                      <>
-                        <Loader className="h-5 w-5 animate-spin" />
-                        <span>Importing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-5 w-5" />
-                        <span>Import OPML</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showSearchResults && searchResults.length > 0 && (
+        {/* Tag / Time / Search / Share controls */}
+        <div className="mb-4 md:mb-6">
+          <div className="flex flex-wrap justify-center items-center gap-2">
             <button
-              onClick={() => {
-                setShowSearchResults(false);
-                setSearchQuery('');
-                setSearchResults([]);
-              }}
-              className="mt-4 text-sm text-purple-400 hover:text-purple-300"
+              type="button"
+              onClick={() => setShowTagFilterCloud((open) => !open)}
+              className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                showTagFilterCloud ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+              }`}
             >
-              ← Back to Chart
+              <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+              Tag
+              {selectedTagFilters.length > 0 && (
+                <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
+                  ({selectedTagFilters.map((t) => `#${t}`).join(', ')})
+                </span>
+              )}
             </button>
-          )}
-        </div>
-          )}
-        </div>
-
-        {/* Filters Panel */}
-        <div className="mb-6 flex justify-center">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-          >
-            <Filter className="h-5 w-5" />
-            <span>Filters</span>
-            {hasActiveFilters && (
-              <span className="bg-purple-800 text-xs px-2 py-0.5 rounded-full">
-                {[filters.category, filters.genre, filters.tag, filters.timeRange !== 'all' ? filters.timeRange : null].filter(Boolean).length}
+            <button
+              type="button"
+              onClick={() => setShowTimeFilter((open) => !open)}
+              className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                showTimeFilter ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+              }`}
+            >
+              <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
+              Time
+              <span className="text-xs text-purple-300 font-normal">
+                ({formatTimeRangeLabel(filters.timeRange)})
               </span>
-            )}
-          </button>
-        </div>
-
-        {showFilters && (
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 mb-6 border border-purple-500/30">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Category</label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="">All Categories</option>
-                  {availableFilters.categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Genre</label>
-                <select
-                  value={filters.genre}
-                  onChange={(e) => setFilters({ ...filters, genre: e.target.value })}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="">All Genres</option>
-                  {availableFilters.genres.map((genre) => (
-                    <option key={genre} value={genre}>{genre}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Tag</label>
-                <select
-                  value={filters.tag}
-                  onChange={(e) => setFilters({ ...filters, tag: e.target.value })}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="">All Tags</option>
-                  {availableFilters.tags.map((tag) => (
-                    <option key={tag} value={tag}>{tag}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Time Range</label>
-                <select
-                  value={filters.timeRange}
-                  onChange={(e) => setFilters({ ...filters, timeRange: e.target.value })}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="all">All Time</option>
-                  <option value="day">Last 24 Hours</option>
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">Last Year</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Sort By</label>
-                <select
-                  value={filters.sortBy}
-                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                >
-                  <option value="globalMediaAggregate">Total Tips</option>
-                  <option value="playCount">Play Count</option>
-                  <option value="popularity">Popularity</option>
-                  <option value="releaseDate">Release Date</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSearchPanel((open) => !open)}
+              className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                showSearchPanel ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+              }`}
+            >
+              <Search className="h-4 w-4 text-purple-400 flex-shrink-0" />
+              Search
+              {searchQuery.trim() && (
+                <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
+                  ({searchQuery.trim()})
+                </span>
+              )}
+            </button>
+            <div className="relative" ref={shareDropdownRef}>
+              {isMobile && 'share' in navigator ? (
                 <button
-                  onClick={clearFilters}
-                  className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  onClick={handleNativeShare}
+                  className="px-3 sm:px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5"
                 >
-                  <X className="h-4 w-4" />
-                  <span>Clear All</span>
+                  <Share2 className="h-4 w-4 text-purple-400" />
+                  Share
                 </button>
-              </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowShareDropdown(!showShareDropdown)}
+                    className="px-3 sm:px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5"
+                  >
+                    <Share2 className="h-4 w-4 text-purple-400" />
+                    Share
+                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showShareDropdown && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50">
+                      <div className="py-2">
+                        <button onClick={() => { handleShare('twitter'); setShowShareDropdown(false); }} className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors">
+                          <Twitter className="h-4 w-4 text-blue-400" /><span className="text-sm text-white">Twitter/X</span>
+                        </button>
+                        <button onClick={() => { handleShare('facebook'); setShowShareDropdown(false); }} className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors">
+                          <Facebook className="h-4 w-4 text-blue-500" /><span className="text-sm text-white">Facebook</span>
+                        </button>
+                        <button onClick={() => { handleShare('linkedin'); setShowShareDropdown(false); }} className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors">
+                          <Linkedin className="h-4 w-4 text-blue-600" /><span className="text-sm text-white">LinkedIn</span>
+                        </button>
+                        <div className="border-t border-gray-700 my-1" />
+                        <button onClick={() => { handleCopyLink(); setShowShareDropdown(false); }} className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors">
+                          {copySuccess ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4 text-gray-400" />}
+                          <span className="text-sm text-white">{copySuccess ? 'Copied!' : 'Copy Link'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Top Tags + Top Fans (two columns on desktop) */}
-        {!showSearchResults && (
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Top Tags Cloud */}
-            {topTags.length > 0 && (
-              <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 md:p-6 border border-purple-500/30">
-                <div className="flex items-center justify-between mb-1 md:mb-3">
-                  <h3 className="text-lg font-semibold text-white flex items-center">
-                    <Tag className="h-4 w-4 mr-2 text-purple-400" />
-                    Top Tags
-                  </h3>
+          {showTagFilterCloud && (
+            <div className="card p-3 md:p-6 mt-3">
+              <div className="flex items-center justify-between mb-1 md:mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Tag className="h-4 w-4 mr-2 text-purple-400" />
+                  Top Tags
+                </h3>
+                <div className="flex items-center gap-2">
                   {selectedTags.length > 0 && (
-                    <button
-                      onClick={() => setSelectedTags([])}
-                      className="text-sm text-purple-300 hover:text-white"
-                    >
+                    <button onClick={() => { setSelectedTags([]); setFilters((f) => ({ ...f, tag: '' })); }} className="text-sm text-purple-300 hover:text-white">
                       Clear tags
                     </button>
                   )}
+                  <button type="button" onClick={() => setShowTagFilterCloud(false)} className="text-sm text-gray-400 hover:text-white">
+                    Hide
+                  </button>
                 </div>
+              </div>
+              {topTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {topTags.map(({ tag, total }) => {
                     const selected = selectedTags.some((t) => t.toLowerCase() === tag.toLowerCase());
                     const weight = Math.max(0.75, Math.min(1.25, total / 50));
                     const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
-
                     return (
                       <button
                         key={tag}
                         onClick={() => {
                           if (selected) {
-                            setSelectedTags(prev => prev.filter(t => t.toLowerCase() !== tag.toLowerCase()));
-                            // Clear tag filter if this was the only selected tag
-                            if (filters.tag === tag) {
-                              setFilters({ ...filters, tag: '' });
-                            }
+                            setSelectedTags((prev) => prev.filter((t) => t.toLowerCase() !== tag.toLowerCase()));
+                            if (filters.tag === tag) setFilters((f) => ({ ...f, tag: '' }));
                           } else {
-                            setSelectedTags(prev => [...prev, tag]);
-                            // Update filter to show only episodes with this tag
-                            setFilters({ ...filters, tag: tag });
+                            setSelectedTags((prev) => [...prev, tag]);
+                            setFilters((f) => ({ ...f, tag }));
                           }
                         }}
                         className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
-                          selected
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
+                          selected ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
                         }`}
                         title={`${penceToPounds(total)} total across episodes`}
                       >
@@ -1749,30 +1315,194 @@ const Podcasts: React.FC = () => {
                     );
                   })}
                 </div>
-              </div>
-            )}
-
-            {/* Top Fans */}
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 md:p-6 border border-purple-500/30">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 md:mb-3">
-                <h3 className="text-base md:text-lg font-semibold text-white">Top Fans</h3>
-                {selectedTagFilters.length > 0 ? (
-                  <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
-                ) : (
-                  <span className="text-xs text-gray-400">Showing global support</span>
-                )}
-              </div>
-              <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
-                <TopSupporters bids={topSupporterBids} maxDisplay={10} />
+              ) : (
+                <p className="text-gray-400 text-sm">No tags yet.</p>
+              )}
+              <div className="mt-4 pt-4 border-t border-gray-700/50">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-white">Top Fans</h4>
+                  {selectedTagFilters.length > 0 ? (
+                    <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Showing global support</span>
+                  )}
+                </div>
+                <div className="max-h-48 overflow-y-auto pr-1">
+                  <TopSupporters bids={topSupporterBids} maxDisplay={10} />
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {showTimeFilter && (
+            <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Clock className="h-4 w-4 mr-2 text-purple-400" />
+                  Sort by Time
+                </h3>
+                <button type="button" onClick={() => setShowTimeFilter(false)} className="text-sm text-gray-400 hover:text-white">
+                  Hide
+                </button>
+              </div>
+              <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
+                {TIME_RANGE_OPTIONS.map((period) => (
+                  <button
+                    key={period.key}
+                    onClick={() => handleTimeRangeChange(period.key)}
+                    className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
+                      filters.timeRange === period.key
+                        ? 'bg-purple-700 text-white'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {period.label}
+                  </button>
+                ))}
+              </div>
+              {(availableFilters.genres.length > 0 || hasActiveFilters) && (
+                <div className="mt-4 pt-4 border-t border-gray-700/50 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {availableFilters.genres.length > 0 && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Genre</label>
+                      <select
+                        value={filters.genre}
+                        onChange={(e) => setFilters((f) => ({ ...f, genre: e.target.value }))}
+                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 text-sm focus:border-purple-500 focus:outline-none"
+                      >
+                        <option value="">All Genres</option>
+                        {availableFilters.genres.map((genre) => (
+                          <option key={genre} value={genre}>{genre}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Sort By</label>
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) => setFilters((f) => ({ ...f, sortBy: e.target.value }))}
+                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 text-sm focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="globalMediaAggregate">Total Tips</option>
+                      <option value="playCount">Play Count</option>
+                      <option value="popularity">Popularity</option>
+                      <option value="releaseDate">Release Date</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showSearchPanel && (
+            <div className="card p-4 sm:p-6 mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-lg font-semibold text-white">Search & Import</h3>
+                <button type="button" onClick={() => setShowSearchPanel(false)} className="text-sm text-gray-400 hover:text-white">
+                  Hide
+                </button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    placeholder="Search podcast episodes..."
+                    className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={handleSearch}
+                  disabled={isSearching || !searchQuery.trim()}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {isSearching ? <><Loader className="h-5 w-5 animate-spin" /><span>Searching...</span></> : <><Search className="h-5 w-5" /><span>Search</span></>}
+                </button>
+                <button
+                  onClick={() => setShowImportSection(!showImportSection)}
+                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <LinkIcon className="h-5 w-5 text-purple-400" />
+                  <span className="text-sm font-medium text-white">Import</span>
+                  <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showImportSection ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {showImportSection && (
+                <div className="space-y-4 border-t border-gray-700/50 pt-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-300 mb-2">Import from URL</h4>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
+                        className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleImportLink}
+                        disabled={isImportingLink || !linkUrl.trim()}
+                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isImportingLink ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing...</span></> : <><LinkIcon className="h-5 w-5" /><span>Import</span></>}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-300 mb-2">Import from Spotify</h4>
+                    <button
+                      onClick={handleImportFromSpotify}
+                      disabled={isImportingSpotify || !user}
+                      className="px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      {isImportingSpotify ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing...</span></> : spotifyConnected ? <><Music2 className="h-5 w-5" /><span>Import My Spotify Podcasts</span></> : <><Music2 className="h-5 w-5" /><span>Connect Spotify & Import</span></>}
+                    </button>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-300 mb-2">Import from OPML</h4>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <label className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-gray-700 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-600 transition-colors">
+                        <Upload className="h-5 w-5 text-purple-400" />
+                        <span className="text-sm text-gray-300 truncate">{opmlFile ? opmlFile.name : 'Choose OPML file...'}</span>
+                        <input type="file" accept=".opml,.xml" className="hidden" onChange={(e) => setOpmlFile(e.target.files?.[0] || null)} />
+                      </label>
+                      <button
+                        onClick={handleImportOpml}
+                        disabled={isImportingOpml || !opmlFile || !user}
+                        className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isImportingOpml ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing...</span></> : <><Upload className="h-5 w-5" /><span>Import OPML</span></>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showSearchResults && searchResults.length > 0 && (
+                <button
+                  onClick={() => { setShowSearchResults(false); setSearchQuery(''); setSearchResults([]); }}
+                  className="mt-4 text-sm text-purple-400 hover:text-purple-300"
+                >
+                  ← Back to Chart
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Episode queue */}
+        {showSearchResults && (
+          <p className="text-center text-sm text-purple-300 mb-3">Search results</p>
         )}
 
-        {/* Chart/Results List */}
         {isLoading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" />
           </div>
         ) : displayEpisodes.length === 0 ? (
           <div className="text-center py-20">
@@ -1781,221 +1511,72 @@ const Podcasts: React.FC = () => {
               {showSearchResults ? 'No episodes found' : 'No podcast episodes found'}
             </p>
             <p className="text-gray-500 text-sm mt-2">
-              {showSearchResults ? 'Try a different search term or adjust your filters' : 'Try adjusting your filters'}
+              {showSearchResults ? 'Try a different search term' : 'Try adjusting your filters or search for podcasts'}
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {displayEpisodes.map((episode, index) => (
-              <div
-                key={episode._id || episode.id}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 sm:p-6 hover:bg-gray-800/70 transition-all border border-gray-700 hover:border-purple-500/50"
-              >
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Cover Art with Play overlay */}
-                  <div 
-                    className="relative flex-shrink-0 cursor-pointer group"
-                    onClick={() => handleEpisodeClick(episode)}
-                  >
-                    <img
-                      src={episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART}
-                      alt={episode.title}
-                      className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
-                    />
-                    {user && getEpisodeAudioUrl({
-                      title: episode.title,
-                      _id: episode._id,
-                      id: episode.id,
-                      sources: episode.sources,
-                      audioUrl: episode.audioUrl,
-                      enclosure: episode.enclosure,
-                    }) && (
-                      <button
-                        type="button"
-                        onClick={(e) => handlePlayEpisode(episode, e)}
-                        className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Play episode"
-                      >
-                        <span className="w-12 h-12 rounded-full bg-amber-500/90 flex items-center justify-center shadow-lg">
-                          <Play className="w-6 h-6 text-gray-900 ml-0.5" fill="currentColor" />
-                        </span>
-                      </button>
-                    )}
-                  </div>
+          <div className="space-y-3">
+            {visibleEpisodes.map((episode, index) => {
+              const epId = episode._id || episode.id;
+              const isExternal = !!episode.isExternal;
+              return (
+                <PodcastQueueMediaCard
+                  key={`${epId || episode.title}-${index}`}
+                  episode={episode}
+                  index={index}
+                  showRank={!showSearchResults}
+                  isBidding={isPlacingBid && selectedEpisode?.title === episode.title}
+                  isPlayLoading={!!fetchingPlayId && fetchingPlayId === epId}
+                  canPlay={canPlayEpisode(episode)}
+                  canTip={!!user}
+                  tipLabel={isExternal ? 'Add & Tip' : 'Tip'}
+                  onEpisodeClick={(ep) => handleEpisodeClick(ep as PodcastEpisode)}
+                  onSeriesClick={(ep, e) => handleSeriesClick(ep as PodcastEpisode, e)}
+                  onPlay={(ep, e) => handleQueuePlay(ep as PodcastEpisode, e)}
+                  onTip={(ep, e) => (isExternal ? handleImportAndTip(ep as PodcastEpisode, e) : handleTipClick(ep as PodcastEpisode, e))}
+                />
+              );
+            })}
 
-                  {/* Episode Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
-                          {!showSearchResults && (
-                            <span className="text-purple-400 font-bold text-lg">#{index + 1}</span>
-                          )}
-                          <h3 
-                            className="text-xl font-bold truncate cursor-pointer hover:text-purple-300"
-                            onClick={() => handleEpisodeClick(episode)}
-                          >
-                            {episode.title}
-                          </h3>
-                          {episode.isExternal && episode.source && (
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              episode.source === 'podcastindex' ? 'bg-blue-600/30 text-blue-300' :
-                              episode.source === 'taddy' ? 'bg-green-600/30 text-green-300' :
-                              episode.source === 'apple' ? 'bg-gray-600/30 text-gray-300' :
-                              'bg-purple-600/30 text-purple-300'
-                            }`}>
-                              {episode.source === 'podcastindex' ? 'Podcast Index' :
-                               episode.source === 'taddy' ? 'Taddy' :
-                               episode.source === 'apple' ? 'Apple' : episode.source}
-                            </span>
-                          )}
-                        </div>
-                        {(episode.podcastSeries || episode.podcastTitle) && (
-                          <p 
-                            className="text-purple-300 text-sm mb-2 cursor-pointer hover:text-purple-200 hover:underline transition-colors"
-                            onClick={(e) => handleSeriesClick(episode, e)}
-                          >
-                            {episode.podcastSeries?.title || episode.podcastTitle}
-                          </p>
-                        )}
-                        {(episode.host && episode.host.length > 0) || episode.podcastAuthor ? (
-                          <p className="text-gray-400 text-sm">
-                            {episode.host && episode.host.length > 0 
-                              ? `Host: ${episode.host.map(h => h.name).join(', ')}`
-                              : episode.podcastAuthor ? `Author: ${episode.podcastAuthor}` : ''}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {episode.description && (
-                      <p className="text-gray-400 text-sm line-clamp-2 mb-3">{stripHtml(episode.description)}</p>
-                    )}
-
-                    {/* Stats */}
-                    <div className="flex flex-wrap items-center gap-4 text-sm mb-3">
-                      <div className="flex items-center space-x-1 text-purple-400">
-                        <TrendingUp className="h-4 w-4" />
-                        <span className="font-semibold">{penceToPounds(episode.globalMediaAggregate)}</span>
-                      </div>
-                      {episode.duration && (
-                        <div className="flex items-center space-x-1 text-gray-400">
-                          <Clock className="h-4 w-4" />
-                          <span>{formatDuration(episode.duration)}</span>
-                        </div>
-                      )}
-                      {episode.playCount !== undefined && (
-                        <div className="flex items-center space-x-1 text-gray-400">
-                          <Play className="h-4 w-4" />
-                          <span>{episode.playCount.toLocaleString()}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center space-x-1 text-gray-400">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatDate(episode.releaseDate, episode.publishedAt)}</span>
-                      </div>
-                    </div>
-
-                    {/* Tags */}
-                    {(episode.tags && episode.tags.length > 0) || (episode.genres && episode.genres.length > 0) ? (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {episode.genres?.slice(0, 3).map((genre, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full"
-                          >
-                            {genre}
-                          </span>
-                        ))}
-                        {episode.tags?.slice(0, 3).map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {/* Play & Tip buttons */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {user && getEpisodeAudioUrl({
-                        title: episode.title,
-                        _id: episode._id,
-                        id: episode.id,
-                        sources: episode.sources,
-                        audioUrl: episode.audioUrl,
-                        enclosure: episode.enclosure,
-                      }) && (
-                        <button
-                          type="button"
-                          onClick={(e) => handlePlayEpisode(episode, e)}
-                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-gray-900 font-semibold rounded-lg transition-all flex items-center gap-2"
-                        >
-                          <Play className="h-4 w-4" fill="currentColor" />
-                          <span>Play</span>
-                        </button>
-                      )}
-                      {user && (
-                        <button
-                          onClick={(e) => episode.isExternal ? handleImportAndTip(episode, e) : handleTipClick(episode, e)}
-                          disabled={isPlacingBid}
-                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2"
-                        >
-                          {isPlacingBid ? (
-                            <>
-                              <Loader className="h-4 w-4 animate-spin" />
-                              <span>Adding...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Coins className="h-4 w-4" />
-                              <span>{episode.isExternal ? 'Add & Tip' : 'Tip Episode'}</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            {!showSearchResults && displayEpisodes.length > visibleEpisodeCount && (
+              <div className="flex justify-center pt-4 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleEpisodeCount((prev) => prev + EPISODE_PAGE_SIZE)}
+                  className="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors flex items-center gap-2"
+                >
+                  <ChevronDown className="h-5 w-5" />
+                  Show more ({displayEpisodes.length - visibleEpisodeCount} remaining)
+                </button>
               </div>
-            ))}
-            
-            {/* Search Results Counter and Load More Button */}
+            )}
+
             {showSearchResults && searchResults.length > 0 && (
               <div className="mt-6 flex flex-col items-center space-y-4">
-                {/* Results counter */}
                 {totalLocal !== null && (
                   <p className="text-sm text-gray-400">
-                    Showing {searchResults.filter(ep => ep.source === 'local').length} of {totalLocal} local results
-                    {searchResults.some(ep => ep.source === 'taddy') && 
-                      ` + ${searchResults.filter(ep => ep.source === 'taddy').length} from Taddy`
-                    }
+                    Showing {searchResults.filter((ep) => ep.source === 'local').length} of {totalLocal} local results
+                    {searchResults.some((ep) => ep.source === 'taddy') && ` + ${searchResults.filter((ep) => ep.source === 'taddy').length} from Taddy`}
                   </p>
                 )}
-                
-                {/* Load More button */}
                 {hasMoreLocal && (
                   <button
                     onClick={handleLoadMoreSearch}
                     disabled={isLoadingMore}
-                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center space-x-2"
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
                   >
-                    {isLoadingMore ? (
-                      <>
-                        <Loader className="h-5 w-5 animate-spin" />
-                        <span>Loading more...</span>
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-5 w-5" />
-                        <span>Load More Search Results</span>
-                      </>
-                    )}
+                    {isLoadingMore ? <><Loader className="h-5 w-5 animate-spin" /><span>Loading more...</span></> : <><ChevronDown className="h-5 w-5" /><span>Load More Search Results</span></>}
                   </button>
                 )}
               </div>
+            )}
+
+            {!showSearchResults && (
+              <PodcastSeriesStrip
+                series={topPodcastSeries}
+                isLoading={isLoadingTopSeries}
+                onSeriesClick={(id) => navigate(`/podcast/${id}`)}
+              />
             )}
           </div>
         )}
