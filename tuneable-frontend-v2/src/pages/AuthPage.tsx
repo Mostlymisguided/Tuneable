@@ -422,7 +422,7 @@ const AuthPage: React.FC = () => {
       const { confirmPassword, ...registerData } = formData;
       await register(registerData);
       toast.success('Registration successful!');
-      navigate(returnUrl === '/profile' ? '/dashboard' : returnUrl);
+      navigate(returnUrl);
     } catch (error: any) {
       console.error('Error registering user:', error);
       const errorResponse = error.response?.data || {};

@@ -1,4 +1,4 @@
-const DEFAULT_POST_AUTH_PATH = '/profile';
+export const DEFAULT_POST_AUTH_PATH = '/party/global?period=all-time';
 
 /** Only allow same-origin relative paths to prevent open redirects. */
 export function sanitizeReturnUrl(url: string | null, fallback = DEFAULT_POST_AUTH_PATH): string {

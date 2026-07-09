@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
+import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -66,12 +67,11 @@ const AuthCallback: React.FC = () => {
             toast.success('Account connected successfully!');
             navigate(cleanPath);
           } else if (oauthSuccess === 'true') {
-            // Redirect to profile page (will redirect to /user/:userId via ProfileRedirect)
             toast.success('Login successful!');
-            navigate('/profile?oauth_success=true');
+            navigate(DEFAULT_POST_AUTH_PATH);
           } else {
             toast.success('Login successful!');
-            navigate('/profile');
+            navigate(DEFAULT_POST_AUTH_PATH);
           }
         } catch (error: any) {
           console.error('Error during OAuth callback:', error);
