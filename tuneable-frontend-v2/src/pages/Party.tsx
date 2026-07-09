@@ -2738,6 +2738,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       )}
       
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
+        {!isGlobalParty && (
         <div className="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:justify-center sm:gap-2 mb-3 sm:mb-4 max-w-md sm:max-w-none mx-auto">
           <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-purple-500/40 min-w-0">
             <div className="flex items-center space-x-1 sm:space-x-2">
@@ -2792,6 +2793,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Top Fans - hidden for now */}
         {false && (
