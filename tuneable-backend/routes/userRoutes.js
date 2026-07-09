@@ -2850,6 +2850,7 @@ router.get('/:userId/profile', async (req, res) => {
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
+      tuneBytes: userObj.tuneBytes || 0,
       socialMedia: socialMediaData,
       creatorProfile: userObj.creatorProfile,
       // Include preferences if viewing own profile

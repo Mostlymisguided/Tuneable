@@ -24,7 +24,8 @@ import {
   Flag,
   Award,
   Plus,
-  Minus
+  Minus,
+  Gift
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI } from '../lib/api';
 import LabelLinkModal from '../components/LabelLinkModal';
@@ -52,6 +53,7 @@ interface UserProfile {
   profilePic?: string;
   email: string;
   balance: number;
+  tuneBytes?: number;
   personalInviteCode?: string;
   personalInviteCodes?: Array<{
     _id: string;
@@ -1969,24 +1971,19 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* User metrics - Tips, Total Tips, Avg Tip, Tunes */}
+              {/* User metrics - Tips, TuneBytes, Tunes */}
               {stats && (
                 <div className="mb-4">
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-2 md:gap-3 lg:grid-cols-4 w-fit max-w-full">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-2 md:gap-3 lg:grid-cols-3 w-fit max-w-full">
                     <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
                       <BarChart3 className="w-6 h-6 md:w-5 md:h-5 text-purple-400 mx-auto mb-1 md:mb-1.5" />
                       <div className="text-lg md:text-base font-bold text-white">{stats.totalBids || 0}</div>
                       <div className="text-xs text-gray-300">Tips</div>
                     </div>
                     <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
-                      <Coins className="w-6 h-6 md:w-5 md:h-5 text-green-400 mx-auto mb-1 md:mb-1.5" />
-                      <div className="text-lg md:text-base font-bold text-white">{penceToPounds(stats.totalAmountBid || 0)}</div>
-                      <div className="text-xs text-gray-300">Total Tips</div>
-                    </div>
-                    <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
-                      <TrendingUp className="w-6 h-6 md:w-5 md:h-5 text-blue-400 mx-auto mb-1 md:mb-1.5" />
-                      <div className="text-lg md:text-base font-bold text-white">{penceToPounds(stats.averageBidAmount || 0)}</div>
-                      <div className="text-xs text-gray-300">Avg Tip</div>
+                      <Gift className="w-6 h-6 md:w-5 md:h-5 text-purple-400 mx-auto mb-1 md:mb-1.5" />
+                      <div className="text-lg md:text-base font-bold text-white">{(user?.tuneBytes ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                      <div className="text-xs text-gray-300">TuneBytes</div>
                     </div>
                     <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
                       <Music className="w-6 h-6 md:w-5 md:h-5 text-yellow-400 mx-auto mb-1 md:mb-1.5" />
