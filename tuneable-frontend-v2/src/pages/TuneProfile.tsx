@@ -322,7 +322,6 @@ const TuneProfile: React.FC = () => {
   // Collapsible sections: Top Fans, Tag Rankings
   const [showTopFans, setShowTopFans] = useState(false);
   const [showTagRankings, setShowTagRankings] = useState(false);
-  const [showRelatedMedia, setShowRelatedMedia] = useState(true);
   const [showFansAlsoTip, setShowFansAlsoTip] = useState(false);
 
   // Share functionality state
@@ -1936,7 +1935,230 @@ const TuneProfile: React.FC = () => {
     { label: 'Encoded By', value: media.encodedBy, icon: SlidersHorizontal },
   ];
 
-  const visibleFields = showAllFields ? mediaFields : mediaFields.slice(0, 8);
+  const HEADER_DETAIL_LABELS = new Set(['Title', 'Artist', 'BPM', 'Duration', 'Album', 'Release Date']);
+  const detailFields = showAllFields
+    ? mediaFields
+    : mediaFields.filter((field) => !HEADER_DETAIL_LABELS.has(field.label)).slice(0, 8);
+
+  const heroMetadata = [
+    media.album,
+    media.releaseDate
+      ? String(new Date(media.releaseDate).getFullYear())
+      : (media as any).releaseYear
+        ? String((media as any).releaseYear)
+        : null,
+    media.bpm ? `${media.bpm} BPM` : null,
+    media.key,
+    media.duration ? formatDuration(media.duration) : null,
+  ].filter((part): part is string => Boolean(part));
+
+  const topTagRankings = tagRankings.slice(0, 3);
+
+  const headerTipLabel = !user
+    ? 'Sign in to Tip'
+    : isGlobalBidValid
+      ? `Tip £${globalBidInput}`
+      : 'Tip';
+
+  const renderShareButton = () => (
+    isMobile ? (
+      <button
+        onClick={handleNativeShare}
+        className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+      >
+        <Share2 className="h-4 w-4" />
+        <span>Share</span>
+      </button>
+    ) : (
+      <div className="relative">
+        <button
+          onClick={() => setShowShareDropdown(!showShareDropdown)}
+          className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+        >
+          <Share2 className="h-4 w-4" />
+          <span>Share</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
+        </button>
+        {showShareDropdown && (
+          <div className="absolute top-full left-0 mt-2 w-48 bg-gray-900/95 border-2 border-purple-500/50 rounded-lg shadow-xl z-50 overflow-hidden">
+            <button onClick={() => handleShare('twitter')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Twitter className="h-5 w-5 text-blue-400" />
+              <span>Twitter/X</span>
+            </button>
+            <button onClick={() => handleShare('facebook')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Facebook className="h-5 w-5 text-blue-500" />
+              <span>Facebook</span>
+            </button>
+            <button onClick={() => handleShare('linkedin')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Linkedin className="h-5 w-5 text-blue-600" />
+              <span>LinkedIn</span>
+            </button>
+            <button onClick={() => handleShare('whatsapp')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+              </svg>
+              <span>WhatsApp</span>
+            </button>
+            <button onClick={() => handleShare('instagram')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Instagram className="h-5 w-5 text-pink-500" />
+              <span>Instagram</span>
+            </button>
+            <button onClick={handleCopyLink} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white border-t border-gray-700/50">
+              {copySuccess ? (
+                <>
+                  <Check className="h-5 w-5 text-green-400" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-5 w-5 text-gray-400" />
+                  <span>Copy Link</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  );
+
+  const renderSlimSupportSection = () => (
+    <div id="support-tune" className="mb-6 px-2 md:px-0">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-4 md:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="text-center sm:text-left">
+              <h3 className="text-lg md:text-xl font-bold text-white flex items-center justify-center sm:justify-start gap-2">
+                <Coins className="h-5 w-5 text-yellow-400" />
+                Support This Tune
+              </h3>
+              <p className="text-gray-300 text-sm mt-1">
+                {!isMediaPlayable(media)
+                  ? 'Tip to help get this track fully added once audio is uploaded.'
+                  : 'Boost global ranking and support the artist'}
+              </p>
+            </div>
+            {user && (
+              <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
+                Balance: {penceToPounds((user as any)?.balance)}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-row items-center justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                const current = parseFloat(globalBidInput) || minimumBid;
+                setGlobalBidInput(Math.max(minimumBid, current - 0.01).toFixed(2));
+                setHasInitializedBidInput(true);
+              }}
+              disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
+              className="px-2 py-2.5 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-bl-lg transition-colors flex items-center justify-center"
+            >
+              <Minus className="h-4 w-4 text-white" />
+            </button>
+            <div className="flex items-center bg-gray-800 overflow-hidden">
+              <input
+                type="number"
+                step="0.01"
+                min={minimumBid}
+                value={globalBidInput}
+                onChange={(e) => {
+                  setHasInitializedBidInput(true);
+                  setGlobalBidInput(e.target.value);
+                }}
+                className="w-20 sm:w-24 bg-gray-800 p-2 text-white text-lg font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const current = parseFloat(globalBidInput) || minimumBid;
+                const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
+                setGlobalBidInput(Math.min(balanceInPounds || 999999, current + 0.01).toFixed(2));
+                setHasInitializedBidInput(true);
+              }}
+              disabled={isPlacingGlobalBid || (user ? (() => {
+                const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
+              })() : false)}
+              className="px-2 py-2.5 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-br-lg transition-colors flex items-center justify-center"
+            >
+              <Plus className="h-4 w-4 text-white" />
+            </button>
+            <button
+              onClick={handleGlobalBid}
+              disabled={isPlacingGlobalBid || !isGlobalBidValid}
+              className="ml-3 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center text-sm md:text-base"
+            >
+              {isPlacingGlobalBid ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
+              ) : (
+                <span>{headerTipLabel}</span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2 mt-3">
+            {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
+              <button
+                key={amount}
+                onClick={() => setGlobalBidInput(amount.toFixed(2))}
+                className="px-3 py-1 bg-gray-700/80 hover:bg-gray-600 text-gray-300 text-xs rounded-full transition-colors font-medium"
+              >
+                £{amount.toFixed(2)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderRelatedTunesRail = (items: RecommendedMediaItem[]) => (
+    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+      {items.map((item) => (
+        <div
+          key={`related-rail-${item._id}`}
+          className="flex-shrink-0 w-[132px] sm:w-[148px] snap-start group"
+        >
+          <div className="relative mb-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
+              className="block w-full"
+            >
+              <img
+                src={item.coverArt || DEFAULT_COVER_ART}
+                alt={item.title}
+                className="w-full aspect-square rounded-lg object-cover bg-black/30 shadow-md group-hover:ring-2 group-hover:ring-purple-500/50 transition-all"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePlayRecommendedMedia(item)}
+              className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 shadow-lg transition-colors opacity-90 group-hover:opacity-100"
+              aria-label={`Play ${item.title}`}
+            >
+              <Play className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
+            className="block w-full text-left"
+          >
+            <div className="text-sm font-semibold text-white truncate hover:text-purple-300 transition-colors">{item.title}</div>
+            <div className="text-xs text-gray-400 truncate">{item.artist}</div>
+          </button>
+          {item.sharedTags && item.sharedTags.length > 0 && (
+            <div className="mt-1 text-[10px] text-purple-300 truncate">#{item.sharedTags[0]}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 
   const renderRecommendationCards = (items: RecommendedMediaItem[], variant: 'related' | 'fans') => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
@@ -2016,7 +2238,7 @@ const TuneProfile: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 pb-24 md:pb-8">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
         {/* Tune Profile Header */}
         <div className="mb-6">  
@@ -2137,167 +2359,83 @@ const TuneProfile: React.FC = () => {
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
                 <ClickableArtistDisplay media={media} />
               </div>
-              
-              {/* Duration & Tags */}
-              {(media.duration || (media.tags && media.tags.length > 0)) && (
-                <div className="flex flex-col items-center md:items-start gap-1.5 px-2 mb-3 text-sm text-gray-400">
-                  {media.duration && (
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-gray-500" />
-                      {formatDuration(media.duration)}
+
+              {heroMetadata.length > 0 && (
+                <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-2">
+                  {heroMetadata.join(' · ')}
+                </p>
+              )}
+
+              {topTagRankings.length > 0 && (
+                <div className="flex flex-wrap justify-center md:justify-start gap-1.5 px-2 mb-3">
+                  {topTagRankings.map((ranking, index) => (
+                    <span
+                      key={`${ranking.tag}-${index}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium"
+                    >
+                      <Tag className="h-3 w-3 text-purple-400" />
+                      #{ranking.rank} {ranking.tag}
                     </span>
-                  )}
-                  {media.tags && media.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {media.tags.map((tag, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 rounded-full bg-white/5 text-gray-300 border border-white/10 hover:border-purple-500/40 hover:text-purple-300 transition-colors text-xs font-medium"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  ))}
                 </div>
               )}
-              
-              {/* Tip Metrics Grid */}
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 md:gap-2 w-fit max-w-xl">
-                {/* Tip Total */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-green-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Tip Total</div>
-                  <div className="text-base md:text-lg font-bold text-green-400">
-                    {penceToPounds(media.globalMediaAggregate)}
-                  </div>
-                </div>
-                
-                {/* Total Tips Count */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-cyan-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Total Tips</div>
-                  <div className="text-base md:text-lg font-bold text-cyan-400">
-                    {media.bids?.length || 0}
-                  </div>
-                </div>
-                
-                {/* Global Rank */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-pink-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Global Rank</div>
-                  <div className="text-base md:text-lg font-bold text-pink-400">
-                    #{media.globalMediaAggregateTopRank || '-'}
-                  </div>
-                </div>
-                
-                {/* Top Fan - Now visible on mobile */}
-                <div className="card bg-black/20 rounded-lg p-3 md:p-2 border-l-4 border-purple-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide md:mb-0.5 mb-1">Top Fan</div>
-                  <div className="text-base md:text-lg font-bold text-purple-400">
-                    {penceToPounds(media.globalMediaAggregateTop)}
-                  </div>
-                </div>
-                
-                {/* Top Tip - Hidden on mobile */}
-                <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-yellow-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Top Tip</div>
-                  <div className="text-lg font-bold text-yellow-400">
-                    {penceToPounds(media.globalMediaBidTop)}
-                  </div>
-                </div>
-                
-                {/* Average Tip - Hidden on mobile */}
-                <div className="hidden md:block card bg-black/20 rounded-lg p-2 border-l-4 border-blue-500/50">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Avg Tip</div>
-                  <div className="text-lg font-bold text-blue-400">
-                    £{calculateGlobalMediaBidAvg(media).toFixed(2)}
-                  </div>
-                </div>
-              </div>
 
+              <p className="text-sm text-center md:text-left px-2 mb-3">
+                <span className="text-green-400 font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
+                <span className="text-gray-500 mx-2">·</span>
+                <span className="text-pink-300 font-medium">#{media.globalMediaAggregateTopRank || '—'} global</span>
+                <span className="text-gray-500 mx-2">·</span>
+                <span className="text-cyan-300">{media.bids?.length || 0} tips</span>
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2" ref={shareDropdownRef}>
+                {isMediaPlayable(media) && (
+                  <button
+                    type="button"
+                    onClick={handlePlaySong}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2 text-sm"
+                  >
+                    <Play className="h-4 w-4" fill="currentColor" />
+                    Play
+                  </button>
+                )}
+                {renderShareButton()}
+                <button
+                  type="button"
+                  onClick={handleGlobalBid}
+                  disabled={isPlacingGlobalBid || (user ? !isGlobalBidValid : false)}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2 text-sm"
+                >
+                  {isPlacingGlobalBid ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Coins className="h-4 w-4 text-yellow-300" />
+                  )}
+                  {headerTipLabel}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Share - Centered below header */}
-        <div className="flex justify-center gap-3 mb-6" ref={shareDropdownRef}>
-            {isMobile ? (
-              <button
-                onClick={handleNativeShare}
-                className="px-3 md:px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all flex items-center space-x-2 text-sm md:text-base"
-              >
-                <Share2 className="h-4 w-4" />
-                <span className="inline">Share</span>
-              </button>
-            ) : (
-              <div className="relative">
-                <button
-                  onClick={() => setShowShareDropdown(!showShareDropdown)}
-                  className="px-3 md:px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all flex items-center space-x-2 text-sm md:text-base"
-                >
-                  <Share2 className="h-4 w-4" />
-                  <span className="inline">Share</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showShareDropdown && (
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-48 bg-gray-900/95 border-2 border-purple-500/50 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={() => handleShare('twitter')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Twitter className="h-5 w-5 text-blue-400" />
-                      <span>Twitter/X</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('facebook')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Facebook className="h-5 w-5 text-blue-500" />
-                      <span>Facebook</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('linkedin')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Linkedin className="h-5 w-5 text-blue-600" />
-                      <span>LinkedIn</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('whatsapp')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                      </svg>
-                      <span>WhatsApp</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('instagram')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Instagram className="h-5 w-5 text-pink-500" />
-                      <span>Instagram</span>
-                    </button>
-                    <button
-                      onClick={handleCopyLink}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white border-t border-gray-700/50"
-                    >
-                      {copySuccess ? (
-                        <>
-                          <Check className="h-5 w-5 text-green-400" />
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-5 w-5 text-gray-400" />
-                          <span>Copy Link</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Related Tunes — discovery rail directly below header */}
+        {!isEditMode && (isLoadingRelatedPlaylists || relatedMedia.length > 0) && (
+          <div className="mb-8 px-2 md:px-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                <Music className="h-5 w-5 text-cyan-300" />
+                Related Tunes
+              </h2>
+            </div>
+            <div className="card bg-black/20 rounded-lg p-4">
+              {isLoadingRelatedPlaylists ? (
+                <div className="text-gray-400 text-sm">Loading related tunes...</div>
+              ) : (
+                renderRelatedTunesRail(relatedMedia)
+              )}
+            </div>
           </div>
+        )}
 
         {/* Tab Navigation - Only show when in edit mode */}
         {isEditMode && canEditTune() && (
@@ -2341,109 +2479,54 @@ const TuneProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* Global Tip Section */}
-        <div className="mb-6 px-2 md:px-0">
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
-              <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
-                <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                Support This Tune
-              </h3>
-              <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                {!isMediaPlayable(media)
-                  ? 'Tip now to support this track being fully added to Tuneable once audio is uploaded by the rights holder or a verified contributor.'
-                  : 'Boost this tune\'s global ranking and support the artist'}
-              </p>
-              
-              <div className="flex flex-row items-center justify-center mb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = parseFloat(globalBidInput) || minimumBid;
-                    const newAmount = Math.max(minimumBid, current - 0.01);
-                    setGlobalBidInput(newAmount.toFixed(2));
-                    setHasInitializedBidInput(true);
-                  }}
-                  disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-                  className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl transition-colors flex items-center justify-center"
-                >
-                  <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                </button>
-                <div className="flex items-center bg-gray-800 overflow-hidden">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={minimumBid}
-                    value={globalBidInput}
-                    onChange={(e) => {
-                      setHasInitializedBidInput(true);
-                      setGlobalBidInput(e.target.value);
-                    }}
-                    className="w-24 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = parseFloat(globalBidInput) || minimumBid;
-                    const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
-                    const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
-                    setGlobalBidInput(newAmount.toFixed(2));
-                    setHasInitializedBidInput(true);
-                  }}
-                  disabled={isPlacingGlobalBid || (user ? (() => {
-                    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                    return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                  })() : false)}
-                  className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl transition-colors flex items-center justify-center"
-                >
-                  <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                </button>
-                <button
-                  onClick={handleGlobalBid}
-                  disabled={isPlacingGlobalBid || !isGlobalBidValid}
-                  className="w-auto px-6 md:px-8 ml-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
-                >
-                  {isPlacingGlobalBid ? (
-                    <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
-                  ) : (
-                    <span>
-                      {!user
-                        ? 'Sign in to Tip'
-                        : (isGlobalBidValid
-                          ? `Tip £${globalBidInput}`
-                          : 'Enter Tip')}
-                    </span>
-                  )}
-                </button>
-              </div>
-                
-                {/* Quick amounts */}
-                <div className="flex flex-wrap justify-center gap-2 mb-4">
-                  {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-                    <button
-                      key={amount}
-                      onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                      className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
-                    >
-                      £{amount.toFixed(2)}
-                    </button>
-                  ))}
-                </div>
-                
-                {user && (
-                  <p className="text-xs md:text-sm text-gray-400">
-                    Your balance: {penceToPounds((user as any)?.balance)}
-                  </p>
-                )}
-                {!user && (
-                  <p className="text-xs md:text-sm text-gray-400">
-                    Sign in to tip and support this tune
-                  </p>
-                )}
-              </div>
-            </div>
+        {/* About this tune */}
+        <div className="mb-8 px-2 md:px-0">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <h2 className="text-xl md:text-2xl font-bold text-white">About this tune</h2>
+            <button
+              onClick={() => setShowAllFields(!showAllFields)}
+              className="flex items-center px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm md:text-base"
+            >
+              {showAllFields ? 'Show Less' : 'Show All'}
+            </button>
           </div>
+          
+          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              {detailFields.map((field, index) => {
+                const IconComponent = field.icon;
+                const isArtistField = field.label === 'Artist';
+                
+                return (
+                  <div key={index} className="flex items-start space-x-3">
+                    <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
+                    <div>
+                      <div className="text-sm text-gray-300">{field.label}</div>
+                      <div className="text-white font-medium">
+                        {isArtistField ? (
+                          <ClickableArtistDisplay media={media} />
+                        ) : (
+                          getFieldValue(field.value, (field as any).fieldName)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {media.lyrics && (
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <h3 className="text-lg font-semibold text-white mb-3">Lyrics</h3>
+                <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
+                  {media.lyrics}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {renderSlimSupportSection()}
 
         {/* Top Fans - collapsible */}
         {media.bids && media.bids.length > 0 && (
@@ -2507,105 +2590,29 @@ const TuneProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Related playlist rails */}
-        {(isLoadingRelatedPlaylists || relatedMedia.length > 0 || fansAlsoTip.length > 0) && (
-          <div className="mb-8 px-2 md:px-0 space-y-6">
-            <div className="flex flex-col items-center">
-              <button
-                onClick={() => setShowRelatedMedia(!showRelatedMedia)}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-              >
-                <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                  <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-cyan-300 flex-shrink-0" />
-                  {showRelatedMedia ? 'Related Tunes' : 'Show Related Tunes'}
-                </span>
-                {showRelatedMedia ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-              </button>
-              {showRelatedMedia && (
-                <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                  <p className="text-sm text-gray-300 mb-4">
-                    Closely related tracks, prioritising shared tags before tip totals.
-                  </p>
-                  {isLoadingRelatedPlaylists ? (
-                    <div className="text-gray-400 text-sm">Loading related tunes...</div>
-                  ) : renderRecommendationCards(relatedMedia, 'related')}
-                </div>
-              )}
-            </div>
-
-            {fansAlsoTip.length > 0 && (
-              <div className="flex flex-col items-center">
-                <button
-                  onClick={() => setShowFansAlsoTip(!showFansAlsoTip)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-                >
-                  <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                    <Users className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-300 flex-shrink-0" />
-                    {showFansAlsoTip ? 'Fans Also Tip' : 'Show Fans Also Tip'}
-                  </span>
-                  {showFansAlsoTip ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-                </button>
-                {showFansAlsoTip && (
-                  <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                    <p className="text-sm text-gray-300 mb-4">
-                      One-hop picks taken from this tune&apos;s strongest supporters, while still requiring tag overlap.
-                    </p>
-                    {renderRecommendationCards(fansAlsoTip, 'fans')}
-                  </div>
-                )}
+        {/* Fans Also Tip - collapsible */}
+        {fansAlsoTip.length > 0 && (
+          <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
+            <button
+              onClick={() => setShowFansAlsoTip(!showFansAlsoTip)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                <Users className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-300 flex-shrink-0" />
+                {showFansAlsoTip ? 'Fans Also Tip' : 'Show Fans Also Tip'}
+              </span>
+              {showFansAlsoTip ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showFansAlsoTip && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <p className="text-sm text-gray-300 mb-4">
+                  One-hop picks taken from this tune&apos;s strongest supporters, while still requiring tag overlap.
+                </p>
+                {renderRecommendationCards(fansAlsoTip, 'fans')}
               </div>
             )}
           </div>
         )}
-
-        {/* Song Details */}
-        <div className="mb-8 px-2 md:px-0">
-          <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h2 className="text-xl md:text-2xl font-bold text-white">Song Details</h2>
-            <button
-              onClick={() => setShowAllFields(!showAllFields)}
-              className="flex items-center px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm md:text-base"
-            >
-              {showAllFields ? 'Show Less' : 'Show All'}
-            </button>
-          </div>
-          
-          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-              {visibleFields.map((field, index) => {
-                const IconComponent = field.icon;
-                // Special handling for Artist field to use ClickableArtistDisplay
-                const isArtistField = field.label === 'Artist';
-                
-                return (
-                  <div key={index} className="flex items-start space-x-3">
-                    <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm text-gray-300">{field.label}</div>
-                      <div className="text-white font-medium">
-                        {isArtistField ? (
-                          <ClickableArtistDisplay media={media} />
-                        ) : (
-                          getFieldValue(field.value, (field as any).fieldName)
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Lyrics Section */}
-            {media.lyrics && (
-              <div className="mt-6 pt-6 border-t border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-3">Lyrics</h3>
-                <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
-                  {media.lyrics}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Production Stack Section */}
         {hasProductionStack(media.productionStack) && (
@@ -4323,6 +4330,25 @@ const TuneProfile: React.FC = () => {
           targetId={media._id}
           targetTitle={`${media.title} by ${Array.isArray(media.artist) ? media.artist.map((a: any) => a.name).join(', ') : media.artist}`}
         />
+      )}
+
+      {/* Mobile sticky tip bar — sits above the web player */}
+      {!isEditMode && (
+        <div className="md:hidden fixed bottom-[4.5rem] left-0 right-0 z-[9998] px-4 pointer-events-none">
+          <button
+            type="button"
+            onClick={handleGlobalBid}
+            disabled={isPlacingGlobalBid}
+            className="pointer-events-auto w-full max-w-md mx-auto flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-bold rounded-full shadow-2xl border border-purple-400/30 transition-all"
+          >
+            {isPlacingGlobalBid ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Coins className="h-4 w-4 text-yellow-300" />
+            )}
+            {headerTipLabel}
+          </button>
+        </div>
       )}
       </div>
     </div>
