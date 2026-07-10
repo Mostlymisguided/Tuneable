@@ -1147,7 +1147,9 @@ const Podcasts: React.FC = () => {
   const displayEpisodes = showSearchResults && searchResults.length > 0 ? searchResults : episodes;
 
   const topLocations = useMemo(() => {
-    if (displayEpisodes.length === 0) return [] as Array<{ pick: ReturnType<typeof getCountryPickFromLocation>; total: number; count: number }>;
+    if (displayEpisodes.length === 0) {
+      return [] as Array<{ pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }>;
+    }
     const startDate = getTimeRangeStartDate(filters.timeRange);
     const counts: Record<string, { pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }> = {};
 
@@ -1178,7 +1180,7 @@ const Podcasts: React.FC = () => {
     const maxPicks = isMobile ? 5 : 6;
     const userPick = getCountryPickFromLocation(user?.homeLocation)
       || getCountryPickFromLocation(user?.secondaryLocation);
-    const picks: PodcastLocationQuickPick[] = [];
+    const picks: LocationQuickPick[] = [];
 
     if (userPick) {
       const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
@@ -1668,7 +1670,6 @@ const Podcasts: React.FC = () => {
                   isBidding={isPlacingBid && selectedEpisode?.title === episode.title}
                   isPlayLoading={!!fetchingPlayId && fetchingPlayId === epId}
                   canPlay={canPlayEpisode(episode)}
-                  canTip={!!user}
                   tipLabel={isExternal ? 'Add & Tip' : 'Tip'}
                   onEpisodeClick={(ep) => handleEpisodeClick(ep as PodcastEpisode)}
                   onSeriesClick={(ep, e) => handleSeriesClick(ep as PodcastEpisode, e)}
