@@ -145,3 +145,12 @@ export function canEditMedia(user: User | null | undefined, media: Media | null 
   return false;
 }
 
+/**
+ * Check if user can delete a media item (owners and admins only)
+ */
+export function canDeleteMedia(user: User | null | undefined, media: Media | null | undefined): boolean {
+  if (!user || !media) return false;
+  if (isAdmin(user)) return true;
+  return isMediaOwner(user, media);
+}
+

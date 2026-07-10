@@ -42,12 +42,11 @@ import {
   Instagram
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
-import TopBidders from '../components/TopBidders';
 import TopSupporters from '../components/TopSupporters';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
-import { canEditMedia } from '../utils/permissionHelpers';
+import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
@@ -55,6 +54,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import DeleteMediaSection from '../components/DeleteMediaSection';
 
 interface Media {
   _id: string;
@@ -294,21 +294,18 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
-  const [topParties, setTopParties] = useState<any[]>([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
-
-  // Add to Other Party modal state
-  const [showAddToPartyModal, setShowAddToPartyModal] = useState(false);
-  const [availableParties, setAvailableParties] = useState<any[]>([]);
-  const [isLoadingParties, setIsLoadingParties] = useState(false);
-  const [partySearchQuery, setPartySearchQuery] = useState('');
-  const [selectedPartyForAdd, setSelectedPartyForAdd] = useState<any | null>(null);
-  const [addToPartyTipAmount, setAddToPartyTipAmount] = useState<string>('');
-  const [isAddingToParty, setIsAddingToParty] = useState(false);
+  const [seriesEpisodes, setSeriesEpisodes] = useState<any[]>([]);
+  const [isLoadingSeriesEpisodes, setIsLoadingSeriesEpisodes] = useState(false);
 
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
+
+  // Collapsible sections
+  const [showTopFans, setShowTopFans] = useState(false);
+  const [showTagRankings, setShowTagRankings] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
@@ -329,14 +326,26 @@ const PodcastEpisodeProfile: React.FC = () => {
   }, [globalBidInput]);
   const isGlobalBidValid = Number.isFinite(parsedGlobalBidAmount) && parsedGlobalBidAmount >= minimumBid;
 
+  const defaultTipAmount = useMemo(() => {
+    if (isGlobalBidValid) return parsedGlobalBidAmount;
+    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    const bids = media?.bids || [];
+    const avgBid =
+      bids.length === 0
+        ? 0
+        : penceToPoundsNumber(bids.reduce((sum, bid) => sum + bid.amount, 0) / bids.length);
+    return Math.max(minimumBid, userDefaultTip, avgBid || 0);
+  }, [isGlobalBidValid, parsedGlobalBidAmount, user?.preferences?.defaultTip, media, minimumBid]);
+
   useEffect(() => {
     console.log('🔍 PodcastEpisodeProfile useEffect triggered with mediaId:', mediaId);
     if (mediaId) {
       console.log('✅ mediaId exists, calling fetchMediaProfile');
-      fetchMediaProfile().then(() => {
-        // Only load top parties and tag rankings after media is loaded
-        loadTopParties();
+      fetchMediaProfile().then((loadedMedia) => {
         loadTagRankings();
+        if (loadedMedia) {
+          loadSeriesEpisodes(loadedMedia);
+        }
       });
     } else {
       console.log('❌ No mediaId provided');
@@ -373,7 +382,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     fetchGlobalPartyMinimumBid();
   }, [hasInitializedBidInput, media]);
 
-  const fetchMediaProfile = async () => {
+  const fetchMediaProfile = async (): Promise<Media | null> => {
     try {
       console.log('🔍 Fetching podcast episode profile for mediaId:', mediaId);
       setLoading(true);
@@ -382,13 +391,47 @@ const PodcastEpisodeProfile: React.FC = () => {
       setMedia(response.media);
       setComments(response.media.comments || []);
       console.log('✅ Podcast episode profile loaded successfully');
+      return response.media;
     } catch (err: any) {
       console.error('❌ Error fetching podcast episode profile:', err);
       console.error('❌ Error details:', err.response?.data);
       setError(err.response?.data?.error || 'Failed to load podcast episode profile');
       toast.error('Failed to load podcast episode profile');
+      return null;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSeriesEpisodes = async (episodeMedia?: Media | null) => {
+    const source = episodeMedia || media;
+    const seriesId =
+      source?.podcastSeries && typeof source.podcastSeries === 'object'
+        ? source.podcastSeries._id
+        : null;
+    if (!seriesId) {
+      setSeriesEpisodes([]);
+      return;
+    }
+
+    setIsLoadingSeriesEpisodes(true);
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(
+        `${backendUrl}/api/podcasts/series/${seriesId}?autoImport=false`
+      );
+      if (!response.ok) throw new Error('Failed to load series episodes');
+      const data = await response.json();
+      const currentId = String(source?._id || mediaId || '');
+      const episodes = (data.episodes || [])
+        .filter((ep: any) => String(ep._id || ep.uuid) !== currentId)
+        .slice(0, 12);
+      setSeriesEpisodes(episodes);
+    } catch (err) {
+      console.error('Error loading series episodes:', err);
+      setSeriesEpisodes([]);
+    } finally {
+      setIsLoadingSeriesEpisodes(false);
     }
   };
 
@@ -404,6 +447,17 @@ const PodcastEpisodeProfile: React.FC = () => {
   // Check if user can edit this tune
   const canEditTune = () => {
     return canEditMedia(user, media);
+  };
+
+  const canDeleteEpisode = () => {
+    return canDeleteMedia(user, media);
+  };
+
+  const getEpisodeDeleteRedirect = () => {
+    if (media?.podcastSeries && typeof media.podcastSeries === 'object' && media.podcastSeries._id) {
+      return `/podcast/${media.podcastSeries._id}`;
+    }
+    return '/podcasts';
   };
 
   // Helper function to get country code from country name
@@ -1128,6 +1182,10 @@ const PodcastEpisodeProfile: React.FC = () => {
         return { icon: Youtube, color: 'hover:bg-red-600/30 hover:border-red-500', bgColor: 'bg-red-600/20' };
       case 'soundcloud':
         return { icon: Music2, color: 'hover:bg-orange-600/30 hover:border-orange-500', bgColor: 'bg-orange-600/20' };
+      case 'audio_direct':
+        return { icon: Headphones, color: 'hover:bg-amber-600/30 hover:border-amber-500', bgColor: 'bg-amber-600/20' };
+      case 'rss':
+        return { icon: Mic, color: 'hover:bg-green-600/30 hover:border-green-500', bgColor: 'bg-green-600/20' };
       default:
         return { icon: ExternalLink, color: 'hover:bg-purple-600/30 hover:border-purple-500', bgColor: 'bg-purple-600/20' };
     }
@@ -1154,13 +1212,19 @@ const PodcastEpisodeProfile: React.FC = () => {
         }
         
         const { icon, color, bgColor } = getPlatformIcon(platform);
+        const displayName =
+          platform === 'audio_direct'
+            ? 'Audio Direct'
+            : platform === 'rss'
+              ? 'RSS Feed'
+              : platform.charAt(0).toUpperCase() + platform.slice(1);
         links.push({
           platform,
           url,
           icon,
           color,
           bgColor,
-          displayName: platform.charAt(0).toUpperCase() + platform.slice(1)
+          displayName
         });
       });
     }
@@ -1455,190 +1519,6 @@ const PodcastEpisodeProfile: React.FC = () => {
     }
   };
 
-  // Load available parties for adding media
-  const loadAvailableParties = async () => {
-    if (!user) {
-      toast.info('Please log in to add tunes to parties');
-      navigate('/login');
-      return;
-    }
-
-    setIsLoadingParties(true);
-    try {
-      const response = await partyAPI.getParties();
-      // Filter out parties where this media is already added (check topParties list)
-      // Prefer _id over uuid for comparison
-      const topPartyIds = new Set(topParties.map((p: any) => p._id || p.uuid));
-      const filteredParties = (response.parties || []).filter((party: any) => {
-        // Exclude parties already in the top parties list (media already added there)
-        const partyId = party._id || party.uuid;
-        return !topPartyIds.has(partyId);
-      });
-      setAvailableParties(filteredParties);
-    } catch (err: any) {
-      console.error('Error loading available parties:', err);
-      toast.error('Failed to load parties');
-    } finally {
-      setIsLoadingParties(false);
-    }
-  };
-
-  // Handle opening Add to Party modal
-  const handleOpenAddToPartyModal = () => {
-    if (!user) {
-      toast.info('Please log in to add tunes to parties');
-      navigate('/login');
-      return;
-    }
-    setShowAddToPartyModal(true);
-    loadAvailableParties();
-    // Initialize tip amount with minimum bid or average bid
-    const avgBid = media?.globalMediaAggregate ? (media.globalMediaAggregate / (media.bids?.length || 1)) / 100 : 0;
-    const minBid = minimumBid;
-    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
-    const defaultBid = Math.max(minBid, userDefaultTip, avgBid || 0);
-    setAddToPartyTipAmount(defaultBid.toFixed(2));
-  };
-
-  // Handle adding media to party with tip
-  const handleAddToParty = async () => {
-    if (!selectedPartyForAdd || !media) {
-      toast.error('Please select a party');
-      return;
-    }
-
-    const tipAmount = parseFloat(addToPartyTipAmount);
-    if (!Number.isFinite(tipAmount) || tipAmount < minimumBid) {
-      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
-      return;
-    }
-
-    setIsAddingToParty(true);
-    try {
-      // Get media URL - prefer YouTube, fallback to first available source
-      const mediaSource = selectedPartyForAdd.mediaSource || 'youtube';
-      let url = '';
-      
-      if ((mediaSource === 'youtube' || mediaSource === 'mixed') && media.sources?.youtube) {
-        url = media.sources.youtube;
-      } else if (media.sources) {
-        // Fallback to first available source
-        url = Object.values(media.sources)[0] as string;
-      }
-
-      if (!url) {
-        toast.error('Media source URL not found. Cannot add to party.');
-        setIsAddingToParty(false);
-        return;
-      }
-
-      // Get artist name (handle both string and array formats)
-      const artistName = Array.isArray(media.artist) 
-        ? media.artist.map((a: any) => a.name || a).join(', ')
-        : media.artist || 'Unknown Artist';
-
-      // Use addMediaToParty which handles adding media and placing bid in one operation
-      // Prefer _id (ObjectId) over uuid - resolvePartyId middleware handles both
-      // Convert _id to string if it's an ObjectId object
-      const rawPartyId = selectedPartyForAdd._id || selectedPartyForAdd.uuid;
-      if (!rawPartyId) {
-        toast.error('Invalid party ID');
-        setIsAddingToParty(false);
-        return;
-      }
-      
-      // Ensure partyId is a string (ObjectId objects need to be converted)
-      const partyIdToUse = typeof rawPartyId === 'string' ? rawPartyId : rawPartyId.toString();
-      
-      console.log('Adding media to party:', {
-        partyId: partyIdToUse,
-        partyName: selectedPartyForAdd.name,
-        mediaTitle: media.title
-      });
-      
-      try {
-        const response = await partyAPI.addMediaToParty(partyIdToUse, {
-          url,
-          title: media.title,
-          artist: artistName,
-          bidAmount: tipAmount,
-          platform: mediaSource,
-          duration: media.duration || 180,
-          category: media.category || 'Music'
-        });
-
-        console.log('Successfully added media to party:', response);
-        toast.success(`Added to ${selectedPartyForAdd.name} with £${tipAmount.toFixed(2)} tip!`);
-        
-        // Refresh top parties to show the newly added party
-        await loadTopParties();
-        
-        // Close modal and reset state
-        setShowAddToPartyModal(false);
-        setSelectedPartyForAdd(null);
-        setAddToPartyTipAmount('');
-      } catch (apiErr: any) {
-        console.error('Error adding media to party:', apiErr);
-        console.error('Error details:', {
-          status: apiErr.response?.status,
-          statusText: apiErr.response?.statusText,
-          error: apiErr.response?.data?.error,
-          message: apiErr.response?.data?.message,
-          partyId: partyIdToUse,
-          url: apiErr.config?.url,
-          method: apiErr.config?.method
-        });
-      
-        // Provide more helpful error messages
-        let errorMessage = 'Failed to add tune to party';
-        if (apiErr.response?.status === 404) {
-          if (apiErr.response?.data?.error?.includes('Party not found')) {
-            errorMessage = 'Party not found. Please try selecting a different party.';
-          } else if (apiErr.response?.data?.error?.includes('Media not found in party queue')) {
-            errorMessage = 'Unable to add media to party. The media may already be in this party.';
-          } else {
-            errorMessage = 'Party or media not found. Please try again.';
-          }
-        } else if (apiErr.response?.data?.error) {
-          errorMessage = apiErr.response.data.error;
-        }
-        
-        toast.error(errorMessage);
-      }
-    } catch (err: any) {
-      // Outer catch for any other errors (like invalid party ID)
-      console.error('Error in handleAddToParty:', err);
-      toast.error('An unexpected error occurred. Please try again.');
-    } finally {
-      setIsAddingToParty(false);
-    }
-  };
-
-  // Load top parties for this tune
-  const loadTopParties = async () => {
-    if (!media && !mediaId) {
-      console.log('⚠️ No media or mediaId available for top parties');
-      return;
-    }
-    
-    try {
-      console.log('🔍 Loading top parties for media:', mediaId);
-      console.log('🔍 Media object:', media);
-      const response = await mediaAPI.getTopPartiesForMedia(media?._id || mediaId!);
-      console.log('📊 Top parties response:', response);
-      console.log('📊 Parties data:', response.parties);
-      setTopParties(response.parties || []);
-      console.log('✅ Top parties state set:', response.parties?.length || 0, 'parties');
-    } catch (err: any) {
-      console.error('❌ Error loading top parties:', err);
-      console.error('Error response:', err.response);
-      console.error('Error data:', err.response?.data);
-      console.error('Error status:', err.response?.status);
-      // Temporarily show error to user for debugging
-      toast.error(`Top Parties Error: ${err.response?.data?.error || err.message}`);
-    }
-  };
-
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
     if (!media && !mediaId) {
@@ -1681,10 +1561,21 @@ const PodcastEpisodeProfile: React.FC = () => {
     toast.success(`Now playing: ${media.title}`);
   };
 
-  // Handle global bid (chart support)
+  // Heart / quick-tip: open confirmation modal with a default amount
+  const handleOpenTipModal = () => {
+    if (!user) {
+      toast.info('Please log in to support this episode');
+      const returnUrl = `/podcasts/${mediaId || media?._id}`;
+      navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+    setShowBidConfirmationModal(true);
+  };
+
+  // Handle global bid from the Support This Episode amount field
   const handleGlobalBid = () => {
     if (!user) {
-      toast.info('Please log in to support this tune');
+      toast.info('Please log in to support this episode');
       const returnUrl = `/podcasts/${mediaId || media?._id}`;
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
@@ -1710,7 +1601,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const handleConfirmGlobalBid = async (tags: string[], amount: number) => {
     if (!user || !mediaId) return;
 
-    const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : parsedGlobalBidAmount;
+    const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : defaultTipAmount;
 
     setShowBidConfirmationModal(false);
     setIsPlacingGlobalBid(true);
@@ -1722,7 +1613,6 @@ const PodcastEpisodeProfile: React.FC = () => {
       
       // Refresh media data to show updated metrics
       await fetchMediaProfile();
-      await loadTopParties();
       
     } catch (err: any) {
       console.error('Error placing global tip:', err);
@@ -2086,11 +1976,302 @@ const PodcastEpisodeProfile: React.FC = () => {
     if (Array.isArray(field.value) && field.value.length === 0) return false;
     return true;
   });
-  
-  const visibleFields = showAllFields ? filteredFields : filteredFields.slice(0, 8);
+
+  const HEADER_DETAIL_LABELS = new Set([
+    'Title',
+    'Podcast Series',
+    'Episode Number',
+    'Season Number',
+    'Duration',
+    'Release Date',
+    'Host',
+    'Guest',
+    'Rating',
+  ]);
+
+  const detailFields = showAllFields
+    ? filteredFields
+    : filteredFields.filter((field) => !HEADER_DETAIL_LABELS.has(field.label)).slice(0, 8);
+
+  const formatPeopleNames = (people?: Array<{ name: string }> | string) => {
+    if (!people) return null;
+    if (typeof people === 'string') return people;
+    if (!Array.isArray(people) || people.length === 0) return null;
+    return people.map((p: any) => p.name || p).filter(Boolean).join(', ');
+  };
+
+  const hostNames = formatPeopleNames(media.host);
+  const guestNames = formatPeopleNames(media.guest);
+
+  const seasonEpisodeLabel = [
+    media.seasonNumber != null ? `S${media.seasonNumber}` : null,
+    media.episodeNumber != null ? `E${media.episodeNumber}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const heroMetadata = [
+    seasonEpisodeLabel || null,
+    media.releaseDate
+      ? new Date(media.releaseDate).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : null,
+    media.duration ? formatDuration(media.duration) : null,
+    media.explicit ? 'Explicit' : null,
+  ].filter((part): part is string => Boolean(part));
+
+  const topTagRankings = tagRankings.slice(0, 3);
+
+  const headerTipLabel = !user
+    ? 'Sign in to Tip'
+    : isGlobalBidValid
+      ? `Tip £${globalBidInput}`
+      : 'Tip';
+
+  const seriesTitle =
+    media.podcastSeries && typeof media.podcastSeries === 'object'
+      ? media.podcastSeries.title
+      : null;
+  const seriesId =
+    media.podcastSeries && typeof media.podcastSeries === 'object'
+      ? media.podcastSeries._id
+      : null;
+
+  const externalLinks = (() => {
+    const links: Array<{
+      platform: string;
+      url: string;
+      icon: any;
+      color: string;
+      bgColor: string;
+      displayName: string;
+    }> = [];
+    if (media?.sources) {
+      Object.entries(media.sources).forEach(([platform, url]) => {
+        if (platform.toLowerCase() === 'upload') return;
+        const { icon, color, bgColor } = getPlatformIcon(platform);
+        const displayName =
+          platform === 'audio_direct'
+            ? 'Audio Direct'
+            : platform === 'rss'
+              ? 'RSS Feed'
+              : platform.charAt(0).toUpperCase() + platform.slice(1);
+        links.push({ platform, url: url as string, icon, color, bgColor, displayName });
+      });
+    }
+    return links;
+  })();
+
+  const renderShareButton = () => (
+    isMobile ? (
+      <button
+        onClick={handleNativeShare}
+        className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+      >
+        <Share2 className="h-4 w-4" />
+        <span>Share</span>
+      </button>
+    ) : (
+      <div className="relative">
+        <button
+          onClick={() => setShowShareDropdown(!showShareDropdown)}
+          className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+        >
+          <Share2 className="h-4 w-4" />
+          <span>Share</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
+        </button>
+        {showShareDropdown && (
+          <div className="absolute top-full left-0 mt-2 w-48 bg-gray-900/95 border-2 border-purple-500/50 rounded-lg shadow-xl z-50 overflow-hidden">
+            <button onClick={() => handleShare('twitter')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Twitter className="h-5 w-5 text-blue-400" /><span>Twitter/X</span>
+            </button>
+            <button onClick={() => handleShare('facebook')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Facebook className="h-5 w-5 text-blue-600" /><span>Facebook</span>
+            </button>
+            <button onClick={() => handleShare('linkedin')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Linkedin className="h-5 w-5 text-blue-500" /><span>LinkedIn</span>
+            </button>
+            <button onClick={() => handleShare('whatsapp')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Share2 className="h-5 w-5 text-green-500" /><span>WhatsApp</span>
+            </button>
+            <button onClick={() => handleShare('instagram')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Instagram className="h-5 w-5 text-pink-500" /><span>Instagram</span>
+            </button>
+            <button onClick={() => handleShare('copy')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white border-t border-gray-700">
+              {copySuccess ? <Check className="h-5 w-5 text-green-400" /> : <Copy className="h-5 w-5 text-gray-400" />}
+              <span>{copySuccess ? 'Copied!' : 'Copy Link'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  );
+
+  const renderSlimSupportSection = () => (
+    <div id="support-episode" className="mb-6 px-2 md:px-0">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-4 md:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="text-center sm:text-left">
+              <h3 className="text-lg md:text-xl font-bold text-white flex items-center justify-center sm:justify-start gap-2">
+                <Coins className="h-5 w-5 text-yellow-400" />
+                Support This Episode
+              </h3>
+              <p className="text-gray-300 text-sm mt-1">
+                Boost global ranking and support the creators
+              </p>
+            </div>
+            {user && (
+              <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
+                Balance: {penceToPounds((user as any)?.balance)}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-row items-center justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                const current = parseFloat(globalBidInput) || minimumBid;
+                setGlobalBidInput(Math.max(minimumBid, current - 0.01).toFixed(2));
+                setHasInitializedBidInput(true);
+              }}
+              disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
+              className="px-2 py-2.5 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-bl-lg transition-colors flex items-center justify-center"
+            >
+              <Minus className="h-4 w-4 text-white" />
+            </button>
+            <div className="flex items-center bg-gray-800 overflow-hidden">
+              <input
+                type="number"
+                step="0.01"
+                min={minimumBid}
+                value={globalBidInput}
+                onChange={(e) => {
+                  setHasInitializedBidInput(true);
+                  setGlobalBidInput(e.target.value);
+                }}
+                className="w-20 sm:w-24 bg-gray-800 p-2 text-white text-lg font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const current = parseFloat(globalBidInput) || minimumBid;
+                const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
+                setGlobalBidInput(Math.min(balanceInPounds || 999999, current + 0.01).toFixed(2));
+                setHasInitializedBidInput(true);
+              }}
+              disabled={isPlacingGlobalBid || (user ? (() => {
+                const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+                return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
+              })() : false)}
+              className="px-2 py-2.5 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-br-lg transition-colors flex items-center justify-center"
+            >
+              <Plus className="h-4 w-4 text-white" />
+            </button>
+            <button
+              onClick={handleGlobalBid}
+              disabled={isPlacingGlobalBid || !isGlobalBidValid}
+              className="ml-3 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center text-sm md:text-base"
+            >
+              {isPlacingGlobalBid ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
+              ) : (
+                <span>{headerTipLabel}</span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2 mt-3">
+            {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
+              <button
+                key={amount}
+                onClick={() => setGlobalBidInput(amount.toFixed(2))}
+                className="px-3 py-1 bg-gray-700/80 hover:bg-gray-600 text-gray-300 text-xs rounded-full transition-colors font-medium"
+              >
+                £{amount.toFixed(2)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const handlePlaySeriesEpisode = (episode: any) => {
+    const playable = {
+      _id: episode._id,
+      id: episode.uuid,
+      title: episode.title,
+      duration: episode.duration,
+      coverArt: episode.coverArt || media.coverArt,
+      podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
+      sources: episode.sources,
+    };
+    if (!getEpisodeAudioUrl(playable)) {
+      toast.error('No playable audio for this episode');
+      return;
+    }
+    setCurrentEpisode(playable);
+    play();
+    toast.success(`Now playing: ${episode.title}`);
+  };
+
+  const renderSeriesEpisodesRail = (episodes: any[]) => (
+    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+      {episodes.map((episode) => (
+        <div
+          key={`series-rail-${episode._id}`}
+          className="flex-shrink-0 w-[132px] sm:w-[148px] snap-start group"
+        >
+          <div className="relative mb-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/podcasts/${episode._id || episode.uuid}`)}
+              className="block w-full"
+            >
+              <img
+                src={episode.coverArt || media.coverArt || DEFAULT_COVER_ART}
+                alt={episode.title}
+                className="w-full aspect-square rounded-lg object-cover bg-black/30 shadow-md group-hover:ring-2 group-hover:ring-purple-500/50 transition-all"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePlaySeriesEpisode(episode)}
+              className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 shadow-lg transition-colors opacity-90 group-hover:opacity-100"
+              aria-label={`Play ${episode.title}`}
+            >
+              <Play className="h-3.5 w-3.5" fill="currentColor" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/podcasts/${episode._id || episode.uuid}`)}
+            className="block w-full text-left"
+          >
+            <div className="text-sm font-semibold text-white truncate hover:text-purple-300 transition-colors">{episode.title}</div>
+            <div className="text-xs text-gray-400 truncate">
+              {[
+                episode.seasonNumber != null || episode.episodeNumber != null
+                  ? [episode.seasonNumber != null ? `S${episode.seasonNumber}` : null, episode.episodeNumber != null ? `E${episode.episodeNumber}` : null].filter(Boolean).join(' ')
+                  : null,
+                episode.duration ? formatDuration(episode.duration) : null,
+              ].filter(Boolean).join(' · ') || seriesTitle || 'Episode'}
+            </div>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 pb-24 md:pb-8">
       <div className="container mx-auto px-2 md:px-4 py-4 md:py-8">
         {/* Podcast Episode Profile Header */}
         <div className="mb-6">  
@@ -2150,275 +2331,140 @@ const PodcastEpisodeProfile: React.FC = () => {
           </div>
           
           <div className="card p-4 md:p-6 flex flex-col md:flex-row items-start relative">
-            {/* Cover Art and Links Container */}
-            <div className="w-full md:w-auto flex flex-col items-center md:items-start mb-2 md:mr-6">
-              {/* Album Art with Play Button Overlay */}
-              <div className="relative group mb-3">
-                <img
-                  src={media.coverArt || DEFAULT_COVER_ART}
-                  alt={`${media.title} cover`}
-                  className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
-                />
-                {/* Play Button Overlay */}
-                <div 
-                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={handlePlaySong}
-                >
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
-                    <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
-                  </div>
+            {/* Album Art with Play Button Overlay */}
+            <div className="w-full md:w-auto flex justify-center md:justify-start mb-2 md:mr-6 relative group">
+              <img
+                src={media.coverArt || DEFAULT_COVER_ART}
+                alt={`${media.title} cover`}
+                className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
+              />
+              <div
+                className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={handlePlaySong}
+              >
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                  <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
                 </div>
               </div>
-              
-              {/* Audio Direct and RSS Links - Below Cover Art */}
-              {(() => {
-                const audioDirectLink = media?.sources?.audio_direct;
-                const rssLink = media?.sources?.rss;
-                const links = [];
-                
-                if (audioDirectLink) {
-                  const { icon, color } = getPlatformIcon('audio_direct');
-                  links.push({
-                    platform: 'audio_direct',
-                    url: audioDirectLink,
-                    icon,
-                    color,
-                    displayName: 'Audio Direct'
-                  });
-                }
-                
-                if (rssLink) {
-                  const { icon, color } = getPlatformIcon('rss');
-                  links.push({
-                    platform: 'rss',
-                    url: rssLink,
-                    icon,
-                    color,
-                    displayName: 'RSS Feed'
-                  });
-                }
-                
-                return links.length > 0 ? (
-                  <div className="w-full flex flex-col gap-2">
-                    {links.map((link) => (
-                      <a
-                        key={link.platform}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center justify-center space-x-2 px-3 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all hover:bg-black/30 ${link.color}`}
-                      >
-                        <link.icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{link.displayName}</span>
-                      </a>
-                    ))}
-                  </div>
-                ) : null;
-              })()}
             </div>
-            
-            {/* Song Info */}
+
+            {/* Episode Info */}
             <div className="flex-1 w-full text-white">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 md:gap-4">
-                <div className="flex-1">
-                  <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
-                  <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
-                    {media.podcastSeries ? (
-                      typeof media.podcastSeries === 'object' && media.podcastSeries._id ? (
-                        <a
-                          href={`/podcast/${media.podcastSeries._id}`}
-                          className="hover:text-purple-200 hover:underline transition-colors"
-                        >
-                          {media.podcastSeries.title}
-                        </a>
-                      ) : (
-                        <span>{typeof media.podcastSeries === 'object' ? media.podcastSeries.title : 'Unknown Series'}</span>
-                      )
-                    ) : (
-                      <span>No Series</span>
-                    )}
-                  </div>
-                </div>
-                {/* Release Date and Duration */}
-                <div className="flex flex-col items-center md:items-end gap-1 md:gap-2 px-2 text-sm md:text-base text-gray-300">
-                  {media.releaseDate && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>{new Date(media.releaseDate).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                  {media.duration && (
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{formatDuration(media.duration)}</span>
-                    </div>
-                  )}
-                </div>
+              <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
+              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
+                {seriesId ? (
+                  <a
+                    href={`/podcast/${seriesId}`}
+                    className="hover:text-purple-200 hover:underline transition-colors"
+                  >
+                    {seriesTitle}
+                  </a>
+                ) : (
+                  <span>{seriesTitle || 'No Series'}</span>
+                )}
               </div>
-              
-              {/* Episode Description */}
-              {media.description && (
-                <div className="px-2 md:px-0 mt-4 mb-4">
-                  <div 
-                    className="text-gray-300 text-sm md:text-base leading-relaxed prose prose-invert prose-sm max-w-none
-                      [&_p]:mb-3 [&_p:last-child]:mb-0 [&_p:first-child]:mt-0
-                      [&_a]:text-purple-400 [&_a]:hover:text-purple-300 [&_a]:underline [&_a]:break-words
-                      [&_strong]:text-white [&_strong]:font-semibold
-                      [&_em]:italic
-                      [&_u]:underline
-                      [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:mt-2
-                      [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:mt-2
-                      [&_li]:mb-1 [&_li]:leading-relaxed
-                      [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-white
-                      [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-white
-                      [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-white
-                      [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3
-                      [&_code]:bg-gray-800 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono
-                      [&_pre]:bg-gray-800 [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-3 [&_pre]:text-sm [&_pre]:font-mono
-                      [&_br]:block [&_br]:content-[''] [&_br]:mt-2"
-                    dangerouslySetInnerHTML={{ __html: sanitizeDescription(media.description) }}
-                  />
+
+              {(hostNames || guestNames) && (
+                <div className="text-sm text-gray-300 text-center md:text-left px-2 mb-2 space-y-0.5">
+                  {hostNames && (
+                    <p>
+                      <span className="text-gray-500">Hosted by </span>
+                      <span className="text-white">{hostNames}</span>
+                    </p>
+                  )}
+                  {guestNames && (
+                    <p>
+                      <span className="text-gray-500">Featuring </span>
+                      <span className="text-white">{guestNames}</span>
+                    </p>
+                  )}
                 </div>
               )}
 
-            </div>
-          </div>
-        </div>
+              {heroMetadata.length > 0 && (
+                <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-2">
+                  {heroMetadata.join(' · ')}
+                </p>
+              )}
 
-        {/* Tip Metrics Grid */}
-        <div className="mb-6 px-2 md:px-0">
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-3 md:grid-cols-3 gap-y-2 md:gap-4">
-            {/* Tip Total */}
-            <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-green-500/50">
-              <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Tip Total</div>
-              <div className="text-base md:text-2xl font-bold text-green-400">
-                {penceToPounds(media.globalMediaAggregate)}
-              </div>
-            </div>
-            
-            {/* Total Tips Count */}
-            <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-cyan-500/50">
-              <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Total Tips</div>
-              <div className="text-base md:text-2xl font-bold text-cyan-400">
-                {media.bids?.length || 0}
-              </div>
-            </div>
-            
-            {/* Global Rank */}
-            <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-pink-500/50">
-              <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Global Rank</div>
-              <div className="text-base md:text-2xl font-bold text-pink-400">
-                #{media.globalMediaAggregateTopRank || '-'}
-              </div>
-            </div>
-            
-            {/* Top Fan - Now visible on mobile */}
-            <div className="card bg-black/20 rounded-lg p-3 md:p-4 border-l-4 border-purple-500/50">
-              <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wide mb-1">Top Fan</div>
-              <div className="text-base md:text-2xl font-bold text-purple-400">
-                {penceToPounds(media.globalMediaAggregateTop)}
-              </div>
-            </div>
-            
-            {/* Top Tip - Hidden on mobile */}
-            <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-yellow-500/50">
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Top Tip</div>
-              <div className="text-2xl font-bold text-yellow-400">
-                {penceToPounds(media.globalMediaBidTop)}
-              </div>
-            </div>
-            
-            {/* Average Tip - Hidden on mobile */}
-            <div className="hidden md:block card bg-black/20 rounded-lg p-4 border-l-4 border-blue-500/50">
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Avg Tip</div>
-              <div className="text-2xl font-bold text-blue-400">
-                £{calculateGlobalMediaBidAvg(media).toFixed(2)}
-              </div>
-            </div>
-          </div>
-        </div>
+              {topTagRankings.length > 0 && (
+                <div className="flex flex-wrap justify-center md:justify-start gap-1.5 px-2 mb-3">
+                  {topTagRankings.map((ranking, index) => (
+                    <span
+                      key={`${ranking.tag}-${index}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium"
+                    >
+                      <Tag className="h-3 w-3 text-purple-400" />
+                      #{ranking.rank} {ranking.tag}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-        {/* Share Button - Centered below header */}
-        <div className="flex justify-center mb-6" ref={shareDropdownRef}>
-            {isMobile ? (
-              <button
-                onClick={handleNativeShare}
-                className="px-3 md:px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all flex items-center space-x-2 text-sm md:text-base"
-              >
-                <Share2 className="h-4 w-4" />
-                <span className="inline">Share</span>
-              </button>
-            ) : (
-              <div className="relative">
+              <p className="text-sm text-center md:text-left px-2 mb-3">
+                <span className="text-green-400 font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
+                <span className="text-gray-500 mx-2">·</span>
+                <span className="text-pink-300 font-medium">#{media.globalMediaAggregateTopRank || '—'} global</span>
+                <span className="text-gray-500 mx-2">·</span>
+                <span className="text-cyan-300">{media.bids?.length || 0} tips</span>
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2" ref={shareDropdownRef}>
                 <button
-                  onClick={() => setShowShareDropdown(!showShareDropdown)}
-                  className="px-3 md:px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border-2 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all flex items-center space-x-2 text-sm md:text-base"
+                  type="button"
+                  onClick={handlePlaySong}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2 text-sm"
                 >
-                  <Share2 className="h-4 w-4" />
-                  <span className="inline">Share</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} />
+                  <Play className="h-4 w-4" fill="currentColor" />
+                  Play
                 </button>
-                
-                {showShareDropdown && (
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-48 bg-gray-900/95 border-2 border-purple-500/50 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={() => handleShare('twitter')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Twitter className="h-5 w-5 text-blue-400" />
-                      <span>Twitter/X</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('facebook')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Facebook className="h-5 w-5 text-blue-500" />
-                      <span>Facebook</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('linkedin')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Linkedin className="h-5 w-5 text-blue-600" />
-                      <span>LinkedIn</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('whatsapp')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                      </svg>
-                      <span>WhatsApp</span>
-                    </button>
-                    <button
-                      onClick={() => handleShare('instagram')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white"
-                    >
-                      <Instagram className="h-5 w-5 text-pink-500" />
-                      <span>Instagram</span>
-                    </button>
-                    <button
-                      onClick={handleCopyLink}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white border-t border-gray-700/50"
-                    >
-                      {copySuccess ? (
-                        <>
-                          <Check className="h-5 w-5 text-green-400" />
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-5 w-5 text-gray-400" />
-                          <span>Copy Link</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
+                {renderShareButton()}
+                <button
+                  type="button"
+                  onClick={handleOpenTipModal}
+                  disabled={isPlacingGlobalBid}
+                  title="Send a tip"
+                  aria-label="Send a tip"
+                  className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isPlacingGlobalBid ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
+                  )}
+                </button>
               </div>
-            )}
+            </div>
           </div>
+        </div>
+
+        {/* More from this series — discovery rail directly below header */}
+        {!isEditMode && (isLoadingSeriesEpisodes || seriesEpisodes.length > 0) && (
+          <div className="mb-8 px-2 md:px-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                <Mic className="h-5 w-5 text-cyan-300" />
+                More from this series
+              </h2>
+              {seriesId && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/podcast/${seriesId}`)}
+                  className="text-sm text-purple-300 hover:text-purple-200 transition-colors"
+                >
+                  View series
+                </button>
+              )}
+            </div>
+            <div className="card bg-black/20 rounded-lg p-4">
+              {isLoadingSeriesEpisodes ? (
+                <div className="text-gray-400 text-sm">Loading episodes...</div>
+              ) : (
+                renderSeriesEpisodesRail(seriesEpisodes)
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tab Navigation - Only show when in edit mode */}
         {isEditMode && canEditTune() && (
@@ -2462,237 +2508,10 @@ const PodcastEpisodeProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* Global Tip Section - Support This Episode */}
-        <div className="mb-6 px-2 md:px-0">
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
-              <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
-                <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                Support This Episode
-              </h3>
-              <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                Boost this episode's global ranking and support the creators
-              </p>
-              
-              <div className="flex flex-row items-center justify-center mb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = parseFloat(globalBidInput) || minimumBid;
-                    const newAmount = Math.max(minimumBid, current - 0.01);
-                    setGlobalBidInput(newAmount.toFixed(2));
-                    setHasInitializedBidInput(true);
-                  }}
-                  disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-                  className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-xl rounded-bl-xl transition-colors flex items-center justify-center"
-                >
-                  <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                </button>
-                <div className="flex items-center bg-gray-800 overflow-hidden">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={minimumBid}
-                    value={globalBidInput}
-                    onChange={(e) => {
-                      setHasInitializedBidInput(true);
-                      setGlobalBidInput(e.target.value);
-                    }}
-                    className="w-24 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = parseFloat(globalBidInput) || minimumBid;
-                    const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
-                    const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
-                    setGlobalBidInput(newAmount.toFixed(2));
-                    setHasInitializedBidInput(true);
-                  }}
-                  disabled={isPlacingGlobalBid || (user ? (() => {
-                    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                    return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                  })() : false)}
-                  className="px-2 md:px-3 py-3 md:py-4 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-xl rounded-br-xl transition-colors flex items-center justify-center"
-                >
-                  <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                </button>
-                <button
-                  onClick={handleGlobalBid}
-                  disabled={isPlacingGlobalBid || !isGlobalBidValid}
-                  className="w-auto px-6 md:px-8 ml-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2 text-base md:text-lg"
-                >
-                  {isPlacingGlobalBid ? (
-                    <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing Bid...</span>
-                  ) : (
-                    <span>
-                      {!user ? 'Sign in to Tip' : (isGlobalBidValid ? `Tip £${globalBidInput}` : 'Enter Tip')}
-                    </span>
-                  )}
-                </button>
-              </div>
-                
-                {/* Quick amounts */}
-                <div className="flex flex-wrap justify-center gap-2 mb-4">
-                  {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-                    <button
-                      key={amount}
-                      onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                      className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
-                    >
-                      £{amount.toFixed(2)}
-                    </button>
-                  ))}
-                </div>
-                
-                {user && (
-                  <p className="text-xs md:text-sm text-gray-400">
-                    Your balance: {penceToPounds((user as any)?.balance)}
-                  </p>
-                )}
-                {!user && (
-                  <p className="text-xs md:text-sm text-gray-400">
-                    Sign in to tip and support this tune
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-        {/* Top Supporters */}
-        {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-              <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400" />
-              Top Supporters
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopSupporters bids={media.bids} maxDisplay={10} />
-            </div>
-          </div>
-        )}
-
-        {/* Top Tips */}
-        {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-              <Coins className="h-5 w-5 md:h-6 md:w-6 mr-2 text-yellow-400" />
-              Top Tips
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <TopBidders bids={media.bids} maxDisplay={5} />
-            </div>
-          </div>
-        )}
-
-        {/* Top Parties */}
-        <div className="mb-6 px-2 md:px-0">
-          <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-            <Music className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
-            Top Parties {topParties.length > 0 && `(${topParties.length})`}
-          </h2>
-          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-            {(() => {
-              console.log('🎪 Rendering Top Parties section, length:', topParties.length);
-              console.log('🎪 Top Parties data:', topParties);
-              return null;
-            })()}
-            {topParties.length > 0 ? (
-              <div className="space-y-2 md:space-y-3">
-                {topParties.map((party, index) => (
-                  <div 
-                    key={party._id} 
-                    className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-white font-bold">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <h3 className="text-white font-semibold text-lg">{party.name}</h3>
-                        <p className="text-sm text-gray-400">{party.location}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-green-400">
-                          {penceToPounds(party.partyMediaAggregate || 0)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {party.bidCount || 0} {party.bidCount === 1 ? 'bid' : 'bids'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => navigate(`/party/${party._id}`)}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
-                      >
-                        View Party
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-400">
-                <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
-                <p>This tune hasn't been added to any parties yet</p>
-                <p className="text-sm text-gray-500 mt-2">Be the first to add it to a party!</p>
-              </div>
-            )}
-            
-            {/* Add to Other Party Button */}
-            {user && (
-              <div className="mt-4 pt-4 border-t border-gray-700">
-                <button
-                  onClick={handleOpenAddToPartyModal}
-                  className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add to Other Party</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tag Rankings */}
-        {tagRankings.length > 0 && (
-          <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-4 flex items-center justify-center md:text-left">
-              <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
-              Tag Rankings
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {tagRankings.map((ranking, index) => (
-                  <div 
-                    key={index} 
-                    className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
-                  >
-                    <div className="flex items-center space-x-2 md:space-x-3">
-                      <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                      <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-base md:text-lg font-bold text-purple-400">
-                        #{ranking.rank}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        of {ranking.total} • Top {ranking.percentile}%
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Episode Details */}
+        {/* About this episode */}
         <div className="mb-8 px-2 md:px-0">
           <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h2 className="text-xl md:text-2xl font-bold text-white">Episode Details</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-white">About this episode</h2>
             <button
               onClick={() => setShowAllFields(!showAllFields)}
               className="flex items-center px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm md:text-base"
@@ -2700,25 +2519,36 @@ const PodcastEpisodeProfile: React.FC = () => {
               {showAllFields ? 'Show Less' : 'Show All'}
             </button>
           </div>
-          
+
           <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-              {visibleFields.map((field, index) => {
+            {media.description && (
+              <div
+                className="text-gray-300 text-sm md:text-base leading-relaxed prose prose-invert prose-sm max-w-none mb-6
+                  [&_p]:mb-3 [&_p:last-child]:mb-0 [&_p:first-child]:mt-0
+                  [&_a]:text-purple-400 [&_a]:hover:text-purple-300 [&_a]:underline [&_a]:break-words
+                  [&_strong]:text-white [&_strong]:font-semibold
+                  [&_em]:italic
+                  [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3
+                  [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3
+                  [&_li]:mb-1
+                  [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-white
+                  [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-white
+                  [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-white
+                  [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3"
+                dangerouslySetInnerHTML={{ __html: sanitizeDescription(media.description) }}
+              />
+            )}
+
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 ${media.description ? 'pt-6 border-t border-gray-700' : ''}`}>
+              {detailFields.map((field, index) => {
                 const IconComponent = field.icon;
-                // Special handling for Artist field to use ClickableArtistDisplay
-                const isArtistField = field.label === 'Artist';
-                
                 return (
                   <div key={index} className="flex items-start space-x-3">
                     <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
                     <div>
                       <div className="text-sm text-gray-300">{field.label}</div>
                       <div className="text-white font-medium">
-                        {isArtistField ? (
-                          <ClickableArtistDisplay media={media} />
-                        ) : (
-                          getFieldValue(field.value, (field as any).fieldName)
-                        )}
+                        {getFieldValue(field.value, (field as any).fieldName)}
                       </div>
                     </div>
                   </div>
@@ -2726,17 +2556,89 @@ const PodcastEpisodeProfile: React.FC = () => {
               })}
             </div>
 
-            {/* Transcript Section */}
             {media.transcript && (
               <div className="mt-6 pt-6 border-t border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-3">Transcript</h3>
-                <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
-                  {media.transcript}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTranscript(!showTranscript)}
+                  className="inline-flex items-center gap-2 text-lg font-semibold text-white hover:text-purple-300 transition-colors"
+                >
+                  Transcript
+                  {showTranscript ? <Minus className="h-4 w-4 text-gray-400" /> : <Plus className="h-4 w-4 text-gray-400" />}
+                </button>
+                {showTranscript && (
+                  <div className="mt-3 text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4 max-h-96 overflow-y-auto">
+                    {media.transcript}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
+
+        {renderSlimSupportSection()}
+
+        {/* Top Fans - collapsible */}
+        {media.bids && media.bids.length > 0 && (
+          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
+            <button
+              onClick={() => setShowTopFans(!showTopFans)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400 flex-shrink-0" />
+                {showTopFans ? 'Top Fans' : 'Show Top Fans'}
+              </span>
+              {showTopFans ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showTopFans && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <TopSupporters bids={media.bids} maxDisplay={10} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tag Rankings - collapsible */}
+        {tagRankings.length > 0 && (
+          <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
+            <button
+              onClick={() => setShowTagRankings(!showTagRankings)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
+                <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400 flex-shrink-0" />
+                {showTagRankings ? 'Tag Rankings' : 'Show Tag Rankings'}
+              </span>
+              {showTagRankings ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showTagRankings && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {tagRankings.map((ranking, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                    >
+                      <div className="flex items-center space-x-2 md:space-x-3">
+                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-base md:text-lg font-bold text-purple-400">
+                          #{ranking.rank}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          of {ranking.total} • Top {ranking.percentile}%
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Collectives Section - Above label, below metrics */}
         {(() => {
@@ -2895,25 +2797,21 @@ const PodcastEpisodeProfile: React.FC = () => {
         )}
 
         {/* Links Section */}
-        {media.sources && Object.keys(media.sources).length > 0 && (
-          <div className="mb-8 hidden px-2">
-            <h2 className="text-xl font-bold text-white mb-3">Links</h2>
-            <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex flex-wrap gap-3 justify-center">
-                {Object.entries(media.sources).map(([platform, url]) => (
+        {externalLinks.length > 0 && (
+          <div className="mb-8 px-2 md:px-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4">Links</h2>
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <div className="flex flex-wrap gap-3">
+                {externalLinks.map((link) => (
                   <a
-                    key={platform}
-                    href={url}
+                    key={link.platform}
+                    href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center px-4 py-2.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors group"
+                    className={`flex items-center gap-2 px-4 py-2.5 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all hover:bg-black/30 ${link.color}`}
                   >
-                    <svg className="w-5 h-5 mr-2 text-white" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                    <span className="text-white text-sm font-semibold group-hover:text-gray-200 transition-colors">
-                      Watch on YouTube
-                    </span>
+                    <link.icon className="w-4 h-4" />
+                    <span className="text-sm font-medium">{link.displayName}</span>
                   </a>
                 ))}
               </div>
@@ -4051,6 +3949,14 @@ const PodcastEpisodeProfile: React.FC = () => {
                     Cancel
                   </button>
                 </div>
+                {canDeleteEpisode() && mediaId && media?.title && (
+                  <DeleteMediaSection
+                    mediaId={media._id || mediaId}
+                    mediaTitle={media.title}
+                    contentLabel="Episode"
+                    redirectTo={getEpisodeDeleteRedirect()}
+                  />
+                )}
               </div>
             )}
             {editTab === 'ownership' && mediaId && (
@@ -4199,12 +4105,18 @@ const PodcastEpisodeProfile: React.FC = () => {
         isOpen={showBidConfirmationModal}
         onClose={() => setShowBidConfirmationModal(false)}
         onConfirm={handleConfirmGlobalBid}
-        bidAmount={parsedGlobalBidAmount}
+        bidAmount={defaultTipAmount}
         minTip={minimumBid}
+        avgTip={media ? calculateGlobalMediaBidAvg(media) || undefined : undefined}
         mediaTitle={media?.title || 'Unknown'}
-        mediaArtist={Array.isArray(media?.artist) 
-          ? media.artist.map((a: any) => a.name || a).join(', ')
-          : (media?.artist as string) || 'Unknown Artist'}
+        mediaArtist={
+          seriesTitle
+          || (Array.isArray(media?.host) ? media.host.map((h: any) => h.name || h).join(', ') : null)
+          || (Array.isArray(media?.artist)
+            ? media.artist.map((a: any) => a.name || a).join(', ')
+            : (media?.artist as string))
+          || 'Unknown'
+        }
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
       />
@@ -4271,177 +4183,6 @@ const PodcastEpisodeProfile: React.FC = () => {
         </div>
       )}
 
-      {/* Add to Other Party Modal */}
-      {showAddToPartyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ zIndex: 10000 }}>
-          <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="flex justify-between items-center p-6 border-b border-gray-700">
-              <div className="flex items-center space-x-2">
-                <Plus className="h-5 w-5 text-purple-400" />
-                <h3 className="text-lg font-semibold text-white">Add to Party</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAddToPartyModal(false);
-                  setSelectedPartyForAdd(null);
-                  setPartySearchQuery('');
-                }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {/* Media Info */}
-              {media && (
-                <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    {media.coverArt && (
-                      <img 
-                        src={media.coverArt} 
-                        alt={media.title}
-                        className="w-12 h-12 rounded object-cover"
-                      />
-                    )}
-                    <div>
-                      <p className="text-white font-medium">{media.title}</p>
-                      <p className="text-gray-400 text-sm">
-                        {Array.isArray(media.artist) 
-                          ? media.artist.map((a: any) => a.name || a).join(', ')
-                          : media.artist || 'Unknown Artist'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Party Search */}
-              <div className="mb-4">
-                <label className="block text-white font-medium mb-2">
-                  Search Parties
-                </label>
-                <input
-                  type="text"
-                  value={partySearchQuery}
-                  onChange={(e) => setPartySearchQuery(e.target.value)}
-                  placeholder="Search by party name or location..."
-                  className="input w-full"
-                />
-              </div>
-
-              {/* Party List */}
-              <div className="mb-4">
-                <label className="block text-white font-medium mb-2">
-                  Select Party
-                </label>
-                {isLoadingParties ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <Loader2 className="h-8 w-8 mx-auto animate-spin mb-2" />
-                    <p>Loading parties...</p>
-                  </div>
-                ) : availableParties.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <Music className="h-12 w-12 mx-auto mb-3 text-gray-500" />
-                    <p>No available parties found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {availableParties
-                      .filter((party: any) => {
-                        if (!partySearchQuery) return true;
-                        const query = partySearchQuery.toLowerCase();
-                        return (
-                          party.name?.toLowerCase().includes(query) ||
-                          party.location?.toLowerCase().includes(query)
-                        );
-                      })
-                      .map((party: any) => {
-                        // Prefer _id over uuid
-                        const partyId = party._id || party.uuid;
-                        const selectedPartyId = selectedPartyForAdd?._id || selectedPartyForAdd?.uuid;
-                        return (
-                        <div
-                          key={partyId}
-                          onClick={() => setSelectedPartyForAdd(party)}
-                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                            selectedPartyId === partyId
-                              ? 'bg-purple-600 border-purple-500'
-                              : 'bg-gray-800 border-gray-700 hover:border-purple-500/50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="text-white font-medium">{party.name}</h4>
-                              <p className="text-gray-400 text-sm">{party.location}</p>
-                            </div>
-                            {selectedPartyId === partyId && (
-                              <CheckCircle className="h-5 w-5 text-white" />
-                            )}
-                          </div>
-                        </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-
-              {/* Tip Amount Input */}
-              {selectedPartyForAdd && (
-                <div className="mb-4">
-                  <label className="block text-white font-medium mb-2">
-                    Tip Amount (£)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={addToPartyTipAmount}
-                    onChange={(e) => {
-                      setAddToPartyTipAmount(e.target.value);
-                    }}
-                    placeholder={`Minimum: £${minimumBid.toFixed(2)}`}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Minimum tip: £{minimumBid.toFixed(2)}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end space-x-3 p-6 border-t border-gray-700">
-              <button
-                onClick={() => {
-                  setShowAddToPartyModal(false);
-                  setSelectedPartyForAdd(null);
-                  setPartySearchQuery('');
-                }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddToParty}
-                disabled={!selectedPartyForAdd || isAddingToParty || parseFloat(addToPartyTipAmount) < minimumBid}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
-              >
-                {isAddingToParty ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Adding...</span>
-                  </>
-                ) : (
-                  <span>Add to Party</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Report Modal */}
       {media && (
         <ReportModal
@@ -4451,6 +4192,25 @@ const PodcastEpisodeProfile: React.FC = () => {
           targetId={media._id}
           targetTitle={`${media.title} by ${Array.isArray(media.artist) ? media.artist.map((a: any) => a.name).join(', ') : media.artist}`}
         />
+      )}
+
+      {/* Mobile sticky tip bar — sits above the podcast player */}
+      {!isEditMode && (
+        <div className="md:hidden fixed bottom-[4.5rem] left-0 right-0 z-[9998] px-4 pointer-events-none">
+          <button
+            type="button"
+            onClick={handleGlobalBid}
+            disabled={isPlacingGlobalBid}
+            className="pointer-events-auto w-full max-w-md mx-auto flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-bold rounded-full shadow-2xl border border-purple-400/30 transition-all"
+          >
+            {isPlacingGlobalBid ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Coins className="h-4 w-4 text-yellow-300" />
+            )}
+            {headerTipLabel}
+          </button>
+        </div>
       )}
       </div>
     </div>

@@ -756,6 +756,33 @@ export const mediaAPI = {
     return response.data;
   },
 
+  deleteMedia: async (mediaId: string, reason?: string) => {
+    const response = await api.delete(`/media/${mediaId}`, {
+      data: reason ? { reason } : undefined,
+    });
+    return response.data;
+  },
+
+  getDeletedMedia: async (params?: {
+    page?: number;
+    limit?: number;
+    sortBy?: 'deletedAt' | 'title';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/media/deleted', { params });
+    return response.data;
+  },
+
+  restoreMedia: async (mediaId: string) => {
+    const response = await api.post(`/media/${mediaId}/restore`);
+    return response.data;
+  },
+
+  purgeMedia: async (mediaId: string) => {
+    const response = await api.delete(`/media/${mediaId}/purge`);
+    return response.data;
+  },
+
   // Place global bid (chart support)
   placeGlobalBid: async (mediaId: string, amount: number, externalMedia?: {
     title: string;
