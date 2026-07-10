@@ -1639,7 +1639,25 @@ const TuneProfile: React.FC = () => {
     toast.success(`Now playing: ${item.title}`);
   };
 
-  // Handle global bid (chart support)
+  const defaultTipAmount = useMemo(() => {
+    if (isGlobalBidValid) return parsedGlobalBidAmount;
+    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    const avgBid = media ? calculateGlobalMediaBidAvg(media) : 0;
+    return Math.max(minimumBid, userDefaultTip, avgBid || 0);
+  }, [isGlobalBidValid, parsedGlobalBidAmount, user?.preferences?.defaultTip, media, minimumBid]);
+
+  // Heart / quick-tip: open confirmation modal with a default amount (no tip-field required)
+  const handleOpenTipModal = () => {
+    if (!user) {
+      toast.info('Please log in to support this tune');
+      const returnUrl = `/tune/${mediaId || media?._id}`;
+      navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+    setShowBidConfirmationModal(true);
+  };
+
+  // Handle global bid from the Support This Tune amount field
   const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
@@ -1668,7 +1686,7 @@ const TuneProfile: React.FC = () => {
   const handleConfirmGlobalBid = async (tags: string[], amount: number) => {
     if (!user || !mediaId) return;
 
-    const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : parsedGlobalBidAmount;
+    const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : defaultTipAmount;
 
     setShowBidConfirmationModal(false);
     setIsPlacingGlobalBid(true);
@@ -2431,16 +2449,17 @@ const TuneProfile: React.FC = () => {
                 {renderShareButton()}
                 <button
                   type="button"
-                  onClick={handleGlobalBid}
-                  disabled={isPlacingGlobalBid || (user ? !isGlobalBidValid : false)}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center gap-2 text-sm"
+                  onClick={handleOpenTipModal}
+                  disabled={isPlacingGlobalBid}
+                  title="Send a tip"
+                  aria-label="Send a tip"
+                  className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isPlacingGlobalBid ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <Coins className="h-4 w-4 text-yellow-300" />
+                    <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
                   )}
-                  {headerTipLabel}
                 </button>
               </div>
             </div>
@@ -4168,8 +4187,9 @@ const TuneProfile: React.FC = () => {
         isOpen={showBidConfirmationModal}
         onClose={() => setShowBidConfirmationModal(false)}
         onConfirm={handleConfirmGlobalBid}
-        bidAmount={parsedGlobalBidAmount}
+        bidAmount={defaultTipAmount}
         minTip={minimumBid}
+        avgTip={media ? calculateGlobalMediaBidAvg(media) || undefined : undefined}
         mediaTitle={media?.title || 'Unknown'}
         mediaArtist={media?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
