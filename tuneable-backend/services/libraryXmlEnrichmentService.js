@@ -15,13 +15,26 @@ function getExternalId(media, key) {
   return media.externalIds[key] || null;
 }
 
+/** Treat null/undefined/0 as missing — many imports store 0 as a placeholder. */
+function isMissingBpm(bpm) {
+  return bpm == null || bpm === 0;
+}
+
+/** Treat null/undefined/blank as missing — many imports store "" as a placeholder. */
+function isMissingKey(key) {
+  return key == null || String(key).trim() === '';
+}
+
 function buildScopeQuery(userId, scope) {
+  // Include placeholder values (bpm: 0, key: "") that older imports used for "unknown"
   const missingMeta = {
     $or: [
       { bpm: { $exists: false } },
       { bpm: null },
+      { bpm: 0 },
       { key: { $exists: false } },
       { key: null },
+      { key: '' },
     ],
   };
 
@@ -109,8 +122,12 @@ function matchMediaToXmlTrack(media, xmlIndexes) {
 
 function buildEnrichmentPatch(media, track) {
   const patch = {};
-  if (media.bpm == null && track.bpm != null) patch.bpm = track.bpm;
-  if (!media.key && track.key) patch.key = track.key;
+  if (isMissingBpm(media.bpm) && track.bpm != null && track.bpm !== 0) {
+    patch.bpm = track.bpm;
+  }
+  if (isMissingKey(media.key) && track.key && String(track.key).trim()) {
+    patch.key = String(track.key).trim();
+  }
   return patch;
 }
 
@@ -148,8 +165,8 @@ async function previewLibraryXmlEnrichment(xmlContent, { user, scope = 'mine', l
   const unmatched = [];
 
   for (const media of mediaList) {
-    const needsBpm = media.bpm == null;
-    const needsKey = !media.key;
+    const needsBpm = isMissingBpm(media.bpm);
+    const needsKey = isMissingKey(media.key);
     if (!needsBpm && !needsKey) continue;
 
     const matched = matchMediaToXmlTrack(media, xmlIndexes);
@@ -165,15 +182,26 @@ async function previewLibraryXmlEnrichment(xmlContent, { user, scope = 'mine', l
     }
 
     const patch = buildEnrichmentPatch(media, matched.track);
-    if (!Object.keys(patch).length) continue;
+    if (!Object.keys(patch).length) {
+      // Matched XML track but nothing useful to fill (e.g. iTunes with no BPM set)
+      unmatched.push({
+        mediaId: media._id.toString(),
+        uuid: media.uuid,
+        title: media.title,
+        artist: media.artist?.[0]?.name || '',
+        missing: { bpm: needsBpm, key: needsKey },
+        reason: 'matched_but_no_xml_values',
+      });
+      continue;
+    }
 
     items.push({
       mediaId: media._id.toString(),
       uuid: media.uuid,
       title: media.title,
       artist: media.artist?.[0]?.name || '',
-      currentBpm: media.bpm ?? null,
-      currentKey: media.key ?? null,
+      currentBpm: isMissingBpm(media.bpm) ? null : media.bpm,
+      currentKey: isMissingKey(media.key) ? null : media.key,
       newBpm: patch.bpm ?? null,
       newKey: patch.key ?? null,
       matchType: matched.matchType,
@@ -252,11 +280,11 @@ async function executeLibraryXmlEnrichment(updates, { user } = {}) {
       }
 
       let changed = false;
-      if (item.bpm != null && media.bpm == null) {
+      if (item.bpm != null && item.bpm !== 0 && isMissingBpm(media.bpm)) {
         media.bpm = Number(item.bpm);
         changed = true;
       }
-      if (item.key && !media.key) {
+      if (item.key && String(item.key).trim() && isMissingKey(media.key)) {
         media.key = String(item.key).trim();
         changed = true;
       }

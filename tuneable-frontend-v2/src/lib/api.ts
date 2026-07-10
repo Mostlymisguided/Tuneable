@@ -647,7 +647,7 @@ export const mediaAPI = {
   previewLibraryXmlEnrichment: async (
     libraryXmlFile: File,
     scope: 'mine' | 'all' = 'mine',
-    limit = 500,
+    limit = 5000,
   ) => {
     const formData = new FormData();
     formData.append('libraryXmlFile', libraryXmlFile);

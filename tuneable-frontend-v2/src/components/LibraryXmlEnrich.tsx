@@ -44,6 +44,7 @@ interface EnrichPreview {
     title: string;
     artist: string;
     missing: { bpm: boolean; key: boolean };
+    reason?: string;
   }>;
 }
 
@@ -288,6 +289,13 @@ const LibraryXmlEnrich: React.FC<LibraryXmlEnrichProps> = ({
             </p>
           )}
 
+          {preview.scannedMedia < preview.totalEligibleMedia && (
+            <p className="text-amber-200 text-sm flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              Scanned {preview.scannedMedia} of {preview.totalEligibleMedia} eligible tunes — re-run after applying to continue.
+            </p>
+          )}
+
           {items.length > 0 && (
             <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
               <div className="p-4 border-b border-gray-700 flex flex-wrap items-center justify-between gap-3">
@@ -357,6 +365,46 @@ const LibraryXmlEnrich: React.FC<LibraryXmlEnrichProps> = ({
                   {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                   Apply to {selectedItems.length} tune(s)
                 </button>
+              </div>
+            </div>
+          )}
+
+          {preview.unmatched && preview.unmatched.length > 0 && (
+            <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+              <div className="p-4 border-b border-gray-700">
+                <div className="text-white font-medium">
+                  Unmatched ({preview.unmatchedCount}
+                  {preview.unmatchedCount > preview.unmatched.length
+                    ? `, showing first ${preview.unmatched.length}`
+                    : ''}
+                  )
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Catalog tunes missing BPM/key that did not get a fillable XML match (title+artist / Rekordbox ID).
+                </p>
+              </div>
+              <div className="max-h-[40vh] overflow-y-auto divide-y divide-gray-700">
+                {preview.unmatched.map((item) => (
+                  <div key={item.mediaId} className="flex items-start gap-3 p-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white truncate">{item.title}</div>
+                      <div className="text-sm text-gray-400 truncate">{item.artist}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Missing:{' '}
+                        {[item.missing.bpm && 'BPM', item.missing.key && 'key'].filter(Boolean).join(', ') || '—'}
+                        {item.reason === 'matched_but_no_xml_values' && ' · XML match had no BPM/key'}
+                        {item.uuid && (
+                          <>
+                            {' · '}
+                            <Link to={`/tune/${item.mediaId}`} className="text-purple-400 hover:underline">
+                              View tune
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
