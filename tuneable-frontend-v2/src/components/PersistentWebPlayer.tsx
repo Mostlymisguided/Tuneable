@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
-import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Maximize, Heart } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Heart } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { mediaAPI, partyAPI } from '../lib/api';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
@@ -85,51 +85,6 @@ const PersistentWebPlayer: React.FC = () => {
   const [playerType, setPlayerType] = useState<'youtube' | null>(null);
   const [isTipModalOpen, setIsTipModalOpen] = useState(false);
   const [isPlacingTip, setIsPlacingTip] = useState(false);
-  // Function to open YouTube player in fullscreen
-  const openYouTubeFullscreen = () => {
-    if (playerType === 'youtube') {
-      // First try to use the YouTube Player API's native fullscreen
-      if (youtubePlayerRef.current && typeof (youtubePlayerRef.current as any).getIframe === 'function') {
-        const iframe = (youtubePlayerRef.current as any).getIframe();
-        if (iframe) {
-          try {
-            if (iframe.requestFullscreen) {
-              iframe.requestFullscreen();
-            } else if (iframe.webkitRequestFullscreen) {
-              iframe.webkitRequestFullscreen();
-            } else if (iframe.mozRequestFullScreen) {
-              iframe.mozRequestFullScreen();
-            } else if (iframe.msRequestFullscreen) {
-              iframe.msRequestFullscreen();
-            }
-          } catch (error) {
-            console.error('Error requesting fullscreen:', error);
-          }
-        }
-      } 
-      // Fallback: try to find iframe in playerRef
-      else if (playerRef.current) {
-        const iframe = playerRef.current.querySelector('iframe');
-        if (iframe) {
-          try {
-            if (iframe.requestFullscreen) {
-              iframe.requestFullscreen();
-            } else if ((iframe as any).webkitRequestFullscreen) {
-              (iframe as any).webkitRequestFullscreen();
-            } else if ((iframe as any).mozRequestFullScreen) {
-              (iframe as any).mozRequestFullScreen();
-            } else if ((iframe as any).msRequestFullscreen) {
-              (iframe as any).msRequestFullscreen();
-            }
-          } catch (error) {
-            console.error('Error requesting fullscreen:', error);
-          }
-        } else {
-          console.log('No iframe found in playerRef');
-        }
-      }
-    }
-  };
   const timePollingRef = useRef<NodeJS.Timeout | null>(null);
   const isSeeking = useRef(false);
   
@@ -873,15 +828,6 @@ const PersistentWebPlayer: React.FC = () => {
             {/* Playback Controls */}
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleOpenTipModal}
-                disabled={!currentMedia}
-                className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={currentMedia ? 'Send a tip' : 'No media playing'}
-                aria-label="Send a tip"
-              >
-                <Heart className="h-3 w-3 md:h-4 md:w-4" />
-              </button>
-              <button
                   onClick={() => previous()}
                 disabled={currentMediaIndex === 0 || !currentMedia}
                   className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -957,16 +903,16 @@ const PersistentWebPlayer: React.FC = () => {
               </div>
             </div>
 
-              {/* YouTube Fullscreen Button */}
-              {playerType === 'youtube' && (
-                <button 
-                  onClick={openYouTubeFullscreen}
-                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-white text-gray-900 hover:bg-purple-50"
-                  title="Open YouTube Fullscreen"
-                >
-                  <Maximize className="h-3 w-3 md:h-4 md:w-4" />
-                </button>
-              )}
+              {/* Tip Button */}
+              <button
+                onClick={handleOpenTipModal}
+                disabled={!currentMedia}
+                className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={currentMedia ? 'Send a tip' : 'No media playing'}
+                aria-label="Send a tip"
+              >
+                <Heart className="h-3 w-3 md:h-4 md:w-4" />
+              </button>
           </div>
         </div>
 
