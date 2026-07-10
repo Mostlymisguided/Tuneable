@@ -1600,16 +1600,33 @@ const TuneProfile: React.FC = () => {
     toast.success(`Now playing: ${media.title}`);
   };
 
-  const handlePlayRecommendedMedia = (item: RecommendedMediaItem) => {
-    if (!item) return;
+  const formatRecommendedForPlayer = (item: RecommendedMediaItem) => ({
+    id: item._id || item.uuid,
+    _id: item._id,
+    title: item.title,
+    artist: item.artist,
+    duration: item.duration || 0,
+    coverArt: item.coverArt || DEFAULT_COVER_ART,
+    sources: item.sources || {},
+    globalMediaAggregate: item.globalMediaAggregate || 0,
+    bids: [],
+    addedBy: null,
+    totalBidValue: item.globalMediaAggregate || 0,
+  });
 
+  const isRecommendedPlayable = (item: RecommendedMediaItem) => {
     const enriched = enrichMediaWithPlayability({
       sources: item.sources || {},
       contentForm: item.contentForm,
       contentType: item.contentType,
     } as any);
+    return isMediaPlayable(enriched);
+  };
 
-    if (!isMediaPlayable(enriched)) {
+  const handlePlayRecommendedMedia = (item: RecommendedMediaItem) => {
+    if (!item) return;
+
+    if (!isRecommendedPlayable(item)) {
       toast.info('This track is not playable yet — opening the tune page instead.');
       navigate(`/tune/${item._id || item.uuid}`);
       return;
@@ -1617,19 +1634,7 @@ const TuneProfile: React.FC = () => {
 
     usePodcastPlayerStore.getState().clear();
 
-    const playableItem = {
-      id: item._id || item.uuid,
-      _id: item._id,
-      title: item.title,
-      artist: item.artist,
-      duration: item.duration || 0,
-      coverArt: item.coverArt || DEFAULT_COVER_ART,
-      sources: item.sources || {},
-      globalMediaAggregate: item.globalMediaAggregate || 0,
-      bids: [],
-      addedBy: null,
-      totalBidValue: item.globalMediaAggregate || 0,
-    };
+    const playableItem = formatRecommendedForPlayer(item);
 
     setQueue([playableItem as any]);
     setCurrentMedia(playableItem as any, 0);
@@ -1637,6 +1642,25 @@ const TuneProfile: React.FC = () => {
     setGlobalPlayerActive(true);
     setCurrentPartyId(null);
     toast.success(`Now playing: ${item.title}`);
+  };
+
+  const handlePlayRelatedTunes = () => {
+    const playableItems = relatedMedia.filter(isRecommendedPlayable);
+
+    if (playableItems.length === 0) {
+      toast.info('No playable related tunes yet.');
+      return;
+    }
+
+    usePodcastPlayerStore.getState().clear();
+
+    const queue = playableItems.map(formatRecommendedForPlayer);
+    setQueue(queue as any);
+    setCurrentMedia(queue[0] as any, 0);
+    play();
+    setGlobalPlayerActive(true);
+    setCurrentPartyId(null);
+    toast.success(`Now playing: ${queue[0].title}`);
   };
 
   const defaultTipAmount = useMemo(() => {
@@ -2474,6 +2498,17 @@ const TuneProfile: React.FC = () => {
                 <Music className="h-5 w-5 text-cyan-300" />
                 Related Tunes
               </h2>
+              {!isLoadingRelatedPlaylists && relatedMedia.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handlePlayRelatedTunes}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
+                  aria-label="Play related tunes"
+                >
+                  <Play className="h-4 w-4" fill="currentColor" />
+                  Play
+                </button>
+              )}
             </div>
             <div className="card bg-black/20 rounded-lg p-4">
               {isLoadingRelatedPlaylists ? (
