@@ -25,9 +25,10 @@ import {
   Award,
   Plus,
   Minus,
-  Gift
+  Gift,
+  Undo2
 } from 'lucide-react';
-import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI } from '../lib/api';
+import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
@@ -187,7 +188,7 @@ const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user: currentUser, token: authToken, handleOAuthCallback } = useAuth();
+  const { user: currentUser, token: authToken, handleOAuthCallback, updateBalance } = useAuth();
   
   // Web player store for playing media
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
@@ -208,6 +209,9 @@ const UserProfile: React.FC = () => {
     limit: 50
   });
   const [tipHistoryPagination, setTipHistoryPagination] = useState<any>(null);
+  const [tipActionTip, setTipActionTip] = useState<any | null>(null);
+  const [tipRefundReason, setTipRefundReason] = useState('');
+  const [isProcessingTipAction, setIsProcessingTipAction] = useState(false);
 
   const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueueItem[]>([]);
   const [isLoadingPlaybackQueue, setIsLoadingPlaybackQueue] = useState(false);
@@ -429,6 +433,97 @@ const UserProfile: React.FC = () => {
       toast.error('Failed to load tip history');
     } finally {
       setIsLoadingTipHistory(false);
+    }
+  };
+
+  const INSTANT_TIP_REMOVAL_WINDOW_MS = 10 * 60 * 1000;
+
+  const getTipPartyId = (tip: any): string | null => {
+    return tip?.party?._id || tip?.party?.uuid || tip?.partyId || null;
+  };
+
+  const getTipActionFlags = (tip: any) => {
+    const isActive = (tip?.status || 'active') === 'active';
+    const hasPendingRefund = Boolean(tip?.refundRequestedAt);
+    if (!isActive || hasPendingRefund || !tip?.createdAt) {
+      return { canRemoveInstantly: false, canRequestRefund: false, hasPendingRefund };
+    }
+    const withinWindow = Date.now() - new Date(tip.createdAt).getTime() <= INSTANT_TIP_REMOVAL_WINDOW_MS;
+    return {
+      canRemoveInstantly: withinWindow,
+      canRequestRefund: !withinWindow,
+      hasPendingRefund,
+    };
+  };
+
+  const closeTipActionModal = () => {
+    setTipActionTip(null);
+    setTipRefundReason('');
+    setIsProcessingTipAction(false);
+  };
+
+  const handleRemoveTipFromHistory = async () => {
+    if (!tipActionTip?._id) return;
+    const partyId = getTipPartyId(tipActionTip);
+    if (!partyId) {
+      toast.error('Unable to remove tip: missing party reference');
+      return;
+    }
+
+    try {
+      setIsProcessingTipAction(true);
+      const response = await partyAPI.removeTip(partyId, tipActionTip._id);
+      toast.success(`Tip of ${penceToPounds(tipActionTip.amount || 0)} removed and refunded to your wallet`);
+      if (updateBalance && response.newBalance !== undefined) {
+        updateBalance(response.newBalance);
+      }
+      closeTipActionModal();
+      await loadTipHistory();
+      // Library is derived from active tips — refresh quietly in the background
+      if (isOwnProfile && userId) {
+        userAPI.getTuneLibrary()
+          .then((data) => setTuneLibrary(data.library || []))
+          .catch(() => {});
+      }
+    } catch (error: any) {
+      console.error('Error removing tip:', error);
+      if (error.response?.data?.useRefundRequest) {
+        toast.error('Instant removal window has expired. Please request a refund instead.');
+        return;
+      }
+      toast.error(error.response?.data?.error || 'Failed to remove tip');
+    } finally {
+      setIsProcessingTipAction(false);
+    }
+  };
+
+  const handleRequestRefundFromHistory = async () => {
+    if (!tipActionTip?._id) return;
+    if (!tipRefundReason.trim()) {
+      toast.error('Please provide a reason for the refund request');
+      return;
+    }
+    const partyId = getTipPartyId(tipActionTip);
+    if (!partyId) {
+      toast.error('Unable to request refund: missing party reference');
+      return;
+    }
+
+    try {
+      setIsProcessingTipAction(true);
+      await partyAPI.requestRefund(partyId, tipActionTip._id, tipRefundReason.trim());
+      toast.success('Refund request submitted. You will be notified when it is processed.');
+      closeTipActionModal();
+      await loadTipHistory();
+    } catch (error: any) {
+      console.error('Error requesting refund:', error);
+      if (error.response?.data?.useInstantRemove) {
+        toast.error('You can still remove this tip instantly. Use Undo tip instead.');
+        return;
+      }
+      toast.error(error.response?.data?.error || 'Failed to request refund');
+    } finally {
+      setIsProcessingTipAction(false);
     }
   };
 
@@ -2630,7 +2725,21 @@ const UserProfile: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {tipHistory.map((tip: any) => (
+                {tipHistory.map((tip: any) => {
+                  const { canRemoveInstantly, canRequestRefund, hasPendingRefund } = getTipActionFlags(tip);
+                  const statusLabel =
+                    tip.status === 'refunded' ? 'refunded' :
+                    tip.status === 'vetoed' ? 'vetoed' :
+                    hasPendingRefund ? 'refund pending' :
+                    (tip.status || 'active');
+                  const statusClass =
+                    tip.status === 'active' && !hasPendingRefund ? 'bg-green-600/30 text-green-200' :
+                    tip.status === 'vetoed' ? 'bg-red-600/30 text-red-200' :
+                    tip.status === 'refunded' ? 'bg-gray-600/30 text-gray-200' :
+                    hasPendingRefund ? 'bg-yellow-600/30 text-yellow-200' :
+                    'bg-gray-600/30 text-gray-200';
+
+                  return (
                   <div
                     key={tip._id}
                     className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
@@ -2669,7 +2778,7 @@ const UserProfile: React.FC = () => {
                         )}
                         
                         {/* Party/Scope Info */}
-                        <div className="flex items-center space-x-4 text-xs text-gray-400 mb-2">
+                        <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-2">
                           {tip.party ? (
                             <span
                               className="cursor-pointer hover:text-purple-300 transition-colors"
@@ -2688,12 +2797,8 @@ const UserProfile: React.FC = () => {
                               Initial Tip
                             </span>
                           )}
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            tip.status === 'active' ? 'bg-green-600/30 text-green-200' :
-                            tip.status === 'vetoed' ? 'bg-red-600/30 text-red-200' :
-                            'bg-gray-600/30 text-gray-200'
-                          }`}>
-                            {tip.status || 'active'}
+                          <span className={`px-2 py-0.5 rounded text-xs ${statusClass}`}>
+                            {statusLabel}
                           </span>
                         </div>
                         
@@ -2704,18 +2809,38 @@ const UserProfile: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* Amount */}
-                      <div className="text-right flex-shrink-0">
+                      {/* Amount + actions */}
+                      <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
                         <div className="text-xl font-bold text-green-400">
                           {penceToPounds(tip.amount || 0)}
                         </div>
+                        {tip.status === 'refunded' && (
+                          <div className="text-xs text-gray-400">Refunded to wallet</div>
+                        )}
                         {tip.status === 'vetoed' && (
-                          <div className="text-xs text-red-400 mt-1">Refunded</div>
+                          <div className="text-xs text-red-400">Media vetoed</div>
+                        )}
+                        {hasPendingRefund && tip.status === 'active' && (
+                          <div className="text-xs text-yellow-300">Refund pending review</div>
+                        )}
+                        {(canRemoveInstantly || canRequestRefund) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTipRefundReason('');
+                              setTipActionTip(tip);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-yellow-600/80 hover:bg-yellow-600 text-white transition-colors"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                            {canRemoveInstantly ? 'Undo tip' : 'Request refund'}
+                          </button>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -3881,6 +4006,125 @@ const UserProfile: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Tip history undo / refund modal */}
+      {tipActionTip && (() => {
+        const { canRemoveInstantly, canRequestRefund } = getTipActionFlags(tipActionTip);
+        const tipTitle = tipActionTip.media?.title || tipActionTip.mediaTitle || 'this tip';
+        return (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+            onClick={closeTipActionModal}
+          >
+            <div
+              className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">
+                  {canRemoveInstantly ? 'Undo tip' : 'Request refund'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeTipActionModal}
+                  className="text-gray-400 hover:text-white"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-gray-300 mb-2">
+                Tip of{' '}
+                <span className="font-semibold text-yellow-400">
+                  {penceToPounds(tipActionTip.amount || 0)}
+                </span>
+                {' '}on <span className="text-white">{tipTitle}</span>
+              </p>
+
+              {canRemoveInstantly ? (
+                <>
+                  <p className="text-sm text-gray-400 mb-6">
+                    Within the 10-minute window this refunds instantly to your wallet.
+                    If this was your only tip on the track, it may leave your library.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRemoveTipFromHistory}
+                      disabled={isProcessingTipAction}
+                      className="flex-1 px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isProcessingTipAction ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>Removing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Undo2 className="h-5 w-5" />
+                          <span>Undo tip</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeTipActionModal}
+                      disabled={isProcessingTipAction}
+                      className="px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : canRequestRefund ? (
+                <>
+                  <p className="text-sm text-gray-400 mb-4">
+                    The instant undo window has passed. Submit a refund request for admin review.
+                  </p>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Reason *
+                  </label>
+                  <textarea
+                    value={tipRefundReason}
+                    onChange={(e) => setTipRefundReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-black/40 border border-gray-600 rounded-lg text-white placeholder-gray-500 mb-4"
+                    placeholder="Why are you requesting a refund?"
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRequestRefundFromHistory}
+                      disabled={isProcessingTipAction || !tipRefundReason.trim()}
+                      className="flex-1 px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isProcessingTipAction ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <span>Submit refund request</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeTipActionModal}
+                      disabled={isProcessingTipAction}
+                      className="px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">This tip can no longer be undone from here.</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Social Media Modal */}
       {socialModal.platform && (

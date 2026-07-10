@@ -1590,11 +1590,29 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
     const averageTip = totalTips > 0 ? totalAmount / totalTips : 0;
     const activeTips = allBids.filter(bid => bid.status === 'active').length;
     const vetoedTips = allBids.filter(bid => bid.status === 'vetoed').length;
+    const refundedTips = allBids.filter(bid => bid.status === 'refunded').length;
+    const INSTANT_REMOVAL_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+    const now = Date.now();
     
     // Format response
     const formattedBids = bids.map(bid => {
       const media = bid.mediaId && typeof bid.mediaId === 'object' ? bid.mediaId : null;
       const party = bid.partyId && typeof bid.partyId === 'object' ? bid.partyId : null;
+      const partyIdRaw = party?._id || bid.partyId || null;
+      const createdAtMs = bid.createdAt ? new Date(bid.createdAt).getTime() : 0;
+      const removeWindowExpiresAt = createdAtMs
+        ? new Date(createdAtMs + INSTANT_REMOVAL_WINDOW_MS).toISOString()
+        : null;
+      const isActive = (bid.status || 'active') === 'active';
+      const hasPendingRefundRequest = Boolean(bid.refundRequestedAt);
+      const canRemoveInstantly = isActive
+        && !hasPendingRefundRequest
+        && createdAtMs > 0
+        && (now - createdAtMs) <= INSTANT_REMOVAL_WINDOW_MS;
+      const canRequestRefund = isActive
+        && !hasPendingRefundRequest
+        && createdAtMs > 0
+        && (now - createdAtMs) > INSTANT_REMOVAL_WINDOW_MS;
       
       return {
       _id: bid._id,
@@ -1617,6 +1635,7 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
         tags: media.tags || []
       } : null,
       // Party details
+      partyId: partyIdRaw,
       party: party ? {
         _id: party._id,
         uuid: party.uuid,
@@ -1633,7 +1652,15 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
       // Veto info (if applicable)
       vetoedBy: bid.vetoedBy,
       vetoedReason: bid.vetoedReason,
-      vetoedAt: bid.vetoedAt
+      vetoedAt: bid.vetoedAt,
+      // Refund / remove-window info (for tip history undo UI)
+      refundedAt: bid.refundedAt || null,
+      refundReason: bid.refundReason || null,
+      refundRequestedAt: bid.refundRequestedAt || null,
+      refundRequestReason: bid.refundRequestReason || null,
+      removeWindowExpiresAt,
+      canRemoveInstantly,
+      canRequestRefund,
       };
     });
     
@@ -1653,7 +1680,8 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
         averageTip, // In pence
         averageTipPounds: (averageTip / 100).toFixed(2),
         activeTips,
-        vetoedTips
+        vetoedTips,
+        refundedTips,
       }
     });
   } catch (error) {
