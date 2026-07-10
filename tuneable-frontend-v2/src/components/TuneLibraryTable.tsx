@@ -100,11 +100,11 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
       <table className="min-w-full divide-y divide-gray-700">
         <thead className="bg-gray-800">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+            <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
               Artwork
             </th>
             <th
-              className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
+              className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
               onClick={() => onSort('title')}
             >
               <div className="flex items-center truncate">
@@ -113,7 +113,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
               </div>
             </th>
             <th
-              className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
+              className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors max-w-[220px] w-[220px]"
               onClick={() => onSort('artist')}
             >
               <div className="flex items-center truncate">
@@ -122,7 +122,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
               </div>
             </th>
             <th
-              className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+              className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
               onClick={() => onSort('duration')}
             >
               <div className="flex items-center">
@@ -130,14 +130,14 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                 {getSortIcon('duration')}
               </div>
             </th>
-            <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+            <th className="hidden md:table-cell px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
               Tags
             </th>
-            <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider min-w-[180px]">
+            <th className="hidden lg:table-cell px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider min-w-[180px]">
               Supporters
             </th>
             <th
-              className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+              className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
               onClick={() => onSort('tuneBytesEarned')}
             >
               <div className="flex items-center">
@@ -145,7 +145,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                 {getSortIcon('tuneBytesEarned')}
               </div>
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-14">
+            <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-14">
               &nbsp;
             </th>
           </tr>
@@ -163,7 +163,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
 
             return (
               <tr key={item.mediaId} className="hover:bg-gray-700/50 transition-colors">
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="px-2 md:px-4 py-3 whitespace-nowrap">
                   <div
                     className="relative w-12 h-12 group cursor-pointer"
                     onClick={() => onPlay(item, actualIndex)}
@@ -186,7 +186,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 max-w-[220px] w-[220px]">
+                <td className="px-2 md:px-4 py-3 max-w-[220px] w-[220px]">
                   <button
                     onClick={() => navigate(resolvePath(item))}
                     className="block w-full min-w-0 truncate text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
@@ -200,34 +200,34 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 max-w-[220px] w-[220px]">
+                <td className="px-2 md:px-4 py-3 max-w-[220px] w-[220px]">
                   <div className="min-w-0 truncate text-sm text-gray-300" title={item.artist}>
                     <ClickableArtistDisplay media={item} />
                   </div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="px-2 md:px-4 py-3 whitespace-nowrap">
                   <div className="text-sm text-gray-300">{formatDuration(item.duration)}</div>
                 </td>
-                <td className="hidden md:table-cell px-4 py-3 max-w-[200px]">
+                <td className="hidden md:table-cell px-2 md:px-4 py-3 max-w-[200px]">
                   {tags.length > 0 ? (
                     <TagList tags={tags} mediaId={mediaId} limit={3} linkPath={resolvePath(item)} />
                   ) : (
                     <span className="text-xs text-gray-500">—</span>
                   )}
                 </td>
-                <td className="hidden lg:table-cell px-4 py-3 max-w-[240px]">
+                <td className="hidden lg:table-cell px-2 md:px-4 py-3 max-w-[240px]">
                   {item.bids && item.bids.length > 0 ? (
                     <MiniSupportersBar bids={item.bids} maxVisible={3} scrollable={true} />
                   ) : (
                     <span className="text-xs text-gray-500">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="px-2 md:px-4 py-3 whitespace-nowrap">
                   <div className="text-sm font-semibold text-yellow-400">
                     {item.tuneBytesEarned.toFixed(1)}
                   </div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="px-2 md:px-4 py-3 whitespace-nowrap">
                   {showTipButton && (onTip || onQueue) ? (
                     <div className="flex items-center gap-2">
                       {showQueueButton && onQueue && (
