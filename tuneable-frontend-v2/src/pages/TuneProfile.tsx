@@ -332,6 +332,7 @@ const TuneProfile: React.FC = () => {
   // Cover art upload state
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
+  const [isRemovingCoverArt, setIsRemovingCoverArt] = useState(false);
 
   // Attach audio to catalog entry (awaiting upload)
   const audioFileInputRef = useRef<HTMLInputElement>(null);
@@ -1214,6 +1215,34 @@ const TuneProfile: React.FC = () => {
   // Handle cover art upload button click
   const handleCoverArtUploadClick = () => {
     coverArtFileInputRef.current?.click();
+  };
+
+  const handleRemoveCoverArt = async () => {
+    if (!mediaId) {
+      toast.error('Media ID not found');
+      return;
+    }
+
+    if (!editForm.coverArt || editForm.coverArt === DEFAULT_COVER_ART) {
+      return;
+    }
+
+    if (!window.confirm('Remove cover art and use the default image? This cannot be undone.')) {
+      return;
+    }
+
+    setIsRemovingCoverArt(true);
+    try {
+      const response = await mediaAPI.removeCoverArt(media?._id || mediaId);
+      toast.success('Cover art removed');
+      setEditForm({ ...editForm, coverArt: response.coverArt || DEFAULT_COVER_ART });
+      await fetchMediaProfile();
+    } catch (err: any) {
+      console.error('Error removing cover art:', err);
+      toast.error(err.response?.data?.error || 'Failed to remove cover art');
+    } finally {
+      setIsRemovingCoverArt(false);
+    }
   };
 
   const handleAttachAudioClick = (e: React.MouseEvent, replace = false) => {
@@ -3876,18 +3905,18 @@ const TuneProfile: React.FC = () => {
                 {/* Cover Art URL */}
                 <div>
                   <label className="block text-white font-medium mb-2">Cover Art URL</label>
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       type="url"
                       value={editForm.coverArt}
                       onChange={(e) => setEditForm({ ...editForm, coverArt: e.target.value })}
-                      className="input flex-1"
+                      className="input flex-1 min-w-[200px]"
                       placeholder="https://example.com/cover.jpg"
                     />
                     <button
                       type="button"
                       onClick={handleCoverArtUploadClick}
-                      disabled={isUploadingCoverArt}
+                      disabled={isUploadingCoverArt || isRemovingCoverArt}
                       className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
                     >
                       {isUploadingCoverArt ? (
@@ -3902,19 +3931,52 @@ const TuneProfile: React.FC = () => {
                         </>
                       )}
                     </button>
+                    {editForm.coverArt && editForm.coverArt !== DEFAULT_COVER_ART && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoverArt}
+                        disabled={isRemovingCoverArt || isUploadingCoverArt}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
+                      >
+                        {isRemovingCoverArt ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Removing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            <span>Remove</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                     <input
                       ref={coverArtFileInputRef}
                       type="file"
                       accept="image/*"
                       onChange={handleCoverArtUpload}
                       className="hidden"
-                  />
-                </div>
+                    />
+                  </div>
                   {editForm.coverArt && (
-                    <div className="mt-2 text-sm text-gray-400">
-                      Current: {editForm.coverArt}
+                    <div className="mt-2 flex items-start gap-3">
+                      <img
+                        src={editForm.coverArt}
+                        alt="Cover art preview"
+                        className="w-16 h-16 rounded object-cover border border-gray-600"
+                      />
+                      <p className="text-sm text-gray-400 break-all flex-1">
+                        Current: {editForm.coverArt}
+                        {editForm.coverArt === DEFAULT_COVER_ART && (
+                          <span className="block text-gray-500 mt-1">Using default cover art</span>
+                        )}
+                      </p>
                     </div>
                   )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    Remove cover art if it has rights issues — the tune will use the default fallback image.
+                  </p>
                 </div>
 
                 {canReplaceAudio() && (

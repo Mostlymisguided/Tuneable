@@ -575,6 +575,12 @@ export const mediaAPI = {
     return response.data;
   },
 
+  // Remove cover art and reset to default fallback image
+  removeCoverArt: async (mediaId: string) => {
+    const response = await api.delete(`/media/${mediaId}/cover-art`);
+    return response.data;
+  },
+
   attachUpload: async (
     mediaId: string,
     audioFile: File,

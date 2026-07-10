@@ -2710,6 +2710,69 @@ router.put('/:id/cover-art', authMiddleware, coverArtUploadSingle.single('coverA
   }
 });
 
+// @route   DELETE /api/media/:id/cover-art
+// @desc    Remove cover art and reset to default fallback image
+// @access  Private (Admin or media owner or verified creator)
+router.delete('/:id/cover-art', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid media ID format' });
+    }
+
+    const media = await Media.findById(id);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!canEditMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to edit this media' });
+    }
+
+    const oldCoverArt = media.coverArt;
+    if (oldCoverArt === DEFAULT_COVER_ART) {
+      return res.json({
+        success: true,
+        coverArt: DEFAULT_COVER_ART,
+        message: 'Cover art already using default'
+      });
+    }
+
+    media.coverArt = DEFAULT_COVER_ART;
+
+    if (!media.editHistory) {
+      media.editHistory = [];
+    }
+    media.editHistory.push({
+      editedBy: userId,
+      editedAt: new Date(),
+      changes: [{
+        field: 'coverArt',
+        oldValue: oldCoverArt,
+        newValue: DEFAULT_COVER_ART
+      }]
+    });
+
+    await media.save();
+
+    console.log(`✅ Cover art removed for media ${id}, reset to default`);
+
+    res.json({
+      success: true,
+      coverArt: DEFAULT_COVER_ART,
+      message: 'Cover art removed and reset to default'
+    });
+  } catch (error) {
+    console.error('Error removing cover art:', error);
+    res.status(500).json({
+      error: 'Failed to remove cover art',
+      details: error.message
+    });
+  }
+});
+
 // @route   GET /api/media/:mediaId/comments
 // @desc    Get all comments for a media item
 // @access  Public
