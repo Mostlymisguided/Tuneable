@@ -1288,6 +1288,29 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: List tip refund requests
+  getRefundRequests: async (params?: {
+    status?: 'pending' | 'approved' | 'rejected' | '';
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/users/admin/refunds', { params });
+    return response.data;
+  },
+
+  // Admin: Approve or reject a tip refund request
+  processRefundRequest: async (
+    requestId: string,
+    status: 'approved' | 'rejected',
+    rejectionReason?: string
+  ) => {
+    const response = await api.post(`/users/admin/refunds/${requestId}/process`, {
+      status,
+      rejectionReason,
+    });
+    return response.data;
+  },
+
   // Search users by username or email
   searchUsers: async (params?: {
     search?: string;

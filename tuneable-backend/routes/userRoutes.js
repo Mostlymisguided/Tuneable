@@ -5005,28 +5005,32 @@ router.get('/admin/refunds', authMiddleware, adminMiddleware, async (req, res) =
     const formattedRequests = refundRequests.map(request => ({
       _id: request._id,
       uuid: request.uuid,
-      bidId: request.bidId?._id,
-      userId: request.userId?._id,
-      user: request.userId ? {
+      bidId: request.bidId?._id || request.bidId,
+      userId: request.userId?._id || request.userId,
+      user: request.userId && typeof request.userId === 'object' ? {
         _id: request.userId._id,
-        username: request.userId.username,
+        username: request.userId.username || request.username,
         email: request.userId.email,
         profilePic: request.userId.profilePic,
         uuid: request.userId.uuid
       } : null,
-      partyId: request.partyId?._id,
-      party: request.partyId ? {
+      partyId: request.partyId?._id || request.partyId,
+      party: request.partyId && typeof request.partyId === 'object' ? {
         _id: request.partyId._id,
-        name: request.partyId.name,
+        name: request.partyId.name || request.partyName,
         type: request.partyId.type
       } : null,
-      mediaId: request.mediaId?._id,
-      media: request.mediaId ? {
+      mediaId: request.mediaId?._id || request.mediaId,
+      media: request.mediaId && typeof request.mediaId === 'object' ? {
         _id: request.mediaId._id,
-        title: request.mediaId.title,
-        artist: request.mediaId.artist,
+        title: request.mediaId.title || request.mediaTitle,
+        artist: request.mediaId.artist || request.mediaArtist,
         coverArt: request.mediaId.coverArt
-      } : null,
+      } : (request.mediaTitle ? {
+        title: request.mediaTitle,
+        artist: request.mediaArtist,
+        coverArt: null
+      } : null),
       amount: request.amount,
       amountPounds: request.amount / 100,
       reason: request.reason,
@@ -5035,6 +5039,10 @@ router.get('/admin/refunds', authMiddleware, adminMiddleware, async (req, res) =
       processedBy: request.processedBy,
       processedAt: request.processedAt,
       rejectionReason: request.rejectionReason,
+      username: request.username,
+      mediaTitle: request.mediaTitle,
+      mediaArtist: request.mediaArtist,
+      partyName: request.partyName,
       createdAt: request.createdAt,
       updatedAt: request.updatedAt
     }));

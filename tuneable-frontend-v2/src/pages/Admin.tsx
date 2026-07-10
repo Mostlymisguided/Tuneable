@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Settings, 
   Users, 
@@ -20,7 +20,8 @@ import {
   Building,
   Bell,
   DollarSign,
-  Gift
+  Gift,
+  Undo2
 } from 'lucide-react';
 import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
@@ -57,9 +58,13 @@ interface User {
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    return tab || 'overview';
+  });
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [creatorApplications, setCreatorApplications] = useState<any[]>([]);
@@ -155,9 +160,40 @@ const Admin: React.FC = () => {
   const [payoutMethod, setPayoutMethod] = useState('bank_transfer');
   const [payoutDetails, setPayoutDetails] = useState<Record<string, string>>({});
 
+  // Tip refund request management
+  const [refundRequests, setRefundRequests] = useState<any[]>([]);
+  const [isLoadingRefunds, setIsLoadingRefunds] = useState(false);
+  const [refundStatusFilter, setRefundStatusFilter] = useState<'pending' | 'approved' | 'rejected' | ''>('pending');
+  const [refundPage, setRefundPage] = useState(1);
+  const [refundTotalPages, setRefundTotalPages] = useState(1);
+  const [pendingRefundCount, setPendingRefundCount] = useState(0);
+  const [selectedRefundRequest, setSelectedRefundRequest] = useState<any | null>(null);
+  const [refundAction, setRefundAction] = useState<'approve' | 'reject' | null>(null);
+  const [refundRejectionReason, setRefundRejectionReason] = useState('');
+  const [processingRefund, setProcessingRefund] = useState(false);
+
   useEffect(() => {
     checkAdminStatus();
   }, []);
+
+  // Keep ?tab= in sync for deep links (e.g. /admin?tab=refunds from notifications)
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    const next = new URLSearchParams(searchParams);
+    if (tabId === 'overview') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tabId);
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const checkAdminStatus = async () => {
     try {
@@ -182,6 +218,7 @@ const Admin: React.FC = () => {
         loadAdminSettings();
         loadLabels();
         refreshReportCounts();
+        loadPendingRefundCount();
       } else {
         setIsAdmin(false);
         navigate('/explore');
@@ -862,6 +899,81 @@ const Admin: React.FC = () => {
     }
   }, [activeTab, payoutStatusFilter, isAdmin]);
 
+  const loadPendingRefundCount = async () => {
+    try {
+      const response = await userAPI.getRefundRequests({ status: 'pending', page: 1, limit: 1 });
+      setPendingRefundCount(response.total || 0);
+    } catch (error) {
+      console.error('Error loading pending refund count:', error);
+    }
+  };
+
+  const loadRefunds = async () => {
+    try {
+      setIsLoadingRefunds(true);
+      const response = await userAPI.getRefundRequests({
+        status: refundStatusFilter || undefined,
+        page: refundPage,
+        limit: 20,
+      });
+      setRefundRequests(response.refunds || []);
+      setRefundTotalPages(response.totalPages || 1);
+      if (!refundStatusFilter || refundStatusFilter === 'pending') {
+        setPendingRefundCount(response.total || 0);
+      } else {
+        loadPendingRefundCount();
+      }
+    } catch (error: any) {
+      console.error('Error loading refund requests:', error);
+      toast.error(error.response?.data?.error || 'Failed to load refund requests');
+      setRefundRequests([]);
+    } finally {
+      setIsLoadingRefunds(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'refunds' && isAdmin) {
+      loadRefunds();
+    }
+  }, [activeTab, refundStatusFilter, refundPage, isAdmin]);
+
+  const closeRefundModal = () => {
+    setSelectedRefundRequest(null);
+    setRefundAction(null);
+    setRefundRejectionReason('');
+  };
+
+  const handleProcessRefund = async () => {
+    if (!selectedRefundRequest?._id || !refundAction) return;
+    if (refundAction === 'reject' && !refundRejectionReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+
+    try {
+      setProcessingRefund(true);
+      await userAPI.processRefundRequest(
+        selectedRefundRequest._id,
+        refundAction === 'approve' ? 'approved' : 'rejected',
+        refundAction === 'reject' ? refundRejectionReason.trim() : undefined
+      );
+      toast.success(
+        refundAction === 'approve'
+          ? 'Refund approved — tip amount returned to user wallet'
+          : 'Refund request rejected'
+      );
+      closeRefundModal();
+      await loadRefunds();
+      await loadPendingRefundCount();
+    } catch (error: any) {
+      console.error('Error processing refund:', error);
+      toast.error(error.response?.data?.error || 'Failed to process refund request');
+    } finally {
+      setProcessingRefund(false);
+    }
+  };
+
   const handleProcessPayout = async (requestId: string, status: 'completed' | 'rejected') => {
     try {
       setProcessingPayout(true);
@@ -951,6 +1063,7 @@ const Admin: React.FC = () => {
     { id: 'bids-media-vetoes', name: 'Bids Media Vetoes', icon: DollarSign },
     { id: 'reports', name: 'Reports Apps Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
+    { id: 'refunds', name: 'Tip Refunds', icon: Undo2, hasNotification: pendingRefundCount > 0 },
     { id: 'ledger', name: 'Ledger', icon: Database },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -996,7 +1109,7 @@ const Admin: React.FC = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? 'border-purple-500 text-purple-400'
@@ -3731,6 +3844,287 @@ const Admin: React.FC = () => {
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {processingPayout ? 'Processing...' : payoutAction === 'complete' ? 'Complete Payout' : 'Reject Payout'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'refunds' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+              <div className="flex items-center">
+                <Undo2 className="h-8 w-8 text-yellow-400 mr-3" />
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Tip Refund Requests</h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Review user tip undo requests outside the 10-minute instant window
+                    {pendingRefundCount > 0 && (
+                      <span className="ml-2 text-yellow-400">· {pendingRefundCount} pending</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <select
+                  value={refundStatusFilter}
+                  onChange={(e) => {
+                    setRefundPage(1);
+                    setRefundStatusFilter(e.target.value as any);
+                  }}
+                  className="bg-gray-800 text-white border border-gray-600 rounded-lg px-4 py-2"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="">All</option>
+                </select>
+                <button
+                  onClick={loadRefunds}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {isLoadingRefunds ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+              </div>
+            ) : refundRequests.length === 0 ? (
+              <div className="bg-gray-800 rounded-lg p-8 text-center">
+                <p className="text-gray-400">No refund requests found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {refundRequests.map((request) => {
+                  const mediaTitle = request.media?.title || 'Unknown media';
+                  const username = request.user?.username || 'Unknown user';
+                  const partyLabel = request.party?.type === 'global'
+                    ? 'Global'
+                    : (request.party?.name || 'Party');
+
+                  return (
+                    <div
+                      key={request._id}
+                      className="bg-gray-800 rounded-lg p-6 border border-gray-700"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center flex-wrap gap-3 mb-3">
+                            {request.media?.coverArt && (
+                              <img
+                                src={request.media.coverArt}
+                                alt={mediaTitle}
+                                className="w-12 h-12 rounded object-cover flex-shrink-0"
+                              />
+                            )}
+                            <div>
+                              <h3 className="text-lg font-semibold text-white">{mediaTitle}</h3>
+                              <p className="text-sm text-gray-400">
+                                {request.media?.artist
+                                  ? (Array.isArray(request.media.artist)
+                                    ? request.media.artist.join(', ')
+                                    : request.media.artist)
+                                  : 'Unknown artist'}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              request.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                              request.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {String(request.status || '').toUpperCase()}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-400">Amount</p>
+                              <p className="text-white font-semibold">
+                                {penceToPounds(request.amount || 0)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-400">User</p>
+                              <p className="text-white">{username}</p>
+                              {request.user?.email && (
+                                <p className="text-xs text-gray-500">{request.user.email}</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-gray-400">Party / Scope</p>
+                              <p className="text-white">{partyLabel}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-400">Requested</p>
+                              <p className="text-white">
+                                {request.requestedAt
+                                  ? new Date(request.requestedAt).toLocaleString()
+                                  : '—'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-400 mb-1">User reason</p>
+                            <p className="text-gray-200 bg-gray-900 rounded p-3 text-sm">
+                              {request.reason || '—'}
+                            </p>
+                          </div>
+
+                          {request.status === 'rejected' && request.rejectionReason && (
+                            <div className="mt-3">
+                              <p className="text-sm text-red-400 mb-1">Rejection reason</p>
+                              <p className="text-gray-300 text-sm">{request.rejectionReason}</p>
+                            </div>
+                          )}
+
+                          {request.processedAt && (
+                            <div className="mt-3 text-sm text-gray-400">
+                              Processed {new Date(request.processedAt).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+
+                        {request.status === 'pending' && (
+                          <div className="flex flex-col space-y-2 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedRefundRequest(request);
+                                setRefundAction('approve');
+                                setRefundRejectionReason('');
+                              }}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm flex items-center justify-center gap-1.5"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedRefundRequest(request);
+                                setRefundAction('reject');
+                                setRefundRejectionReason('');
+                              }}
+                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm flex items-center justify-center gap-1.5"
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {refundTotalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setRefundPage((p) => Math.max(1, p - 1))}
+                  disabled={refundPage === 1}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-gray-400">
+                  Page {refundPage} of {refundTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRefundPage((p) => Math.min(refundTotalPages, p + 1))}
+                  disabled={refundPage >= refundTotalPages}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            {selectedRefundRequest && refundAction && (
+              <div
+                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                onClick={closeRefundModal}
+              >
+                <div
+                  className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-700"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="text-xl font-bold text-white mb-4">
+                    {refundAction === 'approve' ? 'Approve Refund' : 'Reject Refund'}
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">User</p>
+                      <p className="text-white">{selectedRefundRequest.user?.username || 'Unknown'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">Media</p>
+                      <p className="text-white">{selectedRefundRequest.media?.title || 'Unknown'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">Amount</p>
+                      <p className="text-white font-semibold">
+                        {penceToPounds(selectedRefundRequest.amount || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">User reason</p>
+                      <p className="text-gray-300 text-sm bg-gray-900 rounded p-2">
+                        {selectedRefundRequest.reason || '—'}
+                      </p>
+                    </div>
+                    {refundAction === 'approve' ? (
+                      <p className="text-sm text-gray-400">
+                        This will refund the tip to the user&apos;s wallet and mark the bid as refunded.
+                      </p>
+                    ) : (
+                      <div>
+                        <label className="block text-gray-400 text-sm mb-1">Rejection reason *</label>
+                        <textarea
+                          value={refundRejectionReason}
+                          onChange={(e) => setRefundRejectionReason(e.target.value)}
+                          className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-2 h-24"
+                          placeholder="Explain why this refund is being rejected..."
+                        />
+                      </div>
+                    )}
+                    <div className="flex space-x-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeRefundModal}
+                        disabled={processingRefund}
+                        className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleProcessRefund}
+                        disabled={
+                          processingRefund ||
+                          (refundAction === 'reject' && !refundRejectionReason.trim())
+                        }
+                        className={`flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          refundAction === 'approve'
+                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                            : 'bg-red-600 hover:bg-red-700 text-white'
+                        }`}
+                      >
+                        {processingRefund
+                          ? 'Processing...'
+                          : refundAction === 'approve'
+                            ? 'Approve Refund'
+                            : 'Reject Request'}
                       </button>
                     </div>
                   </div>
