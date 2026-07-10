@@ -3,7 +3,6 @@ import { Play, Clock, Heart, Loader } from 'lucide-react';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
-import { penceToPounds } from '../utils/currency';
 
 function formatDuration(duration: number | string | undefined) {
   if (!duration) return '';
@@ -48,7 +47,6 @@ export interface PodcastQueueMediaCardProps {
   isBidding?: boolean;
   isPlayLoading?: boolean;
   canPlay?: boolean;
-  canTip?: boolean;
   tipLabel?: string;
   onEpisodeClick: (episode: PodcastEpisodeCardData) => void;
   onSeriesClick?: (episode: PodcastEpisodeCardData, e: React.MouseEvent) => void;
@@ -63,8 +61,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   isBidding = false,
   isPlayLoading = false,
   canPlay = false,
-  canTip = false,
-  tipLabel = 'Tip',
+  tipLabel = 'Send a tip',
   onEpisodeClick,
   onSeriesClick,
   onPlay,
@@ -83,7 +80,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
     </div>
   ) : null;
 
-  const tipButton = canTip ? (
+  const tipButton = (
     <button
       type="button"
       onClick={(e) => onTip(episode, e)}
@@ -98,7 +95,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
         <Heart className="h-5 w-5 md:h-6 md:w-6 transition-transform group-hover:scale-110" />
       )}
     </button>
-  ) : null;
+  );
 
   return (
     <div className="flex items-stretch gap-1.5 md:contents">
@@ -165,10 +162,15 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
                 {seriesTitle}
               </p>
             )}
-            {(episode.globalMediaAggregate ?? 0) > 0 && (
-              <p className="text-purple-300 text-[10px] md:text-xs mt-0.5">
-                {penceToPounds(episode.globalMediaAggregate || 0)} tipped
-              </p>
+            {tags.length > 0 && (
+              <div className="mt-0.5">
+                <TagList
+                  tags={tags}
+                  mediaId={mediaId ?? ''}
+                  limit={5}
+                  linkPath={mediaId ? `/podcasts/${mediaId}` : undefined}
+                />
+              </div>
             )}
             {episode.isExternal && episode.source && (
               <span
@@ -183,29 +185,16 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
                 {episode.source}
               </span>
             )}
-            {tags.length > 0 && (
-              <div className="hidden md:block mt-1">
-                <TagList tags={tags} mediaId={mediaId ?? ''} limit={5} />
-              </div>
-            )}
           </div>
         </div>
-
-        {tags.length > 0 && (
-          <div className="md:hidden mt-1">
-            <TagList tags={tags} mediaId={mediaId ?? ''} limit={3} />
-          </div>
-        )}
 
         <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
           <MiniSupportersBar bids={episode.bids || []} maxVisible={5} scrollable={true} />
         </div>
 
-        {tipButton && (
-          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
-            {tipButton}
-          </div>
-        )}
+        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
+          {tipButton}
+        </div>
       </div>
     </div>
   );

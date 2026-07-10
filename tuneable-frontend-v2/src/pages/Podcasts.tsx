@@ -1528,8 +1528,7 @@ const Podcasts: React.FC = () => {
                   isBidding={isPlacingBid && selectedEpisode?.title === episode.title}
                   isPlayLoading={!!fetchingPlayId && fetchingPlayId === epId}
                   canPlay={canPlayEpisode(episode)}
-                  canTip={!!user}
-                  tipLabel={isExternal ? 'Add & Tip' : 'Tip'}
+                  tipLabel={isExternal ? 'Add & Tip' : 'Send a tip'}
                   onEpisodeClick={(ep) => handleEpisodeClick(ep as PodcastEpisode)}
                   onSeriesClick={(ep, e) => handleSeriesClick(ep as PodcastEpisode, e)}
                   onPlay={(ep, e) => handleQueuePlay(ep as PodcastEpisode, e)}
