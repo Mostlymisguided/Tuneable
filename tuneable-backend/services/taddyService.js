@@ -119,6 +119,8 @@ class TaddyService {
                   imageUrl
                   language
                   rssUrl
+                  genres
+                  authorName
                 }
               }
               responseDetails {
@@ -243,6 +245,8 @@ class TaddyService {
             getPodcastSeries(uuid: $uuid) {
               uuid
               name
+              genres
+              authorName
               episodes {
                 uuid
                 name
@@ -259,6 +263,8 @@ class TaddyService {
                   imageUrl
                   language
                   rssUrl
+                  genres
+                  authorName
                 }
               }
             }
@@ -279,6 +285,8 @@ class TaddyService {
 
       const seriesData = response.data.data?.getPodcastSeries || null;
       const episodes = seriesData?.episodes || [];
+      const seriesGenres = seriesData?.genres || [];
+      const seriesAuthor = seriesData?.authorName || '';
       // Note: episodeCount is not available in the GraphQL schema, so we use episodes.length
       // Taddy API appears to have a default limit (often 10 episodes)
       const totalEpisodeCount = episodes.length;
@@ -307,7 +315,14 @@ class TaddyService {
       
       // Limit results in code since GraphQL doesn't support limit argument
       // Note: Taddy GraphQL returns all episodes, we just limit here for performance
-      const limitedEpisodes = sortedEpisodes.slice(0, Math.min(maxResults, 500));
+      const limitedEpisodes = sortedEpisodes.slice(0, Math.min(maxResults, 500)).map((episode) => ({
+        ...episode,
+        podcastSeries: {
+          ...(episode.podcastSeries || {}),
+          genres: episode.podcastSeries?.genres?.length ? episode.podcastSeries.genres : seriesGenres,
+          authorName: episode.podcastSeries?.authorName || seriesAuthor
+        }
+      }));
       
       // Return raw episodes - let the adapter handle conversion
       return {
@@ -324,18 +339,92 @@ class TaddyService {
     }
   }
 
+  // Convert Taddy Genre enum values to human-readable tag labels
+  formatTaddyGenre(genre) {
+    if (!genre) return null;
+
+    let raw = String(genre).replace(/^PODCASTSERIES_/, '');
+    if (!raw) return null;
+
+    const topLevelGenres = [
+      'RELIGION_AND_SPIRITUALITY',
+      'HEALTH_AND_FITNESS',
+      'KIDS_AND_FAMILY',
+      'SOCIETY_AND_CULTURE',
+      'TV_AND_FILM',
+      'TRUE_CRIME',
+      'TECHNOLOGY',
+      'GOVERNMENT',
+      'EDUCATION',
+      'BUSINESS',
+      'COMEDY',
+      'FICTION',
+      'HISTORY',
+      'LEISURE',
+      'SCIENCE',
+      'SPORTS',
+      'ARTS',
+      'MUSIC',
+      'NEWS'
+    ].sort((a, b) => b.length - a.length);
+
+    for (const parent of topLevelGenres) {
+      if (raw.startsWith(`${parent}_`)) {
+        raw = raw.slice(parent.length + 1);
+        break;
+      }
+    }
+
+    return raw
+      .split('_')
+      .map((word) => {
+        if (word === 'AND') return '&';
+        return word.charAt(0) + word.slice(1).toLowerCase();
+      })
+      .join(' ')
+      .replace(/\s&\s/g, ' & ');
+  }
+
+  formatTaddyGenres(genres = []) {
+    if (!Array.isArray(genres)) return [];
+
+    const seen = new Set();
+    const tags = [];
+
+    for (const genre of genres) {
+      const label = this.formatTaddyGenre(genre);
+      if (!label) continue;
+
+      const key = label.toLowerCase();
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      tags.push(label);
+    }
+
+    return tags;
+  }
+
+  extractTaddyTags(taddyEpisode) {
+    const series = taddyEpisode?.podcastSeries || {};
+    const genres = series.genres?.length ? series.genres : (series.categories || []);
+    return this.formatTaddyGenres(genres);
+  }
+
   // Convert Taddy podcast to our format
   convertPodcastToOurFormat(taddyPodcast) {
+    const tags = this.formatTaddyGenres(taddyPodcast.genres?.length ? taddyPodcast.genres : (taddyPodcast.categories || []));
+
     return {
       title: taddyPodcast.name || 'Unknown Podcast',
       description: taddyPodcast.description || '',
-      author: taddyPodcast.author || '',
+      author: taddyPodcast.author || taddyPodcast.authorName || '',
       image: taddyPodcast.imageUrl || null,
-      categories: taddyPodcast.categories || [],
+      categories: tags,
       language: taddyPodcast.language || 'en',
       rssUrl: taddyPodcast.rssUrl || '',
       taddyUuid: taddyPodcast.uuid,
-      genre: taddyPodcast.categories?.[0] || '',
+      genre: tags[0] || '',
       releaseDate: taddyPodcast.dateCreated ? new Date(taddyPodcast.dateCreated) : null,
       trackCount: taddyPodcast.episodeCount || 0,
       lastUpdate: taddyPodcast.lastUpdated ? new Date(taddyPodcast.lastUpdated) : null
@@ -371,6 +460,8 @@ class TaddyService {
       }
     }
     
+    const tags = this.extractTaddyTags(taddyEpisode);
+
     return {
       title: taddyEpisode.name || 'Untitled Episode',
       description: taddyEpisode.description || '',
@@ -378,8 +469,8 @@ class TaddyService {
       podcastTitle: taddyEpisode.podcastSeries?.name || 'Unknown Podcast',
       podcastId: taddyEpisode.podcastSeries?.uuid || '',
       podcastImage: taddyEpisode.podcastSeries?.imageUrl || null,
-      podcastAuthor: '', // Not available in current schema
-      podcastCategory: '', // Not available in current schema
+      podcastAuthor: taddyEpisode.podcastSeries?.authorName || '',
+      podcastCategory: tags[0] || '',
       episodeNumber: taddyEpisode.episodeNumber || null,
       seasonNumber: taddyEpisode.seasonNumber || null,
       duration: taddyEpisode.duration || 0,
@@ -392,7 +483,8 @@ class TaddyService {
       guid: taddyEpisode.uuid,
       rssUrl: taddyEpisode.podcastSeries?.rssUrl || '',
       source: 'taddy',
-      tags: [], // Categories not available in current schema
+      tags,
+      genres: tags,
       language: taddyEpisode.podcastSeries?.language || 'en',
       playCount: 0,
       popularity: 0,
