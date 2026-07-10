@@ -827,9 +827,9 @@ async function fetchTuneLibraryForUser(user) {
       return { library: [], total: 0 };
     }
     
-    // Fetch media details (include contentForm to distinguish music vs podcast)
+    // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm globalMediaAggregate uuid _id tags contentForm')
+      .select('title artist coverArt duration bpm globalMediaAggregate uuid _id tags contentForm sources')
       .lean();
     
     // Create media lookup
@@ -943,7 +943,7 @@ async function fetchTuneLibraryForUser(user) {
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        let title, artist, coverArt, duration, bpm, tags, globalMediaAggregate, mediaUuid, contentForm;
+        let title, artist, coverArt, duration, bpm, tags, globalMediaAggregate, mediaUuid, contentForm, sources;
 
         if (media) {
           let artistName = 'Unknown Artist';
@@ -961,6 +961,7 @@ async function fetchTuneLibraryForUser(user) {
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
           contentForm = media.contentForm || [];
+          sources = media.sources || {};
         } else {
           // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
           console.warn('Media not found for mediaId:', aggregate.mediaId, '- using bid denormalized data');
@@ -973,6 +974,7 @@ async function fetchTuneLibraryForUser(user) {
           globalMediaAggregate = aggregate.userBidTotal || 0; // Best we have without Media
           mediaUuid = aggregate.mediaId;
           contentForm = [];
+          sources = {};
         }
 
         try {
@@ -991,6 +993,7 @@ async function fetchTuneLibraryForUser(user) {
             bpm,
             tags,
             contentForm: contentForm || [],
+            sources,
             globalMediaAggregate,
             globalMediaAggregateAvg,
             globalUserMediaAggregate: aggregate.userBidTotal || 0,

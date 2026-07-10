@@ -20,6 +20,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import { normalizeSources } from '../utils/mediaPlayability';
 
 interface SearchResult {
   _id?: string;
@@ -515,48 +516,26 @@ Join here: ${inviteLink}`.trim();
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = async (item: LibraryItem, index: number) => {
+  const handlePlay = (item: LibraryItem, index: number) => {
     try {
-      // Use sorted library to maintain the order the user sees
+      // Use sorted library to maintain the order the user sees.
+      // Sources come from the library payload — no per-track profile fetches.
       const sortedLibrary = getSortedLibrary();
-      
-      // Fetch all media details for the entire library to create the queue
-      const allMediaPromises = sortedLibrary.map(async (libItem) => {
-        const mediaId = libItem.mediaUuid || libItem.mediaId;
-        const mediaData = await mediaAPI.getProfile(mediaId);
-        const media = mediaData.media || mediaData;
-        
-        // Format sources
-        let sources: any = {};
-        if (media.sources) {
-          if (Array.isArray(media.sources)) {
-            for (const source of media.sources) {
-              if (source?.platform === 'youtube' && source?.url) {
-                sources.youtube = source.url;
-              }
-            }
-          } else if (typeof media.sources === 'object') {
-            sources = media.sources;
-          }
-        }
-        
-        return {
-          id: libItem.mediaUuid || libItem.mediaId,
-          _id: libItem.mediaId,
-          title: libItem.title,
-          artist: libItem.artist,
-          duration: libItem.duration,
-          coverArt: libItem.coverArt,
-          sources: sources,
-          globalMediaAggregate: libItem.globalMediaAggregate,
-          bids: [],
-          addedBy: null,
-          totalBidValue: libItem.globalMediaAggregate
-        } as any;
-      });
-      
-      const allFormattedMedia = await Promise.all(allMediaPromises);
-      
+
+      const allFormattedMedia = sortedLibrary.map((libItem) => ({
+        id: libItem.mediaUuid || libItem.mediaId,
+        _id: libItem.mediaId,
+        title: libItem.title,
+        artist: libItem.artist,
+        duration: libItem.duration,
+        coverArt: libItem.coverArt,
+        sources: normalizeSources(libItem.sources),
+        globalMediaAggregate: libItem.globalMediaAggregate,
+        bids: [],
+        addedBy: null,
+        totalBidValue: libItem.globalMediaAggregate,
+      })) as any[];
+
       // Clear podcast player so PlayerRenderer switches to web player
       usePodcastPlayerStore.getState().clear();
       // Set entire library as queue for auto-transition

@@ -25,6 +25,7 @@ export interface LibraryItem {
   bpm?: number;
   tags?: string[];
   contentForm?: string[];
+  sources?: Record<string, string>;
   globalMediaAggregate: number;
   globalMediaAggregateAvg: number;
   globalUserMediaAggregate: number;

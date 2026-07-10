@@ -1068,39 +1068,27 @@ const UserProfile: React.FC = () => {
   };
 
   // Handle playing media from Tune Library with auto-transition
-  const handlePlayLibrary = async (item: LibraryItem, index: number, list?: LibraryItem[]) => {
+  const handlePlayLibrary = (item: LibraryItem, index: number, list?: LibraryItem[]) => {
     try {
-      // Use provided list or full library to maintain the order the user sees
+      // Use provided list or full library to maintain the order the user sees.
+      // Sources come from the library payload — no per-track profile fetches.
       const sortedLibrary = list ?? getSortedLibrary();
-      
-      // Fetch all media details for the entire library to create the queue
-      const allMediaPromises = sortedLibrary.map(async (libItem) => {
-        const mediaId = libItem.mediaUuid || libItem.mediaId;
-        const mediaData = await mediaAPI.getProfile(mediaId);
-        const media = mediaData.media || mediaData;
-        
-        // Preserve every source (esp. the `upload` audio the player needs);
-        // previously this only copied `youtube`, so the player had nothing to play.
-        const sources = normalizeSources(media.sources);
-        
-        return {
-          id: libItem.mediaUuid || libItem.mediaId,
-          _id: libItem.mediaId,
-          title: libItem.title,
-          artist: libItem.artist,
-          duration: libItem.duration,
-          coverArt: libItem.coverArt,
-          sources: sources,
-          globalMediaAggregate: libItem.globalMediaAggregate,
-          bids: [],
-          addedBy: null,
-          totalBidValue: libItem.globalMediaAggregate,
-          sourceType: 'library'
-        } as any;
-      });
-      
-      const allFormattedMedia = await Promise.all(allMediaPromises);
-      
+
+      const allFormattedMedia = sortedLibrary.map((libItem) => ({
+        id: libItem.mediaUuid || libItem.mediaId,
+        _id: libItem.mediaId,
+        title: libItem.title,
+        artist: libItem.artist,
+        duration: libItem.duration,
+        coverArt: libItem.coverArt,
+        sources: normalizeSources(libItem.sources),
+        globalMediaAggregate: libItem.globalMediaAggregate,
+        bids: [],
+        addedBy: null,
+        totalBidValue: libItem.globalMediaAggregate,
+        sourceType: 'library',
+      })) as any[];
+
       // Clear podcast player so PlayerRenderer switches to web player
       usePodcastPlayerStore.getState().clear();
       // Set entire library as queue for auto-transition
@@ -1116,46 +1104,23 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const formatLibraryEpisode = (libItem: LibraryItem, media: any): PodcastPlayerEpisode => {
-    let sources: Record<string, string> = {};
-    if (media.sources) {
-      if (Array.isArray(media.sources)) {
-        for (const source of media.sources) {
-          if (source?.platform && source?.url) {
-            sources[source.platform] = source.url;
-          }
-        }
-      } else if (typeof media.sources === 'object') {
-        sources = media.sources;
-      }
-    }
-
-    return {
-      _id: libItem.mediaId,
-      id: libItem.mediaUuid || libItem.mediaId,
-      title: libItem.title,
-      duration: libItem.duration ?? media.duration,
-      coverArt: libItem.coverArt ?? media.coverArt,
-      podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
-      podcastTitle: libItem.artist,
-      sources,
-      sourceType: 'library',
-    };
-  };
+  const formatLibraryEpisode = (libItem: LibraryItem): PodcastPlayerEpisode => ({
+    _id: libItem.mediaId,
+    id: libItem.mediaUuid || libItem.mediaId,
+    title: libItem.title,
+    duration: libItem.duration,
+    coverArt: libItem.coverArt,
+    podcastTitle: libItem.artist,
+    sources: normalizeSources(libItem.sources),
+    sourceType: 'library',
+  });
 
   // Handle playing episodes from Podcast Library with auto-transition
-  const handlePlayPodcastLibrary = async (item: LibraryItem, index: number, list?: LibraryItem[]) => {
+  const handlePlayPodcastLibrary = (item: LibraryItem, index: number, list?: LibraryItem[]) => {
     try {
       const sortedLibrary = list ?? getSortedPodcastLibrary();
 
-      const allEpisodePromises = sortedLibrary.map(async (libItem) => {
-        const mediaId = libItem.mediaUuid || libItem.mediaId;
-        const mediaData = await mediaAPI.getProfile(mediaId);
-        const media = mediaData.media || mediaData;
-        return formatLibraryEpisode(libItem, media);
-      });
-
-      const allEpisodes = await Promise.all(allEpisodePromises);
+      const allEpisodes = sortedLibrary.map((libItem) => formatLibraryEpisode(libItem));
       const playableEpisodes = allEpisodes.filter((episode) => getEpisodeAudioUrl(episode));
 
       if (playableEpisodes.length === 0) {
@@ -1252,41 +1217,34 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const handlePlayQueueItem = async (item: PlaybackQueueItem) => {
+  const handlePlayQueueItem = (item: PlaybackQueueItem) => {
     try {
       const queueItems = [...playbackQueue];
 
       if (isPodcastQueueItem(item)) {
         const podcastItems = queueItems.filter(isPodcastQueueItem);
-        const episodes = await Promise.all(
-          podcastItems.map(async (queueItem) => {
-            const mediaData = await mediaAPI.getProfile(queueItem.mediaUuid || queueItem.mediaId);
-            const media = mediaData.media || mediaData;
-            return formatLibraryEpisode(
-              {
-                mediaId: queueItem.mediaId,
-                mediaUuid: queueItem.mediaUuid,
-                title: queueItem.title,
-                artist: queueItem.artist,
-                coverArt: queueItem.coverArt,
-                duration: queueItem.duration,
-                contentForm: queueItem.contentForm,
-                tags: queueItem.tags,
-                globalMediaAggregate: 0,
-                globalMediaAggregateAvg: 0,
-                globalUserMediaAggregate: 0,
-                bidCount: 0,
-                tuneBytesEarned: 0,
-                lastBidAt: queueItem.addedAt,
-              },
-              media
-            );
-          })
-        );
+        const episodes = podcastItems.map((queueItem) => ({
+          ...formatLibraryEpisode({
+            mediaId: queueItem.mediaId,
+            mediaUuid: queueItem.mediaUuid,
+            title: queueItem.title,
+            artist: queueItem.artist,
+            coverArt: queueItem.coverArt,
+            duration: queueItem.duration,
+            contentForm: queueItem.contentForm,
+            tags: queueItem.tags,
+            sources: queueItem.sources,
+            globalMediaAggregate: 0,
+            globalMediaAggregateAvg: 0,
+            globalUserMediaAggregate: 0,
+            bidCount: 0,
+            tuneBytesEarned: 0,
+            lastBidAt: queueItem.addedAt,
+          }),
+          sourceType: 'user_queue' as const,
+        }));
 
-        const playableEpisodes = episodes
-          .map((episode) => ({ ...episode, sourceType: 'user_queue' as const }))
-          .filter((episode) => getEpisodeAudioUrl(episode));
+        const playableEpisodes = episodes.filter((episode) => getEpisodeAudioUrl(episode));
 
         const queueIndex = playableEpisodes.findIndex(
           (episode) => (episode._id || episode.id) === item.mediaId
@@ -1310,27 +1268,20 @@ const UserProfile: React.FC = () => {
         playPodcast();
       } else {
         const musicItems = queueItems.filter((queueItem) => !isPodcastQueueItem(queueItem));
-        const allFormattedMedia = await Promise.all(
-          musicItems.map(async (queueItem) => {
-            const mediaData = await mediaAPI.getProfile(queueItem.mediaUuid || queueItem.mediaId);
-            const media = mediaData.media || mediaData;
-
-            return {
-              id: queueItem.mediaUuid || queueItem.mediaId,
-              _id: queueItem.mediaId,
-              title: queueItem.title,
-              artist: queueItem.artist,
-              duration: queueItem.duration ?? media.duration,
-              coverArt: queueItem.coverArt,
-              sources: normalizeSources(media.sources),
-              globalMediaAggregate: 0,
-              bids: [],
-              addedBy: null,
-              totalBidValue: 0,
-              sourceType: 'user_queue' as const,
-            } as any;
-          })
-        );
+        const allFormattedMedia = musicItems.map((queueItem) => ({
+          id: queueItem.mediaUuid || queueItem.mediaId,
+          _id: queueItem.mediaId,
+          title: queueItem.title,
+          artist: queueItem.artist,
+          duration: queueItem.duration,
+          coverArt: queueItem.coverArt,
+          sources: normalizeSources(queueItem.sources),
+          globalMediaAggregate: 0,
+          bids: [],
+          addedBy: null,
+          totalBidValue: 0,
+          sourceType: 'user_queue' as const,
+        })) as any[];
 
         const queueIndex = allFormattedMedia.findIndex(
           (queueItem) => (queueItem._id || queueItem.id) === item.mediaId
