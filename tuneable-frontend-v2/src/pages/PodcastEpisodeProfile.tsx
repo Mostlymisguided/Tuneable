@@ -53,7 +53,6 @@ import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
-import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import DeleteMediaSection from '../components/DeleteMediaSection';
 
 interface Media {
