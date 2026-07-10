@@ -20,6 +20,7 @@ import '../types/youtube'; // Import YouTube types
 import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
@@ -2455,112 +2456,21 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
       {/* Party Header — Variant 2: editorial, quick-picks always visible */}
       {isGlobalParty && headerVariant === 2 && (
-      <div className="text-center px-3 sm:px-6 pt-6 sm:pt-10 pb-3">
-        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
-          The World&apos;s Best Music
-        </p>
-        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
-          Voted From
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowLocationFilter((open) => !open)}
-          className="group"
-        >
-          <h1 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300 drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)] group-hover:from-purple-200 group-hover:to-purple-200 transition-colors">
-            {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Earth'}
-          </h1>
-          <span className="mt-3 inline-flex items-center gap-2 text-xs sm:text-sm text-gray-400 group-hover:text-white transition-colors">
-            <MapPin className="h-3.5 w-3.5 text-purple-400" />
-            {selectedLocation?.placeId ? 'Change location' : 'Choose a location'}
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showLocationFilter ? 'rotate-180' : ''}`} />
-          </span>
-        </button>
-        {!showLocationFilter && locationQuickPicks.length > 0 && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleLocationFilterChange(null)}
-              className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                !selectedLocation?.placeId
-                  ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
-                  : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-              }`}
-            >
-              Earth
-            </button>
-            {locationQuickPicks.map((loc) => {
-              const selected = selectedLocation?.placeId === loc.placeId;
-              return (
-                <button
-                  key={loc.placeId}
-                  type="button"
-                  onClick={() =>
-                    handleLocationFilterChange(selected ? null : countryPickToResolvedLocation(loc))
-                  }
-                  className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                    selected
-                      ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
-                      : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-                  }`}
-                  title={loc.total > 0 ? `${penceToPounds(loc.total)} in tips` : loc.isUser ? 'Your home country' : undefined}
-                >
-                  {loc.country}
-                  {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <GlobalChartLocationHero
+        chartLabel="The World's Best Music"
+        selectedLocation={selectedLocation}
+        showLocationFilter={showLocationFilter}
+        onToggleLocationFilter={() => setShowLocationFilter((open) => !open)}
+        onLocationChange={handleLocationFilterChange}
+        locationQuickPicks={locationQuickPicks}
+        popularLocationsLabel={
+          selectedTimePeriod !== 'all-time'
+            ? formatTimePeriodLabel(selectedTimePeriod).toLowerCase()
+            : undefined
+        }
+      />
       )}
 
-      {/* Location filter panel (global party hero) */}
-      {isGlobalParty && showLocationFilter && headerVariant === 2 && (
-        <div className="max-w-xl mx-auto px-3 sm:px-6 mb-3 text-center">
-          <LocationAutocomplete
-            value={selectedLocation}
-            onChange={handleLocationFilterChange}
-            placeholder="Search city, town, or region…"
-          />
-          {locationQuickPicks.length > 0 && (
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleLocationFilterChange(null)}
-                className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                  !selectedLocation?.placeId
-                    ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
-                    : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-                }`}
-              >
-                Earth
-              </button>
-              {locationQuickPicks.map((loc) => {
-                const selected = selectedLocation?.placeId === loc.placeId;
-                return (
-                  <button
-                    key={loc.placeId}
-                    type="button"
-                    onClick={() =>
-                      handleLocationFilterChange(selected ? null : countryPickToResolvedLocation(loc))
-                    }
-                    className={`rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
-                      selected
-                        ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
-                        : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-                    }`}
-                    title={loc.total > 0 ? `${penceToPounds(loc.total)} in tips` : loc.isUser ? 'Your home country' : undefined}
-                  >
-                    {loc.country}
-                    {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
       {isGlobalParty && showLocationFilter && headerVariant === 1 && (
         <div className="max-w-2xl mx-auto px-3 sm:px-6 mb-3">
           <div className="card p-3 md:p-6">

@@ -366,6 +366,20 @@ function applyResolvedLocation(locationData, existingLocation = null) {
 }
 
 /**
+ * Prefer homeLocation, fall back to secondaryLocation for bid snapshots.
+ */
+function getUserBidLocation(user) {
+  if (!user) return null;
+  if (user.homeLocation?.placeId || user.homeLocation?.city || user.homeLocation?.country) {
+    return user.homeLocation;
+  }
+  if (user.secondaryLocation?.placeId || user.secondaryLocation?.city || user.secondaryLocation?.country) {
+    return user.secondaryLocation;
+  }
+  return user.homeLocation || user.secondaryLocation || null;
+}
+
+/**
  * Snapshot home location onto a Bid for Tunefeed filtering and leaderboard display.
  */
 function getBidLocationSnapshot(homeLocation) {
@@ -400,6 +414,7 @@ module.exports = {
   processLocation,
   mergeLocation,
   applyResolvedLocation,
+  getUserBidLocation,
   getBidLocationSnapshot,
 };
 

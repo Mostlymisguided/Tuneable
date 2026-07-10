@@ -8,7 +8,7 @@ const Bid = require('../models/Bid');
 const Party = require('../models/Party');
 const { isValidObjectId } = require('../utils/validators');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
-const { getBidLocationSnapshot } = require('../utils/locationUtils');
+const { getBidLocationSnapshot, getUserBidLocation } = require('../utils/locationUtils');
 
 const capitalizeTag = (tag) => {
   if (!tag || typeof tag !== 'string') return tag;
@@ -154,7 +154,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     mediaContentType: media.contentType,
     mediaContentForm: media.contentForm,
     mediaDuration: media.duration,
-    ...getBidLocationSnapshot(user.homeLocation),
+    ...getBidLocationSnapshot(getUserBidLocation(user)),
   });
 
   await bid.save();

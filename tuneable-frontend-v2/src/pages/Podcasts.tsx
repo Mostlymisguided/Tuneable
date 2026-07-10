@@ -2,14 +2,13 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
-import { mediaAPI } from '../lib/api';
+import { mediaAPI, locationAPI } from '../lib/api';
 import BidModal from '../components/BidModal';
 import TopSupporters from '../components/TopSupporters';
-import PodcastChartHero from '../components/PodcastChartHero';
+import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import PodcastQueueMediaCard from '../components/PodcastQueueMediaCard';
 import PodcastSeriesStrip from '../components/PodcastSeriesStrip';
 import { 
-  TrendingUp, 
   Clock, 
   Music,
   Search,
@@ -22,15 +21,17 @@ import {
   Twitter,
   Facebook,
   Linkedin,
-  Coins,
   Tag,
   Music2,
-  Upload,
-  Award
+  Upload
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { getCanonicalTag } from '../utils/tagNormalizer';
+import {
+  getCountryPickFromLocation,
+  type ResolvedLocation,
+} from '../utils/locationHelpers';
 
 interface PodcastEpisode {
   _id?: string;
@@ -80,10 +81,14 @@ interface PodcastEpisode {
       username: string;
       profilePic?: string;
       uuid: string;
+      homeLocation?: ResolvedLocation;
+      secondaryLocation?: ResolvedLocation;
     };
     amount: number;
     createdAt: string;
     status?: string;
+    bidderLocationAncestorIds?: string[];
+    bidderLocationDisplay?: string;
   }>;
 }
 
@@ -103,6 +108,23 @@ const TIME_RANGE_OPTIONS = [
 
 function formatTimeRangeLabel(range: string): string {
   return TIME_RANGE_OPTIONS.find((p) => p.key === range)?.label ?? range;
+}
+
+function getTimeRangeStartDate(range: string): Date | null {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  switch (range) {
+    case 'day':
+      return new Date(now - day);
+    case 'week':
+      return new Date(now - 7 * day);
+    case 'month':
+      return new Date(now - 28 * day);
+    case 'year':
+      return new Date(now - 365 * day);
+    default:
+      return null;
+  }
 }
 
 const Podcasts: React.FC = () => {
@@ -126,6 +148,8 @@ const Podcasts: React.FC = () => {
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
+  const [showLocationFilter, setShowLocationFilter] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
   const [visibleEpisodeCount, setVisibleEpisodeCount] = useState(EPISODE_PAGE_SIZE);
   
   // Tag filtering state (for top tags click functionality)
@@ -164,11 +188,6 @@ const Podcasts: React.FC = () => {
   const [copySuccess, setCopySuccess] = useState(false);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Metrics
-  const [totalTips, setTotalTips] = useState(0);
-  const [avgTip, setAvgTip] = useState(0);
-  const [topTip, setTopTip] = useState(0);
-
   // Top Podcast Series
   const [topPodcastSeries, setTopPodcastSeries] = useState<Array<{
     _id: string;
@@ -184,7 +203,7 @@ const Podcasts: React.FC = () => {
   useEffect(() => {
     fetchChart();
     setVisibleEpisodeCount(EPISODE_PAGE_SIZE);
-  }, [filters]);
+  }, [filters, selectedLocation?.placeId]);
 
   // Fetch Spotify connection status when user is logged in
   useEffect(() => {
@@ -245,6 +264,45 @@ const Podcasts: React.FC = () => {
     }
   }, [filters.tag]);
 
+  const locationPlaceIdFromUrl = searchParams.get('location');
+
+  useEffect(() => {
+    if (!locationPlaceIdFromUrl) {
+      setSelectedLocation(null);
+      return;
+    }
+
+    let cancelled = false;
+    locationAPI.resolve(locationPlaceIdFromUrl)
+      .then((response) => {
+        if (!cancelled) {
+          setSelectedLocation(response.location as ResolvedLocation);
+          setShowLocationFilter(true);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to resolve location from URL:', error);
+        if (!cancelled) {
+          setSelectedLocation({ placeId: locationPlaceIdFromUrl, display: locationPlaceIdFromUrl });
+          setShowLocationFilter(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationPlaceIdFromUrl]);
+
+  const handleLocationFilterChange = (location: ResolvedLocation | null) => {
+    setSelectedLocation(location);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (location?.placeId) next.set('location', location.placeId);
+      else next.delete('location');
+      return next;
+    }, { replace: true });
+  };
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
@@ -275,6 +333,9 @@ const Podcasts: React.FC = () => {
       params.append('timeRange', filters.timeRange);
       params.append('sortBy', filters.sortBy);
       params.append('limit', '50');
+      if (selectedLocation?.placeId) {
+        params.append('locationPlaceId', selectedLocation.placeId);
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/chart?${params}`
@@ -288,16 +349,6 @@ const Podcasts: React.FC = () => {
       const episodesList = data.episodes || [];
       setEpisodes(episodesList);
       setAvailableFilters(data.filters || { categories: [], genres: [], tags: [] });
-      
-      // Calculate metrics
-      const total = episodesList.reduce((sum: number, ep: PodcastEpisode) => sum + (ep.globalMediaAggregate || 0), 0);
-      setTotalTips(total);
-      const tipCount = episodesList.reduce((sum: number, ep: PodcastEpisode) => sum + (ep.bids?.length || 0), 0);
-      const avg = tipCount > 0 ? total / tipCount : 0;
-      setAvgTip(avg);
-      const fromBidTop = episodesList.map((ep: PodcastEpisode) => ep.globalMediaBidTop || 0);
-      const fromBids = episodesList.flatMap((ep: PodcastEpisode) => (ep.bids || []).map(b => b.amount));
-      setTopTip(Math.max(0, ...fromBidTop, ...fromBids));
     } catch (error: any) {
       console.error('Error fetching chart:', error);
       toast.error('Failed to load podcast chart');
@@ -1025,10 +1076,6 @@ const Podcasts: React.FC = () => {
     }
   };
 
-  const handleCategoryChange = (category: string) => {
-    setFilters((prev) => ({ ...prev, category }));
-  };
-
   const handleTimeRangeChange = (timeRange: string) => {
     setFilters((prev) => ({ ...prev, timeRange }));
   };
@@ -1099,6 +1146,58 @@ const Podcasts: React.FC = () => {
 
   const displayEpisodes = showSearchResults && searchResults.length > 0 ? searchResults : episodes;
 
+  const topLocations = useMemo(() => {
+    if (displayEpisodes.length === 0) return [] as Array<{ pick: ReturnType<typeof getCountryPickFromLocation>; total: number; count: number }>;
+    const startDate = getTimeRangeStartDate(filters.timeRange);
+    const counts: Record<string, { pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }> = {};
+
+    for (const episode of displayEpisodes) {
+      for (const bid of episode.bids || []) {
+        if (bid.status && bid.status !== 'active') continue;
+        if (startDate) {
+          const created = bid.createdAt ? new Date(bid.createdAt) : null;
+          if (!created || created < startDate) continue;
+        }
+
+        const countryPick = getCountryPickFromLocation(bid.userId?.homeLocation)
+          || getCountryPickFromLocation(bid.userId?.secondaryLocation);
+        if (!countryPick?.placeId) continue;
+
+        const key = countryPick.placeId;
+        const amount = typeof bid.amount === 'number' ? bid.amount : 0;
+        if (!counts[key]) counts[key] = { pick: countryPick, total: 0, count: 0 };
+        counts[key].total += amount;
+        counts[key].count += 1;
+      }
+    }
+
+    return Object.values(counts).sort((a, b) => b.total - a.total || b.count - a.count);
+  }, [displayEpisodes, filters.timeRange]);
+
+  const locationQuickPicks = useMemo((): LocationQuickPick[] => {
+    const maxPicks = isMobile ? 5 : 6;
+    const userPick = getCountryPickFromLocation(user?.homeLocation)
+      || getCountryPickFromLocation(user?.secondaryLocation);
+    const picks: PodcastLocationQuickPick[] = [];
+
+    if (userPick) {
+      const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
+      picks.push({
+        ...userPick,
+        total: userStats?.total ?? 0,
+        isUser: true,
+      });
+    }
+
+    for (const { pick, total } of topLocations) {
+      if (picks.length >= maxPicks) break;
+      if (picks.some((p) => p.placeId === pick.placeId)) continue;
+      picks.push({ ...pick, total, isUser: false });
+    }
+
+    return picks;
+  }, [topLocations, user?.homeLocation, user?.secondaryLocation, isMobile, filters.timeRange]);
+
   // Top Tags cloud (similar to Party page)
   const topTags = useMemo(() => {
     if (displayEpisodes.length === 0) return [] as Array<{ tag: string; total: number; count: number }>;
@@ -1153,15 +1252,18 @@ const Podcasts: React.FC = () => {
       // Add all bids from this episode
       if (episode.bids && Array.isArray(episode.bids)) {
         episode.bids.forEach((b: any) => {
-          // Only include active bids
           if (!b.status || b.status === 'active') {
+            if (selectedLocation?.placeId) {
+              const ancestors = b.bidderLocationAncestorIds || [];
+              if (!ancestors.includes(selectedLocation.placeId)) return;
+            }
             out.push(b);
           }
         });
       }
     }
     return out;
-  }, [displayEpisodes, selectedTagFilters]);
+  }, [displayEpisodes, selectedTagFilters, selectedLocation?.placeId]);
 
   const visibleEpisodes = showSearchResults
     ? displayEpisodes
@@ -1186,50 +1288,17 @@ const Podcasts: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 text-white">
-      <PodcastChartHero
-        categories={availableFilters.categories}
-        selectedCategory={filters.category}
-        onCategoryChange={handleCategoryChange}
+      <GlobalChartLocationHero
+        chartLabel="The World's Best Podcasts"
+        selectedLocation={selectedLocation}
+        showLocationFilter={showLocationFilter}
+        onToggleLocationFilter={() => setShowLocationFilter((open) => !open)}
+        onLocationChange={handleLocationFilterChange}
+        locationQuickPicks={locationQuickPicks}
+        popularLocationsLabel={filters.timeRange !== 'all' ? formatTimeRangeLabel(filters.timeRange).toLowerCase() : undefined}
       />
 
-      {/* Compact metrics */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
-        <div className="grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:justify-center sm:gap-2 mb-3 sm:mb-4 max-w-md sm:max-w-none mx-auto">
-          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-purple-500/40 min-w-0">
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              <div className="p-0.5 sm:p-1 bg-purple-600/30 rounded shrink-0">
-                <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-purple-300" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(totalTips)}</div>
-                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Total Tips</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-green-500/40 min-w-0">
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              <div className="p-0.5 sm:p-1 bg-green-600/30 rounded shrink-0">
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-300" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(avgTip)}</div>
-                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Avg Tip</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-900/80 px-1.5 py-1.5 sm:px-3 sm:py-2 rounded-md border border-yellow-500/40 min-w-0">
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              <div className="p-0.5 sm:p-1 bg-yellow-600/30 rounded shrink-0">
-                <Award className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-300" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs sm:text-lg font-bold text-white leading-tight truncate">{penceToPounds(topTip)}</div>
-                <div className="text-[9px] sm:text-[10px] text-gray-400 truncate leading-tight">Top Tip</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Tag / Time / Search / Share controls */}
         <div className="mb-4 md:mb-6">
           <div className="flex flex-wrap justify-center items-center gap-2">
@@ -1373,8 +1442,12 @@ const Podcasts: React.FC = () => {
               <div className="mt-4 pt-4 border-t border-gray-700/50">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
                   <h4 className="text-sm font-semibold text-white">Top Fans</h4>
-                  {selectedTagFilters.length > 0 ? (
-                    <span className="text-xs text-purple-300">Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</span>
+                  {selectedTagFilters.length > 0 || selectedLocation?.placeId ? (
+                    <span className="text-xs text-purple-300">
+                      {selectedLocation?.placeId && `Tips from ${selectedLocation.display || selectedLocation.city || 'selected location'}`}
+                      {selectedTagFilters.length > 0 && selectedLocation?.placeId && ' · '}
+                      {selectedTagFilters.length > 0 && `Filtered by ${selectedTagFilters.map((t) => `#${t}`).join(', ')}`}
+                    </span>
                   ) : (
                     <span className="text-xs text-gray-400">Showing global support</span>
                   )}
@@ -1412,8 +1485,23 @@ const Podcasts: React.FC = () => {
                   </button>
                 ))}
               </div>
-              {(availableFilters.genres.length > 0 || hasActiveFilters) && (
+              {(availableFilters.categories.length > 0 || availableFilters.genres.length > 0 || hasActiveFilters) && (
                 <div className="mt-4 pt-4 border-t border-gray-700/50 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {availableFilters.categories.length > 0 && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Category</label>
+                      <select
+                        value={filters.category}
+                        onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
+                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 text-sm focus:border-purple-500 focus:outline-none"
+                      >
+                        <option value="">All Categories</option>
+                        {availableFilters.categories.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   {availableFilters.genres.length > 0 && (
                     <div>
                       <label className="block text-xs text-gray-400 mb-1">Genre</label>
@@ -1580,7 +1668,8 @@ const Podcasts: React.FC = () => {
                   isBidding={isPlacingBid && selectedEpisode?.title === episode.title}
                   isPlayLoading={!!fetchingPlayId && fetchingPlayId === epId}
                   canPlay={canPlayEpisode(episode)}
-                  tipLabel={isExternal ? 'Add & Tip' : 'Send a tip'}
+                  canTip={!!user}
+                  tipLabel={isExternal ? 'Add & Tip' : 'Tip'}
                   onEpisodeClick={(ep) => handleEpisodeClick(ep as PodcastEpisode)}
                   onSeriesClick={(ep, e) => handleSeriesClick(ep as PodcastEpisode, e)}
                   onPlay={(ep, e) => handleQueuePlay(ep as PodcastEpisode, e)}

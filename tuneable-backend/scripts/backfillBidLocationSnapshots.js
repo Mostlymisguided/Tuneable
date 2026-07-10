@@ -8,7 +8,7 @@
  *   node scripts/backfillBidLocationSnapshots.js --dry-run
  *   node scripts/backfillBidLocationSnapshots.js --execute
  *   node scripts/backfillBidLocationSnapshots.js --execute --users-only
- *   node scripts/backfillBidLocationSnapshots.js --execute --bids-only
+ *   node scripts/backfillBidLocationSnapshots.js --execute --bids-only --podcasts-only
  *   node scripts/backfillBidLocationSnapshots.js --execute --limit 20 --delay-ms 200
  *
  *   node scripts/backfillBidLocationSnapshots.js --execute --production
@@ -29,12 +29,14 @@ require('dotenv').config({
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Bid = require('../models/Bid');
+const Media = require('../models/Media');
 const { geocodeQuery } = require('../services/mapboxGeocodingService');
-const { applyResolvedLocation, getBidLocationSnapshot } = require('../utils/locationUtils');
+const { applyResolvedLocation, getBidLocationSnapshot, getUserBidLocation } = require('../utils/locationUtils');
 
 const DRY_RUN = !args.includes('--execute');
 const USERS_ONLY = args.includes('--users-only');
 const BIDS_ONLY = args.includes('--bids-only');
+const PODCASTS_ONLY = args.includes('--podcasts-only');
 const LIMIT = (() => {
   const idx = args.indexOf('--limit');
   return idx >= 0 ? parseInt(args[idx + 1], 10) : null;
@@ -85,13 +87,6 @@ function bidMissingLocationQuery() {
   };
 }
 
-function snapshotFromHome(homeLocation) {
-  const snapshot = getBidLocationSnapshot(homeLocation);
-  if (!snapshot.bidderLocationAncestorIds?.length) {
-    return null;
-  }
-  return snapshot;
-}
 
 async function resolveHomeLocation(homeLocation) {
   const query = buildGeocodeQuery(homeLocation);
@@ -107,6 +102,21 @@ async function resolveHomeLocation(homeLocation) {
   return resolved;
 }
 
+function snapshotFromUser(user) {
+  const snapshot = getBidLocationSnapshot(getUserBidLocation(user));
+  if (!snapshot.bidderLocationAncestorIds?.length) {
+    return null;
+  }
+  return snapshot;
+}
+
+async function getPodcastEpisodeMediaIds() {
+  return Media.find({
+    contentType: { $in: ['spoken'] },
+    contentForm: { $in: ['podcastepisode'] },
+  }).distinct('_id');
+}
+
 async function backfillUsers() {
   let userQuery = User.find({
     $and: [
@@ -114,17 +124,50 @@ async function backfillUsers() {
         $or: [
           { 'homeLocation.city': { $exists: true, $nin: [null, ''] } },
           { 'homeLocation.country': { $exists: true, $nin: [null, ''] } },
+          { 'secondaryLocation.city': { $exists: true, $nin: [null, ''] } },
+          { 'secondaryLocation.country': { $exists: true, $nin: [null, ''] } },
         ],
       },
       {
         $or: [
-          { 'homeLocation.placeId': { $exists: false } },
-          { 'homeLocation.placeId': null },
-          { 'homeLocation.placeId': '' },
+          {
+            $and: [
+              {
+                $or: [
+                  { 'homeLocation.city': { $exists: true, $nin: [null, ''] } },
+                  { 'homeLocation.country': { $exists: true, $nin: [null, ''] } },
+                ],
+              },
+              {
+                $or: [
+                  { 'homeLocation.placeId': { $exists: false } },
+                  { 'homeLocation.placeId': null },
+                  { 'homeLocation.placeId': '' },
+                ],
+              },
+            ],
+          },
+          {
+            $and: [
+              {
+                $or: [
+                  { 'secondaryLocation.city': { $exists: true, $nin: [null, ''] } },
+                  { 'secondaryLocation.country': { $exists: true, $nin: [null, ''] } },
+                ],
+              },
+              {
+                $or: [
+                  { 'secondaryLocation.placeId': { $exists: false } },
+                  { 'secondaryLocation.placeId': null },
+                  { 'secondaryLocation.placeId': '' },
+                ],
+              },
+            ],
+          },
         ],
       },
     ],
-  }).select('username homeLocation');
+  }).select('username homeLocation secondaryLocation');
 
   if (LIMIT) {
     userQuery = userQuery.limit(LIMIT);
@@ -139,26 +182,36 @@ async function backfillUsers() {
   let failed = 0;
 
   for (const user of toProcess) {
-    const query = buildGeocodeQuery(user.homeLocation);
-    try {
-      const resolved = await resolveHomeLocation(user.homeLocation);
-      if (!resolved?.placeId) {
-        console.log(`  ⚠️  No Mapbox match for @${user.username}: "${query}"`);
+    let updatedUser = false;
+
+    for (const field of ['homeLocation', 'secondaryLocation']) {
+      const location = user[field];
+      if (!needsMapboxResolve(location)) continue;
+
+      const query = buildGeocodeQuery(location);
+      try {
+        const resolved = await resolveHomeLocation(location);
+        if (!resolved?.placeId) {
+          console.log(`  ⚠️  No Mapbox match for @${user.username} ${field}: "${query}"`);
+          continue;
+        }
+
+        const merged = applyResolvedLocation(resolved, location);
+        console.log(`  ✓ @${user.username} ${field}: "${query}" → ${merged.display || merged.placeId}`);
+
+        if (!DRY_RUN) {
+          user[field] = merged;
+          updatedUser = true;
+        }
+        updated += 1;
+      } catch (error) {
+        console.error(`  ✗ @${user.username} ${field}: "${query}" — ${error.message}`);
         failed += 1;
-        continue;
       }
+    }
 
-      const merged = applyResolvedLocation(resolved, user.homeLocation);
-      console.log(`  ✓ @${user.username}: "${query}" → ${merged.display || merged.placeId}`);
-
-      if (!DRY_RUN) {
-        user.homeLocation = merged;
-        await user.save();
-      }
-      updated += 1;
-    } catch (error) {
-      console.error(`  ✗ @${user.username}: "${query}" — ${error.message}`);
-      failed += 1;
+    if (!DRY_RUN && updatedUser) {
+      await user.save();
     }
   }
 
@@ -167,7 +220,15 @@ async function backfillUsers() {
 }
 
 async function backfillBids() {
-  const userIds = await Bid.distinct('userId', bidMissingLocationQuery());
+  let bidScopeQuery = { ...bidMissingLocationQuery() };
+
+  if (PODCASTS_ONLY) {
+    const podcastMediaIds = await getPodcastEpisodeMediaIds();
+    bidScopeQuery.mediaId = { $in: podcastMediaIds };
+    console.log(`\n🎙️  Scoping to ${podcastMediaIds.length} podcast episode(s)`);
+  }
+
+  const userIds = await Bid.distinct('userId', bidScopeQuery);
   let ids = userIds;
 
   if (LIMIT) {
@@ -181,38 +242,38 @@ async function backfillBids() {
   let usersProcessed = 0;
 
   for (const userId of ids) {
-    const user = await User.findById(userId).select('username homeLocation');
+    const user = await User.findById(userId).select('username homeLocation secondaryLocation');
     if (!user) {
       usersSkipped += 1;
       continue;
     }
 
-    let homeLocation = user.homeLocation;
+    for (const field of ['homeLocation', 'secondaryLocation']) {
+      const location = user[field];
+      if (!needsMapboxResolve(location)) continue;
 
-    if (needsMapboxResolve(homeLocation)) {
       try {
-        const resolved = await resolveHomeLocation(homeLocation);
+        const resolved = await resolveHomeLocation(location);
         if (resolved?.placeId) {
-          homeLocation = applyResolvedLocation(resolved, homeLocation);
+          user[field] = applyResolvedLocation(resolved, location);
           if (!DRY_RUN) {
-            user.homeLocation = homeLocation;
             await user.save();
           }
-          console.log(`  ↳ Geocoded @${user.username} for bid snapshot`);
+          console.log(`  ↳ Geocoded @${user.username} ${field} for bid snapshot`);
         }
       } catch (error) {
-        console.error(`  ✗ Geocode failed for @${user.username}: ${error.message}`);
+        console.error(`  ✗ Geocode failed for @${user.username} ${field}: ${error.message}`);
       }
     }
 
-    const snapshot = snapshotFromHome(homeLocation);
+    const snapshot = snapshotFromUser(user);
     if (!snapshot) {
-      console.log(`  ⚠️  No snapshot for @${user.username} — missing resolved homeLocation`);
+      console.log(`  ⚠️  No snapshot for @${user.username} — missing resolved home/secondary location`);
       usersSkipped += 1;
       continue;
     }
 
-    const matchQuery = { ...bidMissingLocationQuery(), userId: user._id };
+    const matchQuery = { ...bidScopeQuery, userId: user._id };
     const count = await Bid.countDocuments(matchQuery);
 
     if (count === 0) {
@@ -250,6 +311,7 @@ async function main() {
   console.log(DRY_RUN ? '🔍 DRY RUN (pass --execute to apply)' : '🚀 EXECUTE MODE');
   if (useProductionEnv) console.log('   Environment: .env.production');
   if (LIMIT) console.log(`   Limit: ${LIMIT}`);
+  if (PODCASTS_ONLY) console.log('   Scope: podcast episode bids only');
   console.log(`   Mapbox delay: ${DELAY_MS}ms between geocode calls`);
 
   await mongoose.connect(mongoUri);
