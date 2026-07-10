@@ -27,7 +27,9 @@ export interface PodcastEpisodeCardData {
   duration?: number;
   globalMediaAggregate?: number;
   tags?: string[];
-  podcastSeries?: { _id: string; title: string; coverArt?: string };
+  genres?: string[];
+  category?: string;
+  podcastSeries?: { _id: string; title: string; coverArt?: string; genres?: string[]; tags?: string[] };
   podcastTitle?: string;
   isExternal?: boolean;
   source?: 'local' | 'podcastindex' | 'taddy' | 'apple';
@@ -38,6 +40,28 @@ export interface PodcastEpisodeCardData {
     createdAt: string;
     status?: string;
   }>;
+}
+
+/** Category/genre tags first, then tip tags — deduped, same TagList style as global party. */
+function getDisplayTags(episode: PodcastEpisodeCardData): string[] {
+  const candidates = [
+    ...(episode.genres ?? []),
+    ...(episode.podcastSeries?.genres ?? []),
+    ...(episode.category ? [episode.category] : []),
+    ...(episode.tags ?? []),
+    ...(episode.podcastSeries?.tags ?? []),
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of candidates) {
+    const tag = typeof raw === 'string' ? raw.trim() : '';
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+  return out;
 }
 
 export interface PodcastQueueMediaCardProps {
@@ -67,12 +91,13 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   onPlay,
   onTip,
 }) => {
-  const tags = episode.tags ?? [];
+  const tags = getDisplayTags(episode);
   const seriesTitle = episode.podcastSeries?.title || episode.podcastTitle;
   const coverArt =
     episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART;
   const mediaId = episode._id || episode.id;
   const durationLabel = formatDuration(episode.duration);
+  const tagListPath = mediaId ? `/podcasts/${mediaId}` : undefined;
 
   const chartBadge = showRank ? (
     <div className="w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center">
@@ -163,12 +188,12 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
               </p>
             )}
             {tags.length > 0 && (
-              <div className="mt-0.5">
+              <div className="hidden md:block mt-1">
                 <TagList
                   tags={tags}
                   mediaId={mediaId ?? ''}
                   limit={5}
-                  linkPath={mediaId ? `/podcasts/${mediaId}` : undefined}
+                  linkPath={tagListPath}
                 />
               </div>
             )}
@@ -189,6 +214,18 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
             )}
           </div>
         </div>
+
+        {/* Tags — own line on mobile, aligned with supporters bar (same as global party) */}
+        {tags.length > 0 && (
+          <div className="md:hidden mt-1">
+            <TagList
+              tags={tags}
+              mediaId={mediaId ?? ''}
+              limit={3}
+              linkPath={tagListPath}
+            />
+          </div>
+        )}
 
         <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
           <MiniSupportersBar bids={episode.bids || []} maxVisible={5} scrollable={true} />

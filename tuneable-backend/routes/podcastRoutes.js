@@ -1663,7 +1663,7 @@ router.get('/chart', async (req, res) => {
         } else {
           const fetched = await Media.find({ _id: { $in: rankedMediaIds } })
             .populate('addedBy', 'username')
-            .populate('podcastSeries', 'title coverArt')
+            .populate('podcastSeries', 'title coverArt genres tags')
             .populate(populateEpisodeBids)
             .lean();
 
@@ -1726,7 +1726,7 @@ router.get('/chart', async (req, res) => {
         .sort(sortObj)
         .limit(limitNum)
         .populate('addedBy', 'username')
-        .populate('podcastSeries', 'title coverArt')
+        .populate('podcastSeries', 'title coverArt genres tags')
         .populate(populateEpisodeBids)
         .lean();
     }
@@ -1796,8 +1796,8 @@ router.get('/top-episodes', async (req, res) => {
     })
       .sort({ globalMediaAggregate: -1 })
       .limit(limitNum)
-      .populate('podcastSeries', 'title coverArt')
-      .select('_id title coverArt description genres globalMediaAggregate podcastSeries')
+      .populate('podcastSeries', 'title coverArt genres tags')
+      .select('_id title coverArt description genres tags globalMediaAggregate podcastSeries')
       .lean();
 
     res.json({
@@ -3423,7 +3423,7 @@ router.get('/search-episodes', async (req, res) => {
       .skip(offsetNum)
       .limit(limitNum)
       .populate('addedBy', 'username')
-      .populate('podcastSeries', 'title coverArt')
+      .populate('podcastSeries', 'title coverArt genres tags')
       .lean();
     
     // Ensure releaseDate is set - use createdAt as fallback if releaseDate is null

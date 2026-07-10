@@ -50,6 +50,8 @@ interface PodcastEpisode {
     _id: string;
     title: string;
     coverArt?: string;
+    genres?: string[];
+    tags?: string[];
   };
   genres?: string[];
   tags?: string[];
