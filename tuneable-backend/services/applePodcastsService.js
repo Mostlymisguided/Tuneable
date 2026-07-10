@@ -79,12 +79,9 @@ class ApplePodcastsService {
       const episodes = response.data.results || [];
       console.log(`✅ Found ${episodes.length} episodes from Apple Podcasts`);
 
-      // Convert Apple episodes to our format
-      const convertedEpisodes = episodes.map(episode => this.convertEpisodeToOurFormat(episode));
-
       return {
         success: true,
-        episodes: convertedEpisodes,
+        episodes,
         count: episodes.length
       };
     } catch (error) {
@@ -135,10 +132,11 @@ class ApplePodcastsService {
       }
 
       // Filter episodes that match the search query (case-insensitive)
-      const filteredEpisodes = allEpisodes.filter(episode => 
-        episode.title.toLowerCase().includes(query.toLowerCase()) ||
-        episode.podcastTitle.toLowerCase().includes(query.toLowerCase()) ||
-        (episode.description && episode.description.toLowerCase().includes(query.toLowerCase()))
+      const queryLower = query.toLowerCase();
+      const filteredEpisodes = allEpisodes.filter(episode =>
+        (episode.trackName || '').toLowerCase().includes(queryLower) ||
+        (episode.collectionName || '').toLowerCase().includes(queryLower) ||
+        (episode.description && episode.description.toLowerCase().includes(queryLower))
       );
 
       return {

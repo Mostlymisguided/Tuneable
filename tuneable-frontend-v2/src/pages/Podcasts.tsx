@@ -89,6 +89,10 @@ interface PodcastEpisode {
 
 const EPISODE_PAGE_SIZE = 10;
 
+function episodeDedupeKey(ep: PodcastEpisode): string {
+  return `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase();
+}
+
 const TIME_RANGE_OPTIONS = [
   { key: 'all', label: 'All Time' },
   { key: 'year', label: 'This Year' },
@@ -144,6 +148,9 @@ const Podcasts: React.FC = () => {
   const [searchOffset, setSearchOffset] = useState(0);
   const [hasMoreLocal, setHasMoreLocal] = useState(false);
   const [totalLocal, setTotalLocal] = useState<number | null>(null);
+  const [taddyPage, setTaddyPage] = useState(1);
+  const [hasMoreTaddy, setHasMoreTaddy] = useState(false);
+  const [totalTaddy, setTotalTaddy] = useState<number | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Tipping state
@@ -328,85 +335,96 @@ const Podcasts: React.FC = () => {
 
     setIsSearching(true);
     setShowSearchResults(true);
-    setSearchOffset(0); // Reset pagination
+    setSearchOffset(0);
+    setTaddyPage(1);
+    setHasMoreTaddy(false);
+    setTotalTaddy(null);
     const allResults: PodcastEpisode[] = [];
     const seenGuids = new Set<string>();
 
-    try {
-      // Helper to deduplicate and add results
-      const addResults = (episodes: PodcastEpisode[], source: string) => {
-        episodes.forEach(ep => {
-          // Create a unique key for deduplication (title + podcast title)
-          const key = `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase();
-          if (!seenGuids.has(key)) {
-            seenGuids.add(key);
-            allResults.push({
-              ...ep,
-              source: source as any,
-              isExternal: true,
-              globalMediaAggregate: ep.globalMediaAggregate || 0
-            });
-          }
-        });
-      };
-
-      // Step 1: Search local database first
-      try {
-        const params = new URLSearchParams();
-        params.append('q', searchQuery);
-        if (filters.category) params.append('category', filters.category);
-        if (filters.genre) params.append('genre', filters.genre);
-        if (filters.tag) params.append('tag', filters.tag);
-        params.append('limit', '50');
-        params.append('offset', '0');
-
-        const localResponse = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
-        );
-
-        if (localResponse.ok) {
-          const localData = await localResponse.json();
-          const localEpisodes = (localData.episodes || []).map((ep: PodcastEpisode) => ({
+    const addResults = (episodes: PodcastEpisode[], source: string) => {
+      episodes.forEach(ep => {
+        const key = episodeDedupeKey(ep);
+        if (!seenGuids.has(key)) {
+          seenGuids.add(key);
+          allResults.push({
             ...ep,
-            source: 'local' as const,
-            isExternal: false
-          }));
-          addResults(localEpisodes, 'local');
-          
-          // Store pagination info for "Load more"
-          setHasMoreLocal(localData.hasMore || false);
-          setTotalLocal(localData.total || null);
-          setSearchOffset(50); // Next offset
+            source: source as PodcastEpisode['source'],
+            isExternal: source !== 'local',
+            globalMediaAggregate: ep.globalMediaAggregate || 0
+          });
         }
-      } catch (error) {
-        console.error('Error searching local database:', error);
+      });
+    };
+
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
+    try {
+      const localParams = new URLSearchParams();
+      localParams.append('q', searchQuery);
+      if (filters.category) localParams.append('category', filters.category);
+      if (filters.genre) localParams.append('genre', filters.genre);
+      if (filters.tag) localParams.append('tag', filters.tag);
+      localParams.append('limit', '50');
+      localParams.append('offset', '0');
+
+      const taddyParams = new URLSearchParams();
+      taddyParams.append('q', searchQuery);
+      taddyParams.append('max', '25');
+      taddyParams.append('page', '1');
+
+      const appleParams = new URLSearchParams();
+      appleParams.append('q', searchQuery);
+      appleParams.append('max', '50');
+
+      const [localResponse, taddyResponse, appleResponse] = await Promise.allSettled([
+        fetch(`${backendUrl}/api/podcasts/search-episodes?${localParams}`),
+        fetch(`${backendUrl}/api/podcasts/discovery/taddy/search-episodes?${taddyParams}`),
+        fetch(`${backendUrl}/api/podcasts/discovery/apple/search-episodes?${appleParams}`)
+      ]);
+
+      if (localResponse.status === 'fulfilled' && localResponse.value.ok) {
+        const localData = await localResponse.value.json();
+        const localEpisodes = (localData.episodes || []).map((ep: PodcastEpisode) => ({
+          ...ep,
+          source: 'local' as const,
+          isExternal: false
+        }));
+        addResults(localEpisodes, 'local');
+        setHasMoreLocal(localData.hasMore || false);
+        setTotalLocal(localData.total || null);
+        setSearchOffset(50);
+      } else if (localResponse.status === 'rejected') {
+        console.error('Error searching local database:', localResponse.reason);
       }
 
-      // Step 2: Search Taddy (primary external source for discovery)
-      try {
-        const taddyParams = new URLSearchParams();
-        taddyParams.append('q', searchQuery);
-        taddyParams.append('max', '50'); // Increased from 20 to 50
+      if (taddyResponse.status === 'fulfilled' && taddyResponse.value.ok) {
+        const taddyData = await taddyResponse.value.json();
+        const episodesWithRaw = (taddyData.episodes || []).map((ep: any) => ({
+          ...ep,
+          rawData: ep
+        }));
+        addResults(episodesWithRaw, 'taddy');
+        setHasMoreTaddy(taddyData.hasMore || false);
+        setTotalTaddy(taddyData.total ?? null);
+        setTaddyPage(1);
+      } else if (taddyResponse.status === 'rejected') {
+        console.error('Error searching Taddy:', taddyResponse.reason);
+      }
 
-        const taddyResponse = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/taddy/search-episodes?${taddyParams}`
-        );
-
-        if (taddyResponse.ok) {
-          const taddyData = await taddyResponse.json();
-          // Store raw data for import (includes RSS URLs in podcastSeries)
-          const episodesWithRaw = (taddyData.episodes || []).map((ep: any) => ({
-            ...ep,
-            rawData: ep // Store full episode data for import
-          }));
-          addResults(episodesWithRaw, 'taddy');
-        }
-      } catch (error) {
-        console.error('Error searching Taddy:', error);
+      if (appleResponse.status === 'fulfilled' && appleResponse.value.ok) {
+        const appleData = await appleResponse.value.json();
+        const appleEpisodes = (appleData.episodes || []).map((ep: any) => ({
+          ...ep,
+          rawData: ep
+        }));
+        addResults(appleEpisodes, 'apple');
+      } else if (appleResponse.status === 'rejected') {
+        console.error('Error searching Apple Podcasts:', appleResponse.reason);
       }
 
       setSearchResults(allResults);
-      
+
       if (allResults.length === 0) {
         toast.info('No episodes found. Try a different search term.');
       } else {
@@ -426,55 +444,89 @@ const Podcasts: React.FC = () => {
   };
 
   const handleLoadMoreSearch = async () => {
-    if (!searchQuery.trim() || isLoadingMore || !hasMoreLocal) return;
+    if (!searchQuery.trim() || isLoadingMore || (!hasMoreLocal && !hasMoreTaddy)) return;
 
     setIsLoadingMore(true);
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    const seenKeys = new Set(searchResults.map(episodeDedupeKey));
+    const newEpisodes: PodcastEpisode[] = [];
+
     try {
-      const params = new URLSearchParams();
-      params.append('q', searchQuery);
-      if (filters.category) params.append('category', filters.category);
-      if (filters.genre) params.append('genre', filters.genre);
-      if (filters.tag) params.append('tag', filters.tag);
-      params.append('limit', '50');
-      params.append('offset', searchOffset.toString());
+      const fetches: Promise<void>[] = [];
 
-      const localResponse = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/search-episodes?${params}`
-      );
+      if (hasMoreLocal) {
+        fetches.push((async () => {
+          const params = new URLSearchParams();
+          params.append('q', searchQuery);
+          if (filters.category) params.append('category', filters.category);
+          if (filters.genre) params.append('genre', filters.genre);
+          if (filters.tag) params.append('tag', filters.tag);
+          params.append('limit', '50');
+          params.append('offset', searchOffset.toString());
 
-      if (localResponse.ok) {
-        const localData = await localResponse.json();
-        const localEpisodes = (localData.episodes || []).map((ep: PodcastEpisode) => ({
-          ...ep,
-          source: 'local' as const,
-          isExternal: false
-        }));
+          const localResponse = await fetch(`${backendUrl}/api/podcasts/search-episodes?${params}`);
+          if (!localResponse.ok) return;
 
-        // Deduplicate and append to existing results
-        const seenKeys = new Set(
-          searchResults.map(ep => 
-            `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase()
-          )
-        );
-        
-        const newUniqueEpisodes = localEpisodes.filter((ep: PodcastEpisode) => {
-          const key = `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase();
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            return true;
-          }
-          return false;
-        });
+          const localData = await localResponse.json();
+          const localEpisodes = (localData.episodes || []).map((ep: PodcastEpisode) => ({
+            ...ep,
+            source: 'local' as const,
+            isExternal: false
+          }));
 
-        setSearchResults(prev => [...prev, ...newUniqueEpisodes]);
-        setHasMoreLocal(localData.hasMore || false);
-        setSearchOffset(searchOffset + 50);
-        
-        if (newUniqueEpisodes.length > 0) {
-          toast.success(`Loaded ${newUniqueEpisodes.length} more episodes`);
-        } else {
-          toast.info('No more unique episodes found');
-        }
+          localEpisodes.forEach((ep: PodcastEpisode) => {
+            const key = episodeDedupeKey(ep);
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              newEpisodes.push(ep);
+            }
+          });
+
+          setHasMoreLocal(localData.hasMore || false);
+          setSearchOffset(searchOffset + 50);
+        })());
+      }
+
+      if (hasMoreTaddy) {
+        const nextTaddyPage = taddyPage + 1;
+        fetches.push((async () => {
+          const taddyParams = new URLSearchParams();
+          taddyParams.append('q', searchQuery);
+          taddyParams.append('max', '25');
+          taddyParams.append('page', nextTaddyPage.toString());
+
+          const taddyResponse = await fetch(`${backendUrl}/api/podcasts/discovery/taddy/search-episodes?${taddyParams}`);
+          if (!taddyResponse.ok) return;
+
+          const taddyData = await taddyResponse.json();
+          const taddyEpisodes = (taddyData.episodes || []).map((ep: any) => ({
+            ...ep,
+            source: 'taddy' as const,
+            isExternal: true,
+            rawData: ep
+          }));
+
+          taddyEpisodes.forEach((ep: PodcastEpisode) => {
+            const key = episodeDedupeKey(ep);
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              newEpisodes.push(ep);
+            }
+          });
+
+          setHasMoreTaddy(taddyData.hasMore || false);
+          setTotalTaddy(taddyData.total ?? totalTaddy);
+          setTaddyPage(nextTaddyPage);
+        })());
+      }
+
+      await Promise.all(fetches);
+
+      if (newEpisodes.length > 0) {
+        setSearchResults(prev => [...prev, ...newEpisodes]);
+        toast.success(`Loaded ${newEpisodes.length} more episodes`);
+      } else {
+        toast.info('No more unique episodes found');
       }
     } catch (error: any) {
       console.error('Error loading more search results:', error);
@@ -1552,13 +1604,25 @@ const Podcasts: React.FC = () => {
 
             {showSearchResults && searchResults.length > 0 && (
               <div className="mt-6 flex flex-col items-center space-y-4">
-                {totalLocal !== null && (
-                  <p className="text-sm text-gray-400">
-                    Showing {searchResults.filter((ep) => ep.source === 'local').length} of {totalLocal} local results
-                    {searchResults.some((ep) => ep.source === 'taddy') && ` + ${searchResults.filter((ep) => ep.source === 'taddy').length} from Taddy`}
-                  </p>
-                )}
-                {hasMoreLocal && (
+                <p className="text-sm text-gray-400">
+                  {totalLocal !== null && searchResults.some((ep) => ep.source === 'local') && (
+                    <>Showing {searchResults.filter((ep) => ep.source === 'local').length} of {totalLocal} local</>
+                  )}
+                  {searchResults.some((ep) => ep.source === 'taddy') && (
+                    <>
+                      {totalLocal !== null && searchResults.some((ep) => ep.source === 'local') ? ' · ' : ''}
+                      {searchResults.filter((ep) => ep.source === 'taddy').length}
+                      {totalTaddy != null ? ` of ${totalTaddy}` : ''} from Taddy
+                    </>
+                  )}
+                  {searchResults.some((ep) => ep.source === 'apple') && (
+                    <>
+                      {(totalLocal !== null || searchResults.some((ep) => ep.source === 'taddy')) ? ' · ' : ''}
+                      {searchResults.filter((ep) => ep.source === 'apple').length} from Apple
+                    </>
+                  )}
+                </p>
+                {(hasMoreLocal || hasMoreTaddy) && (
                   <button
                     onClick={handleLoadMoreSearch}
                     disabled={isLoadingMore}

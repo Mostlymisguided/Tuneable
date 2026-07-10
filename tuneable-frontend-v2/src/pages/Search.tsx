@@ -176,7 +176,7 @@ const SearchPage: React.FC = () => {
           // Search Taddy for episodes
           const params = new URLSearchParams({
             q: searchQuery,
-            max: '20'
+            max: '25'
           });
           
           const taddyResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/discovery/taddy/search-episodes?${params}`);

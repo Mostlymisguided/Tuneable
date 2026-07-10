@@ -1105,13 +1105,13 @@ router.get('/discovery/taddy/search-episodes', async (req, res) => {
       return res.status(503).json({ error: 'Taddy API not configured' });
     }
     
-    const { q, max = 20 } = req.query;
+    const { q, max = 25, page = 1 } = req.query;
     
     if (!q || q.trim().length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    const result = await taddyService.searchEpisodes(q, parseInt(max));
+    const result = await taddyService.searchEpisodes(q, parseInt(max), parseInt(page));
     
     if (!result.success) {
       return res.status(500).json({ error: result.error });
@@ -1120,6 +1120,10 @@ router.get('/discovery/taddy/search-episodes', async (req, res) => {
     res.json({
       episodes: result.episodes,
       count: result.count,
+      total: result.totalCount,
+      page: result.page,
+      pagesCount: result.pagesCount,
+      hasMore: result.hasMore,
       source: 'taddy'
     });
   } catch (error) {

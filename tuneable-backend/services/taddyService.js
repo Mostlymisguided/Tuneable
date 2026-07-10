@@ -85,15 +85,23 @@ class TaddyService {
     }
   }
 
-  // Search for podcast episodes using GraphQL
-  async searchEpisodes(query, maxResults = 20) {
+  // Search for podcast episodes using Taddy's search API (supports pagination)
+  async searchEpisodes(query, maxResults = 25, page = 1) {
     try {
       await this.enforceRateLimit();
-      
+
+      const limitPerPage = Math.min(Math.max(1, maxResults), 25);
+      const pageNum = Math.min(Math.max(1, page), 20);
+
       const graphqlQuery = {
         query: `
-          query SearchEpisodes($term: String!) {
-            searchForTerm(term: $term, filterForTypes: [PODCASTEPISODE]) {
+          query SearchEpisodes($term: String!, $page: Int!, $limitPerPage: Int!) {
+            search(
+              term: $term
+              filterForTypes: [PODCASTEPISODE]
+              page: $page
+              limitPerPage: $limitPerPage
+            ) {
               searchId
               podcastEpisodes {
                 uuid
@@ -113,11 +121,19 @@ class TaddyService {
                   rssUrl
                 }
               }
+              responseDetails {
+                id
+                type
+                totalCount
+                pagesCount
+              }
             }
           }
         `,
         variables: {
-          term: query
+          term: query,
+          page: pageNum,
+          limitPerPage
         }
       };
 
@@ -129,20 +145,38 @@ class TaddyService {
         }
       });
 
-      console.log('🔍 Taddy API Response:', JSON.stringify(response.data, null, 2));
-      const episodes = response.data.data?.searchForTerm?.podcastEpisodes || [];
-      console.log(`✅ Found ${episodes.length} episodes from Taddy`);
+      if (response.data.errors?.length) {
+        throw new Error(response.data.errors.map((e) => e.message).join('; '));
+      }
+
+      const searchData = response.data.data?.search;
+      const episodes = searchData?.podcastEpisodes || [];
+      const episodeDetails = (searchData?.responseDetails || []).find(
+        (d) => d.type === 'PODCASTEPISODE'
+      );
+      const totalCount = episodeDetails?.totalCount ?? episodes.length;
+      const pagesCount = episodeDetails?.pagesCount ?? 1;
+
+      console.log(`✅ Found ${episodes.length} episodes from Taddy (page ${pageNum}/${pagesCount}, total ${totalCount})`);
 
       return {
         success: true,
-        episodes: episodes.map(episode => this.convertEpisodeToOurFormat(episode)),
-        count: episodes.length
+        episodes: episodes.map((episode) => this.convertEpisodeToOurFormat(episode)),
+        count: episodes.length,
+        totalCount,
+        page: pageNum,
+        pagesCount,
+        hasMore: pageNum < pagesCount
       };
     } catch (error) {
-      console.error('Taddy episode search error:', error.response?.data || error.message);
+      const graphqlErrors = error.response?.data?.errors;
+      const message = graphqlErrors?.length
+        ? graphqlErrors.map((e) => e.message).join('; ')
+        : (error.response?.data?.message || error.message || 'Failed to search episodes');
+      console.error('Taddy episode search error:', graphqlErrors || error.response?.data || error.message);
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to search episodes'
+        error: message
       };
     }
   }

@@ -177,6 +177,8 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
                 className={`inline-block mt-1 px-2 py-0.5 text-[10px] rounded-full ${
                   episode.source === 'taddy'
                     ? 'bg-green-600/30 text-green-300'
+                    : episode.source === 'apple'
+                      ? 'bg-pink-600/30 text-pink-300'
                     : episode.source === 'podcastindex'
                       ? 'bg-blue-600/30 text-blue-300'
                       : 'bg-gray-600/30 text-gray-300'
