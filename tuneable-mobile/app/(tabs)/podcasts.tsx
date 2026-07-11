@@ -10,17 +10,22 @@ import {
 } from 'react-native';
 import { Screen } from '@/src/components/Screen';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
+import { TipSheet } from '@/src/components/TipSheet';
+import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
-import { episodeId, isEpisodePlayable } from '@/src/lib/podcast';
+import { useAuth } from '@/src/auth/AuthContext';
+import { episodeId, isEpisodePlayable, seriesTitle } from '@/src/lib/podcast';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
 import type { PodcastEpisode } from '@/src/types/podcast';
 
 export default function PodcastsScreen() {
+  const { user, updateBalance } = useAuth();
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tipTarget, setTipTarget] = useState<PodcastEpisode | null>(null);
   const setQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
 
   const load = useCallback(async (isRefresh = false) => {
@@ -56,6 +61,32 @@ export default function PodcastsScreen() {
     const first = episodes.findIndex(isEpisodePlayable);
     if (first < 0) return;
     void setQueueAndPlay(episodes, first);
+  };
+
+  const onConfirmTip = async (amountPounds: number) => {
+    if (!tipTarget) return;
+    const id = episodeId(tipTarget);
+    if (!id) throw new Error('Missing episode id');
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds);
+    const tipPence = Math.round(amountPounds * 100);
+    if (typeof res.updatedBalance === 'number') {
+      updateBalance(res.updatedBalance);
+    }
+    setEpisodes((prev) =>
+      prev
+        .map((e) =>
+          episodeId(e) === id
+            ? {
+                ...e,
+                globalMediaAggregate: (e.globalMediaAggregate ?? 0) + tipPence,
+              }
+            : e
+        )
+        .sort(
+          (a, b) =>
+            (b.globalMediaAggregate ?? 0) - (a.globalMediaAggregate ?? 0)
+        )
+    );
   };
 
   return (
@@ -111,8 +142,19 @@ export default function PodcastsScreen() {
             rank={index + 1}
             episode={item}
             onPlay={() => onPlayItem(item)}
+            onTip={() => setTipTarget(item)}
           />
         )}
+      />
+
+      <TipSheet
+        visible={Boolean(tipTarget)}
+        title={tipTarget?.title || 'Episode'}
+        subtitle={tipTarget ? seriesTitle(tipTarget) : undefined}
+        balancePence={user?.balance ?? 0}
+        defaultTipPounds={user?.preferences?.defaultTip ?? 0.5}
+        onClose={() => setTipTarget(null)}
+        onConfirm={onConfirmTip}
       />
     </Screen>
   );

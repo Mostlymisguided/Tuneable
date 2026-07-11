@@ -37,6 +37,7 @@ Restart Expo after changing `.env`.
 - [x] Profile / balance / sign out
 - [x] Global music chart + upload playback (mini bar)
 - [x] Podcast chart + enclosure playback (shared mini bar)
+- [x] Tip on music/podcast charts (global bid)
 - [ ] OAuth, Stripe, Socket.IO (P1)
 
 ## Scripts

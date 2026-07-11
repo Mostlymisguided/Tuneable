@@ -9,22 +9,25 @@ type Props = {
   rank: number;
   item: ChartMediaItem;
   onPlay: () => void;
+  onTip: () => void;
 };
 
-export function ChartTrackRow({ rank, item, onPlay }: Props) {
+export function ChartTrackRow({ rank, item, onPlay, onTip }: Props) {
   const playable = isUploadPlayable(item);
 
   return (
-    <Pressable
-      style={[styles.row, !playable && styles.rowMuted]}
-      onPress={playable ? onPlay : undefined}
-      disabled={!playable}>
+    <View style={[styles.row, !playable && styles.rowMuted]}>
       <Text style={styles.rank}>{rank}</Text>
-      <Image
-        source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
-        style={styles.cover}
-      />
-      <View style={styles.meta}>
+      <Pressable onPress={playable ? onPlay : undefined} disabled={!playable}>
+        <Image
+          source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
+          style={styles.cover}
+        />
+      </Pressable>
+      <Pressable
+        style={styles.meta}
+        onPress={playable ? onPlay : undefined}
+        disabled={!playable}>
         <Text style={styles.title} numberOfLines={1}>
           {item.title || 'Untitled'}
         </Text>
@@ -34,18 +37,25 @@ export function ChartTrackRow({ rank, item, onPlay }: Props) {
         {!playable ? (
           <Text style={styles.hint}>Catalog only — no upload yet</Text>
         ) : null}
-      </View>
+      </Pressable>
       <View style={styles.right}>
         <Text style={styles.tips}>
           {formatPoundsFromPence(item.partyMediaAggregate ?? 0)}
         </Text>
-        {playable ? (
-          <Ionicons name="play-circle" size={28} color={colors.accentLight} />
-        ) : (
-          <Ionicons name="musical-note" size={22} color={colors.textMuted} />
-        )}
+        <View style={styles.actions}>
+          <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn}>
+            <Ionicons name="heart" size={22} color="#f472b6" />
+          </Pressable>
+          {playable ? (
+            <Pressable onPress={onPlay} hitSlop={8} style={styles.actionBtn}>
+              <Ionicons name="play-circle" size={28} color={colors.accentLight} />
+            </Pressable>
+          ) : (
+            <Ionicons name="musical-note" size={22} color={colors.textMuted} />
+          )}
+        </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -60,7 +70,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.cardBorder,
   },
   rowMuted: {
-    opacity: 0.7,
+    opacity: 0.85,
   },
   rank: {
     width: 28,
@@ -102,5 +112,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionBtn: {
+    padding: 2,
   },
 });

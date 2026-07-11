@@ -28,6 +28,7 @@ interface AuthContextValue {
   login: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateBalance: (newBalancePence: number) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -109,6 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateBalance = useCallback((newBalancePence: number) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, balance: newBalancePence };
+      if (tokenRef.current) {
+        void saveSession(tokenRef.current, JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -118,8 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refreshUser,
+      updateBalance,
     }),
-    [user, token, isLoading, login, logout, refreshUser]
+    [user, token, isLoading, login, logout, refreshUser, updateBalance]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

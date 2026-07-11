@@ -13,6 +13,9 @@ export interface User {
   emailVerified?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
+  preferences?: {
+    defaultTip?: number; // pounds
+  };
 }
 
 export interface LoginResponse {

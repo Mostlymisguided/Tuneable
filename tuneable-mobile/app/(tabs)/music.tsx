@@ -10,9 +10,12 @@ import {
 } from 'react-native';
 import { Screen } from '@/src/components/Screen';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
+import { TipSheet } from '@/src/components/TipSheet';
+import { mediaAPI } from '@/src/api/media';
 import { partyAPI } from '@/src/api/party';
+import { useAuth } from '@/src/auth/AuthContext';
 import { formatPoundsFromPence } from '@/src/lib/format';
-import { isUploadPlayable, mediaId } from '@/src/lib/media';
+import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import {
@@ -23,11 +26,13 @@ import {
 } from '@/src/types/media';
 
 export default function MusicScreen() {
+  const { user, updateBalance } = useAuth();
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
 
   const load = useCallback(async (isRefresh = false) => {
@@ -53,10 +58,8 @@ export default function MusicScreen() {
 
   const totals = useMemo(() => {
     const tips = media.reduce((sum, m) => sum + (m.partyMediaAggregate ?? 0), 0);
-    const tipped = media.filter((m) => (m.partyMediaAggregate ?? 0) > 0);
-    const avg = tipped.length ? tips / tipped.length : 0;
     const playableCount = media.filter(isUploadPlayable).length;
-    return { tips, avg, playableCount };
+    return { tips, playableCount };
   }, [media]);
 
   const onPlayItem = (item: ChartMediaItem) => {
@@ -68,6 +71,31 @@ export default function MusicScreen() {
     const firstPlayable = media.findIndex(isUploadPlayable);
     if (firstPlayable < 0) return;
     void setQueueAndPlay(media, firstPlayable);
+  };
+
+  const onConfirmTip = async (amountPounds: number) => {
+    if (!tipTarget) return;
+    const id = mediaId(tipTarget);
+    if (!id) throw new Error('Missing media id');
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds);
+    const tipPence = Math.round(amountPounds * 100);
+    if (typeof res.updatedBalance === 'number') {
+      updateBalance(res.updatedBalance);
+    }
+    setMedia((prev) =>
+      prev
+        .map((m) =>
+          mediaId(m) === id
+            ? {
+                ...m,
+                partyMediaAggregate: (m.partyMediaAggregate ?? 0) + tipPence,
+              }
+            : m
+        )
+        .sort(
+          (a, b) => (b.partyMediaAggregate ?? 0) - (a.partyMediaAggregate ?? 0)
+        )
+    );
   };
 
   return (
@@ -150,8 +178,19 @@ export default function MusicScreen() {
             rank={index + 1}
             item={item}
             onPlay={() => onPlayItem(item)}
+            onTip={() => setTipTarget(item)}
           />
         )}
+      />
+
+      <TipSheet
+        visible={Boolean(tipTarget)}
+        title={tipTarget?.title || 'Untitled'}
+        subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
+        balancePence={user?.balance ?? 0}
+        defaultTipPounds={user?.preferences?.defaultTip ?? 0.5}
+        onClose={() => setTipTarget(null)}
+        onConfirm={onConfirmTip}
       />
     </Screen>
   );

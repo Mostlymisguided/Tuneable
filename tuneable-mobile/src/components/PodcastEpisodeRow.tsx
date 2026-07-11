@@ -9,9 +9,10 @@ type Props = {
   rank: number;
   episode: PodcastEpisode;
   onPlay: () => void;
+  onTip: () => void;
 };
 
-export function PodcastEpisodeRow({ rank, episode, onPlay }: Props) {
+export function PodcastEpisodeRow({ rank, episode, onPlay, onTip }: Props) {
   const playable = isEpisodePlayable(episode);
   const cover =
     episode.coverArt ||
@@ -19,13 +20,15 @@ export function PodcastEpisodeRow({ rank, episode, onPlay }: Props) {
     DEFAULT_PODCAST_COVER;
 
   return (
-    <Pressable
-      style={[styles.row, !playable && styles.rowMuted]}
-      onPress={playable ? onPlay : undefined}
-      disabled={!playable}>
+    <View style={[styles.row, !playable && styles.rowMuted]}>
       <Text style={styles.rank}>{rank}</Text>
-      <Image source={{ uri: cover }} style={styles.cover} />
-      <View style={styles.meta}>
+      <Pressable onPress={playable ? onPlay : undefined} disabled={!playable}>
+        <Image source={{ uri: cover }} style={styles.cover} />
+      </Pressable>
+      <Pressable
+        style={styles.meta}
+        onPress={playable ? onPlay : undefined}
+        disabled={!playable}>
         <Text style={styles.title} numberOfLines={2}>
           {episode.title || 'Untitled episode'}
         </Text>
@@ -33,18 +36,25 @@ export function PodcastEpisodeRow({ rank, episode, onPlay }: Props) {
           {seriesTitle(episode)}
         </Text>
         {!playable ? <Text style={styles.hint}>No audio URL</Text> : null}
-      </View>
+      </Pressable>
       <View style={styles.right}>
         <Text style={styles.tips}>
           {formatPoundsFromPence(episode.globalMediaAggregate ?? 0)}
         </Text>
-        {playable ? (
-          <Ionicons name="play-circle" size={28} color={colors.accentLight} />
-        ) : (
-          <Ionicons name="mic-outline" size={22} color={colors.textMuted} />
-        )}
+        <View style={styles.actions}>
+          <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn}>
+            <Ionicons name="heart" size={22} color="#f472b6" />
+          </Pressable>
+          {playable ? (
+            <Pressable onPress={onPlay} hitSlop={8} style={styles.actionBtn}>
+              <Ionicons name="play-circle" size={28} color={colors.accentLight} />
+            </Pressable>
+          ) : (
+            <Ionicons name="mic-outline" size={22} color={colors.textMuted} />
+          )}
+        </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -58,7 +68,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.cardBorder,
   },
-  rowMuted: { opacity: 0.7 },
+  rowMuted: { opacity: 0.85 },
   rank: {
     width: 28,
     color: colors.textMuted,
@@ -94,4 +104,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionBtn: { padding: 2 },
 });
