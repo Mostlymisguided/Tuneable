@@ -1507,7 +1507,7 @@ router.get('/me/import/soundcloud/preview', authMiddleware, async (req, res) => 
     res.json(preview);
   } catch (error) {
     const status = error.status || (error.response?.status === 401 ? 400 : 500);
-    if (error.code === 'PROVIDER_REAUTH_REQUIRED' || status === 400 || error.response?.status === 401) {
+    if (error.code === 'PROVIDER_REAUTH_REQUIRED' || error.response?.status === 401) {
       return res.status(400).json({
         error: error.message || 'SoundCloud token expired. Please reconnect SoundCloud.',
         code: 'PROVIDER_REAUTH_REQUIRED',
