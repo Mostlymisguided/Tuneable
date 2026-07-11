@@ -137,7 +137,7 @@ function trackKey(track, source) {
   return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
 }
 
-async function previewImportFromTracks(userId, source, tracks, user) {
+async function previewImportFromTracks(userId, source, tracks, user, extraSummary = {}) {
   const userBids = await Bid.find({ userId, status: 'active' }).select('mediaId amount').lean();
   const tippedMediaIds = new Set(userBids.map((b) => b.mediaId?.toString()).filter(Boolean));
   const userBidTotals = {};
@@ -195,6 +195,7 @@ async function previewImportFromTracks(userId, source, tracks, user) {
       estimatedTotal,
       userBalance: (user.balance || 0) / 100,
       defaultTip,
+      ...extraSummary,
     },
   };
 }
@@ -224,11 +225,18 @@ async function previewSoundCloudImport(userId, limit = 50) {
   }
 
   const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-  const likedTracks = await soundcloudService.getLikedTracks(userId, cappedLimit);
+  const { tracks: likedTracks, skippedMixes, scanned } = await soundcloudService.getLikedTracks(
+    userId,
+    cappedLimit,
+    { excludeMixes: true }
+  );
   const tracks = likedTracks.map(soundcloudService.convertLikedTrackToTuneableFormat);
   // Reload balance/preferences in case token refresh mutated user elsewhere
   const freshUser = await User.findById(userId).select('preferences balance');
-  return previewImportFromTracks(userId, 'soundcloud', tracks, freshUser || user);
+  return previewImportFromTracks(userId, 'soundcloud', tracks, freshUser || user, {
+    skippedMixes,
+    scanned,
+  });
 }
 
 async function executeLibraryImport(userId, { items, defaultTip } = {}) {

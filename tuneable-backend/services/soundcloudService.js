@@ -9,11 +9,81 @@ const User = require('../models/User');
 const SOUNDCLOUD_API = 'https://api.soundcloud.com';
 const SOUNDCLOUD_TOKEN_URL = 'https://secure.soundcloud.com/oauth/token';
 
+/** Long-form sets/mixes — Tuneable import is for individual tunes only. */
+const MIX_DURATION_SEC = 15 * 60;
+const HARD_SET_DURATION_SEC = 20 * 60;
+const MIX_TITLE_PATTERNS = [
+  /\bdj\s*set\b/i,
+  /\blive\s*set\b/i,
+  /\bliveset\b/i,
+  /\bmixtape\b/i,
+  /\bcontinuous\s*mix\b/i,
+  /\bradio\s*show\b/i,
+  /\bpodcast\b/i,
+  /\bwarm[\s-]*up\s*mix\b/i,
+  /\bguest\s*mix\b/i,
+  /\bpromo\s*mix\b/i,
+  /\bboiler\s*room\b/i,
+  /\bessential\s*mix\b/i,
+  /\bb2b\b/i,
+];
+
 function authHeaders(accessToken) {
   return {
     Authorization: `OAuth ${accessToken}`,
     Accept: 'application/json; charset=utf-8',
   };
+}
+
+/**
+ * True for DJ mixes / live sets / long-form shows — not individual tunes.
+ * Remixes and short edits are kept.
+ */
+function isLikelyMixOrSet(track) {
+  if (!track) return false;
+
+  const durationSec = track.duration ? Number(track.duration) / 1000 : 0;
+  const title = String(track.title || '');
+  const genre = String(track.genre || '');
+  const tags = String(track.tag_list || '');
+  const haystack = `${title} ${genre} ${tags}`;
+
+  const isRemixOrEdit = /\bremix\b|\bedit\b|\bbootleg\b|\bvip\b/i.test(title)
+    && !MIX_TITLE_PATTERNS.some((p) => p.test(haystack));
+
+  if (isRemixOrEdit && durationSec < HARD_SET_DURATION_SEC) {
+    return false;
+  }
+
+  if (MIX_TITLE_PATTERNS.some((p) => p.test(haystack))) {
+    return true;
+  }
+
+  // Genre often literally "DJ Mix" / "Mix"
+  if (/\b(dj\s*)?mix(es|ing)?\b/i.test(genre) && !/\bremix\b/i.test(genre)) {
+    return true;
+  }
+
+  // Standalone "mix" in title (not remix): "Friday Mix", "House Mix 012"
+  if (/(^|[^a-z])mix([^a-z]|$)/i.test(title) && !/\bremix\b|\bedit\b/i.test(title)) {
+    return true;
+  }
+
+  // Very long uploads are almost always sets
+  if (durationSec >= HARD_SET_DURATION_SEC) {
+    return true;
+  }
+
+  // Borderline length + mix-ish wording in tags/title
+  if (
+    durationSec >= MIX_DURATION_SEC
+    && /\bmix\b|\bset\b|\bdj\b/i.test(haystack)
+    && !/\bremix\b/i.test(title)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -101,11 +171,14 @@ async function soundcloudGet(user, url, config = {}) {
 
 /**
  * Get liked tracks for the authenticated SoundCloud user (paginated).
+ * Mixes / live sets are excluded by default so import stays tune-only.
  * @param {string|import('mongoose').Types.ObjectId} userId
- * @param {number} limit - Max tracks to return overall
- * @returns {Promise<Array>} Array of SoundCloud track objects
+ * @param {number} limit - Max tracks to return overall (after filtering)
+ * @param {{ excludeMixes?: boolean }} [options]
+ * @returns {Promise<{ tracks: Array, skippedMixes: number, scanned: number }>}
  */
-async function getLikedTracks(userId, limit = 50) {
+async function getLikedTracks(userId, limit = 50, options = {}) {
+  const excludeMixes = options.excludeMixes !== false;
   const user = await User.findById(userId).select(
     'soundcloudAccessToken soundcloudRefreshToken soundcloudId'
   );
@@ -116,10 +189,14 @@ async function getLikedTracks(userId, limit = 50) {
   }
 
   const tracks = [];
-  const pageSize = Math.min(Math.max(limit, 1), 200);
-  let url = `${SOUNDCLOUD_API}/me/likes/tracks?limit=${Math.min(pageSize, 50)}&linked_partitioning=true`;
+  let skippedMixes = 0;
+  let scanned = 0;
+  // Scan extra pages so filtering still fills `limit` with real tunes
+  const maxScan = Math.min(Math.max(limit * 3, limit), 400);
+  const pageSize = Math.min(50, Math.max(limit, 1));
+  let url = `${SOUNDCLOUD_API}/me/likes/tracks?limit=${pageSize}&linked_partitioning=true`;
 
-  while (url && tracks.length < limit) {
+  while (url && tracks.length < limit && scanned < maxScan) {
     const res = await soundcloudGet(user, url);
     const data = res.data;
     const batch = Array.isArray(data)
@@ -127,16 +204,27 @@ async function getLikedTracks(userId, limit = 50) {
       : (Array.isArray(data?.collection) ? data.collection : []);
 
     for (const item of batch) {
-      // Some responses wrap the track; prefer the track object itself
       const track = item?.track && typeof item.track === 'object' ? item.track : item;
-      if (track?.id) tracks.push(track);
-      if (tracks.length >= limit) break;
+      if (!track?.id) continue;
+      scanned += 1;
+
+      if (excludeMixes && isLikelyMixOrSet(track)) {
+        skippedMixes += 1;
+        continue;
+      }
+
+      tracks.push(track);
+      if (tracks.length >= limit || scanned >= maxScan) break;
     }
 
-    url = tracks.length < limit ? (data?.next_href || null) : null;
+    url = (tracks.length < limit && scanned < maxScan) ? (data?.next_href || null) : null;
   }
 
-  return tracks.slice(0, limit);
+  return {
+    tracks: tracks.slice(0, limit),
+    skippedMixes,
+    scanned,
+  };
 }
 
 function normalizeArtworkUrl(url) {
@@ -192,4 +280,6 @@ module.exports = {
   getLikedTracks,
   convertLikedTrackToTuneableFormat,
   refreshAccessToken,
+  isLikelyMixOrSet,
+  MIX_DURATION_SEC,
 };

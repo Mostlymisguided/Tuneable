@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
-import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
+import { DEFAULT_POST_AUTH_PATH, sanitizeReturnUrl } from '../utils/authHelpers';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -11,122 +11,92 @@ const AuthCallback: React.FC = () => {
   const hasRun = React.useRef(false);
 
   useEffect(() => {
-    // Prevent duplicate runs (React StrictMode in development causes double renders)
+    // Prevent duplicate runs (React StrictMode / unstable callback identity)
     if (hasRun.current) return;
-    
+    hasRun.current = true;
+
     const handleAuth = async () => {
-      hasRun.current = true;
       const token = searchParams.get('token');
       const error = searchParams.get('error');
 
       if (error) {
-        // Parse error details from URL
         const errorDetails = searchParams.get('details');
         const errorReason = searchParams.get('reason');
-        
+        const errorMessageParam = searchParams.get('message');
+
         let errorMessage = 'Authentication failed. Please try again.';
-        
+
         if (error === 'oauth_state_mismatch') {
           errorMessage = 'Security verification failed. Please try signing in again.';
         } else if (error === 'oauth_session_missing') {
           errorMessage = 'Session expired. Please try signing in again.';
+        } else if (error === 'account_already_linked' || error === 'account_linking_failed') {
+          errorMessage = errorMessageParam
+            ? decodeURIComponent(errorMessageParam)
+            : 'Account linking failed. Please try again.';
         } else if (errorDetails) {
           errorMessage = `Authentication error: ${decodeURIComponent(errorDetails)}`;
         } else if (errorReason) {
           errorMessage = `Authentication failed: ${errorReason}`;
+        } else if (errorMessageParam) {
+          errorMessage = decodeURIComponent(errorMessageParam);
         }
-        
+
         toast.error(errorMessage, {
           autoClose: 10000,
           pauseOnHover: true,
         });
-        navigate('/login');
+        navigate('/login', { replace: true });
         return;
       }
 
       if (token) {
         try {
-          // handleOAuthCallback now fetches user data automatically
           await handleOAuthCallback(token);
-          
-          // Check if this was a social media OAuth connection
-          const oauthSuccess = searchParams.get('oauth_success');
-          
-          // Check if we're on a custom redirect URL (for account linking)
-          // The redirect URL will be in the current URL path, not as a query param
-          const currentPath = window.location.pathname;
-          const currentSearch = window.location.search;
-          
-          // If we're not on /auth/callback, we might be on a custom redirect URL
-          // Check if the URL contains settings=true (profile settings redirect)
-          if (currentSearch.includes('settings=true') || currentSearch.includes('oauth_success=true')) {
-            // Extract the path and clean up the token from query params
-            const urlParams = new URLSearchParams(currentSearch);
-            urlParams.delete('token'); // Remove token from URL
-            const cleanPath = currentPath + (urlParams.toString() ? '?' + urlParams.toString() : '');
-            toast.success('Account connected successfully!');
-            navigate(cleanPath);
-          } else if (oauthSuccess === 'true') {
-            toast.success('Login successful!');
-            navigate(DEFAULT_POST_AUTH_PATH);
-          } else {
-            toast.success('Login successful!');
-            navigate(DEFAULT_POST_AUTH_PATH);
-          }
-        } catch (error: any) {
-          console.error('Error during OAuth callback:', error);
-          
+
+          // Prefer explicit returnUrl; never navigate back to /auth/callback (hangs forever)
+          const returnUrl = sanitizeReturnUrl(
+            searchParams.get('returnUrl'),
+            DEFAULT_POST_AUTH_PATH
+          );
+          const linked = searchParams.get('oauth_success') === 'true'
+            || Boolean(searchParams.get('returnUrl'));
+
+          toast.success(linked ? 'Account connected successfully!' : 'Login successful!');
+          navigate(returnUrl, { replace: true });
+        } catch (err: any) {
+          console.error('Error during OAuth callback:', err);
+
           let errorMessage = 'Authentication failed. Please try again.';
-          
-          if (error?.response?.status === 401) {
+
+          if (err?.response?.status === 401) {
             errorMessage = 'Authentication token is invalid. Please try signing in again.';
-          } else if (error?.response?.status >= 500) {
+          } else if (err?.response?.status >= 500) {
             errorMessage = 'Server error during authentication. Please try again in a moment.';
-          } else if (error?.message) {
-            errorMessage = `Authentication error: ${error.message}`;
+          } else if (err?.message) {
+            errorMessage = `Authentication error: ${err.message}`;
           }
-          
+
           toast.error(errorMessage, {
             autoClose: 10000,
             pauseOnHover: true,
           });
-          navigate('/login');
+          navigate('/login', { replace: true });
         }
-      } else {
-        // Check if this is an OAuth error (account already linked, etc.)
-        const oauthError = searchParams.get('error');
-        const errorMessage = searchParams.get('message');
-        
-        if ((oauthError === 'account_already_linked' || oauthError === 'account_linking_failed') && errorMessage) {
-          toast.error(decodeURIComponent(errorMessage), {
-            autoClose: 10000,
-            pauseOnHover: true,
-          });
-          // Redirect back to creator registration or wherever they came from
-          const currentPath = window.location.pathname;
-          if (currentPath.includes('/creator/register')) {
-            // Already on creator registration page, just remove error params
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.delete('error');
-            urlParams.delete('message');
-            const cleanPath = currentPath + (urlParams.toString() ? '?' + urlParams.toString() : '');
-            navigate(cleanPath);
-          } else {
-            navigate('/creator/register');
-          }
-          return;
-        }
-        
-        toast.error('No authentication token received. Please try signing in again.', {
-          autoClose: 10000,
-          pauseOnHover: true,
-        });
-        navigate('/login');
+        return;
       }
+
+      toast.error('No authentication token received. Please try signing in again.', {
+        autoClose: 10000,
+        pauseOnHover: true,
+      });
+      navigate('/login', { replace: true });
     };
 
-    handleAuth();
-  }, [searchParams, navigate, handleOAuthCallback]);
+    void handleAuth();
+    // Only run once on mount for the initial query string
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

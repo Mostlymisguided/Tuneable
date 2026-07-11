@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { authAPI, setAuthTokenGetter } from '../lib/api';
 
 // Define types directly to avoid import issues
@@ -238,7 +238,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     usePodcastPlayerStore.getState().clear();
   };
 
-  const handleOAuthCallback = async (token: string) => {
+  const handleOAuthCallback = useCallback(async (token: string) => {
     try {
       // Store token first
       setToken(token);
@@ -255,7 +255,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('token');
       throw error;
     }
-  };
+  }, []);
 
   const refreshUser = async () => {
     try {

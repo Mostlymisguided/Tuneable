@@ -750,17 +750,19 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 
         // Check if we have a custom redirect URL (for account linking)
         if (req.session?.oauthRedirect) {
-          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+          // Express already decodes query params once — do not decodeURIComponent again
+          // or nested returnUrl values (%2Fimport%3F...) get corrupted.
+          const redirectUrl = req.session.oauthRedirect;
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;
           delete req.session.linkingUserId;
           delete req.session.linkingUserUuid;
-          // Redirect to custom URL with token
-          res.redirect(`${redirectUrl}&token=${token}`);
+          const sep = redirectUrl.includes('?') ? '&' : '?';
+          res.redirect(`${redirectUrl}${sep}token=${encodeURIComponent(token)}`);
         } else {
           // Default redirect to auth callback
           console.log('✅ Redirecting to:', `${frontendUrl}/auth/callback?token=${token.substring(0, 20)}...`);
-          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+          res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&oauth_success=true`);
         }
         
       } catch (error) {

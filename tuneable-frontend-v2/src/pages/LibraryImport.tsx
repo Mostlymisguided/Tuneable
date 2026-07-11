@@ -49,6 +49,8 @@ interface ImportSummary {
   estimatedTotal: number;
   userBalance: number;
   defaultTip: number;
+  skippedMixes?: number;
+  scanned?: number;
 }
 
 const STATUS_LABELS: Record<MatchStatus, string> = {
@@ -192,7 +194,10 @@ const LibraryImport: React.FC = () => {
 
   const connectSource = () => {
     const token = localStorage.getItem('token') || undefined;
-    const redirect = `${window.location.origin}/import?source=${source}`;
+    // Route through /auth/callback with returnUrl so we never depend on server session
+    // surviving the SoundCloud round-trip, and AuthCallback can send us back here.
+    const returnPath = `/import?source=${source}`;
+    const redirect = `${window.location.origin}/auth/callback?oauth_success=true&returnUrl=${encodeURIComponent(returnPath)}`;
 
     if (source === 'soundcloud') {
       window.location.href = buildOAuthStartUrl('soundcloud', {
@@ -465,6 +470,12 @@ const LibraryImport: React.FC = () => {
           <>
             <div className="mb-4 text-sm text-gray-400">
               Source: <span className="text-white font-medium">{meta.label}</span>
+              {typeof summary.skippedMixes === 'number' && summary.skippedMixes > 0 ? (
+                <span className="ml-2 text-amber-300/90">
+                  · skipped {summary.skippedMixes} mix{summary.skippedMixes === 1 ? '' : 'es'}/set
+                  {typeof summary.scanned === 'number' ? ` (scanned ${summary.scanned})` : ''}
+                </span>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
