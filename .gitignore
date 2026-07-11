@@ -11,6 +11,8 @@ yarn-error.log*
 # Environment variables (ignore all variants and backups)
 *.env
 *.env.*
+!.env.example
+!**/.env.example
 
 # Database files
 *.wt
@@ -68,6 +70,11 @@ tuneable-frontend-v2/android/.gradle/
 tuneable-frontend-v2/android/app/build/
 tuneable-frontend-v2/android/build/
 tuneable-frontend-v2/android/local.properties
+
+# Expo
+tuneable-mobile/.expo/
+tuneable-mobile/dist/
+tuneable-mobile/web-build/
 
 # Local MP3 migration run artifacts (scripts stay in repo when added separately)
 tuneable-backend/scripts/bulk-attach-log*.txt

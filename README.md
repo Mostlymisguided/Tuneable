@@ -79,8 +79,9 @@ Our long-term goal is to transition Tuneable into a **self-governing DAO (Decent
 - **React Router** for navigation
 - **Socket.io Client** for real-time updates
 
-### iOS app
-- **Swift / SwiftUI** (native), same REST API as web; see `tuneable-ios/README.md`
+### Mobile app
+- **Expo / React Native** (`tuneable-mobile/`) — primary native client going forward
+- Legacy (being replaced): Capacitor shell in `tuneable-frontend-v2`, SwiftUI in `tuneable-ios/`
 
 ## 📦 Getting Started
 
@@ -111,7 +112,16 @@ Our long-term goal is to transition Tuneable into a **self-governing DAO (Decent
    npm install
    ```
 
-4. **Set up environment variables**
+4. **Install mobile (Expo) dependencies** (optional)
+   ```bash
+   cd ../tuneable-mobile
+   cp .env.example .env
+   npm install
+   npx expo start
+   ```
+   See `tuneable-mobile/README.md` for device API URL notes.
+
+5. **Set up environment variables**
    
    Backend (`tuneable-backend/.env`):
    ```env
@@ -133,7 +143,7 @@ Our long-term goal is to transition Tuneable into a **self-governing DAO (Decent
    VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
    ```
 
-5. **Run the development servers**
+6. **Run the development servers**
    
    Backend:
    ```bash
@@ -147,6 +157,12 @@ Our long-term goal is to transition Tuneable into a **self-governing DAO (Decent
    npm run dev
    ```
 
+   Mobile:
+   ```bash
+   cd tuneable-mobile
+   npx expo start
+   ```
+
 ## 📁 Project Structure
 
 ```
@@ -158,6 +174,10 @@ TuneableLocal/
 │   ├── middleware/            # Auth and validation middleware
 │   ├── utils/                 # Utility functions
 │   └── scripts/               # Migration and utility scripts
+│
+├── tuneable-mobile/           # Expo / React Native app
+│   ├── app/                   # Expo Router screens (tabs + login)
+│   └── src/                   # API client, auth, theme
 │
 ├── tuneable-frontend-v2/      # React frontend application
 │   ├── src/
