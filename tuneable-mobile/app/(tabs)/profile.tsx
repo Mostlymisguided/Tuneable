@@ -26,6 +26,10 @@ export default function ProfileScreen() {
         <Text style={styles.value}>{formatPoundsFromPence(user?.balance)}</Text>
       </View>
 
+      <Pressable style={styles.walletBtn} onPress={() => router.push('/wallet')}>
+        <Text style={styles.walletBtnText}>Top up wallet</Text>
+      </Pressable>
+
       <Pressable style={styles.button} onPress={() => void onLogout()}>
         <Text style={styles.buttonText}>Sign out</Text>
       </Pressable>
@@ -46,8 +50,16 @@ const styles = StyleSheet.create({
   label: { color: colors.textMuted, fontSize: 13 },
   spaced: { marginTop: 14 },
   value: { color: colors.text, fontSize: 17, marginTop: 4 },
+  walletBtn: {
+    marginTop: 16,
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  walletBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   button: {
-    marginTop: 28,
+    marginTop: 16,
     backgroundColor: 'rgba(239, 68, 68, 0.25)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.5)',

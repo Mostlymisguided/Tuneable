@@ -70,6 +70,7 @@ function RootNavigator() {
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

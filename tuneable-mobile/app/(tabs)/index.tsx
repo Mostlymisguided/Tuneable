@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatPoundsFromPence } from '@/src/lib/format';
@@ -11,14 +12,15 @@ export default function HomeScreen() {
     <Screen style={styles.pad}>
       <Text style={styles.greeting}>Hey {user?.username ?? 'there'}</Text>
       <Text style={styles.lede}>
-        Welcome to Tuneable mobile. Music and podcasts charts land next; for now
-        you can confirm auth and wallet balance.
+        Explore the music and podcast charts, tip what you love, and top up when
+        you need more balance.
       </Text>
 
-      <View style={styles.card}>
+      <Pressable style={styles.card} onPress={() => router.push('/wallet')}>
         <Text style={styles.cardLabel}>Wallet</Text>
         <Text style={styles.cardValue}>{formatPoundsFromPence(user?.balance)}</Text>
-      </View>
+        <Text style={styles.cardCta}>Tap to top up →</Text>
+      </Pressable>
 
       {typeof user?.tuneBytes === 'number' ? (
         <View style={styles.card}>
@@ -64,5 +66,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 24,
     fontWeight: '600',
+  },
+  cardCta: {
+    marginTop: 8,
+    color: colors.accentLight,
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

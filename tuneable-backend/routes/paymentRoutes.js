@@ -62,7 +62,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 // Create Stripe Checkout Session for Wallet Top-up (uses AdminSettings to determine test/live mode)
 router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   try {
-    const { amount, totalCharge, currency = 'gbp' } = req.body;
+    const { amount, totalCharge, currency = 'gbp', successUrl, cancelUrl } = req.body;
     const userId = req.user.uuid;  // Use UUID string instead of _id ObjectId
 
     if (!amount || amount <= 0) {
@@ -71,6 +71,27 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
 
     // Use totalCharge if provided (includes fees), otherwise use amount (backward compatibility)
     const chargeAmount = totalCharge && totalCharge > amount ? totalCharge : amount;
+
+    const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const defaultSuccess = `${frontendBase}/wallet?success=true&amount=${amount}`;
+    const defaultCancel = `${frontendBase}/wallet?canceled=true`;
+
+    const isAllowedRedirect = (url) => {
+      if (!url || typeof url !== 'string') return false;
+      try {
+        const parsed = new URL(url);
+        // Mobile deep link (Expo / Capacitor)
+        if (parsed.protocol === 'stream.tuneable.app:') return true;
+        // Web app
+        if (url.startsWith(frontendBase)) return true;
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    const resolvedSuccess = isAllowedRedirect(successUrl) ? successUrl : defaultSuccess;
+    const resolvedCancel = isAllowedRedirect(cancelUrl) ? cancelUrl : defaultCancel;
     
     // amount is the wallet credit amount, chargeAmount is what Stripe will charge
     const stripe = await getWalletTopUpStripe();
@@ -90,8 +111,8 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?success=true&amount=${amount}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/wallet?canceled=true`,
+      success_url: resolvedSuccess,
+      cancel_url: resolvedCancel,
       metadata: {
         userId: userId,  // Now a UUID string, not ObjectId
         amount: amount.toString(), // Wallet credit amount (what user wants to add)
