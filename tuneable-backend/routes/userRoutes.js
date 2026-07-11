@@ -1426,7 +1426,10 @@ router.get('/me/spotify-liked-tracks', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     if (error.response?.status === 401) {
-      return res.status(401).json({ error: 'Spotify token expired. Please reconnect Spotify.' });
+      return res.status(400).json({
+        error: 'Spotify token expired. Please reconnect Spotify.',
+        code: 'PROVIDER_REAUTH_REQUIRED',
+      });
     }
     console.error('Error fetching Spotify liked tracks:', error);
     res.status(500).json({ error: error.message || 'Failed to fetch Spotify liked tracks' });
@@ -1445,7 +1448,10 @@ router.get('/me/import/spotify/preview', authMiddleware, async (req, res) => {
   } catch (error) {
     const status = error.status || 500;
     if (error.response?.status === 401) {
-      return res.status(401).json({ error: 'Spotify token expired. Please reconnect Spotify.' });
+      return res.status(400).json({
+        error: 'Spotify token expired. Please reconnect Spotify.',
+        code: 'PROVIDER_REAUTH_REQUIRED',
+      });
     }
     console.error('Spotify import preview error:', error);
     res.status(status).json({
@@ -1500,9 +1506,12 @@ router.get('/me/import/soundcloud/preview', authMiddleware, async (req, res) => 
     const preview = await libraryImportService.previewSoundCloudImport(req.user._id, limit);
     res.json(preview);
   } catch (error) {
-    const status = error.status || 500;
-    if (error.response?.status === 401 || status === 401) {
-      return res.status(401).json({ error: 'SoundCloud token expired. Please reconnect SoundCloud.' });
+    const status = error.status || (error.response?.status === 401 ? 400 : 500);
+    if (error.code === 'PROVIDER_REAUTH_REQUIRED' || status === 400 || error.response?.status === 401) {
+      return res.status(400).json({
+        error: error.message || 'SoundCloud token expired. Please reconnect SoundCloud.',
+        code: 'PROVIDER_REAUTH_REQUIRED',
+      });
     }
     console.error('SoundCloud import preview error:', error);
     res.status(status).json({

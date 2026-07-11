@@ -158,12 +158,17 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const isAuthEndpoint = error.config?.url?.includes('/users/login') || 
                              error.config?.url?.includes('/users/register');
-      
+      const errorMessage = String(error.response?.data?.error || error.response?.data?.message || '');
+      // Provider OAuth token expiry (Spotify/SoundCloud/etc.) must not clear the Tuneable JWT
+      const isProviderReauth =
+        error.response?.data?.code === 'PROVIDER_REAUTH_REQUIRED' ||
+        /spotify|soundcloud|reconnect/i.test(errorMessage);
+
       // Only redirect if user had a token (meaning they were authenticated but token expired/invalid)
       // If no token exists, the route might be public and we shouldn't redirect
       const hadToken = authTokenGetter?.() ?? localStorage.getItem('token');
       
-      if (!isAuthEndpoint && hadToken) {
+      if (!isAuthEndpoint && !isProviderReauth && hadToken) {
         // Clear auth data and redirect to login for other endpoints
         // Only do this if user was previously authenticated (had a token)
         localStorage.removeItem('token');

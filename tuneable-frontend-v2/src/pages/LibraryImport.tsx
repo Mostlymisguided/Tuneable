@@ -231,10 +231,17 @@ const LibraryImport: React.FC = () => {
       setStep('review');
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.message || `Failed to load ${meta.likesLabel}`;
+      const needsReauth =
+        error?.response?.data?.code === 'PROVIDER_REAUTH_REQUIRED' ||
+        /reconnect|token expired/i.test(message);
+
       toast.error(message);
-      if (error?.response?.status === 401) {
+      if (needsReauth) {
         if (source === 'spotify') setSpotifyConnected(false);
         else setSoundcloudConnected(false);
+        toast.info(`Reconnect ${meta.label} to continue importing`);
+        // Kick off provider OAuth (keeps Tuneable session; returns to /import)
+        setTimeout(() => connectSource(), 400);
       }
     } finally {
       setIsLoading(false);

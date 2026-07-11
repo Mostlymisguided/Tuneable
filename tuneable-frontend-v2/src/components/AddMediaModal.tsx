@@ -36,7 +36,7 @@ const AddMediaModal: React.FC<AddMediaModalProps> = ({ isOpen, onClose }) => {
 
   const handleImport = () => {
     onClose();
-    navigate('/creator/import-youtube');
+    navigate('/import');
   };
 
   const handleUpload = () => {
@@ -56,10 +56,10 @@ const AddMediaModal: React.FC<AddMediaModalProps> = ({ isOpen, onClose }) => {
     },
     {
       label: 'Import from likes',
-      description: 'Import likes from YouTube',
+      description: 'Import Spotify or SoundCloud likes',
       icon: Download,
       onClick: handleImport,
-      className: 'hover:bg-red-600/30 border-red-500/50',
+      className: 'hover:bg-purple-600/30 border-purple-500/50',
     },
     {
       label: 'Upload',

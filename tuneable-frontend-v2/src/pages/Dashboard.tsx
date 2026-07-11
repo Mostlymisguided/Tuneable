@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight, Youtube } from 'lucide-react';
+import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -1011,13 +1011,6 @@ Join here: ${inviteLink}`.trim();
                           >
                             <Music className="h-4 w-4 flex-shrink-0" />
                             Enrich from XML
-                          </Link>
-                          <Link
-                            to="/creator/import-youtube"
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
-                          >
-                            <Youtube className="h-4 w-4 flex-shrink-0" />
-                            Import from YouTube
                           </Link>
                           <button
                             onClick={handleUploadClick}

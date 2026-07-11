@@ -23,7 +23,6 @@ import {
   Gift,
   Undo2
 } from 'lucide-react';
-import YouTubeLikedImport from '../components/YouTubeLikedImport';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
@@ -1383,26 +1382,6 @@ const Admin: React.FC = () => {
             <div className="bg-gray-800 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-white mb-4">Recent Activity</h3>
               <p className="text-gray-400">No recent activity to display.</p>
-            </div>
-
-            {/* Media Import Section */}
-            <div className="bg-gray-800 rounded-lg p-6">
-              <div className="flex items-center mb-6">
-                <Youtube className="h-8 w-8 text-red-500 mr-3" />
-                <h3 className="text-lg font-semibold text-white">Media Import</h3>
-              </div>
-              
-              <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4 mb-6">
-                <div className="flex items-center">
-                  <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2" />
-                  <span className="text-yellow-200">
-                    <strong>Admin Only Feature:</strong> This tool allows bulk importing of YouTube liked videos. 
-                    Use responsibly and monitor API quota usage.
-                  </span>
-                </div>
-              </div>
-
-              <YouTubeLikedImport />
             </div>
           </div>
         )}

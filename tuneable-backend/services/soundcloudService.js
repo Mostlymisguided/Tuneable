@@ -24,7 +24,8 @@ function authHeaders(accessToken) {
 async function refreshAccessToken(user) {
   if (!user?.soundcloudRefreshToken) {
     const err = new Error('SoundCloud token expired. Please reconnect SoundCloud.');
-    err.status = 401;
+    err.status = 400;
+    err.code = 'PROVIDER_REAUTH_REQUIRED';
     throw err;
   }
   if (!process.env.SOUNDCLOUD_CLIENT_ID || !process.env.SOUNDCLOUD_CLIENT_SECRET) {
@@ -48,7 +49,8 @@ async function refreshAccessToken(user) {
     const { access_token: accessToken, refresh_token: refreshToken } = res.data || {};
     if (!accessToken) {
       const err = new Error('SoundCloud token refresh failed. Please reconnect SoundCloud.');
-      err.status = 401;
+      err.status = 400;
+      err.code = 'PROVIDER_REAUTH_REQUIRED';
       throw err;
     }
 
@@ -59,9 +61,10 @@ async function refreshAccessToken(user) {
     await user.save();
     return accessToken;
   } catch (error) {
-    if (error.status === 401 || error.status === 500) throw error;
+    if (error.status === 400 || error.status === 500 || error.code === 'PROVIDER_REAUTH_REQUIRED') throw error;
     const err = new Error('SoundCloud token expired. Please reconnect SoundCloud.');
-    err.status = 401;
+    err.status = 400;
+    err.code = 'PROVIDER_REAUTH_REQUIRED';
     err.cause = error;
     throw err;
   }
