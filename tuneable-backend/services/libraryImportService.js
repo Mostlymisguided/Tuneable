@@ -1,5 +1,5 @@
 /**
- * User-facing library import: preview + batch tip (Spotify likes, etc.)
+ * User-facing library import: preview + batch tip (Spotify / SoundCloud likes, etc.)
  */
 
 const mongoose = require('mongoose');
@@ -7,6 +7,7 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const spotifyService = require('./spotifyService');
+const soundcloudService = require('./soundcloudService');
 const { placeGlobalBid } = require('./globalBidService');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
@@ -29,23 +30,94 @@ function buildExternalMediaFromTrack(track) {
   };
 }
 
+function normalizePermalink(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const u = new URL(url);
+    u.hash = '';
+    u.search = '';
+    let path = u.pathname.replace(/\/+$/, '');
+    return `${u.origin}${path}`.toLowerCase();
+  } catch {
+    return url.trim().toLowerCase().replace(/\/+$/, '');
+  }
+}
+
 async function findCatalogMedia(track) {
-  const spotifyId = track.externalIds?.spotify || track.id;
+  const spotifyId = track.externalIds?.spotify || (track.sourceLabel === 'Spotify Likes' ? track.id : null);
+  const soundcloudId = track.externalIds?.soundcloud
+    || (track.sourceLabel === 'SoundCloud Likes' ? track.id : null);
   const isrc = track.externalIds?.isrc;
+  const soundcloudUrl = track.sources?.soundcloud;
 
   const or = [];
-  if (spotifyId) or.push({ 'externalIds.spotify': spotifyId });
+  if (spotifyId) or.push({ 'externalIds.spotify': String(spotifyId) });
+  if (soundcloudId) or.push({ 'externalIds.soundcloud': String(soundcloudId) });
   if (isrc) or.push({ isrc });
+  if (soundcloudUrl) {
+    or.push({ 'sources.soundcloud': soundcloudUrl });
+    const normalized = normalizePermalink(soundcloudUrl);
+    if (normalized && normalized !== soundcloudUrl) {
+      or.push({ 'sources.soundcloud': normalized });
+    }
+  }
 
   if (or.length > 0) {
     const byExternal = await Media.findOne({ $or: or }).lean();
     if (byExternal) return byExternal;
   }
 
+  if (!track.title || !track.artist) return null;
+
   return Media.findOne({
     title: track.title,
     'artist.name': track.artist,
   }).lean();
+}
+
+/**
+ * Attach missing SoundCloud/Spotify ids & URLs onto an existing catalog row.
+ */
+async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
+  if (!mediaId || !externalMedia) return;
+  const media = await Media.findById(mediaId);
+  if (!media) return;
+
+  let changed = false;
+  const ensureMap = (field) => {
+    if (!(media[field] instanceof Map)) {
+      media[field] = new Map(Object.entries(media[field] || {}));
+    }
+  };
+
+  if (externalMedia.externalIds && typeof externalMedia.externalIds === 'object') {
+    ensureMap('externalIds');
+    for (const [key, value] of Object.entries(externalMedia.externalIds)) {
+      if (!value) continue;
+      if (!media.externalIds.get(key)) {
+        media.externalIds.set(key, String(value));
+        changed = true;
+      }
+    }
+  }
+
+  if (externalMedia.sources && typeof externalMedia.sources === 'object') {
+    ensureMap('sources');
+    for (const [key, value] of Object.entries(externalMedia.sources)) {
+      if (!value) continue;
+      if (!media.sources.get(key)) {
+        media.sources.set(key, value);
+        changed = true;
+      }
+    }
+  }
+
+  if (externalMedia.externalIds?.isrc && !media.isrc) {
+    media.isrc = externalMedia.externalIds.isrc;
+    changed = true;
+  }
+
+  if (changed) await media.save();
 }
 
 function mediaToPlayabilityFields(media) {
@@ -58,18 +130,14 @@ function mediaToPlayabilityFields(media) {
   return enrichMediaWithPlayability({ ...media, sources });
 }
 
-async function previewSpotifyImport(userId, limit = 50) {
-  const user = await User.findById(userId).select('spotifyAccessToken preferences balance');
-  if (!user?.spotifyAccessToken) {
-    const err = new Error('Spotify not connected. Please connect your Spotify account first.');
-    err.status = 400;
-    throw err;
+function trackKey(track, source) {
+  if (source === 'soundcloud') {
+    return String(track.externalIds?.soundcloud || track.id || `${track.title}-${track.artist}`);
   }
+  return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
+}
 
-  const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-  const savedTracks = await spotifyService.getSavedTracks(user.spotifyAccessToken, cappedLimit);
-  const tracks = savedTracks.map(spotifyService.convertSavedTrackToTuneableFormat);
-
+async function previewImportFromTracks(userId, source, tracks, user) {
   const userBids = await Bid.find({ userId, status: 'active' }).select('mediaId amount').lean();
   const tippedMediaIds = new Set(userBids.map((b) => b.mediaId?.toString()).filter(Boolean));
   const userBidTotals = {};
@@ -93,7 +161,7 @@ async function previewSpotifyImport(userId, limit = 50) {
     else if (catalogMedia) matchStatus = 'on_catalog';
 
     items.push({
-      key: track.externalIds?.spotify || track.id,
+      key: trackKey(track, source),
       title: track.title,
       artist: track.artist,
       coverArt: track.coverArt || catalogMedia?.coverArt || null,
@@ -116,7 +184,7 @@ async function previewSpotifyImport(userId, limit = 50) {
   const estimatedTotal = selectable.reduce((sum, i) => sum + i.defaultTip, 0);
 
   return {
-    source: 'spotify',
+    source,
     items,
     summary: {
       total: items.length,
@@ -131,7 +199,39 @@ async function previewSpotifyImport(userId, limit = 50) {
   };
 }
 
-async function executeSpotifyImport(userId, { items, defaultTip } = {}) {
+async function previewSpotifyImport(userId, limit = 50) {
+  const user = await User.findById(userId).select('spotifyAccessToken preferences balance');
+  if (!user?.spotifyAccessToken) {
+    const err = new Error('Spotify not connected. Please connect your Spotify account first.');
+    err.status = 400;
+    throw err;
+  }
+
+  const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  const savedTracks = await spotifyService.getSavedTracks(user.spotifyAccessToken, cappedLimit);
+  const tracks = savedTracks.map(spotifyService.convertSavedTrackToTuneableFormat);
+  return previewImportFromTracks(userId, 'spotify', tracks, user);
+}
+
+async function previewSoundCloudImport(userId, limit = 50) {
+  const user = await User.findById(userId).select(
+    'soundcloudAccessToken soundcloudRefreshToken preferences balance'
+  );
+  if (!user?.soundcloudAccessToken && !user?.soundcloudRefreshToken) {
+    const err = new Error('SoundCloud not connected. Please connect your SoundCloud account first.');
+    err.status = 400;
+    throw err;
+  }
+
+  const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  const likedTracks = await soundcloudService.getLikedTracks(userId, cappedLimit);
+  const tracks = likedTracks.map(soundcloudService.convertLikedTrackToTuneableFormat);
+  // Reload balance/preferences in case token refresh mutated user elsewhere
+  const freshUser = await User.findById(userId).select('preferences balance');
+  return previewImportFromTracks(userId, 'soundcloud', tracks, freshUser || user);
+}
+
+async function executeLibraryImport(userId, { items, defaultTip } = {}) {
   if (!Array.isArray(items) || items.length === 0) {
     const err = new Error('No items to import');
     err.status = 400;
@@ -212,6 +312,11 @@ async function executeSpotifyImport(userId, { items, defaultTip } = {}) {
         : 'external';
 
       const externalMedia = item.externalMedia || null;
+
+      if (mediaId !== 'external' && externalMedia) {
+        await mergeExternalIdsOntoMedia(mediaId, externalMedia);
+      }
+
       const out = await placeGlobalBid(userId, { mediaId, amount, externalMedia });
 
       results.tipped++;
@@ -243,9 +348,20 @@ async function executeSpotifyImport(userId, { items, defaultTip } = {}) {
   return results;
 }
 
+async function executeSpotifyImport(userId, opts) {
+  return executeLibraryImport(userId, opts);
+}
+
+async function executeSoundCloudImport(userId, opts) {
+  return executeLibraryImport(userId, opts);
+}
+
 module.exports = {
   previewSpotifyImport,
+  previewSoundCloudImport,
   executeSpotifyImport,
+  executeSoundCloudImport,
+  executeLibraryImport,
   MIN_TIP,
   MAX_BATCH,
 };

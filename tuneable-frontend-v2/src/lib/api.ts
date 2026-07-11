@@ -1180,6 +1180,40 @@ export const userAPI = {
     };
   },
 
+  getSoundCloudStatus: async () => {
+    const response = await api.get('/users/me/soundcloud-status');
+    return response.data as { connected: boolean };
+  },
+
+  previewSoundCloudImport: async (limit = 50) => {
+    const response = await api.get('/users/me/import/soundcloud/preview', { params: { limit } });
+    return response.data;
+  },
+
+  executeSoundCloudImport: async (
+    items: Array<{
+      key: string;
+      title?: string;
+      selected?: boolean;
+      mediaId?: string;
+      amount: number;
+      externalMedia?: Record<string, unknown>;
+      skipIfInLibrary?: boolean;
+    }>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/soundcloud/execute', { items, defaultTip });
+    return response.data as {
+      success: boolean;
+      tipped: number;
+      skipped: number;
+      failed: number;
+      totalSpent: number;
+      updatedBalance: number;
+      items: Array<{ key: string; title: string; status: string; error?: string }>;
+    };
+  },
+
   // Get user's tip history (all individual bids/tips)
   getTipHistory: async (params?: {
     partyId?: string;

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -16,7 +16,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { userAPI } from '../lib/api';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { buildOAuthStartUrl } from '../utils/platform';
 
+type ImportSource = 'spotify' | 'soundcloud';
 type MatchStatus = 'in_library' | 'on_catalog' | 'new';
 
 interface ImportItem {
@@ -61,12 +63,42 @@ const STATUS_COLORS: Record<MatchStatus, string> = {
   new: 'bg-purple-900/40 text-purple-300 border-purple-700',
 };
 
+const SOURCE_META: Record<ImportSource, {
+  label: string;
+  likesLabel: string;
+  accent: string;
+  accentHover: string;
+  badge: string;
+}> = {
+  spotify: {
+    label: 'Spotify',
+    likesLabel: 'Spotify likes',
+    accent: 'bg-green-600',
+    accentHover: 'hover:bg-green-500',
+    badge: 'bg-green-600',
+  },
+  soundcloud: {
+    label: 'SoundCloud',
+    likesLabel: 'SoundCloud likes',
+    accent: 'bg-orange-600',
+    accentHover: 'hover:bg-orange-500',
+    badge: 'bg-orange-600',
+  },
+};
+
+function parseSource(value: string | null): ImportSource {
+  return value === 'soundcloud' ? 'soundcloud' : 'spotify';
+}
+
 const LibraryImport: React.FC = () => {
   const navigate = useNavigate();
-  const { user, refreshUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, refreshUser, handleOAuthCallback } = useAuth();
 
+  const [source, setSource] = useState<ImportSource>(() => parseSource(searchParams.get('source')));
   const [step, setStep] = useState<'connect' | 'review' | 'done'>('connect');
   const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [soundcloudConnected, setSoundcloudConnected] = useState(false);
   const [limit, setLimit] = useState(50);
   const [isLoading, setIsLoading] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -82,36 +114,112 @@ const LibraryImport: React.FC = () => {
     updatedBalance: number;
   } | null>(null);
 
-  const checkSpotify = useCallback(async () => {
+  const meta = SOURCE_META[source];
+  const isConnected = source === 'spotify' ? spotifyConnected : soundcloudConnected;
+  const oauthHandledRef = React.useRef(false);
+
+  const checkConnections = useCallback(async () => {
     try {
-      const status = await userAPI.getSpotifyStatus();
-      setSpotifyConnected(status.connected);
+      const [spotify, soundcloud] = await Promise.all([
+        userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
+        userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
+      ]);
+      setSpotifyConnected(!!spotify.connected);
+      setSoundcloudConnected(!!soundcloud.connected);
     } catch {
       setSpotifyConnected(false);
+      setSoundcloudConnected(false);
     }
   }, []);
 
   useEffect(() => {
-    void checkSpotify();
-  }, [checkSpotify]);
+    void checkConnections();
+  }, [checkConnections]);
 
-  const connectSpotify = () => {
+  // Complete OAuth when redirected back to /import with a token
+  useEffect(() => {
+    const urlToken = searchParams.get('token');
+    const error = searchParams.get('error');
+    const message = searchParams.get('message');
+
+    if (error) {
+      toast.error(decodeURIComponent(message || 'Connection failed'));
+      const next = new URLSearchParams(searchParams);
+      next.delete('error');
+      next.delete('message');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    if (!urlToken || !handleOAuthCallback || oauthHandledRef.current) return;
+    oauthHandledRef.current = true;
+
+    handleOAuthCallback(urlToken)
+      .then(async () => {
+        await refreshUser?.();
+        await checkConnections();
+        const next = new URLSearchParams(searchParams);
+        next.delete('token');
+        next.delete('oauth_success');
+        setSearchParams(next, { replace: true });
+        toast.success('Account connected — you can load your likes now');
+      })
+      .catch(() => {
+        oauthHandledRef.current = false;
+        toast.error('Failed to complete account connection');
+        const next = new URLSearchParams(searchParams);
+        next.delete('token');
+        setSearchParams(next, { replace: true });
+      });
+  }, [searchParams, handleOAuthCallback, refreshUser, checkConnections, setSearchParams]);
+
+  useEffect(() => {
+    const fromQuery = parseSource(searchParams.get('source'));
+    if (fromQuery !== source) setSource(fromQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync URL → state only
+  }, [searchParams]);
+
+  const selectSource = (next: ImportSource) => {
+    setSource(next);
+    setStep('connect');
+    setItems([]);
+    setSummary(null);
+    setExecuteResult(null);
+    const params = new URLSearchParams(searchParams);
+    params.set('source', next);
+    setSearchParams(params, { replace: true });
+  };
+
+  const connectSource = () => {
+    const token = localStorage.getItem('token') || undefined;
+    const redirect = `${window.location.origin}/import?source=${source}`;
+
+    if (source === 'soundcloud') {
+      window.location.href = buildOAuthStartUrl('soundcloud', {
+        linkAccount: true,
+        token,
+        customRedirect: redirect,
+      });
+      return;
+    }
+
     const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '')
       || import.meta.env.VITE_BACKEND_URL
       || 'http://localhost:8000';
-    const redirectUrl = encodeURIComponent(`${window.location.origin}/import`);
-    const token = localStorage.getItem('token');
+    const redirectUrl = encodeURIComponent(redirect);
     window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
   };
 
   const loadPreview = async () => {
-    if (!spotifyConnected) {
-      connectSpotify();
+    if (!isConnected) {
+      connectSource();
       return;
     }
     setIsLoading(true);
     try {
-      const data = await userAPI.previewSpotifyImport(limit);
+      const data = source === 'soundcloud'
+        ? await userAPI.previewSoundCloudImport(limit)
+        : await userAPI.previewSpotifyImport(limit);
       setItems(data.items || []);
       setSummary(data.summary || null);
       const amounts: Record<string, string> = {};
@@ -122,7 +230,12 @@ const LibraryImport: React.FC = () => {
       setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 0.11));
       setStep('review');
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || error?.message || 'Failed to load Spotify likes');
+      const message = error?.response?.data?.error || error?.message || `Failed to load ${meta.likesLabel}`;
+      toast.error(message);
+      if (error?.response?.status === 401) {
+        if (source === 'spotify') setSpotifyConnected(false);
+        else setSoundcloudConnected(false);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -149,6 +262,24 @@ const LibraryImport: React.FC = () => {
       ...i,
       selected: i.matchStatus === 'in_library' ? false : selected,
     })));
+  };
+
+  const selectAffordable = () => {
+    let remaining = userBalance;
+    const nextTips = { ...tipAmounts };
+    setItems((prev) => prev.map((item) => {
+      if (item.matchStatus === 'in_library') {
+        return { ...item, selected: false };
+      }
+      const tip = parseFloat(nextTips[item.key] ?? bulkTip);
+      const amount = Number.isFinite(tip) && tip >= 0.01 ? tip : 0.11;
+      if (amount <= remaining + 0.0001) {
+        remaining -= amount;
+        return { ...item, selected: true };
+      }
+      return { ...item, selected: false };
+    }));
+    toast.success('Selected tracks that fit your balance');
   };
 
   const applyBulkTip = () => {
@@ -189,7 +320,9 @@ const LibraryImport: React.FC = () => {
         skipIfInLibrary: true,
       }));
 
-      const result = await userAPI.executeSpotifyImport(payload, parseFloat(bulkTip));
+      const result = source === 'soundcloud'
+        ? await userAPI.executeSoundCloudImport(payload, parseFloat(bulkTip))
+        : await userAPI.executeSpotifyImport(payload, parseFloat(bulkTip));
       setExecuteResult({
         tipped: result.tipped,
         skipped: result.skipped,
@@ -232,62 +365,100 @@ const LibraryImport: React.FC = () => {
             Import &amp; Support
           </h1>
           <p className="text-gray-400 mt-2 max-w-2xl">
-            Bring your Spotify likes onto Tuneable and tip each track to add it to your library.
+            Bring your likes onto Tuneable and tip each track to add it to your library.
+            We cross-check the catalog first so you only pay for tracks you don&apos;t already support.
             Tracks without audio yet are still tip-able — you&apos;re backing artists before playback is available.
           </p>
         </div>
 
         {step === 'connect' && (
-          <div className="bg-gray-800 rounded-xl p-8 border border-gray-700">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-full bg-green-600 flex items-center justify-center">
-                <Music className="w-7 h-7" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">Spotify Likes</h2>
-                <p className="text-gray-400 text-sm">
-                  {spotifyConnected ? 'Connected' : 'Connect to import saved tracks'}
-                </p>
-              </div>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              {(['spotify', 'soundcloud'] as ImportSource[]).map((s) => {
+                const sMeta = SOURCE_META[s];
+                const connected = s === 'spotify' ? spotifyConnected : soundcloudConnected;
+                const active = source === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => selectSource(s)}
+                    className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors ${
+                      active
+                        ? 'border-purple-500 bg-gray-800'
+                        : 'border-gray-700 bg-gray-800/50 hover:border-gray-500'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full ${sMeta.badge} flex items-center justify-center`}>
+                        <Music className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">{sMeta.label}</div>
+                        <div className="text-xs text-gray-400">
+                          {connected ? 'Connected' : 'Not connected'}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {!spotifyConnected ? (
-              <button
-                type="button"
-                onClick={connectSpotify}
-                className="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-medium"
-              >
-                Connect Spotify
-              </button>
-            ) : (
-              <div className="space-y-4">
-                <label className="block text-sm text-gray-400">
-                  How many liked tracks to load? (max 200)
-                  <input
-                    type="number"
-                    min={1}
-                    max={200}
-                    value={limit}
-                    onChange={(e) => setLimit(Math.min(200, Math.max(1, parseInt(e.target.value, 10) || 50)))}
-                    className="mt-1 w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                  />
-                </label>
+            <div className="bg-gray-800 rounded-xl p-8 border border-gray-700">
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`w-14 h-14 rounded-full ${meta.badge} flex items-center justify-center`}>
+                  <Music className="w-7 h-7" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">{meta.likesLabel}</h2>
+                  <p className="text-gray-400 text-sm">
+                    {isConnected ? 'Connected — ready to preview cost' : `Connect to import liked tracks`}
+                  </p>
+                </div>
+              </div>
+
+              {!isConnected ? (
                 <button
                   type="button"
-                  onClick={() => void loadPreview()}
-                  disabled={isLoading}
-                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                  onClick={connectSource}
+                  className={`w-full py-3 ${meta.accent} ${meta.accentHover} rounded-lg font-medium`}
                 >
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                  Load my Spotify likes
+                  Connect {meta.label}
                 </button>
-              </div>
-            )}
+              ) : (
+                <div className="space-y-4">
+                  <label className="block text-sm text-gray-400">
+                    How many liked tracks to load? (max 200)
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={limit}
+                      onChange={(e) => setLimit(Math.min(200, Math.max(1, parseInt(e.target.value, 10) || 50)))}
+                      className="mt-1 w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void loadPreview()}
+                    disabled={isLoading}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                  >
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    Load my {meta.likesLabel}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {step === 'review' && summary && (
           <>
+            <div className="mb-4 text-sm text-gray-400">
+              Source: <span className="text-white font-medium">{meta.label}</span>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <div className="text-2xl font-bold">{summary.total}</div>
@@ -329,12 +500,15 @@ const LibraryImport: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex gap-2 text-sm">
+              <div className="flex flex-wrap gap-3 text-sm">
                 <button type="button" onClick={() => toggleAll(true)} className="text-purple-400 hover:underline">
                   Select all
                 </button>
                 <button type="button" onClick={() => toggleAll(false)} className="text-gray-400 hover:underline">
                   Clear
+                </button>
+                <button type="button" onClick={selectAffordable} className="text-yellow-300 hover:underline">
+                  Select what I can afford
                 </button>
               </div>
             </div>

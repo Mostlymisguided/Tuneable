@@ -254,7 +254,6 @@ const UserProfile: React.FC = () => {
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<any>(null);
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
@@ -304,15 +303,6 @@ const UserProfile: React.FC = () => {
     }
   });
 
-  useEffect(() => {
-    const viewingOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
-    if (!viewingOwnProfile || !showAddTunePanel) return;
-
-    userAPI.getSpotifyStatus()
-      .then((data) => setSpotifyConnected(!!data.connected))
-      .catch(() => setSpotifyConnected(false));
-  }, [showAddTunePanel, currentUser, user]);
-  
   // Social media modal state
   const [socialModal, setSocialModal] = useState<{
     isOpen: boolean;
@@ -1080,28 +1070,10 @@ const UserProfile: React.FC = () => {
     setShowAddTuneTagModal(true);
   };
 
-  const handleConnectSpotify = () => {
+  const handleImportLikes = () => {
     if (!currentUser) {
-      toast.error('Please log in to connect Spotify');
+      toast.error('Please log in to import likes');
       navigate('/login');
-      return;
-    }
-
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-    const redirectUrl = encodeURIComponent(`${window.location.origin}${window.location.pathname}?view=tune-library`);
-    const token = authToken || localStorage.getItem('token');
-    window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-  };
-
-  const handleImportSpotifyLikes = () => {
-    if (!currentUser) {
-      toast.error('Please log in to import Spotify likes');
-      navigate('/login');
-      return;
-    }
-
-    if (!spotifyConnected) {
-      handleConnectSpotify();
       return;
     }
 
@@ -2155,10 +2127,10 @@ const UserProfile: React.FC = () => {
                       )}
                     </button>
                     <button
-                      onClick={handleImportSpotifyLikes}
+                      onClick={handleImportLikes}
                       className="flex py-2 px-4 bg-green-700 hover:bg-green-600 text-white rounded-lg font-medium transition-colors text-sm sm:text-base items-center justify-center gap-2"
                     >
-                      <span>{spotifyConnected ? 'Import Spotify Likes' : 'Connect Spotify'}</span>
+                      <span>Import Likes</span>
                     </button>
                   </div>
                   <p className="mt-3 text-xs text-gray-400">

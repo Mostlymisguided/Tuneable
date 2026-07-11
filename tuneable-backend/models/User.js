@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
   soundcloudId: { type: String, unique: true, sparse: true },
   soundcloudUsername: { type: String },
   soundcloudAccessToken: { type: String },
+  soundcloudRefreshToken: { type: String },
   instagramId: { type: String, unique: true, sparse: true },
   instagramUsername: { type: String },
   instagramAccessToken: { type: String },

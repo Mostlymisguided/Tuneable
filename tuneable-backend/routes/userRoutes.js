@@ -1479,6 +1479,63 @@ router.post('/me/import/spotify/execute', authMiddleware, async (req, res) => {
   }
 });
 
+// Check whether the authenticated user has SoundCloud connected
+router.get('/me/soundcloud-status', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('soundcloudId').lean();
+    res.json({ connected: !!user?.soundcloudId });
+  } catch (error) {
+    console.error('Error checking SoundCloud status:', error);
+    res.status(500).json({ error: 'Failed to check SoundCloud status' });
+  }
+});
+
+// @route   GET /api/users/me/import/soundcloud/preview
+// @desc    Preview SoundCloud likes import with catalog match + cost estimate
+// @access  Private
+router.get('/me/import/soundcloud/preview', authMiddleware, async (req, res) => {
+  try {
+    const limit = req.query.limit;
+    const libraryImportService = require('../services/libraryImportService');
+    const preview = await libraryImportService.previewSoundCloudImport(req.user._id, limit);
+    res.json(preview);
+  } catch (error) {
+    const status = error.status || 500;
+    if (error.response?.status === 401 || status === 401) {
+      return res.status(401).json({ error: 'SoundCloud token expired. Please reconnect SoundCloud.' });
+    }
+    console.error('SoundCloud import preview error:', error);
+    res.status(status).json({
+      error: error.message || 'Failed to preview import',
+      details: error.details,
+    });
+  }
+});
+
+// @route   POST /api/users/me/import/soundcloud/execute
+// @desc    Batch tip + import selected SoundCloud likes
+// @access  Private
+router.post('/me/import/soundcloud/execute', authMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportService = require('../services/libraryImportService');
+    const results = await libraryImportService.executeSoundCloudImport(req.user._id, { items, defaultTip });
+    res.json({
+      success: true,
+      ...results,
+      totalSpent: results.totalSpentPence / 100,
+      updatedBalance: results.updatedBalance / 100,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    console.error('SoundCloud import execute error:', error);
+    res.status(status).json({
+      error: error.message || 'Failed to execute import',
+      details: error.details,
+    });
+  }
+});
+
 // Get a user's tune library by userId (public - for viewing other users' profiles)
 // @route   GET /api/users/:userId/tune-library
 // @desc    Get a user's tune library (public profile data)

@@ -833,6 +833,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             }
             // SoundCloud account is already linked to the current user - just update tokens
             user.soundcloudAccessToken = accessToken;
+            if (refreshToken) user.soundcloudRefreshToken = refreshToken;
             user.oauthVerified = user.oauthVerified || {};
             user.oauthVerified.soundcloud = true;
             await user.save();
@@ -841,6 +842,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           
           // Not linking - just log in as the existing user
           user.soundcloudAccessToken = accessToken;
+          if (refreshToken) user.soundcloudRefreshToken = refreshToken;
           user.oauthVerified = user.oauthVerified || {};
           user.oauthVerified.soundcloud = true; // Mark SoundCloud OAuth as verified
           
@@ -881,6 +883,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
               user.soundcloudId = profile.id;
               user.soundcloudUsername = profile.username;
               user.soundcloudAccessToken = accessToken;
+              if (refreshToken) user.soundcloudRefreshToken = refreshToken;
               user.oauthVerified = user.oauthVerified || {};
               user.oauthVerified.soundcloud = true;
               
@@ -904,6 +907,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             user.soundcloudId = profile.id;
             user.soundcloudUsername = profile.username;
             user.soundcloudAccessToken = accessToken;
+            if (refreshToken) user.soundcloudRefreshToken = refreshToken;
             user.oauthVerified = user.oauthVerified || {};
             user.oauthVerified.soundcloud = true; // Mark SoundCloud OAuth as verified
             
@@ -940,6 +944,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
               user.soundcloudId = profile.id;
               user.soundcloudUsername = profile.username;
               user.soundcloudAccessToken = accessToken;
+              if (refreshToken) user.soundcloudRefreshToken = refreshToken;
               user.oauthVerified = user.oauthVerified || {};
               user.oauthVerified.soundcloud = true;
               
@@ -958,6 +963,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
             user.soundcloudId = profile.id;
             user.soundcloudUsername = profile.username;
             user.soundcloudAccessToken = accessToken;
+            if (refreshToken) user.soundcloudRefreshToken = refreshToken;
             user.oauthVerified = user.oauthVerified || {};
             user.oauthVerified.soundcloud = true;
             
@@ -983,6 +989,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           currentUser.soundcloudId = profile.id;
           currentUser.soundcloudUsername = profile.username;
           currentUser.soundcloudAccessToken = accessToken;
+          if (refreshToken) currentUser.soundcloudRefreshToken = refreshToken;
           currentUser.oauthVerified = currentUser.oauthVerified || {};
           currentUser.oauthVerified.soundcloud = true;
           
@@ -1065,6 +1072,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           soundcloudId: profile.id,
           soundcloudUsername: profile.username,
           soundcloudAccessToken: accessToken,
+          ...(refreshToken ? { soundcloudRefreshToken: refreshToken } : {}),
           email: emailValue,
           username: finalUsername,
           givenName: profile.name ? profile.name.givenName : null,

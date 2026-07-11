@@ -613,6 +613,9 @@ mediaSchema.index({ "externalIds.podcastIndex": 1 }); // Index for Podcast Index
 mediaSchema.index({ "externalIds.taddy": 1 }); // Index for Taddy UUID lookups
 mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
 mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
+mediaSchema.index({ "externalIds.soundcloud": 1 }); // Index for SoundCloud import matching
+mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify import matching
+mediaSchema.index({ "sources.soundcloud": 1 }); // Index for SoundCloud permalink matching
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.targetId": 1 }); // Index for finding relationships to specific media
 mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by owner

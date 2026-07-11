@@ -2364,7 +2364,7 @@ Join here: ${inviteLink}`.trim();
               className="px-4 py-2 rounded-lg bg-purple-900/50 hover:bg-purple-800/60 border border-purple-700 text-purple-100 font-medium transition-colors text-sm sm:text-base flex items-center justify-center gap-2"
             >
               <Upload className="h-4 w-4" />
-              Import Spotify Likes
+              Import Likes
             </Link>
           </div>
         ) : (
