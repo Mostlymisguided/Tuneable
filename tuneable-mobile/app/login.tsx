@@ -31,7 +31,9 @@ export default function LoginScreen() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'facebook' | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
 
   if (!authLoading && isAuthenticated) {
@@ -68,12 +70,12 @@ export default function LoginScreen() {
     }
   };
 
-  const onGoogle = async () => {
+  const onOAuth = async (provider: 'google' | 'facebook') => {
     setError(null);
-    setOauthLoading(true);
+    setOauthLoading(provider);
     try {
       const redirectUrl = getOAuthCallbackRedirect();
-      const startUrl = buildOAuthStartUrl('google');
+      const startUrl = buildOAuthStartUrl(provider);
       const result = await WebBrowser.openAuthSessionAsync(startUrl, redirectUrl);
 
       if (result.type === 'success' && result.url) {
@@ -84,7 +86,7 @@ export default function LoginScreen() {
         }
         const token = extractTokenFromUrl(result.url);
         if (!token) {
-          setError('Google sign-in did not return a token.');
+          setError(`${provider} sign-in did not return a token.`);
           return;
         }
         await handleOAuthCallback(token);
@@ -94,14 +96,16 @@ export default function LoginScreen() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Google sign-in failed.'
+        err instanceof Error
+          ? err.message
+          : `${provider} sign-in failed.`
       );
     } finally {
-      setOauthLoading(false);
+      setOauthLoading(null);
     }
   };
 
-  const busy = submitting || oauthLoading;
+  const busy = submitting || oauthLoading !== null;
 
   return (
     <Screen>
@@ -165,12 +169,23 @@ export default function LoginScreen() {
 
           <Pressable
             style={[styles.googleBtn, busy && styles.buttonDisabled]}
-            onPress={() => void onGoogle()}
+            onPress={() => void onOAuth('google')}
             disabled={busy}>
-            {oauthLoading ? (
+            {oauthLoading === 'google' ? (
               <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.googleText}>Continue with Google</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            style={[styles.googleBtn, busy && styles.buttonDisabled]}
+            onPress={() => void onOAuth('facebook')}
+            disabled={busy}>
+            {oauthLoading === 'facebook' ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Text style={styles.googleText}>Continue with Facebook</Text>
             )}
           </Pressable>
 

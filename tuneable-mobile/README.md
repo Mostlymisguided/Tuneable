@@ -40,7 +40,9 @@ Restart Expo after changing `.env`.
 - [x] Tip on music/podcast charts (global bid)
 - [x] Wallet top-up via Stripe Checkout (browser + deep link)
 - [x] Google OAuth (browser + deep link)
-- [ ] Facebook / SoundCloud OAuth (same pattern)
+- [x] Facebook OAuth (same pattern)
+- [x] Music search + Add & tip to global chart
+- [ ] SoundCloud OAuth / polish
 
 ## Scripts
 

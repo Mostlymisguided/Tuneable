@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -52,9 +53,11 @@ export default function MusicScreen() {
     }
   }, [period]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   const totals = useMemo(() => {
     const tips = media.reduce((sum, m) => sum + (m.partyMediaAggregate ?? 0), 0);
@@ -115,6 +118,12 @@ export default function MusicScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Music</Text>
             <Text style={styles.subtitle}>Global chart</Text>
+
+            <Pressable
+              style={styles.addTunesBtn}
+              onPress={() => router.push('/music-search')}>
+              <Text style={styles.addTunesText}>Add tunes</Text>
+            </Pressable>
 
             <View style={styles.periods}>
               {TIME_PERIODS.map((p) => {
@@ -232,6 +241,21 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     color: colors.textSecondary,
     fontSize: 15,
+  },
+  addTunesBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  addTunesText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
   },
   periods: {
     flexDirection: 'row',
