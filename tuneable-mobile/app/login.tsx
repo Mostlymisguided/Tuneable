@@ -10,17 +10,28 @@ import {
   View,
 } from 'react-native';
 import { Redirect, router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import axios from 'axios';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
 import { colors } from '@/src/theme/colors';
 import { API_ORIGIN } from '@/src/api/client';
+import {
+  buildOAuthStartUrl,
+  extractOAuthError,
+  extractTokenFromUrl,
+  getOAuthCallbackRedirect,
+} from '@/src/lib/oauth';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, handleOAuthCallback, isAuthenticated, isLoading: authLoading } =
+    useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!authLoading && isAuthenticated) {
@@ -57,6 +68,41 @@ export default function LoginScreen() {
     }
   };
 
+  const onGoogle = async () => {
+    setError(null);
+    setOauthLoading(true);
+    try {
+      const redirectUrl = getOAuthCallbackRedirect();
+      const startUrl = buildOAuthStartUrl('google');
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, redirectUrl);
+
+      if (result.type === 'success' && result.url) {
+        const oauthError = extractOAuthError(result.url);
+        if (oauthError) {
+          setError(oauthError.replace(/_/g, ' '));
+          return;
+        }
+        const token = extractTokenFromUrl(result.url);
+        if (!token) {
+          setError('Google sign-in did not return a token.');
+          return;
+        }
+        await handleOAuthCallback(token);
+        router.replace('/(tabs)');
+      } else if (result.type === 'cancel') {
+        setError(null);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Google sign-in failed.'
+      );
+    } finally {
+      setOauthLoading(false);
+    }
+  };
+
+  const busy = submitting || oauthLoading;
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -80,7 +126,7 @@ export default function LoginScreen() {
             placeholderTextColor={colors.textMuted}
             value={identifier}
             onChangeText={setIdentifier}
-            editable={!submitting}
+            editable={!busy}
           />
 
           <Text style={styles.label}>Password</Text>
@@ -94,20 +140,37 @@ export default function LoginScreen() {
             placeholderTextColor={colors.textMuted}
             value={password}
             onChangeText={setPassword}
-            editable={!submitting}
+            editable={!busy}
             onSubmitEditing={() => void onSubmit()}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            style={[styles.button, submitting && styles.buttonDisabled]}
+            style={[styles.button, busy && styles.buttonDisabled]}
             onPress={() => void onSubmit()}
-            disabled={submitting}>
+            disabled={busy}>
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
+            )}
+          </Pressable>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.divider} />
+          </View>
+
+          <Pressable
+            style={[styles.googleBtn, busy && styles.buttonDisabled]}
+            onPress={() => void onGoogle()}
+            disabled={busy}>
+            {oauthLoading ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Text style={styles.googleText}>Continue with Google</Text>
             )}
           </Pressable>
 
@@ -169,6 +232,36 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  divider: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.cardBorder,
+  },
+  dividerText: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  googleBtn: {
+    marginTop: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  googleText: {
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },

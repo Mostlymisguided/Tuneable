@@ -29,6 +29,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
+  handleOAuthCallback: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -121,6 +122,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const handleOAuthCallback = useCallback(async (oauthToken: string) => {
+    setToken(oauthToken);
+    try {
+      // Temporarily set getter so getProfile uses the new token
+      tokenRef.current = oauthToken;
+      const { user: fresh } = await authAPI.getProfile();
+      setUser(fresh);
+      await saveSession(oauthToken, JSON.stringify(fresh));
+    } catch (error) {
+      setToken(null);
+      tokenRef.current = null;
+      await clearSession();
+      throw error;
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -131,8 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshUser,
       updateBalance,
+      handleOAuthCallback,
     }),
-    [user, token, isLoading, login, logout, refreshUser, updateBalance]
+    [
+      user,
+      token,
+      isLoading,
+      login,
+      logout,
+      refreshUser,
+      updateBalance,
+      handleOAuthCallback,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

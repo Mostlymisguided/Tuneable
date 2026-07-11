@@ -39,7 +39,8 @@ Restart Expo after changing `.env`.
 - [x] Podcast chart + enclosure playback (shared mini bar)
 - [x] Tip on music/podcast charts (global bid)
 - [x] Wallet top-up via Stripe Checkout (browser + deep link)
-- [ ] OAuth (P1)
+- [x] Google OAuth (browser + deep link)
+- [ ] Facebook / SoundCloud OAuth (same pattern)
 
 ## Scripts
 
