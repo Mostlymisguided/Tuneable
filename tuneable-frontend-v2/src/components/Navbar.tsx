@@ -71,16 +71,18 @@ const Navbar: React.FC = () => {
                   <Headphones className="h-5 w-5 sm:hidden" />
                   <span className="hidden sm:inline">Podcasts</span>
                 </Link>
-                <Link
-                  to="/conversations"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  <MessagesSquare className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Talks</span>
-                </Link>
+                {user.role?.includes('admin') && (
+                  <Link
+                    to="/conversations"
+                    className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
+                    style={{ textDecoration: 'none' }}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
+                  >
+                    <MessagesSquare className="h-5 w-5 sm:hidden" />
+                    <span className="hidden sm:inline">Talks</span>
+                  </Link>
+                )}
                 <Link
                   to="/party/global"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
@@ -189,22 +191,6 @@ const Navbar: React.FC = () => {
                   <Podcast className="h-5 w-5 sm:hidden" />
                   <span className="hidden sm:inline">Explore Podcasts</span>
                 </a>
-                <Link
-                  to="/conversations"
-                  className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
-                    (e.target as HTMLElement).style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                    (e.target as HTMLElement).style.color = '#D1D5DB';
-                  }}
-                >
-                  <MessagesSquare className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Talks</span>
-                </Link>
                 <Link
                   to="/login"
                   className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors"
