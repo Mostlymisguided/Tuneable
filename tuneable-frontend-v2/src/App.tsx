@@ -54,6 +54,9 @@ import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import ArtistEscrowDashboard from './pages/ArtistEscrowDashboard';
 import JoinUs from './pages/JoinUs';
+import Conversations from './pages/Conversations';
+import ConversationDetail from './pages/ConversationDetail';
+import CreateConversation from './pages/CreateConversation';
 
 // Define fade transition for toast notifications
 // Duration is controlled by CSS animations (0.3s for fadeIn, 0.2s for fadeOut)
@@ -206,6 +209,22 @@ const AppContent = () => {
             <Route 
               path="/podcasts" 
               element={<Podcasts />} 
+            />
+            <Route
+              path="/conversations"
+              element={<Conversations />}
+            />
+            <Route
+              path="/conversations/new"
+              element={
+                <ProtectedRoute>
+                  <CreateConversation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/conversations/:id"
+              element={<ConversationDetail />}
             />
             <Route 
               path="/podcasts/search" 

@@ -35,6 +35,14 @@ const notificationSchema = new mongoose.Schema({
       'payout_requested',        // Payout request submitted (admin notification)
       'payout_processed',        // Payout request processed
       'payout_rejected',         // Payout request rejected
+      'conversation_invite',     // Invited as conversation participant
+      'conversation_pledge',     // New pledge on a conversation
+      'conversation_funded',     // Conversation reached funding goal
+      'conversation_accepted',   // Participant accepted
+      'conversation_declined',   // Participant declined
+      'conversation_scheduled',  // Conversation scheduled
+      'conversation_completed',  // Conversation completed
+      'conversation_cancelled',  // Conversation cancelled (pledges refunded)
     ],
     required: true
   },
@@ -54,6 +62,7 @@ const notificationSchema = new mongoose.Schema({
   relatedCommentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment' },
   relatedLabelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Label' },
   relatedCollectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective' },
+  relatedConversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation' },
   
   // Invitation metadata
   inviteType: { type: String, enum: ['admin', 'artist', 'member'] }, // For label/collective invites

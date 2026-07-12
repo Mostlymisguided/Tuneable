@@ -2057,4 +2057,92 @@ export const ledgerAPI = {
   },
 };
 
+export const conversationAPI = {
+  list: async (params?: {
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    mine?: boolean;
+  }) => {
+    const response = await api.get('/conversations', {
+      params: {
+        ...params,
+        mine: params?.mine ? 'true' : undefined,
+      },
+    });
+    return response.data as {
+      conversations: any[];
+      total: number;
+      page: number;
+      totalPages: number;
+    };
+  },
+
+  get: async (id: string) => {
+    const response = await api.get(`/conversations/${id}`);
+    return response.data as { conversation: any };
+  },
+
+  create: async (payload: {
+    title: string;
+    description?: string;
+    topic?: string;
+    goalAmount: number;
+    minimumPledge?: number;
+    requireAcceptance?: boolean;
+    privacy?: 'public' | 'private';
+    participants: Array<{
+      kind?: 'person' | 'podcast';
+      role?: 'participant' | 'moderator' | 'host';
+      displayName?: string;
+      userId?: string;
+      mediaId?: string;
+    }>;
+  }) => {
+    const response = await api.post('/conversations', payload);
+    return response.data as { conversation: any };
+  },
+
+  pledge: async (id: string, amount: number, message?: string) => {
+    const response = await api.post(`/conversations/${id}/pledge`, { amount, message });
+    return response.data as { conversation: any; userBalance: number };
+  },
+
+  withdrawPledge: async (id: string) => {
+    const response = await api.post(`/conversations/${id}/withdraw-pledge`);
+    return response.data as { conversation: any; refunded: number; userBalance: number };
+  },
+
+  respond: async (id: string, responseValue: 'accepted' | 'declined') => {
+    const response = await api.post(`/conversations/${id}/respond`, { response: responseValue });
+    return response.data as { conversation: any };
+  },
+
+  schedule: async (id: string, payload: { scheduledAt?: string; livestreamUrl?: string }) => {
+    const response = await api.post(`/conversations/${id}/schedule`, payload);
+    return response.data as { conversation: any };
+  },
+
+  complete: async (id: string, payload?: { recordingUrl?: string; resultingMediaId?: string }) => {
+    const response = await api.post(`/conversations/${id}/complete`, payload || {});
+    return response.data as { conversation: any };
+  },
+
+  cancel: async (id: string, reason?: string) => {
+    const response = await api.post(`/conversations/${id}/cancel`, { reason });
+    return response.data as { conversation: any };
+  },
+
+  suggestTopic: async (id: string, text: string) => {
+    const response = await api.post(`/conversations/${id}/topics`, { text });
+    return response.data as { conversation: any };
+  },
+
+  voteTopic: async (id: string, topicId: string) => {
+    const response = await api.post(`/conversations/${id}/topics/${topicId}/vote`);
+    return response.data as { conversation: any };
+  },
+};
+
 export default api;

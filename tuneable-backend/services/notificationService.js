@@ -42,6 +42,7 @@ const createNotification = async (params) => {
       relatedCommentId,
       relatedLabelId,
       relatedCollectiveId,
+      relatedConversationId,
       inviteType,
       inviteRole,
       groupKey
@@ -90,6 +91,7 @@ const createNotification = async (params) => {
       relatedCommentId,
       relatedLabelId,
       relatedCollectiveId,
+      relatedConversationId,
       inviteType,
       inviteRole,
       groupKey,
@@ -105,6 +107,7 @@ const createNotification = async (params) => {
       .populate('relatedUserId', 'username profilePic uuid')
       .populate('relatedLabelId', 'name slug uuid')
       .populate('relatedCollectiveId', 'name slug uuid')
+      .populate('relatedConversationId', 'title uuid')
       .lean();
 
     // Send real-time notification via Socket.IO
