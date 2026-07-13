@@ -2,21 +2,26 @@ import { api } from './client';
 import type { SortedMediaResponse } from '@/src/types/media';
 
 export type AddMediaBody = {
-  url: string;
+  url?: string;
   title: string;
   artist: string;
   bidAmount: number; // pounds
-  platform: string;
+  platform?: string;
   duration?: number;
   coverArt?: string | null;
   category?: string;
   tags?: string[];
+  externalIds?: Record<string, string>;
+  album?: string | null;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
 };
 
 export type AddMediaResponse = {
   message?: string;
   updatedBalance?: number;
   isNewMedia?: boolean;
+  isDuplicate?: boolean;
 };
 
 export const partyAPI = {

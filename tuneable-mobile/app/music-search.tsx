@@ -27,10 +27,7 @@ import {
   type SearchResultItem,
 } from '@/src/types/search';
 
-function isYouTubeUrl(s: string): boolean {
-  const lower = s.toLowerCase();
-  return lower.includes('youtube.com/') || lower.includes('youtu.be/');
-}
+const SEARCH_SOURCE = 'musicbrainz';
 
 export default function MusicSearchScreen() {
   const { user, updateBalance } = useAuth();
@@ -55,20 +52,14 @@ export default function MusicSearchScreen() {
     setError(null);
     setResults([]);
     try {
-      let items: SearchResultItem[] = [];
-      if (isYouTubeUrl(q)) {
-        const res = await searchAPI.searchByYouTubeUrl(q);
-        items = res.videos ?? [];
-      } else {
-        const res = await searchAPI.search(q, { source: 'youtube' });
-        items = [...(res.videos ?? [])];
-        if (res.hasMoreExternal) {
-          const ext = await searchAPI.search(q, {
-            source: 'youtube',
-            forceExternal: true,
-          });
-          items = [...items, ...(ext.videos ?? [])];
-        }
+      const res = await searchAPI.search(q, { source: SEARCH_SOURCE });
+      let items: SearchResultItem[] = [...(res.videos ?? [])];
+      if (res.hasMoreExternal) {
+        const ext = await searchAPI.search(q, {
+          source: SEARCH_SOURCE,
+          forceExternal: true,
+        });
+        items = [...items, ...(ext.videos ?? [])];
       }
       setResults(items);
       setTipAmounts((prev) => {
@@ -88,9 +79,13 @@ export default function MusicSearchScreen() {
 
   const addAndTip = async (item: SearchResultItem) => {
     const id = searchResultId(item);
-    const url = searchResultUrl(item);
-    if (!url) {
-      Alert.alert('Missing URL', 'This result has no playable source URL.');
+    const url = searchResultUrl(item) ?? undefined;
+    const externalIds = item.externalIds;
+    if (!url && (!externalIds || Object.keys(externalIds).length === 0)) {
+      Alert.alert(
+        'Missing catalog data',
+        'This result has no source URL or MusicBrainz ID.'
+      );
       return;
     }
     const tipText = tipAmounts[id] ?? defaultTip;
@@ -121,6 +116,10 @@ export default function MusicSearchScreen() {
         coverArt: item.coverArt,
         category: item.category || 'Music',
         tags: item.tags,
+        externalIds,
+        album: item.album ?? null,
+        releaseDate: item.releaseDate ?? null,
+        releaseYear: item.releaseYear ?? null,
       });
       if (typeof res.updatedBalance === 'number') {
         updateBalance(res.updatedBalance);
@@ -153,7 +152,7 @@ export default function MusicSearchScreen() {
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
-          placeholder="Search library or paste YouTube URL"
+          placeholder="Search MusicBrainz or library"
           placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={setQuery}
@@ -190,13 +189,18 @@ export default function MusicSearchScreen() {
             <Text style={styles.empty}>No tunes found.</Text>
           ) : !hasSearched ? (
             <Text style={styles.empty}>
-              Search Tuneable or YouTube, then add with a tip.
+              Search the library and MusicBrainz catalog, then add with a tip.
+              Uploads stay playable in-app; catalog tips are tippable only until
+              someone uploads audio.
             </Text>
           ) : null
         }
         renderItem={({ item }) => {
           const id = searchResultId(item);
           const isAdding = addingId === id;
+          const label =
+            item.sourceLabel ||
+            (item.isLocal ? 'Library' : item.awaitingUpload ? 'MusicBrainz' : null);
           return (
             <View style={styles.card}>
               <Image
@@ -210,6 +214,7 @@ export default function MusicSearchScreen() {
                 <Text style={styles.artist} numberOfLines={1}>
                   {formatSearchArtist(item.artist)}
                 </Text>
+                {label ? <Text style={styles.sourceLabel}>{label}</Text> : null}
                 <View style={styles.tipRow}>
                   <Text style={styles.currency}>£</Text>
                   <TextInput
@@ -328,6 +333,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: colors.textSecondary,
     fontSize: 13,
+  },
+  sourceLabel: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   tipRow: {
     flexDirection: 'row',

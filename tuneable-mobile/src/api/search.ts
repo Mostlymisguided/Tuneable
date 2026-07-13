@@ -9,17 +9,10 @@ export const searchAPI = {
     const response = await api.get<SearchResponse>('/search', {
       params: {
         query,
-        source: options?.source ?? 'youtube',
+        source: options?.source ?? 'musicbrainz',
         forceExternal: options?.forceExternal ? 'true' : undefined,
         pageToken: options?.pageToken,
       },
-    });
-    return response.data;
-  },
-
-  searchByYouTubeUrl: async (url: string): Promise<SearchResponse> => {
-    const response = await api.get<SearchResponse>('/search/youtube-url', {
-      params: { url },
     });
     return response.data;
   },

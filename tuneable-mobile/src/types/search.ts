@@ -7,9 +7,15 @@ export interface SearchResultItem {
   coverArt?: string;
   duration?: number;
   sources?: Record<string, string>;
+  externalIds?: Record<string, string>;
   isLocal?: boolean;
   tags?: string[];
   category?: string;
+  album?: string | null;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
+  awaitingUpload?: boolean;
+  sourceLabel?: string;
 }
 
 export interface SearchResponse {
@@ -20,19 +26,28 @@ export interface SearchResponse {
 }
 
 export function searchResultId(item: SearchResultItem): string {
-  return item.id || item._id || item.uuid || item.sources?.youtube || '';
+  return (
+    item.id ||
+    item._id ||
+    item.uuid ||
+    item.externalIds?.musicbrainz ||
+    item.sources?.youtube ||
+    item.sources?.upload ||
+    ''
+  );
 }
 
 export function searchResultUrl(item: SearchResultItem): string | null {
   const s = item.sources;
   if (!s) return null;
-  return s.youtube || s.upload || Object.values(s).find(Boolean) || null;
+  return s.upload || s.youtube || Object.values(s).find(Boolean) || null;
 }
 
-export function searchResultPlatform(item: SearchResultItem): 'youtube' | 'upload' {
-  if (item.sources?.youtube) return 'youtube';
+export function searchResultPlatform(item: SearchResultItem): string | undefined {
   if (item.sources?.upload) return 'upload';
-  return 'youtube';
+  if (item.sources?.youtube) return 'youtube';
+  const first = Object.entries(item.sources || {}).find(([, value]) => Boolean(value));
+  return first?.[0];
 }
 
 export function formatSearchArtist(
