@@ -11,6 +11,7 @@ interface UserTopUpModalProps {
   username: string;
   currentBalance?: number; // in pence
   currentTunebytes?: number;
+  welcomeCreditRemainingPence?: number;
   onTopUpComplete?: () => void;
 }
 
@@ -21,6 +22,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
   username,
   currentBalance,
   currentTunebytes,
+  welcomeCreditRemainingPence = 0,
   onTopUpComplete
 }) => {
   const [activeTab, setActiveTab] = useState<'balance' | 'tunebytes'>('balance');
@@ -28,6 +30,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
   const [tunebytesAmount, setTunebytesAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
 
   const handleBalanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,8 +94,38 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
     }
   };
 
+  const handleRevokeWelcomeCredit = async () => {
+    const remainingPounds = (welcomeCreditRemainingPence / 100).toFixed(2);
+    if (
+      !window.confirm(
+        `Revoke £${remainingPounds} unspent welcome credit from ${username}? This cannot be undone from this dialog.`
+      )
+    ) {
+      return;
+    }
+
+    setIsRevoking(true);
+    try {
+      const result = await userAPI.revokeWelcomeCredit(
+        userId,
+        description.trim() || undefined
+      );
+      toast.success(result.message || `Revoked welcome credit for ${username}`);
+      setDescription('');
+      if (onTopUpComplete) {
+        onTopUpComplete();
+      }
+      onClose();
+    } catch (error: any) {
+      console.error('Error revoking welcome credit:', error);
+      toast.error(error.response?.data?.error || 'Failed to revoke welcome credit');
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !isRevoking) {
       setBalanceAmount('');
       setTunebytesAmount('');
       setDescription('');
@@ -103,6 +136,8 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
 
   if (!isOpen) return null;
 
+  const busy = isSubmitting || isRevoking;
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50" style={{ zIndex: 10000 }}>
       <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
@@ -111,7 +146,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
           <h2 className="text-xl font-bold text-white">Top Up Account</h2>
           <button
             onClick={handleClose}
-            disabled={isSubmitting}
+            disabled={busy}
             className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
@@ -123,7 +158,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
           <p className="text-sm text-gray-300">
             User: <span className="font-semibold text-white">{username}</span>
           </p>
-          <div className="mt-2 flex gap-4 text-sm">
+          <div className="mt-2 flex flex-wrap gap-4 text-sm">
             <div>
               <span className="text-gray-400">Balance: </span>
               <span className="text-white font-semibold">
@@ -136,6 +171,12 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                 {currentTunebytes !== undefined ? currentTunebytes.toLocaleString() : 'N/A'}
               </span>
             </div>
+            <div>
+              <span className="text-gray-400">Welcome credit left: </span>
+              <span className="text-white font-semibold">
+                {penceToPounds(welcomeCreditRemainingPence || 0)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -143,7 +184,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
         <div className="flex border-b border-gray-700">
           <button
             onClick={() => setActiveTab('balance')}
-            disabled={isSubmitting}
+            disabled={busy}
             className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'balance'
                 ? 'text-purple-400 border-b-2 border-purple-400 bg-gray-750'
@@ -157,7 +198,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('tunebytes')}
-            disabled={isSubmitting}
+            disabled={busy}
             className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'tunebytes'
                 ? 'text-purple-400 border-b-2 border-purple-400 bg-gray-750'
@@ -186,7 +227,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                   min="0.01"
                   value={balanceAmount}
                   onChange={(e) => setBalanceAmount(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={busy}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                   placeholder="0.00"
                   required
@@ -206,10 +247,10 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={busy}
                   rows={3}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 resize-none"
-                  placeholder="Reason for top-up..."
+                  placeholder="Reason for top-up or revoke..."
                 />
               </div>
 
@@ -217,14 +258,14 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                 <button
                   type="button"
                   onClick={handleClose}
-                  disabled={isSubmitting}
+                  disabled={busy}
                   className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !balanceAmount}
+                  disabled={busy || !balanceAmount}
                   className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
@@ -237,6 +278,30 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                   )}
                 </button>
               </div>
+
+              {welcomeCreditRemainingPence > 0 && (
+                <div className="pt-4 border-t border-gray-700">
+                  <p className="text-xs text-gray-400 mb-3">
+                    Revoke removes only unspent welcome credit ({penceToPounds(welcomeCreditRemainingPence)}),
+                    not Stripe top-ups or spent tips.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRevokeWelcomeCredit}
+                    disabled={busy}
+                    className="w-full px-4 py-2 bg-orange-700 hover:bg-orange-600 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isRevoking ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Revoking...
+                      </>
+                    ) : (
+                      `Revoke Welcome Credit (${penceToPounds(welcomeCreditRemainingPence)})`
+                    )}
+                  </button>
+                </div>
+              )}
             </form>
           ) : (
             <form onSubmit={handleTunebytesSubmit} className="space-y-4">
@@ -251,7 +316,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                   min="1"
                   value={tunebytesAmount}
                   onChange={(e) => setTunebytesAmount(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={busy}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                   placeholder="0"
                   required
@@ -271,7 +336,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={busy}
                   rows={3}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 resize-none"
                   placeholder="Reason for top-up..."
@@ -282,14 +347,14 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                 <button
                   type="button"
                   onClick={handleClose}
-                  disabled={isSubmitting}
+                  disabled={busy}
                   className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !tunebytesAmount}
+                  disabled={busy || !tunebytesAmount}
                   className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
@@ -311,4 +376,3 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
 };
 
 export default UserTopUpModal;
-

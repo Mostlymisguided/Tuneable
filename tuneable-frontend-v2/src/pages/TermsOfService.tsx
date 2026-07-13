@@ -148,6 +148,7 @@ const TermsOfService: React.FC = () => {
                   <li>Wallet funds can be added through secure payment processing via Stripe</li>
                   <li>Wallet balances are non-refundable except as required by law</li>
                   <li>Unused wallet funds remain in your account for future use</li>
+                  <li>Promotional welcome credit may be offered to new users at Tuneable's discretion. Welcome credit is not cash, has no monetary value outside the platform, and any unused welcome credit may be revoked by Tuneable at any time. Spent welcome credit is not clawed back from tips already placed.</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">4.2 Tipping Rules</h3>

@@ -217,7 +217,8 @@ async function placePledge({ conversationId, user, amountPounds, message }) {
   }
 
   const balanceBefore = freshUser.balance;
-  freshUser.balance -= amountPence;
+  const { applyWalletSpend } = require('../utils/welcomeCreditHelper');
+  const { welcomeCreditAppliedPence } = applyWalletSpend(freshUser, amountPence);
   await freshUser.save();
 
   await createWalletTx({
@@ -225,7 +226,11 @@ async function placePledge({ conversationId, user, amountPounds, message }) {
     amountPence,
     type: 'pledge',
     description: `Pledge to conversation: ${conversation.title}`,
-    metadata: { conversationId: conversation._id.toString(), conversationUuid: conversation.uuid },
+    metadata: {
+      conversationId: conversation._id.toString(),
+      conversationUuid: conversation.uuid,
+      welcomeCreditAppliedPence,
+    },
     balanceBefore,
   });
 
@@ -235,6 +240,7 @@ async function placePledge({ conversationId, user, amountPounds, message }) {
     user_uuid: freshUser.uuid,
     username: freshUser.username,
     amount: amountPence,
+    welcomeCreditAppliedPence,
     status: 'active',
     message: message?.trim()?.slice(0, 500) || undefined,
   });
@@ -271,8 +277,10 @@ async function withdrawPledge({ conversationId, user }) {
 
   const freshUser = await User.findById(user._id);
   let refunded = 0;
+  const { restoreWelcomeCredit } = require('../utils/welcomeCreditHelper');
   for (const pledge of active) {
     const balanceBefore = freshUser.balance;
+    restoreWelcomeCredit(freshUser, pledge.welcomeCreditAppliedPence || 0);
     freshUser.balance += pledge.amount;
     refunded += pledge.amount;
     pledge.status = 'refunded';
@@ -282,7 +290,11 @@ async function withdrawPledge({ conversationId, user }) {
       amountPence: pledge.amount,
       type: 'pledge_refund',
       description: `Pledge withdrawn: ${conversation.title}`,
-      metadata: { conversationId: conversation._id.toString(), pledgeId: pledge._id.toString() },
+      metadata: {
+        conversationId: conversation._id.toString(),
+        pledgeId: pledge._id.toString(),
+        welcomeCreditRestoredPence: pledge.welcomeCreditAppliedPence || 0,
+      },
       balanceBefore,
     });
   }
@@ -349,10 +361,12 @@ async function respondAsParticipant({ conversationId, user, response }) {
 
 async function refundAllActivePledges(conversation) {
   const active = (conversation.pledges || []).filter((p) => p.status === 'active');
+  const { restoreWelcomeCredit } = require('../utils/welcomeCreditHelper');
   for (const pledge of active) {
     const pledger = await User.findById(pledge.userId);
     if (!pledger) continue;
     const balanceBefore = pledger.balance;
+    restoreWelcomeCredit(pledger, pledge.welcomeCreditAppliedPence || 0);
     pledger.balance += pledge.amount;
     await pledger.save();
     pledge.status = 'refunded';
@@ -362,7 +376,11 @@ async function refundAllActivePledges(conversation) {
       amountPence: pledge.amount,
       type: 'pledge_refund',
       description: `Conversation cancelled refund: ${conversation.title}`,
-      metadata: { conversationId: conversation._id.toString(), pledgeId: pledge._id.toString() },
+      metadata: {
+        conversationId: conversation._id.toString(),
+        pledgeId: pledge._id.toString(),
+        welcomeCreditRestoredPence: pledge.welcomeCreditAppliedPence || 0,
+      },
       balanceBefore,
     });
   }

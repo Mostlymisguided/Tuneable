@@ -1057,6 +1057,12 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Revoke unspent welcome credit
+  revokeWelcomeCredit: async (userId: string, reason?: string) => {
+    const response = await api.post('/users/admin/revoke-welcome-credit', { userId, reason });
+    return response.data;
+  },
+
   // Admin: Top up user tunebytes
   topUpTunebytes: async (userId: string, amount: number, description?: string) => {
     const response = await api.post('/users/admin/top-up-tunebytes', { userId, amount, description });
@@ -1238,7 +1244,7 @@ export const userAPI = {
 
   // Get user's wallet transaction history
   getWalletHistory: async (params?: {
-    type?: 'topup' | 'refund' | 'adjustment' | 'beta_credit' | 'gift';
+    type?: 'topup' | 'refund' | 'adjustment' | 'beta_credit' | 'beta_credit_revoke' | 'gift';
     status?: 'pending' | 'completed' | 'failed' | 'refunded';
     paymentMethod?: 'stripe' | 'manual' | 'beta' | 'gift';
     startDate?: string;

@@ -3147,12 +3147,14 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     
     // Create bid using standard party bid flow
     const Bid = require('../models/Bid');
+    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
     // Store amount in pence (convert from pounds input)
     const bid = new Bid({
       userId,
       partyId: globalParty._id,
       mediaId: media._id,
       amount: bidAmountPence, // Store in pence
+      welcomeCreditAppliedPence: peekWelcomeCreditApplied(user, bidAmountPence),
       status: 'active',
       bidScope: 'global', // Mark as global bid
       username: user.username,
@@ -3354,8 +3356,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up notifications:', error);
     }
 
-    // Update user balance (already in pence, no conversion needed) - AFTER ledger entry
-    user.balance = user.balance - bidAmountPence;
+    // Update user balance (promo-first welcome credit) - AFTER ledger entry
+    applyWalletSpend(user, bidAmountPence);
     await user.save();
 
     // Send high-value bid notification
@@ -4418,9 +4420,11 @@ router.post('/:mediaId/veto', authMiddleware, adminMiddleware, async (req, res) 
       }
       
       // Refund user balance (add back the amount) AFTER ledger entries are created
+      const { sumWelcomeCreditAppliedForBids, balanceRefundInc } = require('../utils/welcomeCreditHelper');
+      const welcomeRestore = await sumWelcomeCreditAppliedForBids(refund.bidIds);
       refundPromises.push(
         User.findByIdAndUpdate(userId, {
-          $inc: { balance: refund.totalAmount }
+          $inc: balanceRefundInc(refund.totalAmount, welcomeRestore)
         })
       );
       

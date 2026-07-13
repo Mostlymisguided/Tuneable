@@ -117,6 +117,12 @@ const bidSchema = new mongoose.Schema({
         // NOTE: Amount is stored in PENCE (integer), not pounds
         // Example: 33 represents £0.33, 150 represents £1.50
     },
+    // Portion of amount funded by welcome credit (pence). Used to restore remaining on refund.
+    welcomeCreditAppliedPence: {
+        type: Number,
+        default: 0,
+        min: [0, 'Welcome credit applied cannot be negative']
+    },
     status: {
         type: String,
         enum: ['active', 'vetoed', 'refunded'],
@@ -253,6 +259,7 @@ bidSchema.index({ mediaId: 1, createdAt: -1 }); // Media's recent bids
 bidSchema.index({ partyId: 1, createdAt: -1 }); // Party's recent bids
 bidSchema.index({ transactionHash: 1 }); // Hash lookup for verification
 bidSchema.index({ status: 1, bidderLocationAncestorIds: 1, createdAt: -1, mediaId: 1 }); // Tunefeed location filter
+bidSchema.index({ mediaId: 1, status: 1, bidderLocationAncestorIds: 1 }); // Media champions by place
 
 // ========================================
 // HASH GENERATION

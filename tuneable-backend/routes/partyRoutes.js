@@ -1907,11 +1907,13 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         
         // Create bid record with denormalized fields and aggregate tracking
         // Store amount in pence (convert from pounds input)
+        const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
         const bid = new Bid({
             userId,
             partyId,
             mediaId: media._id, // Use mediaId instead of songId
             amount: bidAmountPence, // Store in pence
+            welcomeCreditAppliedPence: peekWelcomeCreditApplied(user, bidAmountPence),
             status: 'active',
             bidScope: (party.type === 'global' || party.type === 'tag' || party.type === 'location') ? 'global' : 'party', // Set bidScope based on party type
             
@@ -2152,8 +2154,8 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             // Don't fail the bid if tunebytes calculation fails - they'll be calculated later
           });
         
-        // THEN update user balance (already in pence, no conversion needed)
-        user.balance = user.balance - bidAmountPence;
+        // THEN update user balance (promo-first welcome credit)
+        applyWalletSpend(user, bidAmountPence);
         await user.save();
 
         // Populate the response
@@ -2493,11 +2495,13 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // No need to calculate them here as they're not stored in the Bid model
         
         // Create bid record with denormalized fields and aggregate tracking
+        const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
         const bid = new Bid({
             userId,
             partyId,
             mediaId: actualMediaId, // Use mediaId instead of songId
             amount: bidAmountPence, // Store in pence
+            welcomeCreditAppliedPence: peekWelcomeCreditApplied(user, bidAmountPence),
             status: 'active',
             bidScope: (party.type === 'global' || party.type === 'tag' || party.type === 'location') ? 'global' : 'party', // Set bidScope based on party type
             
@@ -2766,8 +2770,8 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             // Don't fail the bid if tunebytes calculation fails - they'll be calculated later
           });
         
-        // THEN update user balance (already in pence, no conversion needed)
-        user.balance = user.balance - bidAmountPence;
+        // THEN update user balance (promo-first welcome credit)
+        applyWalletSpend(user, bidAmountPence);
         await user.save();
 
         // Get updated media with bids
@@ -3388,9 +3392,12 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
             }
             
             // Refund user balance (add back the amount) AFTER ledger entries are created
+            // Also restore any welcome credit that funded these tips
+            const { sumWelcomeCreditAppliedForBids, balanceRefundInc } = require('../utils/welcomeCreditHelper');
+            const welcomeRestore = await sumWelcomeCreditAppliedForBids(refund.bidIds);
             refundPromises.push(
                 User.findByIdAndUpdate(userId, {
-                    $inc: { balance: refund.totalAmount }
+                    $inc: balanceRefundInc(refund.totalAmount, welcomeRestore)
                 })
             );
             
@@ -4348,8 +4355,10 @@ router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), as
           // Don't fail the refund if ledger entry fails - log and continue
         }
         
-        // Refund the bid amount to user balance
+        // Refund the bid amount to user balance (restore welcome credit portion if any)
         const refundAmount = bid.amount; // Already in pence
+        const { restoreWelcomeCredit } = require('../utils/welcomeCreditHelper');
+        restoreWelcomeCredit(user, bid.welcomeCreditAppliedPence || 0);
         user.balance = (user.balance || 0) + refundAmount;
         await user.save();
 

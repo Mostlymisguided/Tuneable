@@ -496,7 +496,7 @@ router.post(
       
       console.log('User registered successfully:', user);
 
-      // Give beta users £1.11 credit on sign up
+      // Give beta users £11.11 credit on sign up
       try {
         const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
         await giveBetaSignupCredit(user);
@@ -3517,6 +3517,65 @@ router.post('/admin/top-up-balance', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/admin/revoke-welcome-credit
+// @desc    Revoke unspent welcome credit from a user (admin only)
+// @access  Private (Admin)
+router.post('/admin/revoke-welcome-credit', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, reason } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { revokeUnspentWelcomeCredit, getWelcomeCreditRemaining } = require('../utils/welcomeCreditHelper');
+    const remainingBefore = getWelcomeCreditRemaining(targetUser);
+    const result = await revokeUnspentWelcomeCredit(targetUser, {
+      adminUser: req.user,
+      reason: reason || undefined,
+    });
+
+    if (!result.revoked) {
+      return res.status(400).json({
+        error: result.message || 'No unspent welcome credit to revoke',
+        welcomeCreditRemainingPence: remainingBefore,
+      });
+    }
+
+    res.json({
+      message: `Revoked £${(result.amountPence / 100).toFixed(2)} welcome credit from ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        balance: targetUser.balance,
+        balancePounds: (targetUser.balance / 100).toFixed(2),
+        welcomeCreditRemainingPence: targetUser.welcomeCreditRemainingPence || 0,
+      },
+      revokedAmountPence: result.amountPence,
+      revokedAmountPounds: (result.amountPence / 100).toFixed(2),
+      remainingBeforePence: result.remainingBefore,
+      transaction: result.transaction
+        ? {
+            _id: result.transaction._id,
+            uuid: result.transaction.uuid,
+            amount: result.transaction.amount,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error('Error revoking welcome credit:', error);
+    res.status(500).json({ error: 'Failed to revoke welcome credit' });
+  }
+});
+
 // @route   POST /api/users/admin/top-up-tunebytes
 // @desc    Top up user tunebytes (admin only)
 // @access  Private (Admin)
@@ -4541,8 +4600,10 @@ router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
     }
 
     // Refund the bid amount (balance is stored in pence) - AFTER ledger entry
+    // Restore welcome credit portion if this tip used promo funds
+    const { balanceRefundInc } = require('../utils/welcomeCreditHelper');
     await User.findByIdAndUpdate(user._id, {
-      $inc: { balance: bid.amount }
+      $inc: balanceRefundInc(bid.amount, bid.welcomeCreditAppliedPence || 0)
     });
 
     console.log(`💰 Refunding £${(bid.amount / 100).toFixed(2)} to user ${user.username} for vetoed bid ${bidId}`);
@@ -5228,8 +5289,10 @@ router.post('/admin/refunds/:requestId/process', authMiddleware, adminMiddleware
         // Don't fail the refund if ledger entry fails - log and continue
       }
       
-      // Refund the bid amount to user balance
+      // Refund the bid amount to user balance (restore welcome credit portion if any)
       const refundAmount = refundRequest.amount; // Already in pence
+      const { restoreWelcomeCredit } = require('../utils/welcomeCreditHelper');
+      restoreWelcomeCredit(user, bid.welcomeCreditAppliedPence || 0);
       user.balance = (user.balance || 0) + refundAmount;
       await user.save();
       

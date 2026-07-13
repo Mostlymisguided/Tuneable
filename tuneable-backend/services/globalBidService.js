@@ -142,6 +142,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     partyId: globalParty._id,
     mediaId: media._id,
     amount: bidAmountPence,
+    welcomeCreditAppliedPence: require('../utils/welcomeCreditHelper').peekWelcomeCreditApplied(user, bidAmountPence),
     status: 'active',
     bidScope: 'global',
     username: user.username,
@@ -250,7 +251,8 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     console.error('Failed to create ledger entry for global bid:', bid._id, error);
   }
 
-  user.balance -= bidAmountPence;
+  const { applyWalletSpend } = require('../utils/welcomeCreditHelper');
+  applyWalletSpend(user, bidAmountPence);
   await user.save();
 
   return {

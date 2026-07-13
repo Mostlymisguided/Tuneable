@@ -305,7 +305,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         await inviter.save();
       }
       
-      // Give beta users £1.11 credit on sign up
+      // Give beta users £11.11 credit on sign up
       try {
         const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
         await giveBetaSignupCredit(newUser);
@@ -699,7 +699,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           await inviter.save();
         }
         
-        // Give beta users £1.11 credit on sign up
+        // Give beta users £11.11 credit on sign up
         try {
           const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
           await giveBetaSignupCredit(newUser);
@@ -1130,7 +1130,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           await inviter.save();
         }
         
-        // Give beta users £1.11 credit on sign up
+        // Give beta users £11.11 credit on sign up
         try {
           const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
           await giveBetaSignupCredit(newUser);

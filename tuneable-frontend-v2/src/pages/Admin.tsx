@@ -45,6 +45,7 @@ interface User {
   balance: number;
   inviteCredits?: number;
   tuneBytes?: number;
+  welcomeCreditRemainingPence?: number;
   createdAt: string;
   lastLoginAt?: string;
   oauthVerified?: {
@@ -146,7 +147,7 @@ const Admin: React.FC = () => {
 
   // Top-up modal state
   const [topUpModalOpen, setTopUpModalOpen] = useState(false);
-  const [selectedUserForTopUp, setSelectedUserForTopUp] = useState<{ id: string; username: string; balance?: number; tuneBytes?: number } | null>(null);
+  const [selectedUserForTopUp, setSelectedUserForTopUp] = useState<{ id: string; username: string; balance?: number; tuneBytes?: number; welcomeCreditRemainingPence?: number } | null>(null);
 
   // Payout management state
   const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
@@ -1659,7 +1660,8 @@ const Admin: React.FC = () => {
                                       id: user._id, 
                                       username: user.username,
                                       balance: user.balance,
-                                      tuneBytes: user.tuneBytes
+                                      tuneBytes: user.tuneBytes,
+                                      welcomeCreditRemainingPence: user.welcomeCreditRemainingPence || 0,
                                     });
                                     setTopUpModalOpen(true);
                                   }}
@@ -4167,6 +4169,7 @@ const Admin: React.FC = () => {
             username={selectedUserForTopUp.username}
             currentBalance={selectedUserForTopUp.balance}
             currentTunebytes={selectedUserForTopUp.tuneBytes}
+            welcomeCreditRemainingPence={selectedUserForTopUp.welcomeCreditRemainingPence || 0}
             onTopUpComplete={() => {
               // Refresh users list to show updated balances
               loadUsers();

@@ -39,6 +39,8 @@ const pledgeSchema = new mongoose.Schema({
   user_uuid: { type: String },
   username: { type: String },
   amount: { type: Number, required: true, min: 1 }, // pence
+  // Portion of amount funded by welcome credit (pence). Restored on pledge refund.
+  welcomeCreditAppliedPence: { type: Number, default: 0, min: 0 },
   status: {
     type: String,
     enum: ['active', 'refunded', 'released'],

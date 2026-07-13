@@ -225,7 +225,7 @@ const UserProfile: React.FC = () => {
   const [walletHistoryStats, setWalletHistoryStats] = useState<any>(null);
   const [isLoadingWalletHistory, setIsLoadingWalletHistory] = useState(false);
   const [walletHistoryFilters, setWalletHistoryFilters] = useState({
-    type: '' as 'topup' | 'refund' | 'adjustment' | 'beta_credit' | 'gift' | '',
+    type: '' as 'topup' | 'refund' | 'adjustment' | 'beta_credit' | 'beta_credit_revoke' | 'gift' | '',
     status: '' as 'pending' | 'completed' | 'failed' | 'refunded' | '',
     paymentMethod: '' as 'stripe' | 'manual' | 'beta' | 'gift' | '',
     page: 1,
@@ -2883,6 +2883,7 @@ const UserProfile: React.FC = () => {
                     <option value="refund">Refund</option>
                     <option value="adjustment">Adjustment</option>
                     <option value="beta_credit">Welcome Credit</option>
+                    <option value="beta_credit_revoke">Welcome Credit Revoked</option>
                     <option value="gift">Gift</option>
                   </select>
                 </div>
@@ -2944,12 +2945,14 @@ const UserProfile: React.FC = () => {
                             tx.type === 'topup' ? 'bg-green-600/30 text-green-200' :
                             tx.type === 'refund' ? 'bg-red-600/30 text-red-200' :
                             tx.type === 'beta_credit' ? 'bg-purple-600/30 text-purple-200' :
+                            tx.type === 'beta_credit_revoke' ? 'bg-orange-600/30 text-orange-200' :
                             tx.type === 'adjustment' ? 'bg-blue-600/30 text-blue-200' :
                             'bg-gray-600/30 text-gray-200'
                           }`}>
                             {tx.type === 'topup' ? 'Top-up' :
                              tx.type === 'refund' ? 'Refund' :
                              tx.type === 'beta_credit' ? 'Welcome Credit' :
+                             tx.type === 'beta_credit_revoke' ? 'Welcome Credit Revoked' :
                              tx.type === 'adjustment' ? 'Adjustment' :
                              tx.type === 'gift' ? 'Gift' : tx.type}
                           </span>
@@ -2994,10 +2997,10 @@ const UserProfile: React.FC = () => {
                       <div className="text-right flex-shrink-0 ml-4">
                         <div className={`text-xl font-bold ${
                           tx.type === 'topup' || tx.type === 'beta_credit' || tx.type === 'gift' ? 'text-green-400' :
-                          tx.type === 'refund' ? 'text-red-400' :
+                          tx.type === 'refund' || tx.type === 'beta_credit_revoke' ? 'text-red-400' :
                           'text-blue-400'
                         }`}>
-                          {tx.type === 'refund' ? '-' : '+'}{penceToPounds(tx.amount || 0)}
+                          {tx.type === 'refund' || tx.type === 'beta_credit_revoke' ? '-' : '+'}{penceToPounds(tx.amount || 0)}
                         </div>
                       </div>
                     </div>

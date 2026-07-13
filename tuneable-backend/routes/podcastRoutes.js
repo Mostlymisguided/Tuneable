@@ -279,11 +279,13 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
     
     // Create bid (using mediaId, not episodeId) - BidMetricsEngine will update aggregates
+    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
     const bid = new Bid({
       userId,
       partyId: globalParty._id,
       mediaId: episode._id,
       amount: bidAmountPence,
+      welcomeCreditAppliedPence: peekWelcomeCreditApplied(user, bidAmountPence),
       bidScope: 'global',
       partyType: 'global',
       username: req.user.username,
@@ -317,8 +319,8 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       console.error('Failed to create ledger entry for podcast boost:', ledgerError);
     }
     
-    // Deduct user balance
-    user.balance = userBalancePre - bidAmountPence;
+    // Deduct user balance (promo-first welcome credit)
+    applyWalletSpend(user, bidAmountPence);
     await user.save();
     
     // Allocate artist escrow (async)
@@ -443,11 +445,13 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
     
     // Create bid (using mediaId, not episodeId)
+    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
     const bid = new Bid({
       userId,
       partyId,
       mediaId: episode._id,
       amount: amountInPence,
+      welcomeCreditAppliedPence: peekWelcomeCreditApplied(user, amountInPence),
       bidScope: 'party',
       partyType: party.type,
       username: req.user.username,
@@ -481,8 +485,8 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       console.error('Failed to create ledger entry for podcast party bid:', ledgerError);
     }
     
-    // Deduct user balance
-    user.balance = userBalancePre - amountInPence;
+    // Deduct user balance (promo-first welcome credit)
+    applyWalletSpend(user, amountInPence);
     await user.save();
     
     // Allocate artist escrow (async)

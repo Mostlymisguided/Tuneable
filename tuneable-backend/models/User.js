@@ -41,6 +41,8 @@ const userSchema = new mongoose.Schema({
   parentInviteCodeId: { type: mongoose.Schema.Types.ObjectId }, // Reference to specific invite code object (optional, for tracking)
   balance: { type: Number, default: 0 }, // Wallet balance stored in PENCE (integer), not pounds
   // Example: 1050 represents £10.50, 3300 represents £33.00
+  // Unspent promotional welcome credit still in the wallet (pence). Spent promo-first; revocable by admin.
+  welcomeCreditRemainingPence: { type: Number, default: 0, min: 0 },
   inviteCredits: { type: Number, default: 10 }, // Invite credits for inviting new users
   tuneBytes: { 
     type: Number, 

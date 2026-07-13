@@ -31,7 +31,7 @@ const walletTransactionSchema = new mongoose.Schema({
   
   type: { 
     type: String, 
-    enum: ['topup', 'refund', 'adjustment', 'beta_credit', 'gift', 'pledge', 'pledge_refund'],
+    enum: ['topup', 'refund', 'adjustment', 'beta_credit', 'beta_credit_revoke', 'gift', 'pledge', 'pledge_refund'],
     required: true 
   },
   
