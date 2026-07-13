@@ -3526,6 +3526,33 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/:mediaId/champions
+// @desc    Tip-aggregate champions for a media item (global or Mapbox place scope)
+// @access  Public
+// @query   locationPlaceId — optional Mapbox place id; tippers whose home ancestor chain includes it
+// @query   limit — max rankings (default 10, max 50)
+router.get('/:mediaId/champions', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { locationPlaceId, limit } = req.query;
+
+    const { getMediaChampions } = require('../services/mediaChampionsService');
+    const result = await getMediaChampions(mediaId, {
+      locationPlaceId,
+      limit,
+    });
+
+    if (!result) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching media champions:', error);
+    res.status(500).json({ error: 'Failed to fetch media champions' });
+  }
+});
+
 // @route   GET /api/media/admin/stats
 // @desc    Get media statistics (admin only)
 // @access  Private (Admin)

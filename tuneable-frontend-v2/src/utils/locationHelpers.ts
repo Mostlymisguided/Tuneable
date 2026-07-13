@@ -162,3 +162,73 @@ export function formatLocationFilter(filter: { city?: string; country?: string; 
   return 'Unknown Location';
 }
 
+/** Place types allowed as Champion scopes (excludes street / postcode). */
+const CHAMPION_SCOPE_PLACETYPES = new Set([
+  'country',
+  'region',
+  'district',
+  'place',
+  'locality',
+  'neighborhood',
+]);
+
+export interface ChampionScopePick {
+  placeId: string;
+  label: string;
+  placetype?: string;
+}
+
+/**
+ * Build coarse→fine Champion scope chips from a resolved home location.
+ * Skips address/postcode levels.
+ */
+export function getChampionScopePicksFromLocation(
+  location: (MapboxLocationFields & Location) | null | undefined
+): ChampionScopePick[] {
+  if (!location) return [];
+
+  const picks: ChampionScopePick[] = [];
+  const seen = new Set<string>();
+
+  const add = (placeId?: string, label?: string, placetype?: string) => {
+    if (!placeId || !label || seen.has(placeId)) return;
+    if (placetype && !CHAMPION_SCOPE_PLACETYPES.has(placetype)) return;
+    seen.add(placeId);
+    picks.push({ placeId, label, placetype });
+  };
+
+  const ancestors = Array.isArray(location.ancestors) ? [...location.ancestors] : [];
+  const order = ['country', 'region', 'district', 'place', 'locality', 'neighborhood'];
+  ancestors.sort((a, b) => {
+    const ai = order.indexOf(a.placetype || '');
+    const bi = order.indexOf(b.placetype || '');
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  for (const ancestor of ancestors) {
+    add(ancestor.placeId, ancestor.label, ancestor.placetype);
+  }
+
+  add(
+    location.placeId,
+    location.label || location.city || location.display || location.country,
+    location.featureType
+  );
+
+  return picks;
+}
+
+/**
+ * Minimal ResolvedLocation for Champion place filtering.
+ */
+export function championPickToResolvedLocation(pick: ChampionScopePick): ResolvedLocation {
+  return {
+    placeProvider: 'mapbox',
+    placeId: pick.placeId,
+    featureType: pick.placetype,
+    display: pick.label,
+    label: pick.label,
+    ancestorIds: [pick.placeId],
+  };
+}
+

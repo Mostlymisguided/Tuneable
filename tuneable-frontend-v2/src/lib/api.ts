@@ -817,6 +817,20 @@ export const mediaAPI = {
     return response.data;
   },
 
+  // Tip-aggregate champions (global or place-scoped via Mapbox place id)
+  getChampions: async (
+    mediaId: string,
+    params?: { locationPlaceId?: string; limit?: number }
+  ) => {
+    const response = await api.get(`/media/${mediaId}/champions`, {
+      params: {
+        locationPlaceId: params?.locationPlaceId || undefined,
+        limit: params?.limit,
+      },
+    });
+    return response.data;
+  },
+
   // Get related playlist rails for media
   getRelatedPlaylists: async (mediaId: string, params?: { relatedLimit?: number; fansLimit?: number }) => {
     const response = await api.get(`/media/${mediaId}/related-playlists`, { params });
