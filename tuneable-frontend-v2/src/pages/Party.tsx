@@ -17,7 +17,7 @@ import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMedi
 import VetoedQueueMediaCard from '../components/VetoedQueueMediaCard';
 // MediaLeaderboard kept in codebase for potential future use
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin } from 'lucide-react';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin, Gauge } from 'lucide-react';
 import TopSupporters from '../components/TopSupporters';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
@@ -80,9 +80,27 @@ const TIME_PERIOD_OPTIONS = [
   { key: 'today', label: 'Today' },
 ] as const;
 
+const BPM_SORT_OPTIONS = [
+  { key: 'off', label: 'Default' },
+  { key: 'desc', label: 'High → Low' },
+  { key: 'asc', label: 'Low → High' },
+] as const;
+
+type BpmSortOrder = (typeof BPM_SORT_OPTIONS)[number]['key'];
+
 function formatTimePeriodLabel(period: string): string {
   return TIME_PERIOD_OPTIONS.find((p) => p.key === period)?.label
     ?? period.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+function formatBpmSortLabel(order: BpmSortOrder): string {
+  return BPM_SORT_OPTIONS.find((o) => o.key === order)?.label ?? 'Default';
+}
+
+function getMediaBpm(item: any): number | null {
+  const mediaItem = item?.mediaId || item;
+  const bpm = mediaItem?.bpm;
+  return typeof bpm === 'number' && bpm > 0 ? bpm : null;
 }
 
 function getPeriodStartDate(period: string): Date | null {
@@ -204,23 +222,25 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   
   const [showVetoed, setShowVetoed] = useState(false);
 
-  // Media queue pagination - show first 20, load 20 more per "Show more" click
-  const [visibleMediaCount, setVisibleMediaCount] = useState(20);
-  const MEDIA_PAGE_SIZE = 20;
-  // Reset visible count when party or time period changes
-  useEffect(() => {
-    setVisibleMediaCount(MEDIA_PAGE_SIZE);
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId]);
-
-  // Share functionality state
+  // Share / filter panel state (bpmSortOrder declared before pagination effect that depends on it)
   const [isMobile, setIsMobile] = useState(false);
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
+  const [showBpmFilter, setShowBpmFilter] = useState(false);
+  const [bpmSortOrder, setBpmSortOrder] = useState<BpmSortOrder>('off');
   const [showTopFansPanel, setShowTopFansPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
+
+  // Media queue pagination - show first 20, load 20 more per "Show more" click
+  const [visibleMediaCount, setVisibleMediaCount] = useState(20);
+  const MEDIA_PAGE_SIZE = 20;
+  // Reset visible count when party, time period, or BPM sort changes
+  useEffect(() => {
+    setVisibleMediaCount(MEDIA_PAGE_SIZE);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmSortOrder]);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
@@ -662,7 +682,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         }
       }
     }
-  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, setQueue, setCurrentMedia, currentMedia]);
+  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, bpmSortOrder, setQueue, setCurrentMedia, currentMedia]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -1624,6 +1644,17 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       if (queueSearchTerms.length > 0 || liveTerm) {
         console.log(`🔍 Filtered queue: ${media.length} media items match search terms:`, allTerms);
       }
+    }
+
+    if (bpmSortOrder !== 'off') {
+      media = [...media].sort((a: any, b: any) => {
+        const bpmA = getMediaBpm(a);
+        const bpmB = getMediaBpm(b);
+        if (bpmA == null && bpmB == null) return 0;
+        if (bpmA == null) return 1;
+        if (bpmB == null) return -1;
+        return bpmSortOrder === 'asc' ? bpmA - bpmB : bpmB - bpmA;
+      });
     }
     
     return media;
@@ -2768,7 +2799,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           <div className="space-y-3">
             {party ? (
               <div className="space-y-6">
-                {/* Queue filters: tag, time, search — trigger row + collapsible panels */}
+                {/* Queue filters: tag, time, bpm, search — trigger row + collapsible panels */}
                 {!showVetoed && (
                   <div className="mb-4 md:mb-6">
                     <div className="flex flex-wrap justify-center items-center gap-2">
@@ -2798,6 +2829,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         Time
                         <span className="text-xs text-purple-300 font-normal">
                           ({formatTimePeriodLabel(selectedTimePeriod)})
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowBpmFilter((open) => !open)}
+                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                          showBpmFilter || bpmSortOrder !== 'off' ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                        }`}
+                      >
+                        <Gauge className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        BPM
+                        <span className="text-xs text-purple-300 font-normal">
+                          ({formatBpmSortLabel(bpmSortOrder)})
                         </span>
                       </button>
                       <button
@@ -2939,6 +2983,40 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                               }`}
                             >
                               {period.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {showBpmFilter && (
+                      <div className="card p-3 md:p-6 mt-3 max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-lg font-semibold text-white flex items-center">
+                            <Gauge className="h-4 w-4 mr-2 text-purple-400" />
+                            Sort by BPM
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setShowBpmFilter(false)}
+                            className="text-sm text-gray-400 hover:text-white"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                        <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
+                          {BPM_SORT_OPTIONS.map((option) => (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => setBpmSortOrder(option.key)}
+                              className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
+                                bpmSortOrder === option.key
+                                  ? 'bg-purple-700 text-white'
+                                  : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                              }`}
+                            >
+                              {option.label}
                             </button>
                           ))}
                         </div>

@@ -1172,7 +1172,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay', // ✅ Updated to schema grammar field names
+                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay', // ✅ Updated to schema grammar field names
                 populate: [
                     {
                         path: 'bids',
@@ -1313,6 +1313,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 totalBidValue: entry.partyMediaAggregate || 0, // ✅ Use party-media aggregate for queue ordering
                 tags: entry.mediaId.tags || [], // ✅ Include tags
                 category: entry.mediaId.category || 'Unknown', // ✅ Include category
+                bpm: entry.mediaId.bpm ?? null,
                 
                 // Party-media top bid metrics (schema grammar)
                 partyMediaBidTop: entry.partyMediaBidTop || 0,
@@ -3871,7 +3872,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category uuid featuring creatorDisplay', // Updated to schema grammar
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm uuid featuring creatorDisplay', // Updated to schema grammar
                     populate: [
                         {
                             path: 'bids',
@@ -4086,6 +4087,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                         bids: activeBids, // Only include active bids for TopBidders component
                         tags: media.tags || [], // Include tags for display
                         category: media.category || null, // Include category for display
+                        bpm: media.bpm ?? null,
                         addedBy: media.addedBy,
                         status: 'active', // Global Party media is always active
                         queuedAt: media.createdAt || new Date(),
@@ -4135,6 +4137,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                         bids: entry.partyBids || [], // Use party-specific bids (PartyUserMediaAggregate) for regular parties
                         tags: entry.mediaId.tags || [], // Include tags for display
                         category: entry.mediaId.category || null, // Include category for display
+                        bpm: entry.mediaId.bpm ?? null,
                         addedBy: entry.addedBy,
                         status: entry.status,
                         queuedAt: entry.queuedAt,
