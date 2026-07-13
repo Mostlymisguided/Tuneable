@@ -19,7 +19,7 @@ import { DEFAULT_PROFILE_PIC } from '../constants';
 import { buildOAuthStartUrl } from '../utils/platform';
 
 type ImportSource = 'spotify' | 'soundcloud';
-type MatchStatus = 'in_library' | 'on_catalog' | 'new';
+type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
 
 interface ImportItem {
   key: string;
@@ -29,8 +29,12 @@ interface ImportItem {
   duration?: number;
   album?: string | null;
   matchStatus: MatchStatus;
+  matchType?: string | null;
   mediaId?: string | null;
   mediaUuid?: string | null;
+  suggestedTitle?: string | null;
+  suggestedArtist?: string | null;
+  useSuggestedMatch?: boolean;
   isPlayable: boolean;
   awaitingUpload: boolean;
   userBidTotalPence: number;
@@ -44,6 +48,7 @@ interface ImportSummary {
   total: number;
   inLibrary: number;
   onCatalog: number;
+  possibleMatches?: number;
   newTracks: number;
   selectedCount: number;
   estimatedTotal: number;
@@ -56,12 +61,14 @@ interface ImportSummary {
 const STATUS_LABELS: Record<MatchStatus, string> = {
   in_library: 'In your library',
   on_catalog: 'On Tuneable',
+  possible_match: 'Possible match',
   new: 'New to Tuneable',
 };
 
 const STATUS_COLORS: Record<MatchStatus, string> = {
   in_library: 'bg-green-900/40 text-green-300 border-green-700',
   on_catalog: 'bg-blue-900/40 text-blue-300 border-blue-700',
+  possible_match: 'bg-amber-900/40 text-amber-200 border-amber-700',
   new: 'bg-purple-900/40 text-purple-300 border-purple-700',
 };
 
@@ -327,6 +334,8 @@ const LibraryImport: React.FC = () => {
         title: item.title,
         selected: true,
         mediaId: item.mediaId || undefined,
+        matchStatus: item.matchStatus,
+        useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
         amount: parseFloat(tipAmounts[item.key] ?? bulkTip),
         externalMedia: item.externalMedia,
         skipIfInLibrary: true,
@@ -477,7 +486,7 @@ const LibraryImport: React.FC = () => {
                 </span>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <div className="text-2xl font-bold">{summary.total}</div>
                 <div className="text-xs text-gray-400">Tracks loaded</div>
@@ -485,6 +494,10 @@ const LibraryImport: React.FC = () => {
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <div className="text-2xl font-bold text-purple-300">{summary.newTracks}</div>
                 <div className="text-xs text-gray-400">New to Tuneable</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="text-2xl font-bold text-amber-300">{summary.possibleMatches || 0}</div>
+                <div className="text-xs text-gray-400">Possible matches</div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <div className="text-2xl font-bold text-green-300">{summary.inLibrary}</div>
@@ -577,6 +590,51 @@ const LibraryImport: React.FC = () => {
                         </span>
                       )}
                     </div>
+                    {item.matchStatus === 'possible_match' && (
+                      <div className="mt-2 text-xs text-amber-100/90 space-y-1.5">
+                        <div>
+                          Suggested: <span className="text-white font-medium">{item.suggestedTitle}</span>
+                          {item.suggestedArtist ? (
+                            <span className="text-gray-400"> by {item.suggestedArtist}</span>
+                          ) : null}
+                          {item.matchType ? (
+                            <span className="text-gray-500"> · {item.matchType}</span>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setItems((prev) => prev.map((i) => (
+                                i.key === item.key ? { ...i, useSuggestedMatch: true } : i
+                              )));
+                            }}
+                            className={`px-2 py-0.5 rounded border ${
+                              item.useSuggestedMatch !== false
+                                ? 'bg-amber-700/50 border-amber-500 text-white'
+                                : 'bg-gray-900 border-gray-600 text-gray-300 hover:border-amber-600'
+                            }`}
+                          >
+                            Use match
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setItems((prev) => prev.map((i) => (
+                                i.key === item.key ? { ...i, useSuggestedMatch: false } : i
+                              )));
+                            }}
+                            className={`px-2 py-0.5 rounded border ${
+                              item.useSuggestedMatch === false
+                                ? 'bg-purple-700/50 border-purple-500 text-white'
+                                : 'bg-gray-900 border-gray-600 text-gray-300 hover:border-purple-600'
+                            }`}
+                          >
+                            Create as new
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {item.matchStatus !== 'in_library' && (
                     <div className="flex items-center gap-1 flex-shrink-0">

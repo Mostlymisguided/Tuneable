@@ -374,6 +374,18 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
 
                   {/* Actions */}
                   <div className="ml-4 flex flex-col space-y-2">
+                    {report.category === 'duplicate' && report.mediaId && (
+                      <button
+                        onClick={() => navigate(
+                          `/admin?tab=bids-media-vetoes&sub=media&mergeSource=${encodeURIComponent(
+                            report.mediaId!.uuid || report.mediaId!._id
+                          )}`
+                        )}
+                        className="px-4 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Merge…
+                      </button>
+                    )}
                     {report.status === 'pending' && (
                       <>
                         <button

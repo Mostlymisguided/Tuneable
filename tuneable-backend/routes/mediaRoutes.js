@@ -3574,6 +3574,67 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/media/admin/likely-duplicates
+// @desc    Clusters of likely duplicate media (ISRC / exact title+artist)
+// @access  Private (Admin)
+router.get('/admin/likely-duplicates', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const mediaMergeService = require('../services/mediaMergeService');
+    const data = await mediaMergeService.findLikelyDuplicates({ limit: req.query.limit });
+    res.json(data);
+  } catch (error) {
+    console.error('Error finding likely duplicates:', error);
+    res.status(500).json({ error: error.message || 'Failed to find duplicates' });
+  }
+});
+
+// @route   POST /api/media/admin/merge/preview
+// @desc    Preview merging source media into keep media
+// @access  Private (Admin)
+router.post('/admin/merge/preview', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { sourceId, keepId } = req.body || {};
+    if (!sourceId || !keepId) {
+      return res.status(400).json({ error: 'sourceId and keepId are required' });
+    }
+    const mediaMergeService = require('../services/mediaMergeService');
+    const preview = await mediaMergeService.previewMerge(sourceId, keepId);
+    res.json(preview);
+  } catch (error) {
+    console.error('Error previewing media merge:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to preview merge' });
+  }
+});
+
+// @route   POST /api/media/admin/merge
+// @desc    Merge source media into keep media (reassign refs, soft-delete source)
+// @access  Private (Admin)
+router.post('/admin/merge', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { sourceId, keepId, dryRun } = req.body || {};
+    if (!sourceId || !keepId) {
+      return res.status(400).json({ error: 'sourceId and keepId are required' });
+    }
+    const mediaMergeService = require('../services/mediaMergeService');
+    const result = await mediaMergeService.mergeMedia(sourceId, keepId, req.user._id, {
+      dryRun: !!dryRun,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error merging media:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to merge media' });
+  }
+});
+
 // @route   GET /api/media/admin/all
 // @desc    Get all media with filtering, sorting, and pagination (admin only)
 // @access  Private (Admin)

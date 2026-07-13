@@ -788,6 +788,21 @@ export const mediaAPI = {
     return response.data;
   },
 
+  previewMediaMerge: async (sourceId: string, keepId: string) => {
+    const response = await api.post('/media/admin/merge/preview', { sourceId, keepId });
+    return response.data;
+  },
+
+  mergeMedia: async (sourceId: string, keepId: string, dryRun = false) => {
+    const response = await api.post('/media/admin/merge', { sourceId, keepId, dryRun });
+    return response.data;
+  },
+
+  getLikelyDuplicates: async (limit = 50) => {
+    const response = await api.get('/media/admin/likely-duplicates', { params: { limit } });
+    return response.data;
+  },
+
   // Place global bid (chart support)
   placeGlobalBid: async (mediaId: string, amount: number, externalMedia?: {
     title: string;

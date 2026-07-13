@@ -28,6 +28,7 @@ import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
+import MediaMergePanel from '../components/MediaMergePanel';
 import IssueWarningModal from '../components/IssueWarningModal';
 import InviteReferrals from '../components/InviteReferrals';
 import UserTopUpModal from '../components/UserTopUpModal';
@@ -126,7 +127,12 @@ const Admin: React.FC = () => {
   const [editingValue, setEditingValue] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
   const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels' | 'collectives'>('users');
-  const [bidsMediaVetoesSubTab, setBidsMediaVetoesSubTab] = useState<'bids' | 'media' | 'vetoes'>('bids');
+  const [bidsMediaVetoesSubTab, setBidsMediaVetoesSubTab] = useState<'bids' | 'media' | 'vetoes'>(() => {
+    const sub = searchParams.get('sub');
+    if (sub === 'media' || sub === 'vetoes' || sub === 'bids') return sub;
+    return 'bids';
+  });
+  const mergeSourceFromUrl = searchParams.get('mergeSource') || '';
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
     user: 0,
@@ -181,6 +187,13 @@ const Admin: React.FC = () => {
     const tabFromUrl = searchParams.get('tab');
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
+    }
+    const subFromUrl = searchParams.get('sub');
+    if (subFromUrl === 'media' || subFromUrl === 'vetoes' || subFromUrl === 'bids') {
+      setBidsMediaVetoesSubTab(subFromUrl);
+    } else if (searchParams.get('mergeSource')) {
+      setActiveTab('bids-media-vetoes');
+      setBidsMediaVetoesSubTab('media');
     }
   }, [searchParams]);
 
@@ -2537,6 +2550,11 @@ const Admin: React.FC = () => {
                     Refresh
                   </button>
                 </div>
+
+                <MediaMergePanel
+                  initialSourceId={mergeSourceFromUrl}
+                  onMerged={loadMedia}
+                />
 
                 {/* Filters */}
                 <div className="bg-gray-800 rounded-lg p-4">
