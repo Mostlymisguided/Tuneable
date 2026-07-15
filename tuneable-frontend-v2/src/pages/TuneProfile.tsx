@@ -60,6 +60,7 @@ import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
 import AiToolsEditor from '../components/AiToolsEditor';
 import AiToolsDisplay from '../components/AiToolsDisplay';
+import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 
@@ -315,6 +316,8 @@ const TuneProfile: React.FC = () => {
   const [relatedMedia, setRelatedMedia] = useState<RecommendedMediaItem[]>([]);
   const [fansAlsoTip, setFansAlsoTip] = useState<RecommendedMediaItem[]>([]);
   const [isLoadingRelatedPlaylists, setIsLoadingRelatedPlaylists] = useState(false);
+  const [recommendedItemToTip, setRecommendedItemToTip] = useState<RecommendedMediaItem | null>(null);
+  const [isPlacingRecommendedTip, setIsPlacingRecommendedTip] = useState(false);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
 
   // Report modal state
@@ -1615,6 +1618,20 @@ const TuneProfile: React.FC = () => {
     totalBidValue: item.globalMediaAggregate || 0,
   });
 
+  const recommendedToQueueShape = (item: RecommendedMediaItem) => ({
+    _id: item._id,
+    id: item.uuid || item._id,
+    uuid: item.uuid || item._id,
+    title: item.title,
+    artist: item.artist,
+    coverArt: item.coverArt || DEFAULT_COVER_ART,
+    duration: item.duration || 0,
+    tags: item.tags?.length ? item.tags : item.sharedTags || [],
+    bids: [],
+    globalMediaAggregate: item.globalMediaAggregate || 0,
+    sources: item.sources || {},
+  });
+
   const isRecommendedPlayable = (item: RecommendedMediaItem) => {
     const enriched = enrichMediaWithPlayability({
       sources: item.sources || {},
@@ -1624,44 +1641,88 @@ const TuneProfile: React.FC = () => {
     return isMediaPlayable(enriched);
   };
 
-  const handlePlayRecommendedMedia = (item: RecommendedMediaItem) => {
-    if (!item) return;
+  const startRecommendedQueue = (items: RecommendedMediaItem[], startItem?: RecommendedMediaItem) => {
+    const playableItems = items.filter(isRecommendedPlayable);
 
-    if (!isRecommendedPlayable(item)) {
-      toast.info('This track is not playable yet — opening the tune page instead.');
-      navigate(`/tune/${item._id || item.uuid}`);
+    if (playableItems.length === 0) {
+      if (startItem) {
+        toast.info('This track is not playable yet — opening the tune page instead.');
+        navigate(`/tune/${startItem._id || startItem.uuid}`);
+      } else {
+        toast.info('No playable related tunes yet.');
+      }
       return;
     }
 
-    usePodcastPlayerStore.getState().clear();
-
-    const playableItem = formatRecommendedForPlayer(item);
-
-    setQueue([playableItem as any]);
-    setCurrentMedia(playableItem as any, 0);
-    play();
-    setGlobalPlayerActive(true);
-    setCurrentPartyId(null);
-    toast.success(`Now playing: ${item.title}`);
-  };
-
-  const handlePlayRelatedTunes = () => {
-    const playableItems = relatedMedia.filter(isRecommendedPlayable);
-
-    if (playableItems.length === 0) {
-      toast.info('No playable related tunes yet.');
-      return;
+    let startIndex = 0;
+    if (startItem) {
+      const matchIndex = playableItems.findIndex(
+        (item) => item._id === startItem._id || item.uuid === startItem.uuid
+      );
+      if (matchIndex < 0) {
+        toast.info('This track is not playable yet — opening the tune page instead.');
+        navigate(`/tune/${startItem._id || startItem.uuid}`);
+        return;
+      }
+      startIndex = matchIndex;
     }
 
     usePodcastPlayerStore.getState().clear();
 
     const queue = playableItems.map(formatRecommendedForPlayer);
     setQueue(queue as any);
-    setCurrentMedia(queue[0] as any, 0);
+    setCurrentMedia(queue[startIndex] as any, startIndex);
     play();
     setGlobalPlayerActive(true);
     setCurrentPartyId(null);
-    toast.success(`Now playing: ${queue[0].title}`);
+    toast.success(`Now playing: ${queue[startIndex].title}`);
+  };
+
+  const handlePlayRelatedTunes = () => {
+    startRecommendedQueue(relatedMedia);
+  };
+
+  const handleOpenRecommendedTip = (item: RecommendedMediaItem) => {
+    if (!user) {
+      toast.info('Please log in to support this tune');
+      const returnUrl = `/tune/${mediaId || media?._id}`;
+      navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+    setRecommendedItemToTip(item);
+  };
+
+  const handleConfirmRecommendedTip = async (tags: string[], amount: number) => {
+    if (!user || !recommendedItemToTip) return;
+
+    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : (user?.preferences?.defaultTip || 0.11);
+    if (tipAmount < minimumBid) {
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+
+    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
+    if (balanceInPounds < tipAmount) {
+      toast.error('Insufficient balance. Please top up your wallet.');
+      navigate('/wallet');
+      return;
+    }
+
+    const tipMediaId = recommendedItemToTip._id || recommendedItemToTip.uuid;
+    if (!tipMediaId) return;
+
+    setIsPlacingRecommendedTip(true);
+    try {
+      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags);
+      toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${recommendedItemToTip.title}"!`);
+      setRecommendedItemToTip(null);
+      await loadRelatedPlaylists();
+    } catch (err: any) {
+      console.error('Error placing recommended tip:', err);
+      toast.error(err.response?.data?.error || 'Failed to place tip');
+    } finally {
+      setIsPlacingRecommendedTip(false);
+    }
   };
 
   const defaultTipAmount = useMemo(() => {
@@ -2188,124 +2249,43 @@ const TuneProfile: React.FC = () => {
     </div>
   );
 
-  const renderRelatedTunesRail = (items: RecommendedMediaItem[]) => (
-    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
-      {items.map((item) => (
-        <div
-          key={`related-rail-${item._id}`}
-          className="flex-shrink-0 w-[132px] sm:w-[148px] snap-start group"
-        >
-          <div className="relative mb-2">
-            <button
-              type="button"
-              onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
-              className="block w-full"
-            >
-              <img
-                src={item.coverArt || DEFAULT_COVER_ART}
-                alt={item.title}
-                className="w-full aspect-square rounded-lg object-cover bg-black/30 shadow-md group-hover:ring-2 group-hover:ring-purple-500/50 transition-all"
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePlayRecommendedMedia(item)}
-              className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 shadow-lg transition-colors opacity-90 group-hover:opacity-100"
-              aria-label={`Play ${item.title}`}
-            >
-              <Play className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
-            className="block w-full text-left"
-          >
-            <div className="text-sm font-semibold text-white truncate hover:text-purple-300 transition-colors">{item.title}</div>
-            <div className="text-xs text-gray-400 truncate">{item.artist}</div>
-          </button>
-          {item.sharedTags && item.sharedTags.length > 0 && (
-            <div className="mt-1 text-[10px] text-purple-300 truncate">#{item.sharedTags[0]}</div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  const renderRecommendedQueueList = (items: RecommendedMediaItem[], variant: 'related' | 'fans') => (
+    <div className="space-y-3">
+      {items.map((item, index) => {
+        const queueShape = recommendedToQueueShape(item);
+        const mediaData = normalizeQueueMediaData(queueShape);
+        const reasonBits = [
+          ...(item.reasons?.slice(0, 2) || []),
+          ...(variant === 'fans' && item.fanContext?.user?.username
+            ? [`Picked via top fan ${item.fanContext.user.username}`]
+            : []),
+        ];
 
-  const renderRecommendationCards = (items: RecommendedMediaItem[], variant: 'related' | 'fans') => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-      {items.map((item) => (
-        <div
-          key={`${variant}-${item._id}`}
-          className="rounded-lg border border-purple-500/20 bg-black/20 p-4 hover:border-purple-500/40 transition-all"
-        >
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
-              className="flex-shrink-0"
-            >
-              <img
-                src={item.coverArt || DEFAULT_COVER_ART}
-                alt={item.title}
-                className="h-16 w-16 rounded-lg object-cover bg-black/30"
-              />
-            </button>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/tune/${item._id || item.uuid}`)}
-                    className="block text-left text-white font-semibold hover:text-purple-300 transition-colors truncate"
-                  >
-                    {item.title}
-                  </button>
-                  <div className="text-sm text-gray-300 truncate">{item.artist}</div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handlePlayRecommendedMedia(item)}
-                  className="inline-flex items-center justify-center rounded-full bg-purple-600 hover:bg-purple-700 text-white h-9 w-9 transition-colors"
-                  aria-label={`Play ${item.title}`}
-                >
-                  <Play className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {item.sharedTags?.slice(0, 3).map((tag) => (
-                  <span key={`${item._id}-${tag}`} className="rounded-full bg-purple-500/20 px-2 py-1 text-purple-200">
-                    #{tag}
+        return (
+          <div key={`${variant}-${item._id}`}>
+            <QueueMediaCard
+              item={queueShape}
+              index={index}
+              mediaData={mediaData}
+              showActions={false}
+              isBidding={isPlacingRecommendedTip}
+              onActionClick={() => {}}
+              onPlay={() => startRecommendedQueue(items, item)}
+              onTip={() => handleOpenRecommendedTip(item)}
+              mediaHref={`/tune/${item.uuid || item._id}`}
+            />
+            {reasonBits.length > 0 && (
+              <div className="mt-1 ml-7 md:ml-14 text-xs text-gray-400 flex flex-wrap gap-x-2 gap-y-0.5">
+                {reasonBits.map((reason) => (
+                  <span key={`${item._id}-${reason}`} className="truncate max-w-full">
+                    {reason}
                   </span>
                 ))}
               </div>
-
-              <div className="mt-3 space-y-1 text-xs text-gray-300">
-                {item.reasons?.slice(0, 2).map((reason) => (
-                  <div key={`${item._id}-${reason}`}>{reason}</div>
-                ))}
-                {variant === 'fans' && item.fanContext?.user?.username && (
-                  <div className="text-pink-300">
-                    Picked via top fan {item.fanContext.user.username}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-3 flex items-center justify-between text-sm">
-                <span className="text-green-300 font-medium">
-                  {penceToPounds(item.globalMediaAggregate || 0)}
-                </span>
-                <span className="text-gray-400">
-                  {item.duration ? formatDuration(item.duration) : '0:00'}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -2515,7 +2495,7 @@ const TuneProfile: React.FC = () => {
               {isLoadingRelatedPlaylists ? (
                 <div className="text-gray-400 text-sm">Loading related tunes...</div>
               ) : (
-                renderRelatedTunesRail(relatedMedia)
+                renderRecommendedQueueList(relatedMedia, 'related')
               )}
             </div>
           </div>
@@ -2692,7 +2672,7 @@ const TuneProfile: React.FC = () => {
                 <p className="text-sm text-gray-300 mb-4">
                   One-hop picks taken from this tune&apos;s strongest supporters, while still requiring tag overlap.
                 </p>
-                {renderRecommendationCards(fansAlsoTip, 'fans')}
+                {renderRecommendedQueueList(fansAlsoTip, 'fans')}
               </div>
             )}
           </div>
@@ -4231,6 +4211,21 @@ const TuneProfile: React.FC = () => {
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
         isNonPlayable={media ? !isMediaPlayable(media) : false}
+      />
+
+      <BidConfirmationModal
+        isOpen={!!recommendedItemToTip}
+        onClose={() => setRecommendedItemToTip(null)}
+        onConfirm={handleConfirmRecommendedTip}
+        bidAmount={user?.preferences?.defaultTip || 0.11}
+        minTip={minimumBid}
+        mediaTitle={recommendedItemToTip?.title || 'Unknown'}
+        mediaArtist={recommendedItemToTip?.artist}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isPlacingRecommendedTip}
+        isNonPlayable={
+          recommendedItemToTip ? !isRecommendedPlayable(recommendedItemToTip) : false
+        }
       />
 
       {/* Add Link Modal */}
