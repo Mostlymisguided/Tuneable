@@ -464,7 +464,7 @@ const LibraryImport: React.FC = () => {
     let remaining = mode === 'affordable' ? userBalance : Number.POSITIVE_INFINITY;
     const payloadItems = items
       .filter((i) => i.matchStatus !== 'in_library')
-      .filter((item) => {
+      .filter(() => {
         if (mode === 'all') return true;
         if (tip <= remaining + 0.0001) {
           remaining -= tip;
