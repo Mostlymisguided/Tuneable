@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Globe, Coins, Gift, UserPlus, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
+import { AudioLines, Coins, Gift, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -2554,20 +2554,6 @@ Join here: ${inviteLink}`.trim();
 
           <div className="bg-gray-900 rounded-lg p-4">
           <div className="flex items-center">
-            <div className="bg-green-100 p-3 rounded-lg">
-              <Globe className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Global Rank</p>
-                <p className="text-base md:text-2xl font-semibold text-white">
-                #{user?.globalUserAggregateRank || 'N/A'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-          <div className="bg-gray-900 rounded-lg p-4">
-          <div className="flex items-center">
             <div className="bg-purple-100 p-3 rounded-lg">
               <Gift className="h-6 w-6 text-purple-600" />
             </div>
@@ -2607,20 +2593,6 @@ Join here: ${inviteLink}`.trim();
             </div>
           </div>
         </div>
-
-          <div className="bg-gray-900 rounded-lg p-4">
-          <div className="flex items-center">
-            <div className="bg-orange-100 p-3 rounded-lg">
-              <UserPlus className="h-6 w-6 text-orange-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-white">Invite Credits</p>
-                <p className="text-base md:text-2xl font-semibold text-white">
-                {user?.inviteCredits ?? 10}
-              </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
