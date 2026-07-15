@@ -17,8 +17,8 @@ import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMedi
 import VetoedQueueMediaCard from '../components/VetoedQueueMediaCard';
 // MediaLeaderboard kept in codebase for potential future use
 import '../types/youtube'; // Import YouTube types
-import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin, Gauge } from 'lucide-react';
-import TopSupporters from '../components/TopSupporters';
+import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, Plus, TrendingUp, RefreshCw, Share2, Copy, Check, ChevronDown, Twitter, Facebook, Linkedin, Flag, Search, MapPin, Gauge, Crown } from 'lucide-react';
+import MediaChampions from '../components/MediaChampions';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -1408,13 +1408,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     return (party && party.media) ? party.media : [];
   };
 
-  const getQueueMediaForAggregation = () => {
-    if (useSortedQueue) {
-      return sortedMedia.filter((item: any) => item.status === 'active');
-    }
-    return getPartyMedia().filter((item: any) => item.status === 'active');
-  };
-
   // Top Tags cloud (proxy for GlobalTagAggregate using party/global aggregates)
   const topTags = useMemo(() => {
     if (!party) return [] as Array<{ tag: string; total: number; count: number }>;
@@ -1515,79 +1508,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       .filter((t) => t.startsWith('#'))
       .map((t) => t.slice(1).toLowerCase());
   }, [queueSearchTerms]);
-
-  // Aggregate bids across queued media filtered by selected tags
-  const topSupporterBids = useMemo(() => {
-    if (!party) return [] as any[];
-    const out: any[] = [];
-    const media = getQueueMediaForAggregation();
-    
-    for (const item of media) {
-      const m = item.mediaId || item;
-      // Get canonical forms of tags for matching (handles aliases like D&b -> dnb)
-      const tags: string[] = Array.isArray(m.tags) 
-        ? m.tags.map((t: string) => t && typeof t === 'string' ? getCanonicalTag(t) : '').filter((t: string) => t)
-        : [];
-      
-      if (selectedTagFilters.length > 0) {
-        // Use OR logic (.some()) to match queue filtering behavior
-        // Media should be included if it has ANY of the selected tags
-        const canonicalSelectedTags = selectedTagFilters
-          .map(t => t && typeof t === 'string' ? getCanonicalTag(t) : '')
-          .filter(t => t);
-        const ok = canonicalSelectedTags.some((selectedTag) => 
-          tags.some((tag) => tag === selectedTag)
-        );
-        if (!ok) continue;
-      }
-      (m.bids || []).forEach((b: any) => {
-        if (selectedLocation?.placeId) {
-          const ancestors = b.bidderLocationAncestorIds || [];
-          if (!ancestors.includes(selectedLocation.placeId)) return;
-        }
-        out.push(b);
-      });
-    }
-    return out;
-  }, [party, selectedTagFilters, sortedMedia, useSortedQueue, selectedLocation?.placeId]);
-
-  // Total unique supporters (aggregated by user, same logic as TopSupporters) for load-more cap
-  const totalSupportersCount = useMemo(() => {
-    if (!topSupporterBids.length) return 0;
-    const byUser: Record<string, boolean> = {};
-    topSupporterBids.forEach((bid: any) => {
-      const status = bid.status || (bid._doc && bid._doc.status) || 'active';
-      if (status === 'vetoed') return;
-      const userId = bid.userId?.uuid || bid.userId?.username;
-      if (userId) byUser[userId] = true;
-    });
-    return Object.keys(byUser).length;
-  }, [topSupporterBids]);
-
-  const [topSupportersToShow, setTopSupportersToShow] = useState(10);
-  const topSupportersSentinelRef = useRef<HTMLDivElement>(null);
-
-  // Reset to 10 when party/filters change
-  useEffect(() => {
-    setTopSupportersToShow(10);
-  }, [topSupporterBids, selectedTagFilters, selectedLocation?.placeId]);
-
-  // Load more supporters when user scrolls to bottom of Top Supporters list
-  useEffect(() => {
-    const sentinel = topSupportersSentinelRef.current;
-    if (!sentinel || totalSupportersCount <= 10) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry?.isIntersecting) {
-          setTopSupportersToShow((prev) => Math.min(prev + 10, totalSupportersCount));
-        }
-      },
-      { root: sentinel.parentElement, rootMargin: '20px', threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [totalSupportersCount, topSupportersToShow]);
 
   // Removed TuneBytes/user profile fetch for simplicity and performance
 
@@ -2744,9 +2664,8 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         </div>
         )}
 
-        {/* Top Fans - hidden for now */}
-        {false && (
-        <div className="max-w-7xl mx-auto flex justify-center">
+        {/* Champions for currently playing / focused media */}
+        <div className="max-w-7xl mx-auto flex justify-center mt-4 mb-2 px-2">
           <div className="w-full max-w-xl">
             {!showTopFansPanel ? (
               <div className="flex justify-center">
@@ -2755,32 +2674,36 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                   onClick={() => setShowTopFansPanel(true)}
                   className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
                 >
-                  <Users className="h-4 w-4 text-purple-400" />
-                  Top Fans
+                  <Crown className="h-4 w-4 text-amber-400" />
+                  Champions
                 </button>
               </div>
             ) : (
               <>
-                <div className="text-center mb-2 md:mb-3">
-                  <h3 className="text-base md:text-lg font-semibold text-white">Top Fans</h3>
-                  {(selectedTagFilters.length > 0 || selectedLocation?.display || selectedLocation?.city) && (
-                    <div className="text-xs text-purple-300 mt-1 space-y-0.5">
-                      {selectedLocation?.display || selectedLocation?.city ? (
-                        <p>Tips from {formatLocation(selectedLocation)}</p>
-                      ) : null}
-                      {selectedTagFilters.length > 0 ? (
-                        <p>Filtered by {selectedTagFilters.map((t) => `#${t}`).join(', ')}</p>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-                <div className="max-h-48 md:max-h-64 overflow-y-auto pr-1">
-                  <TopSupporters bids={topSupporterBids} maxDisplay={topSupportersToShow} />
-                  {totalSupportersCount > topSupportersToShow && (
-                    <div ref={topSupportersSentinelRef} className="h-4 flex items-center justify-center text-xs text-gray-500 py-2" aria-hidden>
-                      Scroll for more
-                    </div>
-                  )}
+                <div className="card bg-black/20 rounded-lg p-3 md:p-4 max-h-[28rem] overflow-y-auto">
+                  {(() => {
+                    const mediaId =
+                      currentMedia?._id ||
+                      currentMedia?.id ||
+                      (currentMedia as any)?.uuid ||
+                      null;
+                    if (!mediaId) {
+                      return (
+                        <p className="text-sm text-gray-400 text-center py-4">
+                          Play a track to see its Champions.
+                        </p>
+                      );
+                    }
+                    return (
+                      <MediaChampions
+                        mediaId={String(mediaId)}
+                        maxDisplay={10}
+                        compact
+                        mediaTitle={currentMedia?.title}
+                        seedLocation={selectedLocation}
+                      />
+                    );
+                  })()}
                 </div>
                 <div className="flex justify-center mt-2">
                   <button
@@ -2795,7 +2718,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
             )}
           </div>
         </div>
-        )}
 
 
         {/* Wallet Balance removed per product update */}

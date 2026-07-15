@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI, locationAPI } from '../lib/api';
 import BidModal from '../components/BidModal';
-import TopSupporters from '../components/TopSupporters';
+import MediaChampions from '../components/MediaChampions';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import PodcastQueueMediaCard from '../components/PodcastQueueMediaCard';
 import PodcastSeriesStrip from '../components/PodcastSeriesStrip';
@@ -23,7 +23,8 @@ import {
   Linkedin,
   Tag,
   Music2,
-  Upload
+  Upload,
+  Crown
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
@@ -935,7 +936,7 @@ const Podcasts: React.FC = () => {
     }
   };
 
-  const { setCurrentEpisode, play } = usePodcastPlayerStore();
+  const { setCurrentEpisode, play, currentEpisode } = usePodcastPlayerStore();
 
   const handleEpisodeClick = (episode: PodcastEpisode) => {
     const episodeId = episode._id || episode.id;
@@ -1233,42 +1234,6 @@ const Podcasts: React.FC = () => {
       .filter(t => t);
   }, [selectedTags]);
 
-  // Aggregate bids across episodes filtered by selected tags
-  const topSupporterBids = useMemo(() => {
-    if (displayEpisodes.length === 0) return [] as any[];
-    const out: any[] = [];
-    
-    for (const episode of displayEpisodes) {
-      // Get canonical forms of tags for matching (handles aliases like D&b -> dnb)
-      const tags: string[] = Array.isArray(episode.tags) 
-        ? episode.tags.map((t: string) => t && typeof t === 'string' ? getCanonicalTag(t) : '').filter((t: string) => t)
-        : [];
-      
-      if (selectedTagFilters.length > 0) {
-        // Use OR logic (.some()) to match filtering behavior
-        // Episode should be included if it has ANY of the selected tags
-        const ok = selectedTagFilters.some((selectedTag) => 
-          tags.some((tag) => tag === selectedTag)
-        );
-        if (!ok) continue;
-      }
-      
-      // Add all bids from this episode
-      if (episode.bids && Array.isArray(episode.bids)) {
-        episode.bids.forEach((b: any) => {
-          if (!b.status || b.status === 'active') {
-            if (selectedLocation?.placeId) {
-              const ancestors = b.bidderLocationAncestorIds || [];
-              if (!ancestors.includes(selectedLocation.placeId)) return;
-            }
-            out.push(b);
-          }
-        });
-      }
-    }
-    return out;
-  }, [displayEpisodes, selectedTagFilters, selectedLocation?.placeId]);
-
   const visibleEpisodes = showSearchResults
     ? displayEpisodes
     : displayEpisodes.slice(0, visibleEpisodeCount);
@@ -1444,21 +1409,45 @@ const Podcasts: React.FC = () => {
                 <p className="text-gray-400 text-sm">No tags yet.</p>
               )}
               <div className="mt-4 pt-4 border-t border-gray-700/50">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
-                  <h4 className="text-sm font-semibold text-white">Top Fans</h4>
-                  {selectedTagFilters.length > 0 || selectedLocation?.placeId ? (
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 gap-1">
+                  <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <Crown className="h-3.5 w-3.5 text-amber-400" />
+                    Champions
+                  </h4>
+                  {selectedLocation?.placeId ? (
                     <span className="text-xs text-purple-300">
-                      {selectedLocation?.placeId && `Tips from ${selectedLocation.display || selectedLocation.city || 'selected location'}`}
-                      {selectedTagFilters.length > 0 && selectedLocation?.placeId && ' · '}
-                      {selectedTagFilters.length > 0 && `Filtered by ${selectedTagFilters.map((t) => `#${t}`).join(', ')}`}
+                      Scoped with chart location
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-400">Showing global support</span>
+                    <span className="text-xs text-gray-400">For the playing episode</span>
                   )}
                 </div>
-                <div className="max-h-48 overflow-y-auto pr-1">
-                  <TopSupporters bids={topSupporterBids} maxDisplay={10} />
-                </div>
+                {(() => {
+                  const focusEpisode = currentEpisode || selectedEpisode;
+                  const mediaId =
+                    (focusEpisode as any)?._id ||
+                    (focusEpisode as any)?.id ||
+                    (focusEpisode as any)?.uuid ||
+                    null;
+                  if (!mediaId) {
+                    return (
+                      <p className="text-xs text-gray-500 text-center py-3">
+                        Play an episode to see its Champions.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="max-h-[28rem] overflow-y-auto pr-1">
+                      <MediaChampions
+                        mediaId={String(mediaId)}
+                        maxDisplay={10}
+                        compact
+                        mediaTitle={(focusEpisode as any)?.title}
+                        seedLocation={selectedLocation}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

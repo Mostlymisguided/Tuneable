@@ -19,6 +19,7 @@ import {
   Disc,
   Headphones,
   Award,
+  Crown,
   X,
   Save,
   Youtube,
@@ -42,7 +43,7 @@ import {
   Instagram
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
-import TopSupporters from '../components/TopSupporters';
+import MediaChampions from '../components/MediaChampions';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
@@ -2577,7 +2578,7 @@ const PodcastEpisodeProfile: React.FC = () => {
 
         {renderSlimSupportSection()}
 
-        {/* Top Fans - collapsible */}
+        {/* Champions - collapsible */}
         {media.bids && media.bids.length > 0 && (
           <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
             <button
@@ -2585,14 +2586,14 @@ const PodcastEpisodeProfile: React.FC = () => {
               className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
             >
               <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Heart className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-400 flex-shrink-0" />
-                {showTopFans ? 'Top Fans' : 'Show Top Fans'}
+                <Crown className="h-5 w-5 md:h-6 md:w-6 mr-2 text-amber-400 flex-shrink-0" />
+                {showTopFans ? 'Champions' : 'Show Champions'}
               </span>
               {showTopFans ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
             </button>
             {showTopFans && (
               <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <TopSupporters bids={media.bids} maxDisplay={10} />
+                <MediaChampions mediaId={media.uuid || media._id} maxDisplay={10} />
               </div>
             )}
           </div>

@@ -48,6 +48,12 @@ export interface MediaChampionsResponse {
 interface MediaChampionsProps {
   mediaId: string;
   maxDisplay?: number;
+  /** Seed place scope from a parent chart filter (e.g. Party Tunefeed location). */
+  seedLocation?: ResolvedLocation | null;
+  /** Tighter layout for side panels / chart embeds. */
+  compact?: boolean;
+  /** Optional track/episode title shown under the header for context. */
+  mediaTitle?: string;
 }
 
 const MEDAL_STYLES: Record<
@@ -97,10 +103,16 @@ function medalForRank(rank: number, isChampion: boolean, medal?: ChampionMedal |
   return (['gold', 'silver', 'bronze'] as ChampionMedal[])[rank - 1] || null;
 }
 
-const MediaChampions: React.FC<MediaChampionsProps> = ({ mediaId, maxDisplay = 10 }) => {
+const MediaChampions: React.FC<MediaChampionsProps> = ({
+  mediaId,
+  maxDisplay = 10,
+  seedLocation = null,
+  compact = false,
+  mediaTitle,
+}) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(seedLocation);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [data, setData] = useState<MediaChampionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,6 +122,11 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({ mediaId, maxDisplay = 1
     () => getChampionScopePicksFromLocation(user?.homeLocation || null),
     [user?.homeLocation]
   );
+
+  // Keep in sync when parent chart location changes
+  useEffect(() => {
+    setSelectedLocation(seedLocation ?? null);
+  }, [seedLocation?.placeId]);
 
   const scopeLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
@@ -171,17 +188,22 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({ mediaId, maxDisplay = 1
   }, [data]);
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {/* Scope header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-white">
-            <Crown className="h-5 w-5 text-amber-400 flex-shrink-0" />
-            <h3 className="text-lg md:text-xl font-bold">
+            <Crown className={`text-amber-400 flex-shrink-0 ${compact ? 'h-4 w-4' : 'h-5 w-5'}`} />
+            <h3 className={`font-bold ${compact ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>
               Champions of <span className="text-amber-300">{scopeLabel}</span>
             </h3>
           </div>
-          <p className="text-xs md:text-sm text-gray-400 mt-1">
+          {mediaTitle && (
+            <p className="text-xs text-purple-200/90 mt-1 truncate" title={mediaTitle}>
+              for <span className="text-white font-medium">{mediaTitle}</span>
+            </p>
+          )}
+          <p className={`text-gray-400 mt-1 ${compact ? 'text-[11px]' : 'text-xs md:text-sm'}`}>
             #1 · #2 · #3 Champions by tip total from tippers based here. Social status only — not ownership rights.
           </p>
         </div>
