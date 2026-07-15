@@ -31,6 +31,11 @@ function formatDuration(duration: number | string | undefined) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function getBpm(mediaData: { bpm?: number | null }): number | null {
+  const bpm = mediaData?.bpm;
+  return typeof bpm === 'number' && bpm > 0 ? bpm : null;
+}
+
 export interface QueueMediaCardProps {
   item: any;
   index: number;
@@ -57,6 +62,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const tags = mediaData.tags ?? [];
+  const bpm = getBpm(mediaData);
   const href =
     mediaHref ||
     (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
@@ -142,9 +148,18 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
               >
                 {mediaData.title || 'Unknown Media'}
               </h4>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <Clock className="h-3 w-3 text-gray-500" />
-                <span className="text-xs text-gray-400">{formatDuration(mediaData.duration)}</span>
+              <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
+                {bpm != null && (
+                  <span title={`${bpm} BPM`} className="tabular-nums">
+                    <span className="md:hidden">{bpm}</span>
+                    <span className="hidden md:inline">{bpm} BPM</span>
+                  </span>
+                )}
+                {bpm != null && <span className="text-gray-600" aria-hidden>·</span>}
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-gray-500" />
+                  <span>{formatDuration(mediaData.duration)}</span>
+                </span>
               </div>
             </div>
             <p className="text-gray-400 text-xs truncate">
