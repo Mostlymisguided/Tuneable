@@ -1,20 +1,11 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/auth/AuthContext';
-import { PlayerMiniBar } from '@/src/components/PlayerMiniBar';
 import { colors } from '@/src/theme/colors';
-import { useCurrentTrack } from '@/src/stores/musicPlayerStore';
-import { useCurrentEpisode } from '@/src/stores/podcastPlayerStore';
 
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
-  const currentTrack = useCurrentTrack();
-  const currentEpisode = useCurrentEpisode();
-  const insets = useSafeAreaInsets();
-  const tabBarHeight = 49 + Math.max(insets.bottom, 0);
-  const showMini = Boolean(currentTrack || currentEpisode);
 
   if (!isLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
@@ -73,17 +64,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-      {showMini ? (
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: tabBarHeight,
-          }}>
-          <PlayerMiniBar />
-        </View>
-      ) : null}
     </View>
   );
 }

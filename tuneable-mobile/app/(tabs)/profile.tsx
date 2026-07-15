@@ -2,11 +2,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
+import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { colors } from '@/src/theme/colors';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { contentPaddingBottom } = usePlayerDockState();
 
   const onLogout = async () => {
     await logout();
@@ -14,7 +16,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <Screen style={styles.pad}>
+    <Screen style={[styles.pad, { paddingBottom: contentPaddingBottom }]}>
       <Text style={styles.title}>Profile</Text>
 
       <View style={styles.card}>

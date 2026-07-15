@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 48,
+    paddingBottom: 24,
     alignItems: 'center',
   },
   centered: {

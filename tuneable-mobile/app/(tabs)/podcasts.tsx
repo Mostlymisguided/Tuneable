@@ -14,6 +14,7 @@ import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
+import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { episodeId, isEpisodePlayable, seriesTitle } from '@/src/lib/podcast';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
@@ -21,6 +22,7 @@ import type { PodcastEpisode } from '@/src/types/podcast';
 
 export default function PodcastsScreen() {
   const { user, updateBalance } = useAuth();
+  const { contentPaddingBottom } = usePlayerDockState();
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,7 +96,10 @@ export default function PodcastsScreen() {
       <FlatList
         data={episodes}
         keyExtractor={(item, index) => episodeId(item) || String(index)}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: Math.max(96, contentPaddingBottom + 24) },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -163,7 +168,6 @@ export default function PodcastsScreen() {
 const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 96,
   },
   header: {
     paddingTop: 8,

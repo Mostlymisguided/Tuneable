@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext';
+import { PlayerDock } from '@/src/components/PlayerDock';
 import { colors } from '@/src/theme/colors';
 
 export { ErrorBoundary } from 'expo-router';
@@ -62,22 +63,25 @@ function RootNavigator() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="tune/[id]" options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen
-        name="now-playing"
-        options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
-      />
-      <Stack.Screen name="auth/callback" />
-    </Stack>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="tune/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen
+          name="now-playing"
+          options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+        />
+        <Stack.Screen name="auth/callback" />
+      </Stack>
+      <PlayerDock />
+    </View>
   );
 }

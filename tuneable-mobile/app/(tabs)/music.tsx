@@ -15,6 +15,7 @@ import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import { partyAPI } from '@/src/api/party';
 import { useAuth } from '@/src/auth/AuthContext';
+import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
@@ -28,6 +29,7 @@ import {
 
 export default function MusicScreen() {
   const { user, updateBalance } = useAuth();
+  const { contentPaddingBottom } = usePlayerDockState();
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,10 @@ export default function MusicScreen() {
       <FlatList
         data={media}
         keyExtractor={(item, index) => mediaId(item) || String(index)}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: Math.max(96, contentPaddingBottom + 24) },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -229,7 +234,6 @@ function Metric({
 const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 96,
   },
   header: {
     paddingTop: 8,
