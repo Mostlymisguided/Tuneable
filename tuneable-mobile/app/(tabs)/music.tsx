@@ -186,6 +186,10 @@ export default function MusicScreen() {
           <ChartTrackRow
             rank={index + 1}
             item={item}
+            onOpen={() => {
+              const id = mediaId(item);
+              if (id) router.push(`/tune/${id}`);
+            }}
             onPlay={() => onPlayItem(item)}
             onTip={() => setTipTarget(item)}
           />

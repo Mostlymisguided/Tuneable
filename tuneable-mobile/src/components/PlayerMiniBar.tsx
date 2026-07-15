@@ -7,10 +7,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { router } from 'expo-router';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
-import { formatArtist } from '@/src/lib/media';
+import { formatArtist, mediaId } from '@/src/lib/media';
 import { seriesTitle } from '@/src/lib/podcast';
 import {
   useCurrentTrack,
@@ -51,6 +52,7 @@ export function PlayerMiniBar() {
   }
 
   if (track) {
+    const id = mediaId(track);
     return (
       <MiniBarChrome
         coverUri={track.coverArt || DEFAULT_COVER_ART}
@@ -60,6 +62,7 @@ export function PlayerMiniBar() {
         isLoading={musicLoading}
         onToggle={() => void musicToggle()}
         onNext={() => void musicNext()}
+        onOpen={id ? () => router.push(`/tune/${id}`) : undefined}
       />
     );
   }
@@ -75,6 +78,7 @@ function MiniBarChrome({
   isLoading,
   onToggle,
   onNext,
+  onOpen,
 }: {
   coverUri: string;
   title: string;
@@ -83,18 +87,24 @@ function MiniBarChrome({
   isLoading: boolean;
   onToggle: () => void;
   onNext: () => void;
+  onOpen?: () => void;
 }) {
   return (
     <View style={styles.bar}>
-      <Image source={{ uri: coverUri }} style={styles.cover} />
-      <View style={styles.meta}>
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={styles.artist} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
+      <Pressable
+        style={styles.metaPress}
+        onPress={onOpen}
+        disabled={!onOpen}>
+        <Image source={{ uri: coverUri }} style={styles.cover} />
+        <View style={styles.meta}>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={styles.artist} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        </View>
+      </Pressable>
       <Pressable onPress={onToggle} hitSlop={12} style={styles.iconBtn}>
         {isLoading ? (
           <ActivityIndicator color={colors.text} size="small" />
@@ -123,6 +133,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 26, 46, 0.96)',
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
+  },
+  metaPress: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
   },
   cover: {
     width: 44,

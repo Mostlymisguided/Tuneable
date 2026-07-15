@@ -1,4 +1,5 @@
 import { api } from './client';
+import type { MediaProfileResponse } from '@/src/types/media';
 
 export type PlaceGlobalBidResponse = {
   message?: string;
@@ -8,6 +9,13 @@ export type PlaceGlobalBidResponse = {
 };
 
 export const mediaAPI = {
+  getProfile: async (mediaId: string): Promise<MediaProfileResponse> => {
+    const response = await api.get<MediaProfileResponse>(
+      `/media/${mediaId}/profile`
+    );
+    return response.data;
+  },
+
   /** Tip a chart item. `amount` is in pounds (e.g. 0.50). */
   placeGlobalBid: async (
     mediaId: string,

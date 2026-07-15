@@ -10,15 +10,41 @@ export interface ChartMediaItem {
   uuid?: string;
   title?: string;
   artist?: string | Array<string | { name?: string }>;
+  creatorDisplay?: string;
   duration?: number;
   coverArt?: string;
   partyMediaAggregate?: number;
+  globalMediaAggregate?: number;
+  globalMediaAggregateTopRank?: number;
+  album?: string | null;
   tags?: string[];
+  category?: string;
   status?: string;
   sources?: MediaSources;
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
   isPlayable?: boolean;
+  addedBy?: {
+    _id?: string;
+    username?: string;
+    profilePic?: string;
+    uuid?: string;
+  };
+  bids?: Array<{
+    _id?: string;
+    amount?: number;
+    userId?: {
+      _id?: string;
+      username?: string;
+      profilePic?: string;
+      uuid?: string;
+    };
+  }>;
+}
+
+export interface MediaProfileResponse {
+  message?: string;
+  media: ChartMediaItem;
 }
 
 export interface SortedMediaResponse {

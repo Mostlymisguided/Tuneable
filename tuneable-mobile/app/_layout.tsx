@@ -72,6 +72,7 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="tune/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="auth/callback" />
     </Stack>
   );

@@ -8,26 +8,24 @@ import { formatArtist, isUploadPlayable } from '@/src/lib/media';
 type Props = {
   rank: number;
   item: ChartMediaItem;
+  onOpen: () => void;
   onPlay: () => void;
   onTip: () => void;
 };
 
-export function ChartTrackRow({ rank, item, onPlay, onTip }: Props) {
+export function ChartTrackRow({ rank, item, onOpen, onPlay, onTip }: Props) {
   const playable = isUploadPlayable(item);
 
   return (
     <View style={[styles.row, !playable && styles.rowMuted]}>
       <Text style={styles.rank}>{rank}</Text>
-      <Pressable onPress={playable ? onPlay : undefined} disabled={!playable}>
+      <Pressable onPress={onOpen}>
         <Image
           source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
           style={styles.cover}
         />
       </Pressable>
-      <Pressable
-        style={styles.meta}
-        onPress={playable ? onPlay : undefined}
-        disabled={!playable}>
+      <Pressable style={styles.meta} onPress={onOpen}>
         <Text style={styles.title} numberOfLines={1}>
           {item.title || 'Untitled'}
         </Text>
