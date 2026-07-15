@@ -234,11 +234,8 @@ const LibraryImport: React.FC = () => {
         : await userAPI.previewSpotifyImport(limit);
       setItems(data.items || []);
       setSummary(data.summary || null);
-      const amounts: Record<string, string> = {};
-      (data.items || []).forEach((item: ImportItem) => {
-        amounts[item.key] = String(item.defaultTip ?? data.summary?.defaultTip ?? 0.11);
-      });
-      setTipAmounts(amounts);
+      // Leave tipAmounts empty so rows/total follow bulkTip until a per-row override.
+      setTipAmounts({});
       setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 0.11));
       setStep('review');
     } catch (error: any) {
@@ -301,20 +298,49 @@ const LibraryImport: React.FC = () => {
     toast.success('Selected tracks that fit your balance');
   };
 
-  const applyBulkTip = () => {
-    const amount = parseFloat(bulkTip);
-    if (!Number.isFinite(amount) || amount < 0.01) {
-      toast.error('Enter a valid tip amount (min £0.01)');
-      return;
-    }
+  const syncTipToTargets = (rawAmount: string, targets: ImportItem[]) => {
+    const amount = parseFloat(rawAmount);
+    if (!Number.isFinite(amount) || amount < 0.01) return null;
+    const formatted = amount.toFixed(2);
+    setBulkTip(formatted);
     setTipAmounts((prev) => {
       const next = { ...prev };
-      selectedItems.forEach((item) => {
-        next[item.key] = amount.toFixed(2);
+      targets.forEach((item) => {
+        next[item.key] = formatted;
       });
       return next;
     });
-    toast.success(`Set ${selectedItems.length} tracks to £${amount.toFixed(2)}`);
+    return { formatted, count: targets.length, total: amount * targets.length };
+  };
+
+  const applyBulkTip = () => {
+    const targets = items.filter((i) => i.selected && i.matchStatus !== 'in_library');
+    if (targets.length === 0) {
+      toast.error('Select at least one track first');
+      return;
+    }
+    const result = syncTipToTargets(bulkTip, targets);
+    if (!result) {
+      toast.error('Enter a valid tip amount (min £0.01)');
+      return;
+    }
+    toast.success(
+      `Set ${result.count} track${result.count === 1 ? '' : 's'} to £${result.formatted} (total £${result.total.toFixed(2)})`
+    );
+  };
+
+  const handleBulkTipChange = (value: string) => {
+    setBulkTip(value);
+    // Live-sync selected rows so the default tip field actually drives their amounts/total.
+    const targets = items.filter((i) => i.selected && i.matchStatus !== 'in_library');
+    if (targets.length === 0) return;
+    setTipAmounts((prev) => {
+      const next = { ...prev };
+      targets.forEach((item) => {
+        next[item.key] = value;
+      });
+      return next;
+    });
   };
 
   const handleExecute = async () => {
@@ -369,7 +395,7 @@ const LibraryImport: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-32">
+    <div className="min-h-screen bg-gray-900 text-white pb-40">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <button
           type="button"
@@ -509,7 +535,7 @@ const LibraryImport: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-4 flex flex-wrap gap-4 items-end">
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-4 flex flex-wrap gap-4 items-end justify-between">
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Default tip for selection</label>
                 <div className="flex items-center gap-2">
@@ -519,7 +545,7 @@ const LibraryImport: React.FC = () => {
                     min={0.01}
                     step={0.01}
                     value={bulkTip}
-                    onChange={(e) => setBulkTip(e.target.value)}
+                    onChange={(e) => handleBulkTipChange(e.target.value)}
                     className="w-24 bg-gray-900 border border-gray-600 rounded px-2 py-1"
                   />
                   <button
@@ -531,7 +557,7 @@ const LibraryImport: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3 text-sm">
+              <div className="flex flex-wrap gap-3 text-sm items-center">
                 <button type="button" onClick={() => toggleAll(true)} className="text-purple-400 hover:underline">
                   Select all
                 </button>
@@ -542,9 +568,36 @@ const LibraryImport: React.FC = () => {
                   Select what I can afford
                 </button>
               </div>
+              <div className="w-full flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-700">
+                <div>
+                  <div className="text-sm text-gray-400">
+                    {selectedItems.length} track{selectedItems.length !== 1 ? 's' : ''} selected
+                  </div>
+                  <div className="text-xl font-bold flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-yellow-400" />
+                    £{totalCost.toFixed(2)}
+                  </div>
+                  {!canAfford && (
+                    <div className="text-sm text-red-400 flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Need £{(totalCost - userBalance).toFixed(2)} more —{' '}
+                      <Link to="/wallet" className="underline">top up wallet</Link>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleExecute()}
+                  disabled={isExecuting || selectedItems.length === 0 || !canAfford}
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center gap-2"
+                >
+                  {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                  Import &amp; tip £{totalCost.toFixed(2)}
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-2 mb-24 max-h-[50vh] overflow-y-auto pr-1">
+            <div className="space-y-2 mb-8 max-h-[45vh] overflow-y-auto pr-1">
               {items.map((item) => (
                 <div
                   key={item.key}
@@ -675,8 +728,8 @@ const LibraryImport: React.FC = () => {
               ))}
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-700 p-4 backdrop-blur">
-              <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div className="sticky bottom-28 sm:bottom-32 z-40 bg-gray-900/95 border border-gray-700 rounded-xl p-4 backdrop-blur shadow-xl">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <div className="text-sm text-gray-400">
                     {selectedItems.length} track{selectedItems.length !== 1 ? 's' : ''} selected
