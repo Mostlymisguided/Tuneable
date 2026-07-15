@@ -3860,6 +3860,49 @@ router.get('/:userId/tag-rankings', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch tag rankings', details: error.message });
   }
 });
+
+// @route   GET /api/users/:userId/tunebytes-tag-rankings
+// @desc    Get TuneBytes-based discovery tag rankings (champion badges) for a user
+// @access  Public
+router.get('/:userId/tunebytes-tag-rankings', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 5, refresh = false } = req.query;
+    const User = require('../models/User');
+    const mongoose = require('mongoose');
+    const tuneBytesTagRankingsService = require('../services/tuneBytesTagRankingsService');
+
+    let user;
+    if (typeof userId === 'string' && userId.includes('-')) {
+      user = await User.findOne({ uuid: userId }).select('_id');
+    } else if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId).select('_id');
+    } else {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const tuneBytesTagRankings =
+      await tuneBytesTagRankingsService.calculateAndUpdateUserTuneBytesTagRankings(
+        user._id,
+        parseInt(limit, 10) || 5,
+        refresh === 'true' || refresh === true
+      );
+
+    res.json({
+      tuneBytesTagRankings: (tuneBytesTagRankings || []).slice(0, parseInt(limit, 10) || 5),
+    });
+  } catch (error) {
+    console.error('Error fetching TuneBytes tag rankings:', error);
+    res.status(500).json({
+      error: 'Failed to fetch TuneBytes tag rankings',
+      details: error.message,
+    });
+  }
+});
 // ========================================
 // TUNEBYTES ROUTES
 // ========================================

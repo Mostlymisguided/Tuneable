@@ -32,6 +32,7 @@ export interface LibraryItem {
   bidCount: number;
   tuneBytesEarned: number;
   lastBidAt: string;
+  firstBidAt?: string;
   bids?: LibraryBid[];
 }
 

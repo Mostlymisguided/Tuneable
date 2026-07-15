@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
@@ -26,7 +26,9 @@ import {
   Plus,
   Minus,
   Gift,
-  Undo2
+  Tag,
+  Undo2,
+  Crown
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 import LabelLinkModal from '../components/LabelLinkModal';
@@ -44,6 +46,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import { normalizeSources } from '../utils/mediaPlayability';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
+import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 
 interface UserProfile {
@@ -196,7 +199,14 @@ const UserProfile: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [, setMediaWithBids] = useState<MediaWithBids[]>([]);
-  const [, setTagRankings] = useState<any[]>([]);
+  const [tuneBytesTagRankings, setTuneBytesTagRankings] = useState<Array<{
+    tag: string;
+    tuneBytesEarned: number;
+    rank: number;
+    totalUsers: number;
+    percentile: number;
+  }>>([]);
+  const [showTuneBytesTagRankings, setShowTuneBytesTagRankings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Tip history state
@@ -382,16 +392,12 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const loadTagRankings = async () => {
+  const loadTuneBytesTagRankings = async () => {
     try {
-      console.log('🏷️ Loading tag rankings for user:', userId);
-      const response = await userAPI.getTagRankings(userId!, 10);
-      console.log('📊 Tag rankings response:', response);
-      setTagRankings(response.tagRankings || []);
-      console.log('✅ Tag rankings loaded:', response.tagRankings?.length || 0, 'tags');
+      const response = await userAPI.getTuneBytesTagRankings(userId!, 5);
+      setTuneBytesTagRankings(response.tuneBytesTagRankings || []);
     } catch (err: any) {
-      console.error('❌ Error loading tag rankings:', err);
-      // Silent fail - not critical
+      console.error('Error loading TuneBytes tag rankings:', err);
     }
   };
 
@@ -689,8 +695,7 @@ const UserProfile: React.FC = () => {
       setUser(response.user);
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
-      // Also load tag rankings, label affiliations, and collective memberships
-      loadTagRankings();
+      loadTuneBytesTagRankings();
       loadLabelAffiliations();
       loadCollectiveMemberships();
       
@@ -1229,13 +1234,14 @@ const UserProfile: React.FC = () => {
 
   // Play a single library item, routing to the correct player with a
   // type-consistent queue (podcasts → podcast player, tunes → web player).
-  const handlePlayLibraryItem = (item: LibraryItem) => {
+  const handlePlayLibraryItem = (item: LibraryItem, _index?: number, sourceList?: LibraryItem[]) => {
+    const baseList = sourceList ?? getSortedLibrary();
     if (isPodcastItem(item)) {
-      const list = getSortedLibrary().filter(isPodcastItem);
+      const list = baseList.filter(isPodcastItem);
       const index = list.findIndex((i) => i.mediaId === item.mediaId);
       handlePlayPodcastLibrary(item, Math.max(index, 0), list);
     } else {
-      const list = getSortedLibrary().filter((i) => !isPodcastItem(i));
+      const list = baseList.filter((i) => !isPodcastItem(i));
       const index = list.findIndex((i) => i.mediaId === item.mediaId);
       handlePlayLibrary(item, Math.max(index, 0), list);
     }
@@ -1419,7 +1425,19 @@ const UserProfile: React.FC = () => {
   };
 
   const handleOpenLibraryTipModal = (item: LibraryItem) => {
+    if (!currentUser) {
+      toast.info('Please sign in to tip');
+      navigate(buildLoginUrl(getCurrentReturnPath()));
+      return;
+    }
     setLibraryItemToTip(item);
+  };
+
+  const championBadgeStyles = (rank: number) => {
+    if (rank === 1) return 'from-amber-400 to-yellow-600 text-black border-amber-300/50';
+    if (rank === 2) return 'from-slate-200 to-slate-400 text-slate-900 border-slate-300/40';
+    if (rank === 3) return 'from-orange-400 to-amber-700 text-black border-orange-300/40';
+    return 'from-purple-600/80 to-purple-800/80 text-white border-purple-400/30';
   };
 
   // Get social media links based on manual URLs only
@@ -1989,6 +2007,66 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
+              {/* Champion / discovery badges — prominent in header */}
+              {tuneBytesTagRankings.length > 0 &&
+                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
+                <div className="mb-4 w-full max-w-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Crown className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                    <h3 className="text-sm font-semibold text-white">
+                      {isOwnProfile ? 'Your Champion Badges' : 'Champion Badges'}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tuneBytesTagRankings.slice(0, 5).map((ranking) => (
+                      <Link
+                        key={ranking.tag}
+                        to={`/party/global?tag=${encodeURIComponent(ranking.tag)}`}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
+                        title={`#${ranking.rank} of ${ranking.totalUsers} · Top ${ranking.percentile}% · ${ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })} TuneBytes`}
+                      >
+                        <Award className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span>#{ranking.rank}</span>
+                        <span className="opacity-90">#{ranking.tag}</span>
+                      </Link>
+                    ))}
+                  </div>
+                  {isOwnProfile && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTuneBytesTagRankings(!showTuneBytesTagRankings)}
+                      className="mt-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                    >
+                      {showTuneBytesTagRankings ? 'Hide discovery details' : 'Show discovery details'}
+                    </button>
+                  )}
+                  {isOwnProfile && showTuneBytesTagRankings && (
+                    <div className="mt-2 card bg-black/20 rounded-lg p-3 md:p-4 space-y-2">
+                      {tuneBytesTagRankings.slice(0, 5).map((ranking) => (
+                        <Link
+                          key={`detail-${ranking.tag}`}
+                          to={`/party/global?tag=${encodeURIComponent(ranking.tag)}`}
+                          className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-sm truncate">{ranking.tag}</span>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <div className="text-sm font-bold text-purple-300">
+                              {ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })} TB
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              #{ranking.rank} of {ranking.totalUsers} · Top {ranking.percentile}%
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* User metrics - Tips, TuneBytes, Tunes */}
               {stats && (
                 <div className="mb-4">
@@ -2390,6 +2468,17 @@ const UserProfile: React.FC = () => {
           </div>
         )}
 
+            {!isOwnProfile ? (
+              <PublicUserLibraryChart
+                items={tuneLibrary}
+                isLoading={isLoadingLibrary}
+                username={user?.username}
+                onPlay={handlePlayLibraryItem}
+                onTip={handleOpenLibraryTipModal}
+                emptyMessage={`${user?.username || 'This user'} hasn't tipped on anything yet.`}
+              />
+            ) : (
+              <>
             <div className="card flex items-center justify-between mb-4">
               <div className="flex items-center">
                 <Music className="h-6 w-6 text-purple-400 mr-2" />
@@ -2440,6 +2529,8 @@ const UserProfile: React.FC = () => {
                     : `/tune/${item.mediaId || item.mediaUuid}`
                 }
               />
+            )}
+              </>
             )}
           </div>
         ) : viewTab === 'queue' ? (

@@ -1078,6 +1078,13 @@ export const userAPI = {
     return response.data;
   },
 
+  // TuneBytes discovery tag rankings (champion badges on profile)
+  getTuneBytesTagRankings: async (userId: string, limit?: number) => {
+    const params = limit ? { limit } : {};
+    const response = await api.get(`/users/${userId}/tunebytes-tag-rankings`, { params });
+    return response.data;
+  },
+
   // Update notification preferences
   updateNotificationPreferences: async (preferences: {
     bid_received?: boolean;

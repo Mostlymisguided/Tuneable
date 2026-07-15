@@ -303,7 +303,18 @@ const userSchema = new mongoose.Schema({
     percentile: { type: Number, required: true }, // Percentile ranking (0-100)
     lastUpdated: { type: Date, default: Date.now }
   }],
-  tagRankingsUpdatedAt: { type: Date } // Last time tag rankings were recalculated
+  tagRankingsUpdatedAt: { type: Date }, // Last time tag rankings were recalculated
+
+  // TuneBytes tag rankings - cached top tags by TuneBytes earned (discovery identity)
+  tuneBytesTagRankings: [{
+    tag: { type: String, required: true },
+    tuneBytesEarned: { type: Number, required: true },
+    rank: { type: Number, required: true },
+    totalUsers: { type: Number, required: true },
+    percentile: { type: Number, required: true },
+    lastUpdated: { type: Date, default: Date.now }
+  }],
+  tuneBytesTagRankingsUpdatedAt: { type: Date }
 }, { 
   timestamps: true,
   toJSON: { virtuals: true }, 

@@ -240,6 +240,13 @@ class TuneBytesService {
 
       console.log(`✅ Awarded ${calculation.tuneBytesEarned.toFixed(2)} TuneBytes to ${user.username} for bid on "${media.title}"`);
 
+      // Invalidate TuneBytes tag rankings cache (recalculate on next profile load)
+      try {
+        const tuneBytesTagRankingsService = require('./tuneBytesTagRankingsService');
+        tuneBytesTagRankingsService.invalidateUserTuneBytesTagRankings(user._id).catch(() => {});
+        tuneBytesTagRankingsService.calculateAndUpdateUserTuneBytesTagRankings(user._id, 10).catch(() => {});
+      } catch (_) { /* non-blocking */ }
+
       return {
         tuneBytesEarned: calculation.tuneBytesEarned,
         transaction: transaction

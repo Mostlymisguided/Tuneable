@@ -40,6 +40,8 @@ export interface QueueMediaCardProps {
   onActionClick: (item: any) => void;
   onPlay: (item: any, index: number) => void;
   onTip: (item: any) => void;
+  /** Override profile link (defaults to /tune/:uuid) */
+  mediaHref?: string;
 }
 
 const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
@@ -51,9 +53,13 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   onActionClick,
   onPlay,
   onTip,
+  mediaHref,
 }) => {
   const navigate = useNavigate();
   const tags = mediaData.tags ?? [];
+  const href =
+    mediaHref ||
+    (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
 
   const chartBadge = (
     <div className="w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center">
@@ -106,7 +112,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         <div className="flex flex-row items-start gap-2 md:contents">
           <div
             className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
-            onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
+            onClick={() => href && navigate(href)}
           >
             <img
               src={mediaData.coverArt || DEFAULT_COVER_ART}
@@ -132,7 +138,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
             <div className="flex items-center gap-2 min-w-0">
               <h4
                 className="flex-1 min-w-0 font-medium text-white text-sm truncate cursor-pointer hover:text-purple-300 transition-colors"
-                onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
+                onClick={() => href && navigate(href)}
               >
                 {mediaData.title || 'Unknown Media'}
               </h4>
