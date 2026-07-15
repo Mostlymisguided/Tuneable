@@ -301,7 +301,7 @@ async function previewSoundCloudImport(userId, limit = 50) {
   });
 }
 
-async function executeLibraryImport(userId, { items, defaultTip } = {}) {
+async function executeLibraryImport(userId, { items, defaultTip, importSource = 'library_import' } = {}) {
   if (!Array.isArray(items) || items.length === 0) {
     const err = new Error('No items to import');
     err.status = 400;
@@ -418,15 +418,26 @@ async function executeLibraryImport(userId, { items, defaultTip } = {}) {
     }
   }
 
+  // Queue MusicBrainz enrichment for tipped tracks (non-blocking)
+  try {
+    const metadataEnrichmentService = require('./metadataEnrichmentService');
+    await metadataEnrichmentService.enqueueAfterLibraryImport(results.items, {
+      importSource,
+      importedBy: userId,
+    });
+  } catch (enrichErr) {
+    console.error('library import enrichment enqueue failed:', enrichErr.message);
+  }
+
   return results;
 }
 
 async function executeSpotifyImport(userId, opts) {
-  return executeLibraryImport(userId, opts);
+  return executeLibraryImport(userId, { ...opts, importSource: 'spotify_likes' });
 }
 
 async function executeSoundCloudImport(userId, opts) {
-  return executeLibraryImport(userId, opts);
+  return executeLibraryImport(userId, { ...opts, importSource: 'soundcloud_likes' });
 }
 
 module.exports = {

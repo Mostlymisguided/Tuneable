@@ -21,6 +21,7 @@ import {
   Bell,
   DollarSign,
   Gift,
+  Sparkles,
   Undo2
 } from 'lucide-react';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
@@ -29,6 +30,7 @@ import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
 import MediaMergePanel from '../components/MediaMergePanel';
+import MetadataEnrichmentAdmin from '../components/MetadataEnrichmentAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
 import InviteReferrals from '../components/InviteReferrals';
 import UserTopUpModal from '../components/UserTopUpModal';
@@ -127,12 +129,13 @@ const Admin: React.FC = () => {
   const [editingValue, setEditingValue] = useState<string>('');
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
   const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels' | 'collectives'>('users');
-  const [bidsMediaVetoesSubTab, setBidsMediaVetoesSubTab] = useState<'bids' | 'media' | 'vetoes'>(() => {
+  const [bidsMediaVetoesSubTab, setBidsMediaVetoesSubTab] = useState<'bids' | 'media' | 'vetoes' | 'enrichment'>(() => {
     const sub = searchParams.get('sub');
-    if (sub === 'media' || sub === 'vetoes' || sub === 'bids') return sub;
+    if (sub === 'media' || sub === 'vetoes' || sub === 'bids' || sub === 'enrichment') return sub;
     return 'bids';
   });
   const mergeSourceFromUrl = searchParams.get('mergeSource') || '';
+  const [enrichmentReviewCount, setEnrichmentReviewCount] = useState(0);
   const [reportsSummary, setReportsSummary] = useState<Record<'media' | 'user' | 'label' | 'collective' | 'claims' | 'applications' | 'invites', number>>({
     media: 0,
     user: 0,
@@ -189,7 +192,7 @@ const Admin: React.FC = () => {
       setActiveTab(tabFromUrl);
     }
     const subFromUrl = searchParams.get('sub');
-    if (subFromUrl === 'media' || subFromUrl === 'vetoes' || subFromUrl === 'bids') {
+    if (subFromUrl === 'media' || subFromUrl === 'vetoes' || subFromUrl === 'bids' || subFromUrl === 'enrichment') {
       setBidsMediaVetoesSubTab(subFromUrl);
     } else if (searchParams.get('mergeSource')) {
       setActiveTab('bids-media-vetoes');
@@ -232,6 +235,9 @@ const Admin: React.FC = () => {
         loadLabels();
         refreshReportCounts();
         loadPendingRefundCount();
+        mediaAPI.getEnrichments({ status: 'needs_review', limit: 1 })
+          .then((data) => setEnrichmentReviewCount(data.statusCounts?.needs_review || data.pagination?.total || 0))
+          .catch(() => setEnrichmentReviewCount(0));
       } else {
         setIsAdmin(false);
         navigate('/explore');
@@ -2243,6 +2249,22 @@ const Admin: React.FC = () => {
                     <XCircle className="h-4 w-4 mr-2" />
                     Vetoes
                   </button>
+                  <button
+                    onClick={() => setBidsMediaVetoesSubTab('enrichment')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      bidsMediaVetoesSubTab === 'enrichment'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Import review
+                    {enrichmentReviewCount > 0 ? (
+                      <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-amber-600 text-white">
+                        {enrichmentReviewCount}
+                      </span>
+                    ) : null}
+                  </button>
                 </nav>
               </div>
             </div>
@@ -3208,6 +3230,10 @@ const Admin: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
+
+            {bidsMediaVetoesSubTab === 'enrichment' && (
+              <MetadataEnrichmentAdmin />
             )}
           </div>
         )}

@@ -803,6 +803,36 @@ export const mediaAPI = {
     return response.data;
   },
 
+  getEnrichments: async (params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+    importSource?: string;
+  }) => {
+    const response = await api.get('/media/admin/enrichment', { params });
+    return response.data;
+  },
+
+  processEnrichmentQueue: async (limit = 20) => {
+    const response = await api.post('/media/admin/enrichment/process', { limit });
+    return response.data;
+  },
+
+  applyEnrichment: async (id: string, overrides?: Record<string, unknown>) => {
+    const response = await api.post(`/media/admin/enrichment/${id}/apply`, overrides || {});
+    return response.data;
+  },
+
+  dismissEnrichment: async (id: string, adminNotes?: string) => {
+    const response = await api.post(`/media/admin/enrichment/${id}/dismiss`, { adminNotes });
+    return response.data;
+  },
+
+  chooseEnrichmentCandidate: async (id: string, candidateIndex: number) => {
+    const response = await api.post(`/media/admin/enrichment/${id}/choose-candidate`, { candidateIndex });
+    return response.data;
+  },
+
   // Place global bid (chart support)
   placeGlobalBid: async (mediaId: string, amount: number, externalMedia?: {
     title: string;

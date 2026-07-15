@@ -3591,6 +3591,123 @@ router.get('/admin/likely-duplicates', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/media/admin/enrichment
+// @desc    List metadata enrichment queue items
+// @access  Private (Admin)
+router.get('/admin/enrichment', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const data = await metadataEnrichmentService.listEnrichments({
+      status: req.query.status || 'needs_review',
+      page: parseInt(req.query.page, 10) || 1,
+      limit: parseInt(req.query.limit, 10) || 30,
+      importSource: req.query.importSource || undefined,
+    });
+    res.json(data);
+  } catch (error) {
+    console.error('Error listing enrichments:', error);
+    res.status(500).json({ error: error.message || 'Failed to list enrichments' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/process
+// @desc    Process pending MusicBrainz enrichment queue
+// @access  Private (Admin)
+router.post('/admin/enrichment/process', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const result = await metadataEnrichmentService.processQueue({
+      limit: parseInt(req.body?.limit, 10) || 20,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error processing enrichment queue:', error);
+    res.status(500).json({ error: error.message || 'Failed to process queue' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/:id/apply
+// @desc    Apply enrichment suggestion (optional field overrides)
+// @access  Private (Admin)
+router.post('/admin/enrichment/:id/apply', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const result = await metadataEnrichmentService.applyEnrichment(
+      req.params.id,
+      req.user._id,
+      req.body || {}
+    );
+    res.json({
+      success: true,
+      item: result.item,
+      media: {
+        _id: result.media._id,
+        uuid: result.media.uuid,
+        title: result.media.title,
+        artist: result.media.artist,
+      },
+    });
+  } catch (error) {
+    console.error('Error applying enrichment:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to apply enrichment' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/:id/dismiss
+// @desc    Dismiss enrichment item
+// @access  Private (Admin)
+router.post('/admin/enrichment/:id/dismiss', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const item = await metadataEnrichmentService.dismissEnrichment(
+      req.params.id,
+      req.user._id,
+      req.body?.adminNotes
+    );
+    res.json({ success: true, item });
+  } catch (error) {
+    console.error('Error dismissing enrichment:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to dismiss enrichment' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/:id/choose-candidate
+// @desc    Apply a specific MusicBrainz candidate by index
+// @access  Private (Admin)
+router.post('/admin/enrichment/:id/choose-candidate', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const index = parseInt(req.body?.candidateIndex, 10);
+    if (!Number.isFinite(index) || index < 0) {
+      return res.status(400).json({ error: 'candidateIndex is required' });
+    }
+    const result = await metadataEnrichmentService.chooseCandidate(
+      req.params.id,
+      index,
+      req.user._id
+    );
+    res.json({ success: true, item: result.item });
+  } catch (error) {
+    console.error('Error choosing enrichment candidate:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to choose candidate' });
+  }
+});
+
 // @route   POST /api/media/admin/merge/preview
 // @desc    Preview merging source media into keep media
 // @access  Private (Admin)
