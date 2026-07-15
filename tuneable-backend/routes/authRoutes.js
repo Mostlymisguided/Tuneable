@@ -8,6 +8,25 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
+/** Append query params to a URL that may already include a query string. */
+function appendQueryParams(url, params) {
+  try {
+    const parsed = new URL(url);
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null) continue;
+      parsed.searchParams.set(key, String(value));
+    }
+    return parsed.toString();
+  } catch {
+    const join = url.includes('?') ? '&' : '?';
+    const qs = Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+      .join('&');
+    return qs ? `${url}${join}${qs}` : url;
+  }
+}
+
 // Helper function to optionally extract user from JWT token (for account linking)
 // Can extract from Authorization header or query parameter (for OAuth redirects)
 async function extractUserFromToken(req) {
@@ -1024,6 +1043,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
 }
 
 // Spotify OAuth routes (for podcast import - link_account only)
+// Callback host MUST match OAuth start host (tuneable.stream/api → same-site session cookie).
 if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
   router.get('/spotify', async (req, res, next) => {
     if (req.query.redirect) {
@@ -1041,41 +1061,52 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
         console.warn('⚠️ Spotify link requested but no valid user token found');
       }
     }
-    passport.authenticate('spotify', {
-      scope: ['user-library-read'],
-      showDialog: false
-    })(req, res, next);
+    // Persist session before redirecting to Spotify (required for account linking)
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error('Spotify OAuth session save failed:', saveErr);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(appendQueryParams(
+          typeof req.query.redirect === 'string'
+            ? req.query.redirect
+            : `${frontendUrl}/auth/callback`,
+          { error: 'spotify_auth_failed', message: 'Session could not be started' }
+        ));
+      }
+      passport.authenticate('spotify', {
+        scope: ['user-library-read'],
+        showDialog: false
+      })(req, res, next);
+    });
   });
 
   router.get('/spotify/callback',
     (req, res, next) => {
-      passport.authenticate('spotify', { session: false }, (err, user, info) => {
+      passport.authenticate('spotify', { session: false }, (err, user) => {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const baseRedirect = req.session?.oauthRedirect
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        const clearSpotifySession = () => {
+          if (!req.session) return;
+          delete req.session.oauthRedirect;
+          delete req.session.linkAccount;
+          delete req.session.linkingUserId;
+          delete req.session.linkingUserUuid;
+        };
         if (err) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-          const redirectUrl = req.session?.oauthRedirect
-            ? decodeURIComponent(req.session.oauthRedirect)
-            : `${frontendUrl}/podcasts`;
-          if (req.session) {
-            delete req.session.oauthRedirect;
-            delete req.session.linkAccount;
-            delete req.session.linkingUserId;
-            delete req.session.linkingUserUuid;
-          }
-          const msg = encodeURIComponent(err.message || 'Spotify connection failed');
-          return res.redirect(`${redirectUrl}?error=spotify_auth_failed&message=${msg}`);
+          clearSpotifySession();
+          return res.redirect(appendQueryParams(baseRedirect, {
+            error: 'spotify_auth_failed',
+            message: err.message || 'Spotify connection failed'
+          }));
         }
         if (!user) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-          const redirectUrl = req.session?.oauthRedirect
-            ? decodeURIComponent(req.session.oauthRedirect)
-            : `${frontendUrl}/podcasts`;
-          if (req.session) {
-            delete req.session.oauthRedirect;
-            delete req.session.linkAccount;
-            delete req.session.linkingUserId;
-            delete req.session.linkingUserUuid;
-          }
-          return res.redirect(`${redirectUrl}?error=spotify_auth_failed`);
+          clearSpotifySession();
+          return res.redirect(appendQueryParams(baseRedirect, {
+            error: 'spotify_auth_failed',
+            message: 'Spotify connection failed'
+          }));
         }
         req.user = user;
         next();
@@ -1089,20 +1120,25 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           SECRET_KEY,
           { expiresIn: '24h' }
         );
-        if (req.session?.oauthRedirect) {
-          const redirectUrl = decodeURIComponent(req.session.oauthRedirect);
+        const baseRedirect = req.session?.oauthRedirect
+          ? decodeURIComponent(req.session.oauthRedirect)
+          : `${frontendUrl}/auth/callback`;
+        if (req.session) {
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;
           delete req.session.linkingUserId;
           delete req.session.linkingUserUuid;
-          res.redirect(`${redirectUrl}&token=${token}&oauth_success=true`);
-        } else {
-          res.redirect(`${frontendUrl}/podcasts?token=${token}&oauth_success=true`);
         }
+        res.redirect(appendQueryParams(baseRedirect, {
+          token,
+          oauth_success: 'true'
+        }));
       } catch (error) {
         console.error('Spotify callback error:', error);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/podcasts?error=spotify_auth_failed`);
+        res.redirect(appendQueryParams(`${frontendUrl}/auth/callback`, {
+          error: 'spotify_auth_failed'
+        }));
       }
     }
   );
