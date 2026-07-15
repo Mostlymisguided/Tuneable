@@ -45,6 +45,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import { normalizeSources } from '../utils/mediaPlayability';
+import { getTagProfilePath } from '../utils/tagNormalizer';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -2021,7 +2022,7 @@ const UserProfile: React.FC = () => {
                     {tuneBytesTagRankings.slice(0, 5).map((ranking) => (
                       <Link
                         key={ranking.tag}
-                        to={`/party/global?tag=${encodeURIComponent(ranking.tag)}`}
+                        to={getTagProfilePath(ranking.tag)}
                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
                         title={`#${ranking.rank} of ${ranking.totalUsers} · Top ${ranking.percentile}% · ${ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })} TuneBytes`}
                       >
@@ -2045,7 +2046,7 @@ const UserProfile: React.FC = () => {
                       {tuneBytesTagRankings.slice(0, 5).map((ranking) => (
                         <Link
                           key={`detail-${ranking.tag}`}
-                          to={`/party/global?tag=${encodeURIComponent(ranking.tag)}`}
+                          to={getTagProfilePath(ranking.tag)}
                           className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
                         >
                           <div className="flex items-center gap-2 min-w-0">

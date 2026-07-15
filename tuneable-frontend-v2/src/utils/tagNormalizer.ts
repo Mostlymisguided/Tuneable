@@ -179,12 +179,33 @@ export function normalizeTagForStorage(tag: string): string {
 }
 
 /**
+ * URL-friendly slug for tag profile routes (matches backend tagPartyService.generateSlug)
+ */
+export function generateTagSlug(tag: string): string {
+  if (!tag || typeof tag !== 'string') return '';
+
+  return tag
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Profile path for a tag string, e.g. "Hip Hop" → "/tag/hip-hop" */
+export function getTagProfilePath(tag: string): string {
+  const slug = generateTagSlug(normalizeTagForStorage(tag) || tag);
+  return slug ? `/tag/${encodeURIComponent(slug)}` : '/tag';
+}
+
+/**
  * Capitalize tag preserving acronyms and stylized capitalization
  * Matches backend logic from tagPartyService.js
  * @param tag - The tag to capitalize
  * @returns Capitalized tag
  */
-function capitalizeTag(tag: string): string {
+export function capitalizeTag(tag: string): string {
   if (!tag || typeof tag !== 'string') return tag;
   
   // Common acronyms that should be preserved as uppercase

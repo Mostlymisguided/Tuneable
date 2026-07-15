@@ -947,6 +947,14 @@ export const gearAPI = {
   },
 };
 
+// Tag profile API
+export const tagAPI = {
+  getProfile: async (slug: string, params?: { page?: number; limit?: number }) => {
+    const response = await api.get(`/tags/${encodeURIComponent(slug)}/profile`, { params });
+    return response.data;
+  },
+};
+
 // Top Tunes API
 export const topTunesAPI = {
   getTopTunes: async (sortBy: string = 'globalMediaAggregate', limit: number = 10, timePeriod: string = 'all-time', search?: string, tags?: string[]) => {

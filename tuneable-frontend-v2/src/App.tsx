@@ -34,6 +34,7 @@ import Podcasts from './pages/Podcasts';
 import PodcastSearch from './pages/PodcastSearch';
 import TuneProfile from './pages/TuneProfile';
 import GearProfile from './pages/GearProfile';
+import TagProfile from './pages/TagProfile';
 import PodcastEpisodeProfile from './pages/PodcastEpisodeProfile';
 import PodcastSeriesProfile from './pages/PodcastSeriesProfile';
 import UserProfile from './pages/UserProfile';
@@ -205,6 +206,10 @@ const AppContent = () => {
             <Route 
               path="/gear/:gearName" 
               element={<GearProfile />} 
+            />
+            <Route
+              path="/tag/:slug"
+              element={<TagProfile />}
             />
             <Route 
               path="/podcasts" 

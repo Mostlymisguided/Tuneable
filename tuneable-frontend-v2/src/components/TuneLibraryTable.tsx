@@ -198,7 +198,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                   </button>
                   {tags.length > 0 && (
                     <div className="md:hidden mt-1">
-                      <TagList tags={tags} mediaId={mediaId} limit={2} linkPath={resolvePath(item)} />
+                      <TagList tags={tags} mediaId={mediaId} limit={2} />
                     </div>
                   )}
                 </td>
@@ -212,7 +212,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                 </td>
                 <td className="hidden md:table-cell px-2 md:px-4 py-3 max-w-[200px]">
                   {tags.length > 0 ? (
-                    <TagList tags={tags} mediaId={mediaId} limit={3} linkPath={resolvePath(item)} />
+                    <TagList tags={tags} mediaId={mediaId} limit={3} />
                   ) : (
                     <span className="text-xs text-gray-500">—</span>
                   )}
