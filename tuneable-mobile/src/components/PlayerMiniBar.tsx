@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
-import { formatArtist, mediaId } from '@/src/lib/media';
+import { formatArtist } from '@/src/lib/media';
 import { seriesTitle } from '@/src/lib/podcast';
 import {
   useCurrentTrack,
@@ -37,6 +37,8 @@ export function PlayerMiniBar() {
   const podToggle = usePodcastPlayerStore((s) => s.togglePlayPause);
   const podNext = usePodcastPlayerStore((s) => s.next);
 
+  const openNowPlaying = () => router.push('/now-playing');
+
   if (episode) {
     return (
       <MiniBarChrome
@@ -47,12 +49,12 @@ export function PlayerMiniBar() {
         isLoading={podLoading}
         onToggle={() => void podToggle()}
         onNext={() => void podNext()}
+        onOpen={openNowPlaying}
       />
     );
   }
 
   if (track) {
-    const id = mediaId(track);
     return (
       <MiniBarChrome
         coverUri={track.coverArt || DEFAULT_COVER_ART}
@@ -62,7 +64,7 @@ export function PlayerMiniBar() {
         isLoading={musicLoading}
         onToggle={() => void musicToggle()}
         onNext={() => void musicNext()}
-        onOpen={id ? () => router.push(`/tune/${id}`) : undefined}
+        onOpen={openNowPlaying}
       />
     );
   }
