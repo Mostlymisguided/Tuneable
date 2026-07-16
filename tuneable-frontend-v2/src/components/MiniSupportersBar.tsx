@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
+import { Crown } from 'lucide-react';
 
 interface Bid {
   userId?: {
@@ -27,6 +28,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
 
   const supporters = useMemo(() => {
     const map: Record<string, {
+      id: string;
       user: NonNullable<Bid['userId']>;
       total: number;
       count: number;
@@ -37,7 +39,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
       if (!u?.username) continue;
       const id = u.uuid || u._id || u.id || u.username;
       const amt = (typeof b?.amount === 'number' ? b.amount : (b as any)?._doc?.amount) || 0;
-      if (!map[id]) map[id] = { user: u, total: 0, count: 0 };
+      if (!map[id]) map[id] = { id, user: u, total: 0, count: 0 };
       map[id].total += amt;
       map[id].count += 1;
     }
@@ -49,12 +51,26 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
 
   const visible = expanded || scrollable ? supporters : supporters.slice(0, maxVisible);
   const moreCount = supporters.length - maxVisible;
+  const podiumRankById = useMemo(() => {
+    const m = new Map<string, number>();
+    supporters.slice(0, 3).forEach((s, idx) => {
+      m.set(s.id, idx + 1);
+    });
+    return m;
+  }, [supporters]);
+
+  const podiumBadgeStyles = (rank: number) => {
+    if (rank === 1) return 'bg-amber-400/15 border-amber-400/30 text-amber-200';
+    if (rank === 2) return 'bg-slate-300/10 border-slate-300/25 text-slate-200';
+    return 'bg-orange-400/15 border-orange-400/30 text-orange-200';
+  };
 
   return (
     <div className="md:mt-2">
       <div className={scrollable ? 'flex gap-2 overflow-x-auto py-1' : 'flex flex-wrap gap-2'}>
         {visible.map((s) => {
-          const id = s.user.uuid || s.user._id || s.user.id || s.user.username;
+          const id = s.id;
+          const rank = podiumRankById.get(id);
           return (
             <button
               key={id}
@@ -70,6 +86,18 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
                   e.currentTarget.src = DEFAULT_PROFILE_PIC;
                 }}
               />
+              {rank && (
+                <span
+                  className={`inline-flex items-center justify-center h-4 w-4 md:h-5 md:w-5 rounded-full border ${podiumBadgeStyles(rank)} flex-shrink-0`}
+                  title={`#${rank} tip champion`}
+                >
+                  <Crown
+                    className={`h-2.5 w-2.5 ${
+                      rank === 1 ? 'text-amber-200' : rank === 2 ? 'text-slate-200' : 'text-orange-200'
+                    }`}
+                  />
+                </span>
+              )}
               <span className="text-[10px] md:text-sm text-white whitespace-nowrap">{s.user.username}</span>
               <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
             </button>
