@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Tag, Loader2, Music, Users } from 'lucide-react';
+import { Tag, Loader2, Music, Users, Crown, Minus, Plus } from 'lucide-react';
 import { tagAPI } from '../lib/api';
+import MediaChampions from '../components/MediaChampions';
 import { getMediaCoverArt } from '../utils/coverArt';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
@@ -51,6 +52,7 @@ const TagProfile: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showChampions, setShowChampions] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -129,6 +131,31 @@ const TagProfile: React.FC = () => {
               </div>
               <span className="text-sm text-purple-300 font-medium flex-shrink-0">Open party →</span>
             </Link>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setShowChampions(!showChampions)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
+            >
+              <span className="flex items-center text-lg md:text-xl font-bold text-white">
+                <Crown className="h-5 w-5 md:h-6 md:w-6 mr-2 text-amber-400 flex-shrink-0" />
+                {showChampions ? 'Champions' : 'Show Champions'}
+              </span>
+              {showChampions ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showChampions && slug && (
+              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
+                <MediaChampions
+                  tagSlug={slug}
+                  entityLabel={`#${displayName}`}
+                  maxDisplay={10}
+                />
+              </div>
+            )}
           </div>
         )}
 

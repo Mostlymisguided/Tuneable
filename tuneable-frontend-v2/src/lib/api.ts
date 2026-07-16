@@ -953,6 +953,38 @@ export const tagAPI = {
     const response = await api.get(`/tags/${encodeURIComponent(slug)}/profile`, { params });
     return response.data;
   },
+  getChampions: async (
+    slug: string,
+    params?: { locationPlaceId?: string; limit?: number }
+  ) => {
+    const response = await api.get(`/tags/${encodeURIComponent(slug)}/champions`, {
+      params: {
+        locationPlaceId: params?.locationPlaceId || undefined,
+        limit: params?.limit,
+      },
+    });
+    return response.data;
+  },
+};
+
+// Artist champions API
+export const artistAPI = {
+  getChampions: async (params: {
+    userId?: string;
+    name?: string;
+    locationPlaceId?: string;
+    limit?: number;
+  }) => {
+    const response = await api.get('/artists/champions', {
+      params: {
+        userId: params.userId || undefined,
+        name: params.name || undefined,
+        locationPlaceId: params.locationPlaceId || undefined,
+        limit: params.limit,
+      },
+    });
+    return response.data;
+  },
 };
 
 // Top Tunes API

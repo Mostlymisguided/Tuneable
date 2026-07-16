@@ -25,4 +25,30 @@ router.get('/:slug/profile', async (req, res) => {
   }
 });
 
+// @route   GET /api/tags/:slug/champions
+// @desc    Tip-aggregate champions for a tag (global or Mapbox place scope)
+// @access  Public
+router.get('/:slug/champions', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { locationPlaceId, limit } = req.query;
+
+    if (!slug || !String(slug).trim()) {
+      return res.status(400).json({ error: 'Tag slug is required' });
+    }
+
+    const { getTagChampions } = require('../services/mediaChampionsService');
+    const result = await getTagChampions(slug, { locationPlaceId, limit });
+
+    if (!result) {
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching tag champions:', error);
+    res.status(500).json({ error: 'Failed to fetch tag champions' });
+  }
+});
+
 module.exports = router;

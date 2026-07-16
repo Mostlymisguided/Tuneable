@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Crown, Loader2, MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
-import { mediaAPI } from '../lib/api';
+import { mediaAPI, tagAPI, artistAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import {
   championPickToResolvedLocation,
@@ -31,6 +31,9 @@ export interface MediaChampionRanking {
 }
 
 export interface MediaChampionsResponse {
+  entityType?: 'media' | 'tag' | 'artist';
+  tag?: { name: string; slug: string; canonicalTag?: string };
+  artist?: { userId?: string | null; name?: string };
   scope: 'global' | 'place';
   locationPlaceId: string | null;
   tipperCount: number;
@@ -46,13 +49,22 @@ export interface MediaChampionsResponse {
 }
 
 interface MediaChampionsProps {
-  mediaId: string;
+  /** Media UUID or ObjectId */
+  mediaId?: string;
+  /** Tag profile slug for tag-scoped champions */
+  tagSlug?: string;
+  /** Verified artist user id/uuid */
+  artistUserId?: string;
+  /** Artist display name when no userId */
+  artistName?: string;
   maxDisplay?: number;
   /** Seed place scope from a parent chart filter (e.g. Party Tunefeed location). */
   seedLocation?: ResolvedLocation | null;
   /** Tighter layout for side panels / chart embeds. */
   compact?: boolean;
-  /** Optional track/episode title shown under the header for context. */
+  /** Optional subject label (track, tag, or artist name). */
+  entityLabel?: string;
+  /** @deprecated Use entityLabel */
   mediaTitle?: string;
 }
 
@@ -105,9 +117,13 @@ function medalForRank(rank: number, isChampion: boolean, medal?: ChampionMedal |
 
 const MediaChampions: React.FC<MediaChampionsProps> = ({
   mediaId,
+  tagSlug,
+  artistUserId,
+  artistName,
   maxDisplay = 10,
   seedLocation = null,
   compact = false,
+  entityLabel,
   mediaTitle,
 }) => {
   const navigate = useNavigate();
@@ -132,17 +148,46 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     ? formatLocation(selectedLocation)
     : 'Earth';
 
+  const subjectLabel = useMemo(() => {
+    if (entityLabel) return entityLabel;
+    if (mediaTitle) return mediaTitle;
+    if (data?.tag?.name) return `#${data.tag.name}`;
+    if (data?.artist?.name) return data.artist.name;
+    if (tagSlug) return `#${tagSlug.replace(/-/g, ' ')}`;
+    if (artistName) return artistName;
+    return null;
+  }, [entityLabel, mediaTitle, data, tagSlug, artistName]);
+
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
+      if (!mediaId && !tagSlug && !artistUserId && !artistName) {
+        setData(null);
+        setLoading(false);
+        setError('No champions target specified');
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
-        const response = await mediaAPI.getChampions(mediaId, {
+        const params = {
           locationPlaceId: selectedLocation?.placeId,
           limit: maxDisplay,
-        });
+        };
+        let response;
+        if (mediaId) {
+          response = await mediaAPI.getChampions(mediaId, params);
+        } else if (tagSlug) {
+          response = await tagAPI.getChampions(tagSlug, params);
+        } else {
+          response = await artistAPI.getChampions({
+            userId: artistUserId,
+            name: artistName,
+            ...params,
+          });
+        }
         if (!cancelled) {
           setData(response);
         }
@@ -162,7 +207,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [mediaId, selectedLocation?.placeId, maxDisplay]);
+  }, [mediaId, tagSlug, artistUserId, artistName, selectedLocation?.placeId, maxDisplay]);
 
   const openProfile = (ranking: MediaChampionRanking) => {
     const id = ranking.user.uuid || ranking.user._id;
@@ -195,14 +240,20 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
           <div className="flex items-center gap-2 text-white">
             <Crown className={`text-amber-400 flex-shrink-0 ${compact ? 'h-4 w-4' : 'h-5 w-5'}`} />
             <h3 className={`font-bold ${compact ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>
-              Champions of <span className="text-amber-300">{scopeLabel}</span>
+              Champions of{' '}
+              {subjectLabel ? (
+                <span className="text-amber-300">{subjectLabel}</span>
+              ) : (
+                <span className="text-amber-300">{scopeLabel}</span>
+              )}
+              {subjectLabel && (
+                <span className="text-gray-400 font-normal text-sm md:text-base">
+                  {' '}
+                  · {scopeLabel}
+                </span>
+              )}
             </h3>
           </div>
-          {mediaTitle && (
-            <p className="text-xs text-purple-200/90 mt-1 truncate" title={mediaTitle}>
-              for <span className="text-white font-medium">{mediaTitle}</span>
-            </p>
-          )}
           <p className={`text-gray-400 mt-1 ${compact ? 'text-[11px]' : 'text-xs md:text-sm'}`}>
             #1 · #2 · #3 Champions by tip total from tippers based here. Social status only — not ownership rights.
           </p>

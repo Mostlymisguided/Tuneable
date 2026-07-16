@@ -35,6 +35,7 @@ import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
 import TagInputModal from '../components/TagInputModal';
+import MediaChampions from '../components/MediaChampions';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
@@ -207,6 +208,14 @@ const UserProfile: React.FC = () => {
     totalUsers: number;
     percentile: number;
   }>>([]);
+  const [tipTagChampions, setTipTagChampions] = useState<Array<{
+    tag: string;
+    rank: number;
+    totalUsers: number;
+    percentile: number;
+    aggregate: number;
+  }>>([]);
+  const [showArtistChampions, setShowArtistChampions] = useState(false);
   const [showTuneBytesTagRankings, setShowTuneBytesTagRankings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -399,6 +408,18 @@ const UserProfile: React.FC = () => {
       setTuneBytesTagRankings(response.tuneBytesTagRankings || []);
     } catch (err: any) {
       console.error('Error loading TuneBytes tag rankings:', err);
+    }
+  };
+
+  const loadTipTagChampions = async () => {
+    try {
+      const response = await userAPI.getTagRankings(userId!, 30);
+      const podium = (response.tagRankings || []).filter(
+        (r: { rank: number }) => r.rank >= 1 && r.rank <= 3
+      );
+      setTipTagChampions(podium);
+    } catch (err: any) {
+      console.error('Error loading tip tag champions:', err);
     }
   };
 
@@ -697,6 +718,7 @@ const UserProfile: React.FC = () => {
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
       loadTuneBytesTagRankings();
+      loadTipTagChampions();
       loadLabelAffiliations();
       loadCollectiveMemberships();
       
@@ -2008,14 +2030,41 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Champion / discovery badges — prominent in header */}
-              {tuneBytesTagRankings.length > 0 &&
+              {/* Tip champion badges (by aggregate tips on tags) */}
+              {tipTagChampions.length > 0 &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
                 <div className="mb-4 w-full max-w-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <Crown className="h-4 w-4 text-amber-400 flex-shrink-0" />
                     <h3 className="text-sm font-semibold text-white">
-                      {isOwnProfile ? 'Your Champion Badges' : 'Champion Badges'}
+                      {isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tipTagChampions.slice(0, 8).map((ranking) => (
+                      <Link
+                        key={`tip-${ranking.tag}-${ranking.rank}`}
+                        to={getTagProfilePath(ranking.tag)}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
+                        title={`#${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.aggregate)} tipped · ${ranking.totalUsers} tippers`}
+                      >
+                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span>#{ranking.rank} Champion</span>
+                        <span className="opacity-90">#{ranking.tag}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Discovery champion badges (TuneBytes) */}
+              {tuneBytesTagRankings.length > 0 &&
+                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
+                <div className="mb-4 w-full max-w-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Award className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                    <h3 className="text-sm font-semibold text-white">
+                      {isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}
                     </h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -2063,6 +2112,40 @@ const UserProfile: React.FC = () => {
                           </div>
                         </Link>
                       ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Artist champions — supporters of this creator's catalog */}
+              {(user?.creatorProfile?.artistName || user?.creatorProfile?.verificationStatus === 'verified') &&
+                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
+                <div className="mb-4 w-full max-w-lg">
+                  <button
+                    type="button"
+                    onClick={() => setShowArtistChampions(!showArtistChampions)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black/20 hover:bg-black/30 border border-amber-500/20 transition-colors"
+                  >
+                    <Crown className="h-4 w-4 text-amber-400" />
+                    <span className="text-sm font-semibold text-white">
+                      {showArtistChampions
+                        ? 'Hide artist Champions'
+                        : `Champions of ${user.creatorProfile?.artistName || user.username}`}
+                    </span>
+                    {showArtistChampions ? (
+                      <Minus className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Plus className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                  {showArtistChampions && (
+                    <div className="mt-3 card bg-black/20 rounded-lg p-3 md:p-4">
+                      <MediaChampions
+                        artistUserId={user.uuid || user._id}
+                        entityLabel={user.creatorProfile?.artistName || user.username}
+                        maxDisplay={10}
+                        compact
+                      />
                     </div>
                   )}
                 </div>

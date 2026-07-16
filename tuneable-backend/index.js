@@ -30,6 +30,7 @@ const emailRoutes = require('./routes/emailRoutes'); // Email routes
 const labelRoutes = require('./routes/labelRoutes'); // Import label routes
 const gearRoutes = require('./routes/gearRoutes'); // Production gear catalog
 const tagRoutes = require('./routes/tagRoutes'); // Tag profile pages
+const artistRoutes = require('./routes/artistRoutes'); // Artist champions
 const collectiveRoutes = require('./routes/collectiveRoutes'); // Import collective routes
 const notificationRoutes = require('./routes/notificationRoutes'); // Import notification routes
 
@@ -646,6 +647,7 @@ app.use('/api/email', emailRoutes); // Email routes
 app.use('/api/labels', labelRoutes); // Label routes
 app.use('/api/gear', gearRoutes); // Production gear catalog
 app.use('/api/tags', tagRoutes); // Tag profile pages
+app.use('/api/artists', artistRoutes); // Artist champions
 app.use('/api/collectives', collectiveRoutes); // Collective routes
 app.use('/api/notifications', notificationRoutes); // Notification routes
 app.use('/api/conversations', require('./routes/conversationRoutes')); // Tuneable Conversations

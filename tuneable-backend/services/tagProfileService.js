@@ -174,4 +174,5 @@ module.exports = {
   resolveTagFromSlug,
   getTagProfile,
   generateSlug,
+  collectTagVariants,
 };
