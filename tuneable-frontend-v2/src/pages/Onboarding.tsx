@@ -19,7 +19,6 @@ import { penceToPoundsNumber } from '../utils/currency';
 type OnboardingStep = 'tags' | 'tip' | 'import';
 type ImportSource = 'spotify' | 'soundcloud';
 
-const MIN_TAGS = 3;
 const MAX_TAGS = 8;
 const QUICK_TIP_OPTIONS = [0.05, 0.11, 0.25, 0.5];
 const ONBOARDING_IMPORT_LIMIT = 25;
@@ -200,18 +199,15 @@ const Onboarding: React.FC = () => {
     setTagSearch('');
   };
 
-  const saveTagsStep = async () => {
-    if (selectedTags.length < MIN_TAGS) {
-      toast.error(`Please choose at least ${MIN_TAGS} tags`);
-      return;
-    }
-
+  const saveTagsStep = async (options?: { skipped?: boolean }) => {
     setIsSaving(true);
     try {
+      const tags = options?.skipped ? [] : selectedTags;
       await authAPI.updateProfile({
-        preferences: { favoriteTags: selectedTags },
+        preferences: { favoriteTags: tags },
         onboarding: { favoriteTagsSelectedAt: new Date().toISOString() },
       });
+      if (options?.skipped) setSelectedTags([]);
       await refreshUser();
       goToStep('tip');
     } catch (error: unknown) {
@@ -371,7 +367,7 @@ const Onboarding: React.FC = () => {
             <div>
               <h2 className="text-xl font-semibold text-white">Choose your favourite tags</h2>
               <p className="mt-2 text-sm text-gray-400">
-                Pick {MIN_TAGS}–{MAX_TAGS} genres or styles. We&apos;ll use these to filter your music feed.
+                Pick up to {MAX_TAGS} genres or styles. We&apos;ll use these to filter your music feed — or skip for now.
               </p>
             </div>
 
@@ -438,18 +434,27 @@ const Onboarding: React.FC = () => {
 
             <p className="text-sm text-gray-500">
               {selectedTags.length} of {MAX_TAGS} selected
-              {selectedTags.length < MIN_TAGS && ` · ${MIN_TAGS - selectedTags.length} more needed`}
             </p>
 
-            <button
-              type="button"
-              onClick={saveTagsStep}
-              disabled={isSaving || selectedTags.length < MIN_TAGS}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-              Continue
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => saveTagsStep({ skipped: true })}
+                disabled={isSaving}
+                className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+              >
+                Skip for now
+              </button>
+              <button
+                type="button"
+                onClick={() => saveTagsStep()}
+                disabled={isSaving}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                Continue
+              </button>
+            </div>
           </div>
         )}
 
