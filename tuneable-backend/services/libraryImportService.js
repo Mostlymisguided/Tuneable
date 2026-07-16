@@ -14,6 +14,7 @@ const {
   buildMediaIndexes,
   findFuzzyCatalogMatch,
   mediaPrimaryArtistName,
+  normalizeIsrc,
 } = require('../utils/mediaMatchUtils');
 
 const DEFAULT_TIP = 0.11;
@@ -56,7 +57,7 @@ async function findExactCatalogMedia(track) {
   const spotifyId = track.externalIds?.spotify || (track.sourceLabel === 'Spotify Likes' ? track.id : null);
   const soundcloudId = track.externalIds?.soundcloud
     || (track.sourceLabel === 'SoundCloud Likes' ? track.id : null);
-  const isrc = track.externalIds?.isrc;
+  const isrc = normalizeIsrc(track.externalIds?.isrc);
   const soundcloudUrl = track.sources?.soundcloud;
 
   const or = [];
@@ -150,7 +151,7 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
   }
 
   if (externalMedia.externalIds?.isrc && !media.isrc) {
-    media.isrc = externalMedia.externalIds.isrc;
+    media.isrc = normalizeIsrc(externalMedia.externalIds.isrc);
     changed = true;
   }
 

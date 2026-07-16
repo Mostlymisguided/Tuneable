@@ -29,6 +29,7 @@ const {
   buildMediaGearQuery,
 } = require('../services/gearService');
 const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService');
+const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const Gear = require('../models/Gear');
 
 /**
@@ -853,7 +854,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       libraryMatch,
       extracted: extractedMetadata,
     });
-    const finalIsrc = isrc || mappedMetadata.isrc || null;
+    const finalIsrc = normalizeIsrc(isrc || mappedMetadata.isrc);
     const finalUpc = upc || mappedMetadata.upc || null;
     const finalLyrics = lyrics || mappedMetadata.lyrics || null;
     const finalComposer = composer
@@ -2058,6 +2059,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
             // Allow null/undefined/empty string to clear the media-level override
             value = null;
           }
+        }
+
+        if (field === 'isrc') {
+          value = (value === '' || value == null) ? null : normalizeIsrc(value);
         }
         
         // Handle releaseDate and releaseYear together

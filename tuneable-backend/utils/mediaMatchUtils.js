@@ -3,6 +3,32 @@
  * Used by library import (assisted matches) and offline bulk scripts.
  */
 
+/** ISRC without hyphens: CC + XXX + YY + NNNNN (12 chars). */
+const ISRC_RE = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
+
+const INVALID_ISRC_LITERALS = new Set(['NULL', 'UNDEFINED', 'N/A', 'NA', 'UNKNOWN', 'NONE']);
+
+/**
+ * Normalize a raw ISRC value to canonical uppercase 12-char form, or null if invalid.
+ * music-metadata may return string | string[]; empty arrays are truthy and must not be stored.
+ */
+function normalizeIsrc(value) {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    const first = value.find((v) => v != null && String(v).trim());
+    if (!first) return null;
+    value = first;
+  }
+  const stripped = String(value).trim().toUpperCase().replace(/-/g, '');
+  if (!stripped || INVALID_ISRC_LITERALS.has(stripped)) return null;
+  if (!ISRC_RE.test(stripped)) return null;
+  return stripped;
+}
+
+function isValidIsrc(value) {
+  return normalizeIsrc(value) !== null;
+}
+
 function foldAccents(str) {
   return (str || '').normalize('NFD').replace(/\p{M}/gu, '');
 }
@@ -217,6 +243,9 @@ function findFuzzyCatalogMatch(track, indexes) {
 }
 
 module.exports = {
+  ISRC_RE,
+  normalizeIsrc,
+  isValidIsrc,
   foldAccents,
   normalize,
   primaryArtist,

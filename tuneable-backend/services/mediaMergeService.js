@@ -19,7 +19,7 @@ const Conversation = require('../models/Conversation');
 const Label = require('../models/Label');
 const Collective = require('../models/Collective');
 const bidMetricsEngine = require('./bidMetricsEngine');
-const { mediaPrimaryArtistName } = require('../utils/mediaMatchUtils');
+const { mediaPrimaryArtistName, normalizeIsrc } = require('../utils/mediaMatchUtils');
 
 async function resolveMediaByIdentifier(mediaId) {
   // Lazy-load so endpoints that only need duplicate clustering don't fail
@@ -288,7 +288,7 @@ async function mergeMedia(sourceId, keepId, actorId, { dryRun = false } = {}) {
   // 1) Merge metadata onto keep
   await mergeMapFields(keep, source, 'externalIds');
   await mergeMapFields(keep, source, 'sources');
-  if (source.isrc && !keep.isrc) keep.isrc = source.isrc;
+  if (source.isrc && !keep.isrc) keep.isrc = normalizeIsrc(source.isrc);
   if (!keep.coverArt && source.coverArt) keep.coverArt = source.coverArt;
   if ((!keep.duration || keep.duration === 0) && source.duration) keep.duration = source.duration;
   if (!keep.album && source.album) keep.album = source.album;
@@ -394,14 +394,32 @@ async function findLikelyDuplicates({ limit = 50 } = {}) {
   const byIsrc = await Media.aggregate([
     {
       $match: {
-        isrc: { $ne: null, $exists: true },
+        isrc: { $type: 'string', $nin: [null, ''] },
         status: { $ne: 'deleted' },
         deletedAt: null,
       },
     },
     {
+      $addFields: {
+        normalizedIsrc: {
+          $toUpper: {
+            $replaceAll: {
+              input: { $trim: { input: '$isrc' } },
+              find: '-',
+              replacement: '',
+            },
+          },
+        },
+      },
+    },
+    {
+      $match: {
+        normalizedIsrc: { $regex: /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/ },
+      },
+    },
+    {
       $group: {
-        _id: '$isrc',
+        _id: '$normalizedIsrc',
         count: { $sum: 1 },
         ids: { $push: { id: '$_id', uuid: '$uuid', title: '$title', artist: { $arrayElemAt: ['$artist.name', 0] }, aggregate: '$globalMediaAggregate' } },
       },

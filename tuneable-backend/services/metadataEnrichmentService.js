@@ -17,6 +17,7 @@ const {
   durationWithinTolerance,
   mediaPrimaryArtistName,
   levenshtein,
+  normalizeIsrc,
 } = require('../utils/mediaMatchUtils');
 
 const MB_GAP_MS = 1100;
@@ -211,7 +212,7 @@ async function applySuggestionToMedia(media, suggestion, { preserveOriginal = tr
   }
 
   if (suggestion.album) media.album = suggestion.album;
-  if (suggestion.isrc && !media.isrc) media.isrc = suggestion.isrc;
+  if (suggestion.isrc && !media.isrc) media.isrc = normalizeIsrc(suggestion.isrc);
   if (suggestion.duration && (!media.duration || media.duration === 0)) {
     media.duration = suggestion.duration;
   }

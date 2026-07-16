@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { uuidv7 } = require('uuidv7');
+const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -514,6 +515,10 @@ mediaSchema.pre('save', function (next) {
   if (!this.creatorDisplay && (this.artist || this.featuring)) {
     const { formatCreatorDisplay } = require('../utils/artistParser');
     this.creatorDisplay = formatCreatorDisplay(this.artist || [], this.featuring || []);
+  }
+
+  if (this.isModified('isrc')) {
+    this.isrc = normalizeIsrc(this.isrc);
   }
   
   next();
