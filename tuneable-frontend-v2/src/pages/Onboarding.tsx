@@ -15,12 +15,13 @@ import { buildOnboardingCompletePath, needsOnboarding } from '../utils/authHelpe
 import { buildOAuthStartUrl } from '../utils/platform';
 import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
 import { penceToPoundsNumber } from '../utils/currency';
+import { DEFAULT_TIP_POUNDS } from '../constants';
 
 type OnboardingStep = 'tags' | 'tip' | 'import';
 type ImportSource = 'spotify' | 'soundcloud';
 
 const MAX_TAGS = 8;
-const QUICK_TIP_OPTIONS = [0.05, 0.11, 0.25, 0.5];
+const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
 const ONBOARDING_IMPORT_LIMIT = 25;
 
 const STEP_ORDER: OnboardingStep[] = ['tags', 'tip', 'import'];
@@ -44,7 +45,7 @@ const Onboarding: React.FC = () => {
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [defaultTip, setDefaultTip] = useState('0.11');
+  const [defaultTip, setDefaultTip] = useState(DEFAULT_TIP_POUNDS.toFixed(2));
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
@@ -70,8 +71,13 @@ const Onboarding: React.FC = () => {
     if (!user) return;
     const existing = user.preferences?.favoriteTags ?? [];
     if (existing.length > 0) setSelectedTags(existing);
-    const tip = user.preferences?.defaultTip ?? 0.11;
-    setDefaultTip(tip.toFixed(2));
+    // Suggest £1.11 until the user saves a tip during onboarding
+    if (!user.onboarding?.defaultTipPromptSeenAt) {
+      setDefaultTip(DEFAULT_TIP_POUNDS.toFixed(2));
+    } else {
+      const tip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
+      setDefaultTip(tip.toFixed(2));
+    }
   }, [user]);
 
   useEffect(() => {
@@ -124,7 +130,7 @@ const Onboarding: React.FC = () => {
         : await userAPI.previewSpotifyImport(ONBOARDING_IMPORT_LIMIT);
 
       const items = data.items || [];
-      const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? 0.11;
+      const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
       const actionable = items.filter((i: { matchStatus: string }) => i.matchStatus !== 'in_library');
       const balance = data.summary?.userBalance
         ?? (user?.balance != null ? penceToPoundsNumber(user.balance) : 0);
@@ -288,7 +294,7 @@ const Onboarding: React.FC = () => {
   const runQuickImport = async () => {
     setIsImportLoading(true);
     try {
-      const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? 0.11;
+      const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
       const data = importSource === 'soundcloud'
         ? await userAPI.previewSoundCloudImport(ONBOARDING_IMPORT_LIMIT)
         : await userAPI.previewSpotifyImport(ONBOARDING_IMPORT_LIMIT);
@@ -338,6 +344,22 @@ const Onboarding: React.FC = () => {
   };
 
   const userBalance = user?.balance != null ? penceToPoundsNumber(user.balance) : 0;
+
+  const parsedDefaultTip = useMemo(() => {
+    const parsed = parseFloat(defaultTip);
+    return Number.isFinite(parsed) && parsed >= 0.01 ? parsed : DEFAULT_TIP_POUNDS;
+  }, [defaultTip]);
+
+  const tunesCovered = useMemo(() => {
+    if (userBalance <= 0 || parsedDefaultTip < 0.01) return null;
+    return Math.floor((userBalance + 0.0001) / parsedDefaultTip);
+  }, [userBalance, parsedDefaultTip]);
+
+  const tunesCoveredLabel = useMemo(() => {
+    if (tunesCovered == null) return null;
+    if (tunesCovered >= 100) return '100+';
+    return String(tunesCovered);
+  }, [tunesCovered]);
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-2xl flex-col px-4 py-8">
@@ -503,7 +525,7 @@ const Onboarding: React.FC = () => {
                     type="button"
                     onClick={() => setDefaultTip(amount.toFixed(2))}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                      parseFloat(defaultTip) === amount
+                      Math.abs(parseFloat(defaultTip) - amount) < 0.001
                         ? 'bg-purple-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
@@ -512,6 +534,14 @@ const Onboarding: React.FC = () => {
                   </button>
                 ))}
               </div>
+              {tunesCoveredLabel != null && (
+                <p className="mt-3 text-sm text-gray-400">
+                  At <strong className="text-white">£{parsedDefaultTip.toFixed(2)}</strong>, your
+                  balance covers about{' '}
+                  <strong className="text-white">{tunesCoveredLabel}</strong>{' '}
+                  {tunesCovered === 1 ? 'tune' : 'tunes'}.
+                </p>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -545,7 +575,7 @@ const Onboarding: React.FC = () => {
                 <h2 className="text-xl font-semibold text-white">Jump-start your library</h2>
                 <p className="mt-2 text-sm text-gray-400">
                   Import likes from Spotify or SoundCloud. Each imported track gets a tip at your default
-                  (£{(user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? 0.11).toFixed(2)}).
+                  (£{(user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS).toFixed(2)}).
                   You can skip and do this later.
                 </p>
               </div>

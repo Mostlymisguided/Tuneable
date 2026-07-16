@@ -32,7 +32,7 @@ const BidModal: React.FC<BidModalProps> = ({
   // Initialize bid amount when modal opens
   useEffect(() => {
     if (isOpen) {
-      const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+      const userDefaultTip = user?.preferences?.defaultTip || 1.11;
       const initialAmount = Math.max(minimumBid, userDefaultTip).toFixed(2);
       setBidAmount(initialAmount);
     } else {

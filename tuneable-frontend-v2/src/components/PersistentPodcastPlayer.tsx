@@ -439,7 +439,7 @@ const PersistentPodcastPlayer: React.FC = () => {
         isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
-        bidAmount={Math.max(currentEpisode?.minimumBid || 0.01, user?.preferences?.defaultTip || 0.11)}
+        bidAmount={Math.max(currentEpisode?.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
         minTip={currentEpisode?.minimumBid || 0.01}
         avgTip={getAverageTip()}
         topTip={getTopTip()}

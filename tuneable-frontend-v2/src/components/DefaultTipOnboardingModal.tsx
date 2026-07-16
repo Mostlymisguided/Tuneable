@@ -26,14 +26,14 @@ const shouldShowPrompt = (user: ReturnType<typeof useAuth>['user']) => {
 
 const DefaultTipOnboardingModal: React.FC = () => {
   const { user, refreshUser } = useAuth();
-  const [defaultTip, setDefaultTip] = useState('0.11');
+  const [defaultTip, setDefaultTip] = useState('1.11');
   const [isSaving, setIsSaving] = useState(false);
 
   const isOpen = useMemo(() => shouldShowPrompt(user), [user]);
 
   useEffect(() => {
     if (!user) return;
-    const nextValue = user.preferences?.defaultTip ?? 0.11;
+    const nextValue = user.preferences?.defaultTip ?? 1.11;
     setDefaultTip(nextValue.toFixed(2));
   }, [user]);
 
@@ -86,7 +86,7 @@ const DefaultTipOnboardingModal: React.FC = () => {
 
   if (!isOpen || !user) return null;
 
-  const currentTip = user.preferences?.defaultTip ?? 0.11;
+  const currentTip = user.preferences?.defaultTip ?? 1.11;
 
   return (
     <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/70 p-4">
@@ -133,7 +133,7 @@ const DefaultTipOnboardingModal: React.FC = () => {
               value={defaultTip}
               onChange={(e) => setDefaultTip(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-white outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/40"
-              placeholder="0.11"
+              placeholder="1.11"
               disabled={isSaving}
             />
             <p className="mt-2 text-sm text-gray-400">

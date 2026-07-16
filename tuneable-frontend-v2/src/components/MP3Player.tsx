@@ -659,7 +659,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
-        bidAmount={Math.max(media.minimumBid || 0.01, user?.preferences?.defaultTip || 0.11)}
+        bidAmount={Math.max(media.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
         minTip={media.minimumBid || 0.01}
         avgTip={getAverageTip()}
         topTip={getTopTip()}

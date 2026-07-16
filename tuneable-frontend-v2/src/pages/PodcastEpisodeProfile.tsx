@@ -328,7 +328,7 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   const defaultTipAmount = useMemo(() => {
     if (isGlobalBidValid) return parsedGlobalBidAmount;
-    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    const userDefaultTip = user?.preferences?.defaultTip || 1.11;
     const bids = media?.bids || [];
     const avgBid =
       bids.length === 0
@@ -362,14 +362,14 @@ const PodcastEpisodeProfile: React.FC = () => {
           setMinimumBid(globalParty.minimumBid);
           if (!hasInitializedBidInput && media) {
             const avgBid = calculateGlobalMediaBidAvg(media);
-            const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+            const userDefaultTip = user?.preferences?.defaultTip || 1.11;
             const initialBid = Math.max(globalParty.minimumBid, userDefaultTip, avgBid || 0);
             setGlobalBidInput(initialBid.toFixed(2));
             setHasInitializedBidInput(true);
           }
         } else if (!hasInitializedBidInput && media) {
           const avgBid = calculateGlobalMediaBidAvg(media);
-          const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+          const userDefaultTip = user?.preferences?.defaultTip || 1.11;
           const initialBid = Math.max(userDefaultTip, avgBid || 0);
           setGlobalBidInput(initialBid.toFixed(2));
           setHasInitializedBidInput(true);

@@ -380,14 +380,14 @@ const TuneProfile: React.FC = () => {
           setMinimumBid(globalParty.minimumBid);
           if (!hasInitializedBidInput && media) {
             const avgBid = calculateGlobalMediaBidAvg(media);
-            const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+            const userDefaultTip = user?.preferences?.defaultTip || 1.11;
             const initialBid = Math.max(globalParty.minimumBid, userDefaultTip, avgBid || 0);
             setGlobalBidInput(initialBid.toFixed(2));
             setHasInitializedBidInput(true);
           }
         } else if (!hasInitializedBidInput && media) {
           const avgBid = calculateGlobalMediaBidAvg(media);
-          const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+          const userDefaultTip = user?.preferences?.defaultTip || 1.11;
           const initialBid = Math.max(userDefaultTip, avgBid || 0);
           setGlobalBidInput(initialBid.toFixed(2));
           setHasInitializedBidInput(true);
@@ -1713,7 +1713,7 @@ const TuneProfile: React.FC = () => {
   const handleConfirmRecommendedTip = async (tags: string[], amount: number) => {
     if (!user || !recommendedItemToTip) return;
 
-    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : (user?.preferences?.defaultTip || 0.11);
+    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : (user?.preferences?.defaultTip || 1.11);
     if (tipAmount < minimumBid) {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
@@ -1745,7 +1745,7 @@ const TuneProfile: React.FC = () => {
 
   const defaultTipAmount = useMemo(() => {
     if (isGlobalBidValid) return parsedGlobalBidAmount;
-    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    const userDefaultTip = user?.preferences?.defaultTip || 1.11;
     const avgBid = media ? calculateGlobalMediaBidAvg(media) : 0;
     return Math.max(minimumBid, userDefaultTip, avgBid || 0);
   }, [isGlobalBidValid, parsedGlobalBidAmount, user?.preferences?.defaultTip, media, minimumBid]);
@@ -4210,7 +4210,7 @@ const TuneProfile: React.FC = () => {
         isOpen={!!recommendedItemToTip}
         onClose={() => setRecommendedItemToTip(null)}
         onConfirm={handleConfirmRecommendedTip}
-        bidAmount={user?.preferences?.defaultTip || 0.11}
+        bidAmount={user?.preferences?.defaultTip || 1.11}
         minTip={minimumBid}
         mediaTitle={recommendedItemToTip?.title || 'Unknown'}
         mediaArtist={recommendedItemToTip?.artist}

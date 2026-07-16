@@ -31,7 +31,7 @@ export function TipSheet({
   title,
   subtitle,
   balancePence,
-  defaultTipPounds = 0.5,
+  defaultTipPounds = 1.11,
   onClose,
   onConfirm,
 }: Props) {
@@ -42,7 +42,7 @@ export function TipSheet({
 
   useEffect(() => {
     if (visible) {
-      const start = Math.max(0.01, defaultTipPounds || 0.5);
+      const start = Math.max(0.01, defaultTipPounds || 1.11);
       setAmount(start);
       setAmountText(start.toFixed(2));
       setError(null);
@@ -143,7 +143,7 @@ export function TipSheet({
         </View>
 
         <View style={styles.presets}>
-          {[0.1, 0.5, 1, 2].map((preset) => (
+          {[0.11, 0.5, 1.11, 5].map((preset) => (
             <Pressable
               key={preset}
               style={styles.preset}

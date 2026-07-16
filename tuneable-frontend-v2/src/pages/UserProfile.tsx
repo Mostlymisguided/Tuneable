@@ -330,7 +330,7 @@ const UserProfile: React.FC = () => {
     email: true,
     anonymousMode: false,
     inApp: true, // Always true
-    defaultTip: 0.11 // Default tip amount in pounds
+    defaultTip: 1.11 // Default tip amount in pounds
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
@@ -727,7 +727,7 @@ const UserProfile: React.FC = () => {
           email: notifPrefs.email ?? true,
           anonymousMode: prefs.anonymousMode ?? false,
           inApp: true, // Always true
-          defaultTip: prefs.defaultTip ?? 0.11
+          defaultTip: prefs.defaultTip ?? 1.11
         });
       }
       
@@ -968,7 +968,7 @@ const UserProfile: React.FC = () => {
 
   const getDefaultBidAmount = (media?: any): number => {
     const minBid = getEffectiveMinimumBid(media);
-    const userDefaultTip = currentUser?.preferences?.defaultTip || 0.11;
+    const userDefaultTip = currentUser?.preferences?.defaultTip || 1.11;
     return Math.max(minBid, userDefaultTip);
   };
 
@@ -4066,10 +4066,10 @@ const UserProfile: React.FC = () => {
                       value={notificationPrefs.defaultTip}
                       onChange={(e) => setNotificationPrefs({
                         ...notificationPrefs,
-                        defaultTip: parseFloat(e.target.value) || 0.11
+                        defaultTip: parseFloat(e.target.value) || 1.11
                       })}
                       className="w-full max-w-xs px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="0.11"
+                      placeholder="1.11"
                     />
                     <p className="text-sm text-gray-400 mt-2">
                       Default tip amount when placing bids (minimum: £0.01). Currently set to £{notificationPrefs.defaultTip.toFixed(2)}.
@@ -4484,7 +4484,7 @@ const UserProfile: React.FC = () => {
         isOpen={!!libraryItemToTip}
         onClose={() => setLibraryItemToTip(null)}
         onConfirm={handlePlaceLibraryTip}
-        bidAmount={currentUser?.preferences?.defaultTip || 0.11}
+        bidAmount={currentUser?.preferences?.defaultTip || 1.11}
         minTip={0.01}
         avgTip={libraryItemToTip ? calculateAverageBid(libraryItemToTip) : undefined}
         topTip={getTopTip(libraryItemToTip)}

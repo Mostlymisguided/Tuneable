@@ -958,7 +958,7 @@ const PersistentWebPlayer: React.FC = () => {
         isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
-        bidAmount={Math.max(currentMedia?.minimumBid || 0.01, user?.preferences?.defaultTip || 0.11)}
+        bidAmount={Math.max(currentMedia?.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
         minTip={currentMedia?.minimumBid || 0.01}
         avgTip={getCurrentMediaAverageTip()}
         topTip={getCurrentMediaTopTip()}

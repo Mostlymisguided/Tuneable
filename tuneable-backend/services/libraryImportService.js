@@ -17,7 +17,7 @@ const {
   normalizeIsrc,
 } = require('../utils/mediaMatchUtils');
 
-const DEFAULT_TIP = 0.11;
+const DEFAULT_TIP = 1.11;
 const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 25000;

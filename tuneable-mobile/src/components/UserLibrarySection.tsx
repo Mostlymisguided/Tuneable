@@ -150,7 +150,7 @@ export function UserLibrarySection({
         title={tipTarget?.title || 'Untitled'}
         subtitle={tipTarget?.artist}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 0.5}
+        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         onClose={() => setTipTarget(null)}
         onConfirm={confirmTip}
       />

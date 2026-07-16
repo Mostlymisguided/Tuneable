@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
   
   // Helper function to get user's default tip amount
   const getUserDefaultTip = (): number => {
-    return user?.preferences?.defaultTip || 0.11;
+    return user?.preferences?.defaultTip || 1.11;
   };
 
   const getLibraryTopTip = (item: LibraryItem | null): number | undefined => {

@@ -119,7 +119,7 @@ const LibraryImport: React.FC = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [items, setItems] = useState<ImportItem[]>([]);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
-  const [bulkTip, setBulkTip] = useState('0.11');
+  const [bulkTip, setBulkTip] = useState('1.11');
   const [tipAmounts, setTipAmounts] = useState<Record<string, string>>({});
   const [executeResult, setExecuteResult] = useState<{
     tipped: number;
@@ -244,7 +244,7 @@ const LibraryImport: React.FC = () => {
       setItems(data.items || []);
       setSummary(data.summary || null);
       setTipAmounts({});
-      setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 0.11));
+      setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
       setStep('summary');
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.message || `Failed to scan ${meta.likesLabel}`;
@@ -266,7 +266,7 @@ const LibraryImport: React.FC = () => {
 
   const tipAmount = useMemo(() => {
     const parsed = parseFloat(bulkTip);
-    return Number.isFinite(parsed) && parsed >= 0.01 ? parsed : 0.11;
+    return Number.isFinite(parsed) && parsed >= 0.01 ? parsed : 1.11;
   }, [bulkTip]);
 
   const selectableItems = useMemo(
@@ -324,7 +324,7 @@ const LibraryImport: React.FC = () => {
         return { ...item, selected: false };
       }
       const tip = parseFloat(nextTips[item.key] ?? bulkTip);
-      const amount = Number.isFinite(tip) && tip >= 0.01 ? tip : 0.11;
+      const amount = Number.isFinite(tip) && tip >= 0.01 ? tip : 1.11;
       if (amount <= remaining + 0.0001) {
         remaining -= amount;
         return { ...item, selected: true };

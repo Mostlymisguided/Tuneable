@@ -174,7 +174,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Helper function to get default bid amount (uses user's defaultTip preference, respects minimum)
   const getDefaultBidAmount = (media?: any): number => {
     const minBid = getEffectiveMinimumBid(media);
-    const userDefaultTip = user?.preferences?.defaultTip || 0.11;
+    const userDefaultTip = user?.preferences?.defaultTip || 1.11;
     // Use the higher of minimum bid or user's default tip
     return Math.max(minBid, userDefaultTip);
   };

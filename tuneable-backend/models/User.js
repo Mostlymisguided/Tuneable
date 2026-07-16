@@ -143,7 +143,7 @@ const userSchema = new mongoose.Schema({
     anonymousMode: { type: Boolean, default: false },
     defaultTip: { 
       type: Number, 
-      default: 0.11, // 11p default
+      default: 1.11, // £1.11 default
       min: [0.01, 'Default tip must be at least £0.01']
     },
     favoriteTags: {

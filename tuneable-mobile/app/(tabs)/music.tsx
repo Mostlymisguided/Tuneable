@@ -206,7 +206,7 @@ export default function MusicScreen() {
         title={tipTarget?.title || 'Untitled'}
         subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 0.5}
+        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         onClose={() => setTipTarget(null)}
         onConfirm={onConfirmTip}
       />

@@ -6,7 +6,7 @@ struct PodcastEpisodeProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showTipSheet = false
-    @State private var tipAmountPounds: Double = 0.11
+    @State private var tipAmountPounds: Double = 1.11
     @State private var isPlacingBid = false
     @State private var tipError: String?
     @State private var tipSuccess = false

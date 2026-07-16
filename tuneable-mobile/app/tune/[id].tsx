@@ -264,7 +264,7 @@ export default function TuneProfileScreen() {
             title={media.title || 'Untitled'}
             subtitle={artist}
             balancePence={user.balance ?? 0}
-            defaultTipPounds={user.preferences?.defaultTip ?? 0.5}
+            defaultTipPounds={user.preferences?.defaultTip ?? 1.11}
             onClose={() => setTipOpen(false)}
             onConfirm={onConfirmTip}
           />
