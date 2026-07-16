@@ -29,20 +29,85 @@ import {
 
 const SEARCH_SOURCE = 'musicbrainz';
 
+type FilterKey = 'all' | 'library' | 'catalog';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'library', label: 'Library' },
+  { key: 'catalog', label: 'Catalog' },
+];
+
+function isLibraryResult(item: SearchResultItem): boolean {
+  return Boolean(item.isLocal) || item.sourceLabel === 'Library';
+}
+
+function resultLabel(item: SearchResultItem): string {
+  if (item.sourceLabel) return item.sourceLabel;
+  if (isLibraryResult(item)) return 'Library';
+  if (item.awaitingUpload) return 'MusicBrainz';
+  return 'Catalog';
+}
+
+function mergeUnique(
+  existing: SearchResultItem[],
+  incoming: SearchResultItem[]
+): SearchResultItem[] {
+  const seen = new Set(existing.map((item) => searchResultId(item)).filter(Boolean));
+  const next = [...existing];
+  for (const item of incoming) {
+    const id = searchResultId(item);
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    next.push(item);
+  }
+  return next;
+}
+
 export default function MusicSearchScreen() {
   const { user, updateBalance } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tipAmounts, setTipAmounts] = useState<Record<string, string>>({});
+  const [searchSource, setSearchSource] = useState<'local' | 'external' | string | null>(
+    null
+  );
+  const [hasMoreExternal, setHasMoreExternal] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>('all');
+  const [statusNote, setStatusNote] = useState<string | null>(null);
 
   const defaultTip = useMemo(
     () => (user?.preferences?.defaultTip ?? 1).toFixed(2),
     [user?.preferences?.defaultTip]
   );
+
+  const seedTips = (items: SearchResultItem[]) => {
+    setTipAmounts((prev) => {
+      const next = { ...prev };
+      for (const item of items) {
+        const id = searchResultId(item);
+        if (id && next[id] == null) next[id] = defaultTip;
+      }
+      return next;
+    });
+  };
+
+  const filteredResults = useMemo(() => {
+    if (filter === 'library') return results.filter(isLibraryResult);
+    if (filter === 'catalog') return results.filter((item) => !isLibraryResult(item));
+    return results;
+  }, [results, filter]);
+
+  const libraryCount = useMemo(
+    () => results.filter(isLibraryResult).length,
+    [results]
+  );
+  const catalogCount = results.length - libraryCount;
 
   const performSearch = async () => {
     const q = query.trim();
@@ -50,30 +115,87 @@ export default function MusicSearchScreen() {
     setHasSearched(true);
     setLoading(true);
     setError(null);
+    setStatusNote(null);
     setResults([]);
+    setHasMoreExternal(false);
+    setNextPageToken(null);
+    setSearchSource(null);
+    setFilter('all');
     try {
       const res = await searchAPI.search(q, { source: SEARCH_SOURCE });
-      let items: SearchResultItem[] = [...(res.videos ?? [])];
-      if (res.hasMoreExternal) {
-        const ext = await searchAPI.search(q, {
-          source: SEARCH_SOURCE,
-          forceExternal: true,
-        });
-        items = [...items, ...(ext.videos ?? [])];
-      }
+      const items = [...(res.videos ?? [])];
       setResults(items);
-      setTipAmounts((prev) => {
-        const next = { ...prev };
-        for (const item of items) {
-          const id = searchResultId(item);
-          if (id && next[id] == null) next[id] = defaultTip;
-        }
-        return next;
-      });
+      setSearchSource(res.source || null);
+      setHasMoreExternal(Boolean(res.hasMoreExternal));
+      setNextPageToken(res.nextPageToken || null);
+      seedTips(items);
+
+      if (res.source === 'local') {
+        setStatusNote(
+          `Found ${items.length} in your library${
+            res.hasMoreExternal ? ' · more available on MusicBrainz' : ''
+          }`
+        );
+      } else if (items.length > 0) {
+        setStatusNote(`Found ${items.length} from MusicBrainz`);
+      } else {
+        setStatusNote(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const showMoreFromCatalog = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const res = await searchAPI.search(q, {
+        source: SEARCH_SOURCE,
+        forceExternal: true,
+      });
+      const items = [...(res.videos ?? [])];
+      setResults(items);
+      setSearchSource(res.source || 'external');
+      setHasMoreExternal(false);
+      setNextPageToken(res.nextPageToken || null);
+      seedTips(items);
+      setStatusNote(`Showing ${items.length} MusicBrainz catalog matches`);
+      setFilter('all');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load catalog');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMore = async () => {
+    const q = query.trim();
+    if (!q || !nextPageToken) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const res = await searchAPI.search(q, {
+        source: SEARCH_SOURCE,
+        forceExternal: searchSource === 'external' || Boolean(nextPageToken),
+        pageToken: nextPageToken,
+      });
+      const items = [...(res.videos ?? [])];
+      setResults((prev) => mergeUnique(prev, items));
+      setNextPageToken(res.nextPageToken || null);
+      if (res.source) setSearchSource(res.source);
+      seedTips(items);
+      setStatusNote((prev) =>
+        prev ? `${prev.split(' ·')[0]} · loaded more` : `Loaded ${items.length} more`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load more');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -140,6 +262,8 @@ export default function MusicSearchScreen() {
     }
   };
 
+  const busy = loading || loadingMore;
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -152,7 +276,7 @@ export default function MusicSearchScreen() {
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
-          placeholder="Search MusicBrainz or library"
+          placeholder="Search library or MusicBrainz"
           placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={setQuery}
@@ -160,12 +284,12 @@ export default function MusicSearchScreen() {
           autoCorrect={false}
           returnKeyType="search"
           onSubmitEditing={() => void performSearch()}
-          editable={!loading}
+          editable={!busy}
         />
         <Pressable
-          style={[styles.searchBtn, loading && styles.disabled]}
+          style={[styles.searchBtn, busy && styles.disabled]}
           onPress={() => void performSearch()}
-          disabled={loading}>
+          disabled={busy}>
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -178,29 +302,132 @@ export default function MusicSearchScreen() {
         Balance {formatPoundsFromPence(user?.balance)}
       </Text>
 
+      {statusNote ? <Text style={styles.status}>{statusNote}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      {hasSearched && results.length > 0 ? (
+        <View style={styles.filters}>
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            const count =
+              f.key === 'all'
+                ? results.length
+                : f.key === 'library'
+                  ? libraryCount
+                  : catalogCount;
+            return (
+              <Pressable
+                key={f.key}
+                onPress={() => setFilter(f.key)}
+                style={[styles.filterChip, active && styles.filterChipActive]}>
+                <Text
+                  style={[
+                    styles.filterText,
+                    active && styles.filterTextActive,
+                  ]}>
+                  {f.label} ({count})
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
       <FlatList
-        data={results}
+        data={filteredResults}
         keyExtractor={(item, index) => searchResultId(item) || String(index)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          hasSearched && !loading ? (
-            <Text style={styles.empty}>No tunes found.</Text>
-          ) : !hasSearched ? (
-            <Text style={styles.empty}>
-              Search the library and MusicBrainz catalog, then add with a tip.
-              Uploads stay playable in-app; catalog tips are tippable only until
-              someone uploads audio.
-            </Text>
+          loading ? (
+            <ActivityIndicator
+              color={colors.accentLight}
+              style={{ marginTop: 40 }}
+            />
+          ) : hasSearched ? (
+            <View style={styles.emptyBlock}>
+              <Ionicons
+                name="musical-notes-outline"
+                size={40}
+                color={colors.textMuted}
+              />
+              <Text style={styles.emptyTitle}>
+                {filter !== 'all' && results.length > 0
+                  ? `No ${filter} matches`
+                  : 'No tunes found'}
+              </Text>
+              <Text style={styles.empty}>
+                {filter !== 'all' && results.length > 0
+                  ? 'Try All, or search with different keywords.'
+                  : 'Try another title, artist, or spelling. Library hits appear first; MusicBrainz fills in the rest.'}
+              </Text>
+              {hasMoreExternal && searchSource === 'local' ? (
+                <Pressable
+                  style={styles.showMoreBtn}
+                  onPress={() => void showMoreFromCatalog()}
+                  disabled={busy}>
+                  <Text style={styles.showMoreText}>
+                    Search MusicBrainz catalog
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.emptyBlock}>
+              <Ionicons
+                name="search-outline"
+                size={40}
+                color={colors.textMuted}
+              />
+              <Text style={styles.emptyTitle}>Find something to tip</Text>
+              <Text style={styles.empty}>
+                We check Tuneable’s library first, then MusicBrainz. Uploads stay
+                playable in-app; catalog tips are tippable until someone uploads
+                audio.
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          filteredResults.length > 0 ? (
+            <View style={styles.footer}>
+              {hasMoreExternal && searchSource === 'local' ? (
+                <Pressable
+                  style={[styles.showMoreBtn, busy && styles.disabled]}
+                  onPress={() => void showMoreFromCatalog()}
+                  disabled={busy}>
+                  {loadingMore ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="globe-outline" size={18} color="#fff" />
+                      <Text style={styles.showMoreText}>
+                        Show more from MusicBrainz
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
+
+              {nextPageToken ? (
+                <Pressable
+                  style={[styles.loadMoreBtn, busy && styles.disabled]}
+                  onPress={() => void loadMore()}
+                  disabled={busy}>
+                  {loadingMore ? (
+                    <ActivityIndicator color={colors.text} />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Load more</Text>
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
           ) : null
         }
         renderItem={({ item }) => {
           const id = searchResultId(item);
           const isAdding = addingId === id;
-          const label =
-            item.sourceLabel ||
-            (item.isLocal ? 'Library' : item.awaitingUpload ? 'MusicBrainz' : null);
+          const label = resultLabel(item);
+          const library = isLibraryResult(item);
           return (
             <View style={styles.card}>
               <Image
@@ -214,7 +441,13 @@ export default function MusicSearchScreen() {
                 <Text style={styles.artist} numberOfLines={1}>
                   {formatSearchArtist(item.artist)}
                 </Text>
-                {label ? <Text style={styles.sourceLabel}>{label}</Text> : null}
+                <Text
+                  style={[
+                    styles.sourceLabel,
+                    library ? styles.sourceLibrary : styles.sourceCatalog,
+                  ]}>
+                  {label}
+                </Text>
                 <View style={styles.tipRow}>
                   <Text style={styles.currency}>£</Text>
                   <TextInput
@@ -287,8 +520,14 @@ const styles = StyleSheet.create({
   },
   balance: {
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 4,
     color: colors.textMuted,
+    fontSize: 13,
+  },
+  status: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    color: colors.accentLight,
     fontSize: 13,
   },
   error: {
@@ -296,16 +535,88 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#fca5a5',
   },
+  filters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  filterChipActive: {
+    backgroundColor: '#7e22ce',
+    borderColor: '#7e22ce',
+  },
+  filterText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  filterTextActive: {
+    color: '#fff',
+  },
   list: {
     paddingHorizontal: 16,
     paddingBottom: 24,
+    flexGrow: 1,
+  },
+  emptyBlock: {
+    alignItems: 'center',
+    marginTop: 36,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   empty: {
     textAlign: 'center',
     color: colors.textSecondary,
-    marginTop: 40,
-    paddingHorizontal: 24,
     lineHeight: 22,
+  },
+  footer: {
+    paddingTop: 8,
+    paddingBottom: 16,
+    gap: 10,
+  },
+  showMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  showMoreText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  loadMoreBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  loadMoreText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
   },
   card: {
     flexDirection: 'row',
@@ -336,11 +647,16 @@ const styles = StyleSheet.create({
   },
   sourceLabel: {
     marginTop: 4,
-    color: colors.textMuted,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  sourceLibrary: {
+    color: colors.success,
+  },
+  sourceCatalog: {
+    color: colors.textMuted,
   },
   tipRow: {
     flexDirection: 'row',
