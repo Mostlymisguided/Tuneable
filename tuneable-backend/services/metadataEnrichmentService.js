@@ -140,6 +140,26 @@ function snapshotMedia(media) {
   };
 }
 
+function resolveImportSourceUrl(media, importSource) {
+  if (!media) return null;
+  const sources = mapToObject(media.sources);
+  const externalIds = mapToObject(media.externalIds);
+
+  if (importSource === 'soundcloud_likes' || sources.soundcloud) {
+    return sources.soundcloud || null;
+  }
+  if (importSource === 'spotify_likes' || sources.spotify) {
+    return sources.spotify
+      || (externalIds.spotify ? `https://open.spotify.com/track/${externalIds.spotify}` : null);
+  }
+  if (sources.soundcloud) return sources.soundcloud;
+  if (sources.spotify) {
+    return sources.spotify
+      || (externalIds.spotify ? `https://open.spotify.com/track/${externalIds.spotify}` : null);
+  }
+  return null;
+}
+
 /**
  * Enqueue enrichment for a tipped/imported media item (idempotent for open statuses).
  */
@@ -401,8 +421,22 @@ async function listEnrichments({
     return acc;
   }, {});
 
+  const mediaIds = items.map((item) => item.mediaId).filter(Boolean);
+  const mediaDocs = mediaIds.length > 0
+    ? await Media.find({ _id: { $in: mediaIds } }).select('sources externalIds').lean()
+    : [];
+  const mediaById = new Map(mediaDocs.map((doc) => [String(doc._id), doc]));
+
+  const enrichedItems = items.map((item) => ({
+    ...item,
+    importSourceUrl: resolveImportSourceUrl(
+      mediaById.get(String(item.mediaId)),
+      item.importSource
+    ),
+  }));
+
   return {
-    items,
+    items: enrichedItems,
     pagination: {
       page: Math.max(1, page),
       limit: capped,

@@ -16,6 +16,7 @@ interface EnrichmentItem {
   mediaId: string;
   mediaUuid?: string;
   importSource?: string;
+  importSourceUrl?: string | null;
   status: string;
   confidence?: string | null;
   original?: {
@@ -64,6 +65,16 @@ function formatDuration(sec?: number) {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function importSourceLinkLabel(url: string, importSource?: string) {
+  if (importSource === 'soundcloud_likes' || url.includes('soundcloud.com')) {
+    return 'View on SoundCloud';
+  }
+  if (importSource === 'spotify_likes' || url.includes('spotify.com')) {
+    return 'View on Spotify';
+  }
+  return 'View source';
 }
 
 const MetadataEnrichmentAdmin: React.FC = () => {
@@ -297,6 +308,16 @@ const MetadataEnrichmentAdmin: React.FC = () => {
                   <div className="text-xs text-gray-500 mt-1">
                     {item.original?.album || 'No album'} · {formatDuration(item.original?.duration)}
                   </div>
+                  {item.importSourceUrl ? (
+                    <a
+                      href={item.importSourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-purple-300 hover:underline mt-1 inline-block"
+                    >
+                      {importSourceLinkLabel(item.importSourceUrl, item.importSource)}
+                    </a>
+                  ) : null}
                 </div>
                 <div className="bg-gray-900/70 rounded-lg p-3">
                   <div className="text-xs text-green-300 mb-1">Suggestion (MusicBrainz)</div>
