@@ -20,7 +20,7 @@ const {
   lookupTrackInLibrary,
   resolveBpmKey,
 } = require('../utils/libraryXml');
-const { canUploadMedia, canEditMedia, isAdmin } = require('../utils/permissionHelpers');
+const { canUploadMedia, canEditMedia, canDeleteMedia, isAdmin } = require('../utils/permissionHelpers');
 const { getCanonicalTag } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const {
@@ -1668,6 +1668,10 @@ router.get('/:mediaId/profile', async (req, res) => {
       console.log('❌ Media not found for ID:', mediaId);
       return res.status(404).json({ error: 'Media not found' });
     }
+
+    if (media.status === 'deleted') {
+      return res.status(404).json({ error: 'Media not found' });
+    }
     
     console.log('✅ Media found:', media.title);
 
@@ -2006,6 +2010,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
+
+    if (media.status === 'deleted') {
+      return res.status(404).json({ error: 'Media not found' });
+    }
     
     // Check permissions: must be admin OR media owner OR verified creator
     if (!canEditMedia(req.user, media)) {
@@ -2093,7 +2101,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             value = Array.from(
               new Set(
                 value
-                  .split(',\)
+                  .split(',')
                   .map(tag => capitalizeTag(tag.trim()))
                   .filter(Boolean)
               )
@@ -3132,6 +3140,10 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
+    if (media.status === 'deleted' || media.status === 'vetoed') {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
     if (media && Array.isArray(tags) && tags.length > 0) {
       const normalizedTags = tags
         .map(tag => capitalizeTag(tag))
@@ -3190,8 +3202,19 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       mediaContentType: media.contentType,
       mediaContentForm: media.contentForm,
       mediaDuration: media.duration,
-      ...require('../utils/locationUtils').getBidLocationSnapshot(user.homeLocation),
+      ...require('../utils/locationUtils').getBidLocationSnapshot(
+        require('../utils/locationUtils').getUserBidLocation(user)
+      ),
     });
+
+    // Snapshot podium before the new bid (for champion title steal notifications)
+    let oldMediaChampions = null;
+    try {
+      const { getMediaChampions } = require('../services/mediaChampionsService');
+      oldMediaChampions = await getMediaChampions(media._id, { limit: 3 });
+    } catch (error) {
+      console.error('Failed to snapshot old media champions:', error);
+    }
 
     await bid.save();
 
@@ -4874,6 +4897,172 @@ router.get('/vetoed', authMiddleware, adminMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching vetoed media:', error);
     res.status(500).json({ error: 'Failed to fetch vetoed media', details: error.message });
+  }
+});
+
+// ========================================
+// MEDIA DELETION LIFECYCLE (soft delete / restore / purge)
+// ========================================
+
+const mediaLifecycleService = require('../services/mediaLifecycleService');
+
+/**
+ * @route   GET /api/media/deleted
+ * @desc    Get all soft-deleted media (admin only)
+ */
+router.get('/deleted', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, sortBy = 'deletedAt', sortOrder = 'desc' } = req.query;
+    const query = { status: 'deleted' };
+    const sort = {};
+
+    if (sortBy === 'deletedAt') {
+      sort.deletedAt = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'title') {
+      sort.title = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sort.deletedAt = -1;
+    }
+
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const [deletedMedia, total] = await Promise.all([
+      Media.find(query)
+        .populate('deletedBy', 'username uuid')
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .lean(),
+      Media.countDocuments(query),
+    ]);
+
+    const formattedMedia = deletedMedia.map((item) => ({
+      _id: item._id,
+      uuid: item.uuid,
+      title: item.title,
+      artist: Array.isArray(item.artist) && item.artist.length > 0 ? item.artist[0].name : 'Unknown',
+      coverArt: item.coverArt,
+      contentForm: item.contentForm,
+      contentType: item.contentType,
+      status: item.status,
+      deletedAt: item.deletedAt,
+      deletedBy: item.deletedBy
+        ? {
+            _id: item.deletedBy._id,
+            username: item.deletedBy.username,
+            uuid: item.deletedBy.uuid,
+          }
+        : null,
+      deletedReason: item.deletedReason,
+    }));
+
+    res.json({
+      deletedMedia: formattedMedia,
+      pagination: {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+        total,
+        pages: Math.ceil(total / parseInt(limit, 10)),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching deleted media:', error);
+    res.status(500).json({ error: 'Failed to fetch deleted media', details: error.message });
+  }
+});
+
+/**
+ * @route   DELETE /api/media/:mediaId
+ * @desc    Soft-delete media (owner or admin). Refunds active tips.
+ */
+router.delete('/:mediaId', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { reason } = req.body || {};
+
+    const media = await mediaLifecycleService.resolveMediaByIdentifier(mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!canDeleteMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to delete this media' });
+    }
+
+    const result = await mediaLifecycleService.softDeleteMedia(media, req.user, reason);
+
+    res.json({
+      message: 'Media deleted successfully',
+      media: {
+        _id: result.media._id,
+        uuid: result.media.uuid,
+        title: result.media.title,
+        status: result.media.status,
+        deletedAt: result.media.deletedAt,
+      },
+      refundedBidsCount: result.refundedBidsCount,
+      refundedUsersCount: result.refundedUsersCount,
+      refundedAmount: result.refundedAmount,
+    });
+  } catch (error) {
+    console.error('Error deleting media:', error);
+    const status = error.message?.includes('already deleted') || error.message?.includes('vetoed') ? 400 : 500;
+    res.status(status).json({ error: error.message || 'Error deleting media' });
+  }
+});
+
+/**
+ * @route   POST /api/media/:mediaId/restore
+ * @desc    Restore soft-deleted media (admin only). Does not restore refunded tips.
+ */
+router.post('/:mediaId/restore', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const media = await mediaLifecycleService.resolveMediaByIdentifier(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const restored = await mediaLifecycleService.restoreMedia(media);
+
+    res.json({
+      message: 'Media restored successfully',
+      media: {
+        _id: restored._id,
+        uuid: restored.uuid,
+        title: restored.title,
+        status: restored.status,
+      },
+      note: 'Refunded tips are not re-applied. The media can receive new tips.',
+    });
+  } catch (error) {
+    console.error('Error restoring media:', error);
+    const status = error.message?.includes('not deleted') ? 400 : 500;
+    res.status(status).json({ error: error.message || 'Error restoring media' });
+  }
+});
+
+/**
+ * @route   DELETE /api/media/:mediaId/purge
+ * @desc    Permanently delete soft-deleted media (admin only). Financial records are retained.
+ */
+router.delete('/:mediaId/purge', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const media = await mediaLifecycleService.resolveMediaByIdentifier(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const result = await mediaLifecycleService.purgeMedia(media);
+
+    res.json({
+      message: 'Media permanently deleted',
+      purgedId: result.purgedId,
+      title: result.title,
+      note: 'Bid and ledger records are retained for audit purposes.',
+    });
+  } catch (error) {
+    console.error('Error purging media:', error);
+    const status = error.message?.includes('soft-deleted') ? 400 : 500;
+    res.status(status).json({ error: error.message || 'Error purging media' });
   }
 });
 

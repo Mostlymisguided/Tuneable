@@ -113,6 +113,18 @@ function canEditMedia(user, media) {
   return false;
 }
 
+/**
+ * Check if user can delete a media item (owners and admins only)
+ * @param {Object} user - User object
+ * @param {Object} media - Media object
+ * @returns {boolean}
+ */
+function canDeleteMedia(user, media) {
+  if (!user || !media) return false;
+  if (isAdmin(user)) return true;
+  return isMediaOwner(user, media);
+}
+
 module.exports = {
   isAdmin,
   isCreator,
@@ -120,6 +132,7 @@ module.exports = {
   canUploadMedia,
   isMediaOwner,
   isVerifiedCreatorOnMedia,
-  canEditMedia
+  canEditMedia,
+  canDeleteMedia
 };
 

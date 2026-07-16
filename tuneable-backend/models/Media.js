@@ -456,13 +456,16 @@ const mediaSchema = new mongoose.Schema({
   // ========================================
   status: {
     type: String,
-    enum: ['active', 'vetoed'],
+    enum: ['active', 'vetoed', 'deleted'],
     default: 'active',
     index: true
   },
   vetoedAt: { type: Date },
   vetoedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  vetoedReason: { type: String }
+  vetoedReason: { type: String },
+  deletedAt: { type: Date },
+  deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  deletedReason: { type: String }
 }, { 
   timestamps: true // Automatically manage createdAt and updatedAt
 });

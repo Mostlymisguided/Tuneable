@@ -15,6 +15,7 @@ const notificationSchema = new mongoose.Schema({
       'admin_announcement',      // Admin sends to all users
       'bid_received',            // Someone tipped on your media
       'bid_outbid',              // You were outtipped on media
+      'champion_title_stolen',  // Someone displaced your #1–#3 champion title
       'comment_reply',           // Reply to your comment
       'creator_approved',        // Creator application approved
       'creator_rejected',        // Creator application rejected
@@ -29,6 +30,7 @@ const notificationSchema = new mongoose.Schema({
       'warning',                 // Admin warning issued to user
       'media_vetoed',            // Media you tipped on was vetoed
       'media_unvetoed',          // Media you tipped on was unvetoed
+      'media_deleted',           // Media you tipped on was deleted by owner
       'user_kicked',             // User was kicked from a party
       'escrow_allocated',        // Escrow allocated for your media
       'escrow_matched',          // Unknown artist allocations matched to your account

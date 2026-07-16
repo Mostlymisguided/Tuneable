@@ -206,6 +206,51 @@ const notifyOutbid = async (userId, mediaId, bidId, newTopBid, mediaTitle) => {
 };
 
 /**
+ * Create champion title stolen notification
+ * @param {string} dethronedUserId - User who lost their #1–#3 title
+ * @param {string} stealingUserId - User who displaced them
+ * @param {string} mediaId - Media ID
+ * @param {string} mediaTitle - Media title
+ * @param {number} oldRank - Previous champion rank (1–3)
+ * @param {number | undefined | null} newRank - New rank (1–3) or undefined if dropped from podium
+ */
+const notifyChampionTitleStolen = async (
+  dethronedUserId,
+  stealingUserId,
+  mediaId,
+  mediaTitle,
+  oldRank,
+  newRank
+) => {
+  try {
+    const stealingUser = await User.findById(stealingUserId).select('username');
+    const Media = require('../models/Media');
+    const media = await Media.findById(mediaId).select('uuid');
+
+    const mediaLinkId = media?.uuid || mediaId;
+    const droppedFromPodium = newRank == null;
+
+    const message = droppedFromPodium
+      ? `${stealingUser?.username || 'Someone'} stole your #${oldRank} Champion title on "${mediaTitle}". You dropped out of the podium.`
+      : `${stealingUser?.username || 'Someone'} stole your #${oldRank} Champion title on "${mediaTitle}". You are now #${newRank}.`;
+
+    await createNotification({
+      userId: dethronedUserId,
+      type: 'champion_title_stolen',
+      title: 'Champion Title Stolen',
+      message,
+      link: `/tune/${mediaLinkId}`,
+      linkText: 'View Media',
+      relatedMediaId: mediaId,
+      relatedUserId: stealingUserId,
+      groupKey: `champion_title_stolen_${mediaId}_${dethronedUserId}_${oldRank}`,
+    });
+  } catch (error) {
+    console.error('Error creating champion title stolen notification:', error);
+  }
+};
+
+/**
  * Create comment reply notification
  * @param {string} commentOwnerId - User ID of original comment owner
  * @param {string} replierId - User ID of user who replied
@@ -437,15 +482,42 @@ const notifyMediaUnvetoed = async (userId, mediaId, mediaTitle, partyId, partyNa
   }
 };
 
+/**
+ * Notify users that media they tipped on was deleted by the owner
+ */
+const notifyMediaDeleted = async (userId, mediaId, mediaTitle, refundAmount, reason = null) => {
+  try {
+    let message = `"${mediaTitle}" was removed by its owner. Your tip of £${(refundAmount / 100).toFixed(2)} has been refunded.`;
+    if (reason) {
+      message += ` Reason: ${reason}`;
+    }
+
+    await createNotification({
+      userId,
+      type: 'media_deleted',
+      title: 'Media Removed',
+      message,
+      link: '/',
+      linkText: 'Browse Tunes',
+      relatedMediaId: mediaId,
+      groupKey: `media_deleted_${mediaId}_${userId}`,
+    });
+  } catch (error) {
+    console.error('Error creating media deleted notification:', error);
+  }
+};
+
 module.exports = {
   createNotification,
   notifyBidReceived,
   notifyOutbid,
+  notifyChampionTitleStolen,
   notifyCommentReply,
   notifyCreatorApplication,
   notifyClaim,
   notifyTuneBytesEarned,
   notifyMediaVetoed,
-  notifyMediaUnvetoed
+  notifyMediaUnvetoed,
+  notifyMediaDeleted
 };
 
