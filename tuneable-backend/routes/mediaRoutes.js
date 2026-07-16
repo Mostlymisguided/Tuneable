@@ -2079,6 +2079,29 @@ router.put('/:id', authMiddleware, async (req, res) => {
         if (field === 'language') {
           value = normalizeLanguageInput(value);
         }
+
+        if (field === 'tags') {
+          if (Array.isArray(value)) {
+            value = Array.from(
+              new Set(
+                value
+                  .map(tag => typeof tag === 'string' ? capitalizeTag(tag.trim()) : '')
+                  .filter(Boolean)
+              )
+            );
+          } else if (typeof value === 'string') {
+            value = Array.from(
+              new Set(
+                value
+                  .split(',\)
+                  .map(tag => capitalizeTag(tag.trim()))
+                  .filter(Boolean)
+              )
+            );
+          } else {
+            value = [];
+          }
+        }
         
         // Check if value actually changed
         if (media[field] !== value) {

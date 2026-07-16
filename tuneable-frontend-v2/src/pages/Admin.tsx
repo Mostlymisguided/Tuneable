@@ -39,6 +39,13 @@ import { toast } from 'react-toastify';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import TagList from '../components/TagList';
+
+interface MediaEditDraft {
+  title: string;
+  artist: string;
+  tags: string;
+}
 
 interface User {
   _id: string;
@@ -125,8 +132,8 @@ const Admin: React.FC = () => {
   const [mediaSearchQuery, setMediaSearchQuery] = useState<string>('');
   const [mediaRightsFilter, setMediaRightsFilter] = useState<string>('');
   const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
-  const [editingField, setEditingField] = useState<'title' | 'artist' | null>(null);
-  const [editingValue, setEditingValue] = useState<string>('');
+  const [mediaEditDraft, setMediaEditDraft] = useState<MediaEditDraft | null>(null);
+  const [isSavingMediaEdit, setIsSavingMediaEdit] = useState(false);
   const [reportsSubTab, setReportsSubTab] = useState<'media' | 'user' | 'label' | 'collective' | 'claims' | 'invites' | 'applications'>('media');
   const [usersLabelsSubTab, setUsersLabelsSubTab] = useState<'users' | 'labels' | 'collectives'>('users');
   const [bidsMediaVetoesSubTab, setBidsMediaVetoesSubTab] = useState<'bids' | 'media' | 'vetoes' | 'enrichment'>(() => {
@@ -826,35 +833,96 @@ const Admin: React.FC = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleStartEdit = (mediaId: string, field: 'title' | 'artist', currentValue: string) => {
-    setEditingMediaId(mediaId);
-    setEditingField(field);
-    setEditingValue(currentValue);
+  const parseTagInput = (value: string) => {
+    return Array.from(
+      new Set(
+        value
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const handleStartEdit = (item: any) => {
+    const currentArtist = Array.isArray(item?.artists) && item.artists.length > 0
+      ? item.artists.map((artist: any) => artist?.name).filter(Boolean).join(', ')
+      : item.artist || '';
+
+    setEditingMediaId(item._id);
+    setMediaEditDraft({
+      title: item.title || '',
+      artist: currentArtist,
+      tags: Array.isArray(item.tags) ? item.tags.join(', ') : ''
+    });
   };
 
   const handleCancelEdit = () => {
     setEditingMediaId(null);
-    setEditingField(null);
-    setEditingValue('');
+    setMediaEditDraft(null);
   };
 
-  const handleSaveEdit = async (mediaId: string, field: 'title' | 'artist') => {
-    if (!editingValue.trim()) {
-      toast.error(`${field === 'title' ? 'Title' : 'Artist'} cannot be empty`);
+  const handleSaveEdit = async (mediaId: string) => {
+    if (!mediaEditDraft) return;
+
+    const trimmedTitle = mediaEditDraft.title.trim();
+    const trimmedArtist = mediaEditDraft.artist.trim();
+    const parsedTags = parseTagInput(mediaEditDraft.tags);
+
+    if (!trimmedTitle) {
+      toast.error('Title cannot be empty');
+      return;
+    }
+
+    if (!trimmedArtist) {
+      toast.error('Artist cannot be empty');
       return;
     }
 
     try {
-      const updates: { title?: string; artist?: string } = {};
-      updates[field] = editingValue.trim();
-      
-      await mediaAPI.updateMedia(mediaId, updates);
-      toast.success(`${field === 'title' ? 'Title' : 'Artist'} updated successfully`);
+      setIsSavingMediaEdit(true);
+      const response = await mediaAPI.updateMedia(mediaId, {
+        title: trimmedTitle,
+        artist: trimmedArtist,
+        tags: parsedTags
+      });
+
+      const updatedMedia = response?.media;
+      const updatedArtists = Array.isArray(updatedMedia?.artist) && updatedMedia.artist.length > 0
+        ? updatedMedia.artist
+        : trimmedArtist.split(',').map((name: string) => ({
+            name: name.trim(),
+            userId: null,
+            collectiveId: null,
+            relationToNext: null,
+            verified: false
+          })).filter((artist: any) => artist.name);
+      const updatedArtistText = updatedArtists.length > 0
+        ? updatedArtists.map((artist: any) => artist.name).join(', ')
+        : trimmedArtist;
+      const updatedTags = Array.isArray(updatedMedia?.tags) ? updatedMedia.tags : parsedTags;
+
+      setMediaList((current) => current.map((item) => (
+        item._id === mediaId
+          ? {
+              ...item,
+              title: updatedMedia?.title || trimmedTitle,
+              artist: updatedArtistText,
+              artists: updatedArtists,
+              artistArray: updatedArtists,
+              creatorDisplay: updatedMedia?.creatorDisplay || updatedArtistText,
+              tags: updatedTags
+            }
+          : item
+      )));
+
+      toast.success('Media details updated');
       handleCancelEdit();
-      loadMedia(); // Reload to get updated data
     } catch (error: any) {
       console.error('Error updating media:', error);
-      toast.error(error.response?.data?.error || `Failed to update ${field}`);
+      toast.error(error.response?.data?.error || 'Failed to update media details');
+    } finally {
+      setIsSavingMediaEdit(false);
     }
   };
 
@@ -2747,7 +2815,7 @@ const Admin: React.FC = () => {
                         <tbody className="bg-gray-800 divide-y divide-gray-700">
                           {mediaList.map((item) => (
                             <tr key={item._id} className="hover:bg-gray-700/50 transition-colors">
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-6 py-4">
                                 <div className="flex items-center">
                                   {item.coverArt && (
                                     <img
@@ -2757,15 +2825,15 @@ const Admin: React.FC = () => {
                                     />
                                   )}
                                   <div className="flex-1">
-                                    {editingMediaId === item._id && editingField === 'title' ? (
-                                      <div className="flex items-center gap-2">
+                                    {editingMediaId === item._id && mediaEditDraft ? (
+                                      <div className="space-y-2">
                                         <input
                                           type="text"
-                                          value={editingValue}
-                                          onChange={(e) => setEditingValue(e.target.value)}
+                                          value={mediaEditDraft.title}
+                                          onChange={(e) => setMediaEditDraft((current) => current ? { ...current, title: e.target.value } : current)}
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
-                                              handleSaveEdit(item._id, 'title');
+                                              handleSaveEdit(item._id);
                                             } else if (e.key === 'Escape') {
                                               handleCancelEdit();
                                             }
@@ -2773,54 +2841,64 @@ const Admin: React.FC = () => {
                                           className="flex-1 px-2 py-1 bg-gray-700 border border-purple-500 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
                                           autoFocus
                                         />
-                                        <button
-                                          onClick={() => handleSaveEdit(item._id, 'title')}
-                                          className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                          title="Save"
-                                        >
-                                          ✓
-                                        </button>
-                                        <button
-                                          onClick={handleCancelEdit}
-                                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
-                                          title="Cancel"
-                                        >
-                                          ✕
-                                        </button>
+                                        <input
+                                          type="text"
+                                          value={mediaEditDraft.tags}
+                                          onChange={(e) => setMediaEditDraft((current) => current ? { ...current, tags: e.target.value } : current)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleSaveEdit(item._id);
+                                            } else if (e.key === 'Escape') {
+                                              handleCancelEdit();
+                                            }
+                                          }}
+                                          className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                          placeholder="Tags (comma-separated)"
+                                        />
+                                        <p className="text-[11px] text-gray-500">
+                                          Add tags as comma-separated values.
+                                        </p>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-2 group">
-                                        <button
-                                          onClick={() => navigate(`/tune/${item._id}`)}
-                                          className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
-                                        >
-                                          {item.title || 'Unknown'}
-                                        </button>
-                                        <button
-                                          onClick={() => handleStartEdit(item._id, 'title', item.title || '')}
-                                          className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
-                                          title="Edit title"
-                                        >
-                                          ✏️
-                                        </button>
-                                        {item.explicit && (
-                                          <span className="ml-2 text-xs text-red-400">E</span>
+                                      <div className="space-y-2 group">
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={() => navigate(`/tune/${item._id}`)}
+                                            className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
+                                          >
+                                            {item.title || 'Unknown'}
+                                          </button>
+                                          <button
+                                            onClick={() => handleStartEdit(item)}
+                                            className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
+                                            title="Edit media"
+                                          >
+                                            ✏️
+                                          </button>
+                                          {item.explicit && (
+                                            <span className="ml-2 text-xs text-red-400">E</span>
+                                          )}
+                                        </div>
+                                        {Array.isArray(item.tags) && item.tags.length > 0 ? (
+                                          <TagList tags={item.tags} limit={4} />
+                                        ) : (
+                                          <span className="text-xs text-gray-500">No tags</span>
                                         )}
                                       </div>
                                     )}
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {editingMediaId === item._id && editingField === 'artist' ? (
+                              <td className="px-6 py-4">
+                                {editingMediaId === item._id && mediaEditDraft ? (
                                   <div className="flex items-center gap-2">
                                     <input
                                       type="text"
-                                      value={editingValue}
-                                      onChange={(e) => setEditingValue(e.target.value)}
+                                      value={mediaEditDraft.artist}
+                                      onChange={(e) => setMediaEditDraft((current) => current ? { ...current, artist: e.target.value } : current)}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
-                                          handleSaveEdit(item._id, 'artist');
+                                          handleSaveEdit(item._id);
                                         } else if (e.key === 'Escape') {
                                           handleCancelEdit();
                                         }
@@ -2829,35 +2907,14 @@ const Admin: React.FC = () => {
                                       placeholder="Artist names (comma-separated)"
                                       autoFocus
                                     />
-                                    <button
-                                      onClick={() => handleSaveEdit(item._id, 'artist')}
-                                      className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
-                                      title="Save"
-                                    >
-                                      ✓
-                                    </button>
-                                    <button
-                                      onClick={handleCancelEdit}
-                                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
-                                      title="Cancel"
-                                    >
-                                      ✕
-                                    </button>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-2 group">
+                                  <div className="flex items-center gap-2">
                                     <div className="text-sm text-gray-300">
                                       <ClickableArtistDisplay media={item} />
                                     </div>
-                                    <button
-                                      onClick={() => handleStartEdit(item._id, 'artist', item.artist || '')}
-                                      className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
-                                      title="Edit artist"
-                                    >
-                                      ✏️
-                                    </button>
-                                </div>
-                              )}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-xs text-gray-400">
@@ -2937,6 +2994,34 @@ const Admin: React.FC = () => {
                                   >
                                     View
                                   </button>
+                                  {editingMediaId === item._id ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleSaveEdit(item._id)}
+                                        disabled={isSavingMediaEdit}
+                                        className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-xs rounded transition-colors"
+                                        title="Save media details"
+                                      >
+                                        {isSavingMediaEdit ? 'Saving...' : 'Save'}
+                                      </button>
+                                      <button
+                                        onClick={handleCancelEdit}
+                                        disabled={isSavingMediaEdit}
+                                        className="px-3 py-1 bg-gray-600 hover:bg-gray-500 disabled:opacity-50 text-white text-xs rounded transition-colors"
+                                        title="Cancel edit"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleStartEdit(item)}
+                                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                                      title="Edit media details"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
                                   {item.status !== 'vetoed' && (
                                     <button
                                       onClick={() => handleVetoMedia(item._id, item.title)}
