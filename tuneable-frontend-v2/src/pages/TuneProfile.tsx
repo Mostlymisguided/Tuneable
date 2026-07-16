@@ -1439,7 +1439,20 @@ const TuneProfile: React.FC = () => {
 
   const getFieldValue = (value: any, fieldName?: string, fallback = 'Not specified') => {
     if (value === null || value === undefined || value === '') return fallback;
-    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : fallback;
+    if (Array.isArray(value)) {
+      if (value.length === 0) return fallback;
+      return value
+        .map((item) => {
+          if (typeof item === 'string' || typeof item === 'number') return String(item);
+          if (item && typeof item === 'object') {
+            if ('name' in item && item.name) return String(item.name);
+            if ('title' in item && item.title) return String(item.title);
+          }
+          return '';
+        })
+        .filter(Boolean)
+        .join(', ') || fallback;
+    }
     // Special handling for pitch - display as whole number with Hz
     if (fieldName === 'pitch' && typeof value === 'number') {
       return `${Math.round(value)} Hz`;
