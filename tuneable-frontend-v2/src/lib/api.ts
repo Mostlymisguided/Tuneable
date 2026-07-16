@@ -64,9 +64,14 @@ interface User {
     theme?: string;
     anonymousMode?: boolean;
     defaultTip?: number;
+    favoriteTags?: string[];
   };
   onboarding?: {
     defaultTipPromptSeenAt?: string;
+    completedAt?: string;
+    favoriteTagsSelectedAt?: string;
+    importPromptSeenAt?: string;
+    importSkipped?: boolean;
   };
   creatorProfile?: {
     artistName?: string;
