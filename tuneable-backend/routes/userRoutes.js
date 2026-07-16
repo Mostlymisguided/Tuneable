@@ -3925,10 +3925,16 @@ router.get('/:userId/tag-rankings', async (req, res) => {
 router.get('/:userId/champion-titles', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { mediaLimit, checkMediaLimit } = req.query;
+    const { mediaLimit, checkMediaLimit, locationPlaceId, tagLimit, checkTagLimit } = req.query;
 
     const { getUserChampionTitles } = require('../services/mediaChampionsService');
-    const result = await getUserChampionTitles(userId, { mediaLimit, checkMediaLimit });
+    const result = await getUserChampionTitles(userId, {
+      mediaLimit,
+      checkMediaLimit,
+      locationPlaceId,
+      tagLimit,
+      checkTagLimit,
+    });
 
     if (!result) {
       return res.status(404).json({ error: 'User not found' });

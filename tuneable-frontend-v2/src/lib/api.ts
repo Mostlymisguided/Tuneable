@@ -1125,7 +1125,13 @@ export const userAPI = {
   // Tip-based champion titles (#1–#3 on tags and media)
   getChampionTitles: async (
     userId: string,
-    params?: { mediaLimit?: number; checkMediaLimit?: number }
+    params?: {
+      mediaLimit?: number;
+      checkMediaLimit?: number;
+      locationPlaceId?: string;
+      tagLimit?: number;
+      checkTagLimit?: number;
+    }
   ) => {
     const response = await api.get(`/users/${userId}/champion-titles`, { params });
     return response.data;

@@ -7,8 +7,8 @@ const mongoose = require('mongoose');
 const Bid = require('../models/Bid');
 const Media = require('../models/Media');
 const { isValidObjectId } = require('../utils/validators');
-const { resolveTagFromSlug, collectTagVariants } = require('./tagProfileService');
-const { tagsMatch } = require('../utils/tagNormalizer');
+const { resolveTagFromSlug, collectTagVariants, generateSlug } = require('./tagProfileService');
+const { getCanonicalTag, tagsMatch } = require('../utils/tagNormalizer');
 
 /** Minimum distinct tippers in-scope before crowning Champions. */
 const MIN_TIPPERS_FOR_CHAMPION = 1;
@@ -335,6 +335,86 @@ async function getArtistChampions({ userId, name } = {}, options = {}) {
   );
 }
 
+async function getScopedUserTagChampionTitles(userObjectId, userIdStr, options = {}) {
+  const locationPlaceId =
+    typeof options.locationPlaceId === 'string' && options.locationPlaceId.trim()
+      ? options.locationPlaceId.trim()
+      : null;
+
+  if (!locationPlaceId) return null;
+
+  const tagLimit = Math.min(Math.max(parseInt(options.tagLimit, 10) || 8, 1), 20);
+  const checkTagLimit = Math.min(Math.max(parseInt(options.checkTagLimit, 10) || 24, 3), 60);
+
+  const scopedBids = await Bid.find({
+    userId: userObjectId,
+    status: 'active',
+    bidderLocationAncestorIds: locationPlaceId,
+  })
+    .select('mediaId amount')
+    .sort({ amount: -1, createdAt: -1 })
+    .lean();
+
+  if (!scopedBids.length) return [];
+
+  const mediaIds = [...new Set(scopedBids.map((bid) => String(bid.mediaId)).filter(Boolean))];
+  const mediaDocs = await Media.find({ _id: { $in: mediaIds } })
+    .select('_id tags')
+    .lean();
+
+  const mediaTagsById = new Map(
+    mediaDocs.map((doc) => [String(doc._id), Array.isArray(doc.tags) ? doc.tags : []])
+  );
+
+  const tagTotals = new Map();
+  for (const bid of scopedBids) {
+    const mediaTags = mediaTagsById.get(String(bid.mediaId)) || [];
+    for (const rawTag of mediaTags) {
+      if (typeof rawTag !== 'string' || !rawTag.trim()) continue;
+      const canonicalTag = getCanonicalTag(rawTag);
+      if (!canonicalTag) continue;
+
+      const existing = tagTotals.get(canonicalTag) || {
+        canonicalTag,
+        displayName: rawTag.trim(),
+        totalAmount: 0,
+      };
+      existing.totalAmount += bid.amount || 0;
+      if (!existing.displayName || existing.displayName.length > rawTag.trim().length) {
+        existing.displayName = rawTag.trim();
+      }
+      tagTotals.set(canonicalTag, existing);
+    }
+  }
+
+  const candidates = [...tagTotals.values()]
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+    .slice(0, checkTagLimit);
+
+  const titles = [];
+  for (const candidate of candidates) {
+    const result = await getTagChampions(generateSlug(candidate.displayName), {
+      locationPlaceId,
+      limit: CHAMPION_PODIUM_SIZE,
+    });
+    const ranking = result?.rankings?.find((entry) => entry.user?._id?.toString() === userIdStr);
+    if (!ranking || ranking.rank > CHAMPION_PODIUM_SIZE) continue;
+
+    titles.push({
+      entityType: 'tag',
+      tag: result?.tag?.name || candidate.displayName,
+      rank: ranking.rank,
+      totalAmount: ranking.totalAmount,
+      totalUsers: result?.tipperCount || 0,
+      medal: ['gold', 'silver', 'bronze'][ranking.rank - 1] || null,
+    });
+
+    if (titles.length >= tagLimit) break;
+  }
+
+  return titles.sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+}
+
 /**
  * Champion titles (#1–#3) held by a user globally.
  * Tags from cached tagRankings; media from bid aggregate rank checks.
@@ -349,22 +429,33 @@ async function getUserChampionTitles(userId, options = {}) {
   const User = require('../models/User');
   const user = await User.findById(userObjectId).select('tagRankings').lean();
   const userIdStr = userObjectId.toString();
+  const locationPlaceId =
+    typeof options.locationPlaceId === 'string' && options.locationPlaceId.trim()
+      ? options.locationPlaceId.trim()
+      : null;
 
-  const tags = (user?.tagRankings || [])
-    .filter((r) => r.rank >= 1 && r.rank <= CHAMPION_PODIUM_SIZE)
-    .map((r) => ({
-      entityType: 'tag',
-      tag: r.tag,
-      rank: r.rank,
-      totalAmount: r.aggregate,
-      totalUsers: r.totalUsers,
-      percentile: r.percentile,
-      medal: ['gold', 'silver', 'bronze'][r.rank - 1] || null,
-    }))
-    .sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+  const tags = locationPlaceId
+    ? await getScopedUserTagChampionTitles(userObjectId, userIdStr, options)
+    : (user?.tagRankings || [])
+        .filter((r) => r.rank >= 1 && r.rank <= CHAMPION_PODIUM_SIZE)
+        .map((r) => ({
+          entityType: 'tag',
+          tag: r.tag,
+          rank: r.rank,
+          totalAmount: r.aggregate,
+          totalUsers: r.totalUsers,
+          percentile: r.percentile,
+          medal: ['gold', 'silver', 'bronze'][r.rank - 1] || null,
+        }))
+        .sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+
+  const userBidMatch = { userId: userObjectId, status: 'active' };
+  if (locationPlaceId) {
+    userBidMatch.bidderLocationAncestorIds = locationPlaceId;
+  }
 
   const userMediaAggregates = await Bid.aggregate([
-    { $match: { userId: userObjectId, status: 'active' } },
+    { $match: userBidMatch },
     {
       $group: {
         _id: '$mediaId',
@@ -416,6 +507,8 @@ async function getUserChampionTitles(userId, options = {}) {
     tags,
     media,
     podiumSize: CHAMPION_PODIUM_SIZE,
+    scope: locationPlaceId ? 'place' : 'global',
+    locationPlaceId,
   };
 }
 

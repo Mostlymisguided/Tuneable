@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
@@ -44,7 +44,11 @@ import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/curr
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
+import {
+  formatLocation,
+  getChampionScopePicksFromLocation,
+  type ResolvedLocation,
+} from '../utils/locationHelpers';
 import { normalizeSources } from '../utils/mediaPlayability';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
@@ -223,6 +227,21 @@ const UserProfile: React.FC = () => {
     totalAmount: number;
     bidCount?: number;
   }>>([]);
+  const [scopedTipTagChampions, setScopedTipTagChampions] = useState<Array<{
+    tag: string;
+    rank: number;
+    totalUsers: number;
+    totalAmount: number;
+  }>>([]);
+  const [scopedMediaChampionTitles, setScopedMediaChampionTitles] = useState<Array<{
+    rank: number;
+    uuid?: string;
+    mediaId: string;
+    title: string;
+    totalAmount: number;
+    bidCount?: number;
+  }>>([]);
+  const [selectedChampionScopePlaceId, setSelectedChampionScopePlaceId] = useState('');
   const [showArtistChampions, setShowArtistChampions] = useState(false);
   const [showTuneBytesTagRankings, setShowTuneBytesTagRankings] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -376,6 +395,13 @@ const UserProfile: React.FC = () => {
 
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
+  const championScopePicks = useMemo(
+    () => getChampionScopePicksFromLocation(user?.homeLocation || null),
+    [user?.homeLocation]
+  );
+  const selectedChampionScope = championScopePicks.find(
+    (pick) => pick.placeId === selectedChampionScopePlaceId
+  ) || null;
 
   // Helper functions for loading additional data
   const loadLabelAffiliations = async () => {
@@ -428,6 +454,30 @@ const UserProfile: React.FC = () => {
       console.error('Error loading champion titles:', err);
     }
   };
+
+  const loadScopedChampionTitles = useCallback(async (locationPlaceId: string) => {
+    if (!userId || !locationPlaceId) {
+      setScopedTipTagChampions([]);
+      setScopedMediaChampionTitles([]);
+      return;
+    }
+
+    try {
+      const response = await userAPI.getChampionTitles(userId, {
+        mediaLimit: 8,
+        checkMediaLimit: 40,
+        tagLimit: 8,
+        checkTagLimit: 24,
+        locationPlaceId,
+      });
+      setScopedTipTagChampions(response.tags || []);
+      setScopedMediaChampionTitles(response.media || []);
+    } catch (err: any) {
+      console.error('Error loading scoped champion titles:', err);
+      setScopedTipTagChampions([]);
+      setScopedMediaChampionTitles([]);
+    }
+  }, [userId]);
 
   const loadTipHistory = async () => {
     if (!isOwnProfile) return;
@@ -797,6 +847,31 @@ const UserProfile: React.FC = () => {
       }
     }
   }, [currentUser, user, searchParams, handleOAuthCallback, fetchUserProfile, setSearchParams]);
+
+  useEffect(() => {
+    if (!championScopePicks.length) {
+      setSelectedChampionScopePlaceId('');
+      setScopedTipTagChampions([]);
+      setScopedMediaChampionTitles([]);
+      return;
+    }
+
+    setSelectedChampionScopePlaceId((current) => {
+      if (current && championScopePicks.some((pick) => pick.placeId === current)) {
+        return current;
+      }
+      return championScopePicks[championScopePicks.length - 1]?.placeId || '';
+    });
+  }, [championScopePicks]);
+
+  useEffect(() => {
+    if (!selectedChampionScopePlaceId) {
+      setScopedTipTagChampions([]);
+      setScopedMediaChampionTitles([]);
+      return;
+    }
+    loadScopedChampionTitles(selectedChampionScopePlaceId);
+  }, [selectedChampionScopePlaceId, loadScopedChampionTitles]);
 
   // Load tip history when viewing tip history tab
   useEffect(() => {
@@ -2082,6 +2157,67 @@ const UserProfile: React.FC = () => {
                         title={`#${title.rank} Champion of "${title.title}" · ${penceToPounds(title.totalAmount)} tipped`}
                       >
                         <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="flex-shrink-0">#{title.rank}</span>
+                        <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Place-scoped champion badges */}
+              {championScopePicks.length > 0 &&
+                (scopedTipTagChampions.length > 0 || scopedMediaChampionTitles.length > 0) &&
+                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
+                <div className="mb-4 w-full max-w-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                    <h3 className="text-sm font-semibold text-white">
+                      {selectedChampionScope?.label
+                        ? `${selectedChampionScope.label} Champion Badges`
+                        : 'Local Champion Badges'}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {championScopePicks.map((pick) => {
+                      const isActive = pick.placeId === selectedChampionScopePlaceId;
+                      return (
+                        <button
+                          key={pick.placeId}
+                          type="button"
+                          onClick={() => setSelectedChampionScopePlaceId(pick.placeId)}
+                          className={`px-3 py-1.5 rounded-full border text-xs sm:text-sm transition-all ${
+                            isActive
+                              ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-100'
+                              : 'bg-black/20 border-white/10 text-gray-300 hover:border-emerald-400/30'
+                          }`}
+                        >
+                          {pick.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {scopedTipTagChampions.slice(0, 6).map((ranking) => (
+                      <Link
+                        key={`scoped-tip-${selectedChampionScopePlaceId}-${ranking.tag}-${ranking.rank}`}
+                        to={getTagProfilePath(ranking.tag)}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
+                        title={`${selectedChampionScope?.label || 'Local'} · #${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.totalAmount)} tipped`}
+                      >
+                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span>#{ranking.rank}</span>
+                        <span className="opacity-90">{ranking.tag}</span>
+                      </Link>
+                    ))}
+                    {scopedMediaChampionTitles.slice(0, 4).map((title) => (
+                      <Link
+                        key={`scoped-media-${selectedChampionScopePlaceId}-${title.mediaId}-${title.rank}`}
+                        to={`/tune/${title.uuid || title.mediaId}`}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all max-w-full ${championBadgeStyles(title.rank)}`}
+                        title={`${selectedChampionScope?.label || 'Local'} · #${title.rank} Champion of "${title.title}" · ${penceToPounds(title.totalAmount)} tipped`}
+                      >
+                        <Music className="h-3.5 w-3.5 flex-shrink-0" />
                         <span className="flex-shrink-0">#{title.rank}</span>
                         <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
                       </Link>
