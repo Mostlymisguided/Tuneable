@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Music, Tag } from 'lucide-react';
+import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
 
 interface TagInputModalProps {
   isOpen: boolean;
@@ -20,9 +21,9 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
   const [tags, setTags] = useState<string[]>([]);
 
   const handleAddTag = () => {
-    const trimmedTag = tagInput.trim().toLowerCase();
-    if (trimmedTag && !tags.includes(trimmedTag) && tags.length < 5) {
-      setTags([...tags, trimmedTag]);
+    const display = normalizeTagForStorage(tagInput);
+    if (display && !tags.some((t) => tagsMatch(t, display)) && tags.length < 5) {
+      setTags([...tags, display]);
       setTagInput('');
     }
   };

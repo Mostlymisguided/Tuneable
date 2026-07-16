@@ -1,12 +1,8 @@
 /**
  * Normalize existing tags in Media documents
- * 
- * This script:
- * 1. Finds all Media documents with tags
- * 2. Gets the canonical form of each tag (e.g., "r&b" -> "rnb")
- * 3. Capitalizes it for display (e.g., "rnb" -> "Rnb")
- * 4. Updates the Media document
- * 
+ *
+ * Uses normalizeTagForStorage (aliases + Title Case) for every media.tags entry.
+ *
  * Usage:
  *   node scripts/normalizeMediaTags.js --dry-run  # Preview changes
  *   node scripts/normalizeMediaTags.js             # Apply changes
@@ -15,36 +11,9 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Media = require('../models/Media');
-const { getCanonicalTag, normalizeTagForMatching, TAG_ALIASES } = require('../utils/tagNormalizer');
-const { capitalizeTag } = require('../services/tagPartyService');
+const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 
 const DRY_RUN = process.argv.includes('--dry-run');
-
-/**
- * Normalize a tag: get canonical form, then capitalize for display
- * @param {string} tag - The tag to normalize
- * @returns {string} - Normalized and capitalized tag
- */
-function normalizeTagForStorage(tag) {
-  if (!tag || typeof tag !== 'string') return tag;
-  
-  // Normalize the tag for matching (removes spaces, special chars)
-  const normalized = normalizeTagForMatching(tag);
-  
-  // Check if this normalized form is in our aliases
-  const canonical = TAG_ALIASES[normalized];
-  
-  // If it's in aliases, use the canonical form (already in display format with spaces)
-  // This handles tags like "Hip Hop", "Deep House", "R&B", "DnB", "Singer Songwriter"
-  if (canonical && /^[A-Z]/.test(canonical)) {
-    return canonical;
-  }
-  
-  // If not in aliases, preserve the original tag's structure (spaces)
-  // but capitalize it properly (e.g., "Indie Folk" -> "Indie Folk", not "Indiefolk")
-  // This handles tags like "Indie Folk", "Ballroom Folk" that aren't in aliases
-  return capitalizeTag(tag);
-}
 
 async function normalizeMediaTags() {
   if (!process.env.MONGODB_URI) {
@@ -55,103 +24,75 @@ async function normalizeMediaTags() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB');
-    
+
     if (DRY_RUN) {
       console.log('🔍 DRY RUN MODE - No changes will be saved\n');
     }
 
-    const cursor = Media.find({ 
-      tags: { $exists: true, $ne: [] } 
+    const cursor = Media.find({
+      tags: { $exists: true, $ne: [] },
     }).cursor();
-    
+
     let processed = 0;
     let updated = 0;
-    let tagChanges = new Map(); // Track tag transformations for reporting
-    
+    const tagChanges = new Map();
+
     for await (const media of cursor) {
       if (!media.tags || !Array.isArray(media.tags) || media.tags.length === 0) {
         continue;
       }
-      
+
       const originalTags = [...media.tags];
-      const normalizedTags = media.tags.map(tag => {
+      const normalizedTags = [];
+      for (const tag of media.tags) {
         const normalized = normalizeTagForStorage(tag);
-        
-        // Track transformations for reporting
-        if (normalized !== tag) {
-          const key = `${tag} -> ${normalized}`;
+        if (!normalized) continue;
+
+        if (!normalizedTags.some((t) => tagsMatch(t, normalized))) {
+          normalizedTags.push(normalized);
+        }
+
+        if (tag !== normalized) {
+          const key = `${tag} → ${normalized}`;
           tagChanges.set(key, (tagChanges.get(key) || 0) + 1);
         }
-        
-        return normalized;
-      });
-      
-      // Remove duplicates while preserving order
-      const uniqueNormalizedTags = [...new Set(normalizedTags)];
-      
-      // Check if tags changed
-      const tagsChanged = 
-        originalTags.length !== uniqueNormalizedTags.length ||
-        originalTags.some((tag, index) => tag !== uniqueNormalizedTags[index]);
-      
+      }
+
+      processed++;
+
+      const tagsChanged =
+        originalTags.length !== normalizedTags.length ||
+        originalTags.some((tag, i) => tag !== normalizedTags[i]);
+
       if (tagsChanged) {
-        if (DRY_RUN) {
-          console.log(`📝 Would update: "${media.title}" (${media._id})`);
-          console.log(`   Before: [${originalTags.join(', ')}]`);
-          console.log(`   After:  [${uniqueNormalizedTags.join(', ')}]`);
-        } else {
-          media.tags = uniqueNormalizedTags;
+        if (!DRY_RUN) {
+          media.tags = normalizedTags;
           await media.save();
         }
         updated++;
-      }
-      
-      processed++;
-      
-      if (processed % 100 === 0) {
-        console.log(`📊 Processed ${processed} media items, updated ${updated}...`);
+        if (updated <= 20 || updated % 50 === 0) {
+          console.log(
+            `${DRY_RUN ? '[dry-run] ' : ''}Updated "${media.title}": [${originalTags.join(', ')}] → [${normalizedTags.join(', ')}]`
+          );
+        }
       }
     }
-    
-    console.log('\n' + '='.repeat(60));
-    console.log('📊 SUMMARY');
-    console.log('='.repeat(60));
-    console.log(`Total media items processed: ${processed}`);
-    console.log(`Media items ${DRY_RUN ? 'that would be' : ''} updated: ${updated}`);
-    
+
+    console.log(`\n📊 Processed ${processed} media items, ${updated} would be/were updated`);
     if (tagChanges.size > 0) {
-      console.log('\n📋 Tag Transformations:');
-      const sortedChanges = Array.from(tagChanges.entries())
-        .sort((a, b) => b[1] - a[1]); // Sort by count
-      
-      sortedChanges.forEach(([transformation, count]) => {
-        console.log(`   ${transformation}: ${count} occurrence${count !== 1 ? 's' : ''}`);
-      });
+      console.log('\nTag transformations:');
+      [...tagChanges.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 40)
+        .forEach(([change, count]) => console.log(`  ${change} (${count})`));
     }
-    
-    if (DRY_RUN) {
-      console.log('\n💡 Run without --dry-run to apply these changes');
-    } else {
-      console.log('\n✅ Tag normalization complete!');
-    }
-    
+
+    console.log('\n✅ Tag normalization complete!');
+    await mongoose.disconnect();
   } catch (error) {
     console.error('❌ Error:', error);
-    throw error;
-  } finally {
-    await mongoose.disconnect();
-    console.log('✅ Disconnected from MongoDB');
+    process.exit(1);
   }
 }
 
-// Run the migration
-normalizeMediaTags()
-  .then(() => {
-    console.log('✅ Script completed successfully');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('❌ Script failed:', error);
-    process.exit(1);
-  });
-
+normalizeMediaTags();

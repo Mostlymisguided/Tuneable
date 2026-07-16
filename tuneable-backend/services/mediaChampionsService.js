@@ -8,7 +8,7 @@ const Bid = require('../models/Bid');
 const Media = require('../models/Media');
 const { isValidObjectId } = require('../utils/validators');
 const { resolveTagFromSlug, collectTagVariants, generateSlug } = require('./tagProfileService');
-const { getCanonicalTag, tagsMatch } = require('../utils/tagNormalizer');
+const { getCanonicalTag, tagsMatch, normalizeTagForStorage } = require('../utils/tagNormalizer');
 
 /** Minimum distinct tippers in-scope before crowning Champions. */
 const MIN_TIPPERS_FOR_CHAMPION = 1;
@@ -374,14 +374,15 @@ async function getScopedUserTagChampionTitles(userObjectId, userIdStr, options =
       const canonicalTag = getCanonicalTag(rawTag);
       if (!canonicalTag) continue;
 
+      const display = normalizeTagForStorage(rawTag);
       const existing = tagTotals.get(canonicalTag) || {
         canonicalTag,
-        displayName: rawTag.trim(),
+        displayName: display,
         totalAmount: 0,
       };
       existing.totalAmount += bid.amount || 0;
-      if (!existing.displayName || existing.displayName.length > rawTag.trim().length) {
-        existing.displayName = rawTag.trim();
+      if (display && (!existing.displayName || display.length >= existing.displayName.length)) {
+        existing.displayName = display;
       }
       tagTotals.set(canonicalTag, existing);
     }

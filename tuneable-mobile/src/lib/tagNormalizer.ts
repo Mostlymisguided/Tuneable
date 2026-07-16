@@ -1,38 +1,23 @@
 /**
- * Tag normalization and fuzzy matching utilities
+ * Tag normalization — mirrors tuneable-backend/utils/tagNormalizer.js
  *
  * Two layers:
  * - Match key: lowercase, no spaces/punctuation (never show/store this)
  * - Display/storage: Title Case, with aliases + acronym exceptions
  */
 
-/**
- * Normalize tag for fuzzy matching
- * Handles: D&b -> dnb, hip-hop -> hiphop, etc.
- * @param {string} tag - The tag to normalize
- * @returns {string} - Normalized tag (lowercase, no special chars, no spaces)
- */
-function normalizeTagForMatching(tag) {
+function normalizeTagForMatching(tag: string): string {
   if (!tag || typeof tag !== 'string') return '';
-
   return tag
     .toLowerCase()
     .trim()
-    // Remove special characters (keep alphanumeric and spaces)
     .replace(/[^\w\s]/g, '')
-    // Normalize whitespace (multiple spaces/hyphens/underscores to single space)
     .replace(/[\s\-_]+/g, ' ')
     .trim()
-    // Remove spaces entirely for matching (Drum And Bass -> drumandbass)
     .replace(/\s+/g, '');
 }
 
-/**
- * Tag aliases — keys must be match keys (output of normalizeTagForMatching).
- * Values are canonical display forms.
- */
-const TAG_ALIASES = {
-  // Drum & Bass
+const TAG_ALIASES: Record<string, string> = {
   dnb: 'DnB',
   drumandbass: 'DnB',
   drumbass: 'DnB',
@@ -40,24 +25,18 @@ const TAG_ALIASES = {
   drumnbassmusic: 'DnB',
   db: 'DnB',
 
-  // Hip Hop
   hiphop: 'Hip Hop',
 
-  // UK Hip Hop
   ukhiphop: 'UK Hip Hop',
 
-  // UK R&B
   ukrb: 'UK R&B',
   ukrandb: 'UK R&B',
 
-  // UK Rap
   ukrap: 'UK Rap',
 
-  // Electronic
   edm: 'Electronic',
   electronic: 'Electronic',
 
-  // House
   house: 'House',
   housemusic: 'House',
   deephouse: 'Deep House',
@@ -66,26 +45,18 @@ const TAG_ALIASES = {
   melodichouse: 'Melodic House',
   afrohouse: 'Afro House',
 
-  // Singer Songwriter
   singersongwriter: 'Singer Songwriter',
 
-  // Techno
   techno: 'Techno',
   technomusic: 'Techno',
   melodictechno: 'Melodic Techno',
 
-  // R&B
   rnb: 'R&B',
   randb: 'R&B',
   rb: 'R&B',
 };
 
-/**
- * Capitalize tag for display: Title Case per word, with acronym + stylization exceptions.
- * @param {string} tag
- * @returns {string}
- */
-function capitalizeTag(tag) {
+export function capitalizeTag(tag: string): string {
   if (!tag || typeof tag !== 'string') return tag;
 
   const acronyms = new Set(['uk', 'dj', 'edm', 'rnb', 'dnb', 'r&b', 'd&b']);
@@ -133,13 +104,7 @@ function capitalizeTag(tag) {
     .join(' ');
 }
 
-/**
- * Normalize tag for storage/display.
- * Uses canonical alias when available; otherwise Title-Cases the original wording.
- * @param {string} tag
- * @returns {string}
- */
-function normalizeTagForStorage(tag) {
+export function normalizeTagForStorage(tag: string): string {
   if (!tag || typeof tag !== 'string') return tag;
 
   const trimmed = tag.trim();
@@ -147,73 +112,27 @@ function normalizeTagForStorage(tag) {
 
   const normalized = normalizeTagForMatching(trimmed);
   const canonical = TAG_ALIASES[normalized];
+  if (canonical) return canonical;
 
-  if (canonical) {
-    return canonical;
-  }
-
-  // Preserve original word boundaries/spaces; Title Case for display
   return capitalizeTag(trimmed);
 }
 
-/**
- * Canonical form for matching/grouping.
- * Prefer display alias when known; otherwise the match key.
- * Do NOT use for user-facing labels — use normalizeTagForStorage.
- * @param {string} tag
- * @returns {string}
- */
-function getCanonicalTag(tag) {
+export function getCanonicalTag(tag: string): string {
   const normalized = normalizeTagForMatching(tag);
   return TAG_ALIASES[normalized] || normalized;
 }
 
-/**
- * Check if two tags match (fuzzy)
- * @param {string} tag1
- * @param {string} tag2
- * @returns {boolean}
- */
-function tagsMatch(tag1, tag2) {
+export function getTagMatchKey(tag: string): string {
+  return normalizeTagForMatching(getCanonicalTag(tag));
+}
+
+export function tagsMatch(tag1: string, tag2: string): boolean {
   const norm1 = normalizeTagForMatching(tag1);
   const norm2 = normalizeTagForMatching(tag2);
-
   if (norm1 === norm2) return true;
-
   const canon1 = TAG_ALIASES[norm1] || norm1;
   const canon2 = TAG_ALIASES[norm2] || norm2;
-
   return normalizeTagForMatching(canon1) === normalizeTagForMatching(canon2);
 }
 
-/**
- * Find all tags that match a given tag (fuzzy)
- * @param {string} tag
- * @param {Array<string>} tagList
- * @returns {Array<string>}
- */
-function findMatchingTags(tag, tagList) {
-  if (!tag || !Array.isArray(tagList)) return [];
-  return tagList.filter((t) => tagsMatch(tag, t));
-}
-
-/**
- * Stable match key for grouping (aliases collapse to the same key)
- * @param {string} tag
- * @returns {string}
- */
-function getTagMatchKey(tag) {
-  const canonical = getCanonicalTag(tag);
-  return normalizeTagForMatching(canonical);
-}
-
-module.exports = {
-  normalizeTagForMatching,
-  normalizeTagForStorage,
-  capitalizeTag,
-  getCanonicalTag,
-  getTagMatchKey,
-  tagsMatch,
-  findMatchingTags,
-  TAG_ALIASES,
-};
+export { normalizeTagForMatching, TAG_ALIASES };

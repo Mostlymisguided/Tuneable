@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { Music, Calendar, Shield, ArrowLeft } from 'lucide-react';
+import { normalizeTagForStorage } from '../utils/tagNormalizer';
 
 // Slider styles
 const sliderStyles = `
@@ -68,8 +69,8 @@ const CreateParty: React.FC = () => {
       // Process tags from comma-separated string to array
       const tagsArray = formData.tags
         .split(',')
-        .map(tag => tag.trim().toLowerCase())
-        .filter(tag => tag.length > 0)
+        .map((tag) => normalizeTagForStorage(tag.trim()))
+        .filter((tag) => tag.length > 0)
         .slice(0, 5); // Limit to 5 tags max
 
       // Prepare party data based on schedule type

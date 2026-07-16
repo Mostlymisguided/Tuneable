@@ -18,6 +18,7 @@ const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { getBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
+const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
 // via Bid model hooks (post('save') and post('remove'))
@@ -37,20 +38,6 @@ const deriveCodeFromPartyId = (objectId) => {
     return crypto.createHash('md5').update(objectId.toString()).digest('hex').substring(0, 6).toUpperCase();
   };
 
-/**
- * Capitalize the first letter of each word in a tag (title case)
- * @param {string} tag - The tag to capitalize
- * @returns {string} - The capitalized tag
- */
-const capitalizeTag = (tag) => {
-  if (!tag || typeof tag !== 'string') return tag;
-  return tag
-    .trim()
-    .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-};
-
 // Global Party: only show tunes (contentType: music, contentForm: tune). Exclude podcast episodes/series.
 // Spread this into Media.find() wherever Global Party aggregates media. Later we may add a filterable global feed.
 const GLOBAL_PARTY_TUNES_FILTER = {
@@ -59,29 +46,25 @@ const GLOBAL_PARTY_TUNES_FILTER = {
 };
 
 /**
- * Merge tags and ensure they're capitalized (title case)
+ * Merge tags and ensure they're in display/storage form (Title Case + aliases)
  * @param {Array} existingTags - Existing tags array
  * @param {Array} newTags - New tags to merge
- * @returns {Array} - Merged and capitalized tags array
+ * @returns {Array} - Merged and normalized tags array
  */
 const mergeTags = (existingTags, newTags) => {
   if (!newTags || !Array.isArray(newTags) || newTags.length === 0) {
-    // Capitalize existing tags if they're not already capitalized
-    return (existingTags || []).map(tag => capitalizeTag(tag));
+    return (existingTags || []).map(tag => normalizeTagForStorage(tag)).filter(Boolean);
   }
-  
-  const existing = (existingTags || []).map(t => t.toLowerCase().trim());
-  const merged = [...(existingTags || []).map(tag => capitalizeTag(tag))];
-  
+
+  const merged = [...(existingTags || []).map(tag => normalizeTagForStorage(tag)).filter(Boolean)];
+
   newTags.forEach(tag => {
-    const capitalizedTag = capitalizeTag(tag);
-    const lowerTag = capitalizedTag.toLowerCase().trim();
-    if (lowerTag && !existing.includes(lowerTag)) {
-      merged.push(capitalizedTag);
-      existing.push(lowerTag);
+    const normalizedTag = normalizeTagForStorage(tag);
+    if (normalizedTag && !merged.some(t => tagsMatch(t, normalizedTag))) {
+      merged.push(normalizedTag);
     }
   });
-  
+
   return merged;
 };
 
@@ -224,7 +207,9 @@ router.post('/', adminMiddleware, async (req, res) => {
         status: startTime ? 'scheduled' : 'active', // If no startTime provided, party starts immediately
         mediaSource: mediaSource || 'youtube',
         minimumBid: minimumBid || 0.33,
-        tags: tags || [],
+        tags: Array.isArray(tags)
+          ? tags.map((t) => normalizeTagForStorage(t)).filter(Boolean)
+          : [],
         description: description || '',
       });
   
@@ -474,8 +459,7 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
             // Handle tag parties
             if (party.type === 'tag' && party.tags && party.tags.length > 0) {
                 const tagPartyTag = party.tags[0];
-                const { capitalizeTag } = require('../services/tagPartyService');
-                const normalizedTag = capitalizeTag(tagPartyTag);
+                const normalizedTag = normalizeTagForStorage(tagPartyTag);
                 const lowerTag = normalizedTag.toLowerCase().trim();
                 
                 // Find all media with this tag that has bids
@@ -850,8 +834,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 const startTime = Date.now();
                 
                 // Normalize tag for case-insensitive matching
-                const { capitalizeTag } = require('../services/tagPartyService');
-                const normalizedTag = capitalizeTag(tagPartyTag);
+                const normalizedTag = normalizeTagForStorage(tagPartyTag);
                 const lowerTag = normalizedTag.toLowerCase().trim();
                 
                 // Find ALL media with this tag that has ANY bids
@@ -1598,8 +1581,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                 console.log(`🏷️  Searching Tag Party for tag "${tagPartyTag}" - searching all media with this tag and bids...`);
                 
                 const Media = require('../models/Media');
-                const { capitalizeTag } = require('../services/tagPartyService');
-                const normalizedTag = capitalizeTag(tagPartyTag);
+                const normalizedTag = normalizeTagForStorage(tagPartyTag);
                 const lowerTag = normalizedTag.toLowerCase().trim();
                 
                 const allMediaWithTagAndBids = await Media.find({
@@ -1793,7 +1775,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         // Use only user-provided tags (no extraction from YouTube)
         // Capitalize tags for consistent display
-        let videoTags = Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [];
+        let videoTags = Array.isArray(tags) ? tags.map(tag => normalizeTagForStorage(tag)) : [];
         let videoCategory = category || 'Unknown';
         
         // Re-check if media already exists to prevent duplicates (existingMedia was already checked above for minimumBid)
@@ -2294,8 +2276,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             // Verify media has the tag party's tag
             const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
             if (tagPartyTag) {
-                const { capitalizeTag } = require('../services/tagPartyService');
-                const normalizedTag = capitalizeTag(tagPartyTag);
+                const normalizedTag = normalizeTagForStorage(tagPartyTag);
                 const lowerTag = normalizedTag.toLowerCase().trim();
                 const mediaHasTag = populatedMedia.tags && Array.isArray(populatedMedia.tags) && 
                     populatedMedia.tags.some(tag => {
@@ -2421,8 +2402,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             const Media = require('../models/Media');
             const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
             if (tagPartyTag) {
-                const { capitalizeTag } = require('../services/tagPartyService');
-                const normalizedTag = capitalizeTag(tagPartyTag);
+                const normalizedTag = normalizeTagForStorage(tagPartyTag);
                 const lowerTag = normalizedTag.toLowerCase().trim();
                 
                 queuedMedia = await Media.find({
@@ -2632,7 +2612,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             if (tags && Array.isArray(tags) && tags.length > 0) {
                 const tagsBefore = media.tags || [];
                 // Capitalize incoming tags before merging
-                const capitalizedTags = tags.map(tag => capitalizeTag(tag));
+                const capitalizedTags = tags.map(tag => normalizeTagForStorage(tag));
                 media.tags = mergeTags(media.tags, capitalizedTags);
                 console.log(`✅ Merged tags into media: "${media.title}" (${media._id})`);
                 console.log(`   Tags before: [${tagsBefore.join(', ')}]`);

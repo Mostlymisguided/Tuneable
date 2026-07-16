@@ -9,11 +9,7 @@ const Party = require('../models/Party');
 const { isValidObjectId } = require('../utils/validators');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { getBidLocationSnapshot, getUserBidLocation } = require('../utils/locationUtils');
-
-const capitalizeTag = (tag) => {
-  if (!tag || typeof tag !== 'string') return tag;
-  return tag.trim().charAt(0).toUpperCase() + tag.trim().slice(1).toLowerCase();
-};
+const { normalizeTagForStorage } = require('../utils/tagNormalizer');
 
 /**
  * @param {string} userId
@@ -104,7 +100,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
         duration: duration || 0,
         sources: new Map(sourceEntries),
         externalIds: new Map(externalIdEntries),
-        tags: Array.isArray(tags) ? tags.map((tag) => capitalizeTag(tag)) : [],
+        tags: Array.isArray(tags) ? tags.map((tag) => normalizeTagForStorage(tag)) : [],
         category: category || 'Music',
         album: album || null,
         releaseDate: releaseDate || null,

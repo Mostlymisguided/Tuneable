@@ -2493,7 +2493,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
     }
 
-    const { getCanonicalTag } = require('../utils/tagNormalizer');
+    const { normalizeTagForStorage, getTagMatchKey } = require('../utils/tagNormalizer');
 
     // Handle preferences updates separately
     if (preferences?.defaultTip !== undefined) {
@@ -2529,11 +2529,17 @@ router.put('/profile', authMiddleware, async (req, res) => {
         });
       }
 
-      const canonicalTags = [...new Set(
-        preferences.favoriteTags
-          .map((tag) => (typeof tag === 'string' ? getCanonicalTag(tag.trim()) : null))
-          .filter(Boolean)
-      )];
+      const canonicalTags = [];
+      const seenFavoriteTags = new Set();
+      for (const tag of preferences.favoriteTags) {
+        if (typeof tag !== 'string') continue;
+        const display = normalizeTagForStorage(tag.trim());
+        if (!display) continue;
+        const key = getTagMatchKey(display);
+        if (seenFavoriteTags.has(key)) continue;
+        seenFavoriteTags.add(key);
+        canonicalTags.push(display);
+      }
 
       user.preferences.favoriteTags = canonicalTags;
     }

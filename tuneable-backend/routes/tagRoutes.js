@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Media = require('../models/Media');
 const { getTagProfile } = require('../services/tagProfileService');
-const { getCanonicalTag } = require('../utils/tagNormalizer');
+const {
+  normalizeTagForStorage,
+  getTagMatchKey,
+} = require('../utils/tagNormalizer');
 
 const FALLBACK_POPULAR_TAGS = [
   'Hip Hop', 'Electronic', 'House', 'DnB', 'Indie', 'Rock', 'Pop', 'R&B',
@@ -40,12 +43,17 @@ router.get('/popular', async (req, res) => {
 
     const tagMap = new Map();
     results.forEach((entry) => {
-      const canonical = getCanonicalTag(entry._id);
-      if (!canonical) return;
-      const existing = tagMap.get(canonical) || { tag: canonical, count: 0, aggregate: 0 };
+      const display = normalizeTagForStorage(entry._id);
+      if (!display) return;
+      const key = getTagMatchKey(display);
+      const existing = tagMap.get(key) || { tag: display, count: 0, aggregate: 0 };
       existing.count += entry.count;
       existing.aggregate += entry.aggregate || 0;
-      tagMap.set(canonical, existing);
+      // Prefer alias-style display if we already have a nicer form
+      if (display.length >= existing.tag.length) {
+        existing.tag = display;
+      }
+      tagMap.set(key, existing);
     });
 
     let tags = [...tagMap.values()]
@@ -53,11 +61,12 @@ router.get('/popular', async (req, res) => {
       .slice(0, limit);
 
     if (tags.length < 12) {
-      const seen = new Set(tags.map((t) => t.tag));
+      const seen = new Set(tags.map((t) => getTagMatchKey(t.tag)));
       for (const tag of FALLBACK_POPULAR_TAGS) {
-        if (seen.has(tag)) continue;
+        const key = getTagMatchKey(tag);
+        if (seen.has(key)) continue;
         tags.push({ tag, count: 0, aggregate: 0 });
-        seen.add(tag);
+        seen.add(key);
         if (tags.length >= limit) break;
       }
     }

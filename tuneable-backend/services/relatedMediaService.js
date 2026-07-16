@@ -1,7 +1,7 @@
 const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
-const { getCanonicalTag } = require('../utils/tagNormalizer');
+const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 
 const DEFAULT_OPTIONS = {
   candidatePoolSize: 120,
@@ -105,15 +105,13 @@ const buildCandidateRecord = ({ media, source, sourceCanonicalTags, canonicalTag
     return null;
   }
 
-  const sharedDisplayTags = normalizeTags(source.tags || []).filter(tag => {
-    const canonical = getCanonicalTag(tag);
-    return canonical && sharedCanonicalTags.includes(canonical);
-  });
+  const sharedDisplayTags = normalizeTags(source.tags || [])
+    .filter((tag) => sharedCanonicalTags.some((c) => tagsMatch(tag, c)))
+    .map((tag) => normalizeTagForStorage(tag));
 
-  const fallbackDisplayTags = rawTags.filter(tag => {
-    const canonical = getCanonicalTag(tag);
-    return canonical && sharedCanonicalTags.includes(canonical);
-  });
+  const fallbackDisplayTags = rawTags
+    .filter((tag) => sharedCanonicalTags.some((c) => tagsMatch(tag, c)))
+    .map((tag) => normalizeTagForStorage(tag));
 
   const uniqueSharedDisplayTags = Array.from(new Set([
     ...sharedDisplayTags,

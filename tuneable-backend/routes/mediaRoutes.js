@@ -21,7 +21,7 @@ const {
   resolveBpmKey,
 } = require('../utils/libraryXml');
 const { canUploadMedia, canEditMedia, canDeleteMedia, isAdmin } = require('../utils/permissionHelpers');
-const { getCanonicalTag } = require('../utils/tagNormalizer');
+const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const {
   attachGearIdsToProductionStack,
@@ -31,20 +31,6 @@ const {
 const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const Gear = require('../models/Gear');
-
-/**
- * Capitalize the first letter of each word in a tag (title case)
- * @param {string} tag - The tag to capitalize
- * @returns {string} - The capitalized tag
- */
-const capitalizeTag = (tag) => {
-  if (!tag || typeof tag !== 'string') return tag;
-  return tag
-    .trim()
-    .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-};
 
 /**
  * Extract release year from releaseDate or use provided releaseYear
@@ -821,7 +807,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     }
     
     // Parse tags (comma-separated string to array) and capitalize them
-    const parsedTags = tags ? tags.split(',').map(t => capitalizeTag(t.trim())).filter(t => t) : [];
+    const parsedTags = tags ? tags.split(',').map(t => normalizeTagForStorage(t.trim())).filter(t => t) : [];
     
     // Determine final values (user input takes priority over extracted metadata)
     const finalTitle = title || extractedMetadata?.title || 'Untitled';
@@ -2098,7 +2084,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             value = Array.from(
               new Set(
                 value
-                  .map(tag => typeof tag === 'string' ? capitalizeTag(tag.trim()) : '')
+                  .map(tag => typeof tag === 'string' ? normalizeTagForStorage(tag.trim()) : '')
                   .filter(Boolean)
               )
             );
@@ -2107,7 +2093,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
               new Set(
                 value
                   .split(',')
-                  .map(tag => capitalizeTag(tag.trim()))
+                  .map(tag => normalizeTagForStorage(tag.trim()))
                   .filter(Boolean)
               )
             );
@@ -3124,7 +3110,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           duration: duration || 0,
           sources: sourcesMap,
           externalIds: externalIdsMap,
-          tags: Array.isArray(tags) ? tags.map(tag => capitalizeTag(tag)) : [],
+          tags: Array.isArray(tags) ? tags.map(tag => normalizeTagForStorage(tag)) : [],
           category: category || 'Music',
           album: album || null,
           releaseDate: releaseDate || null,
@@ -3151,17 +3137,17 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
 
     if (media && Array.isArray(tags) && tags.length > 0) {
       const normalizedTags = tags
-        .map(tag => capitalizeTag(tag))
+        .map(tag => normalizeTagForStorage(tag))
         .filter(tag => typeof tag === 'string' && tag.trim().length > 0);
 
       if (normalizedTags.length > 0) {
-        const existingTags = Array.isArray(media.tags) ? media.tags : [];
-        const existingTagSet = new Set(existingTags.map(tag => String(tag).toLowerCase()));
+        const existingTags = Array.isArray(media.tags)
+          ? media.tags.map((t) => normalizeTagForStorage(t)).filter(Boolean)
+          : [];
         let didAddTag = false;
 
-        normalizedTags.forEach(tag => {
-          if (!existingTagSet.has(tag.toLowerCase())) {
-            existingTagSet.add(tag.toLowerCase());
+        normalizedTags.forEach((tag) => {
+          if (!existingTags.some((t) => tagsMatch(t, tag))) {
             existingTags.push(tag);
             didAddTag = true;
           }

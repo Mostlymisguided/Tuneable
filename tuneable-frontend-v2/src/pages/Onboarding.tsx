@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { authAPI, tagAPI, userAPI } from '../lib/api';
 import { buildOnboardingCompletePath, needsOnboarding } from '../utils/authHelpers';
 import { buildOAuthStartUrl } from '../utils/platform';
-import { getCanonicalTag } from '../utils/tagNormalizer';
+import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
 import { penceToPoundsNumber } from '../utils/currency';
 
 type OnboardingStep = 'tags' | 'tip' | 'import';
@@ -174,28 +174,28 @@ const Onboarding: React.FC = () => {
   };
 
   const toggleTag = (tag: string) => {
-    const canonical = getCanonicalTag(tag);
-    if (!canonical) return;
+    const display = normalizeTagForStorage(tag);
+    if (!display) return;
 
     setSelectedTags((prev) => {
-      if (prev.includes(canonical)) {
-        return prev.filter((t) => t !== canonical);
+      if (prev.some((t) => tagsMatch(t, display))) {
+        return prev.filter((t) => !tagsMatch(t, display));
       }
       if (prev.length >= MAX_TAGS) {
         toast.info(`Choose up to ${MAX_TAGS} tags`);
         return prev;
       }
-      return [...prev, canonical];
+      return [...prev, display];
     });
   };
 
   const addCustomTag = () => {
-    const canonical = getCanonicalTag(tagSearch.trim());
-    if (!canonical) {
+    const display = normalizeTagForStorage(tagSearch.trim());
+    if (!display) {
       toast.error('Enter a valid tag name');
       return;
     }
-    toggleTag(canonical);
+    toggleTag(display);
     setTagSearch('');
   };
 
@@ -413,7 +413,7 @@ const Onboarding: React.FC = () => {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {filteredTagOptions.map((tag) => {
-                  const selected = selectedTags.includes(tag);
+                  const selected = selectedTags.some((t) => tagsMatch(t, tag));
                   return (
                     <button
                       key={tag}

@@ -3,72 +3,14 @@ const Media = require('../models/Media');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const { getCanonicalTag } = require('../utils/tagNormalizer');
+const {
+  getCanonicalTag,
+  capitalizeTag,
+  normalizeTagForStorage,
+} = require('../utils/tagNormalizer');
 
 // Configurable threshold from environment variable, default to 3
 const TAG_PARTY_THRESHOLD = parseInt(process.env.TAG_PARTY_THRESHOLD || '3', 10);
-
-/**
- * Capitalize the first letter of each word in a tag (title case)
- * Preserves acronyms like UK, DJ, R&B, etc.
- * @param {string} tag - The tag to capitalize
- * @returns {string} - The capitalized tag
- */
-const capitalizeTag = (tag) => {
-  if (!tag || typeof tag !== 'string') return tag;
-  
-  // Common acronyms that should be preserved as uppercase
-  const acronyms = new Set(['uk', 'dj', 'edm', 'rnb', 'dnb', 'r&b', 'd&b']);
-  
-  return tag
-    .trim()
-    .split(/\s+/)
-    .map(word => {
-      const wordLower = word.toLowerCase();
-      // Check if it's a known acronym (including special char variants)
-      const isKnownAcronym = acronyms.has(wordLower);
-      // Check if it's already in acronym format (all caps, 2-4 letters)
-      const isAcronymFormat = /^[A-Z]{2,4}$/.test(word);
-      // Check if it has special chars (might be an acronym like R&B, D&B)
-      const hasSpecialChars = /[&\/\-]/.test(word);
-      // Check if it's stylistically capitalized (camelCase, mixed case like WantTheGanja)
-      const isStylized = /^[A-Z][a-z]+[A-Z]/.test(word) || /[a-z][A-Z]/.test(word);
-      
-      if (isKnownAcronym) {
-        // Known acronym: make uppercase (handles both "uk" -> "UK" and "r&b" -> "R&B")
-        return wordLower.split('').map((char, i) => {
-          if (/[&\/\-]/.test(char)) return char; // Preserve special chars
-          return char.toUpperCase();
-        }).join('');
-      }
-      
-      if (isAcronymFormat) {
-        // Already in acronym format, preserve it
-        return word;
-      }
-      
-      if (isStylized) {
-        // Stylistically capitalized (camelCase, mixed case), preserve as-is
-        return word;
-      }
-      
-      if (hasSpecialChars) {
-        // Has special chars but not a known acronym - capitalize properly
-        // e.g., "r&b" -> "R&B", "d&b" -> "D&B"
-        return word.split('').map((char, i) => {
-          if (/[&\/\-]/.test(char)) return char; // Preserve special chars
-          if (i === 0 || (i > 0 && /[&\/\-]/.test(word[i-1]))) {
-            return char.toUpperCase(); // Capitalize first char and chars after special chars
-          }
-          return char.toLowerCase();
-        }).join('');
-      }
-      
-      // Regular word: capitalize first letter, lowercase rest
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(' ');
-};
 
 /**
  * Generate a URL-friendly slug from a tag
@@ -204,8 +146,8 @@ const createTagParty = async (tag) => {
     throw new Error('Tag is required to create a tag party');
   }
   
-  // Normalize tag to title case
-  const normalizedTag = capitalizeTag(tag);
+  // Normalize tag to display/storage form (aliases + Title Case)
+  const normalizedTag = normalizeTagForStorage(tag);
   const slug = generateSlug(normalizedTag);
   
   // Check if party already exists (pass original tag for fuzzy matching)
@@ -273,7 +215,7 @@ const checkAndCreateTagParties = async (tags) => {
   for (const tag of tags) {
     if (!tag || typeof tag !== 'string') continue;
     
-    const normalizedTag = capitalizeTag(tag);
+    const normalizedTag = normalizeTagForStorage(tag);
     
     try {
       // Check if threshold is met (pass original tag for fuzzy matching)
@@ -310,6 +252,7 @@ module.exports = {
   checkAndCreateTagParties,
   generateSlug,
   capitalizeTag,
+  normalizeTagForStorage,
   TAG_PARTY_THRESHOLD
 };
 

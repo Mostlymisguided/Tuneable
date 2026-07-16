@@ -3,8 +3,8 @@ const User = require('../models/User');
 const Media = require('../models/Media');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const { getCanonicalTag } = require('../utils/tagNormalizer');
-const { getExistingTagParty, shouldCreateTagParty, capitalizeTag, generateSlug, TAG_PARTY_THRESHOLD } = require('../services/tagPartyService');
+const { getCanonicalTag, normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { getExistingTagParty, shouldCreateTagParty, generateSlug, TAG_PARTY_THRESHOLD } = require('../services/tagPartyService');
 
 // Generate unique party code
 const deriveCodeFromPartyId = (objectId) => {
@@ -260,7 +260,7 @@ async function autoJoinTagParties(user, media) {
 
     for (const tag of media.tags) {
         try {
-            const normalizedTag = capitalizeTag(tag);
+            const normalizedTag = normalizeTagForStorage(tag);
             
             // Check if tag party already exists (using fuzzy matching)
             let party = await getExistingTagParty(tag);

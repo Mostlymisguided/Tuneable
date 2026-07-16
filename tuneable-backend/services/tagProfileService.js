@@ -3,10 +3,11 @@ const Party = require('../models/Party');
 const {
   getCanonicalTag,
   normalizeTagForMatching,
+  normalizeTagForStorage,
   tagsMatch,
   TAG_ALIASES,
 } = require('../utils/tagNormalizer');
-const { generateSlug, capitalizeTag, getExistingTagParty } = require('./tagPartyService');
+const { generateSlug, getExistingTagParty } = require('./tagPartyService');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 
@@ -34,13 +35,13 @@ async function resolveTagFromSlug(rawSlug) {
   if (party) {
     displayName = (party.tags && party.tags[0])
       || (party.name ? party.name.replace(/\s+Party$/i, '').trim() : null)
-      || capitalizeTag(nameFromSlug);
+      || normalizeTagForStorage(nameFromSlug);
   } else {
     // Prefer alias display forms (e.g. "Hip Hop") when available
     const aliasForm = TAG_ALIASES[normalizeTagForMatching(nameFromSlug)];
     displayName = (aliasForm && /^[A-Z]/.test(aliasForm))
       ? aliasForm
-      : capitalizeTag(nameFromSlug);
+      : normalizeTagForStorage(nameFromSlug);
   }
 
   const canonicalTag = party?.canonicalTag || getCanonicalTag(displayName);
@@ -65,14 +66,14 @@ function collectTagVariants(displayName, canonicalTag) {
     if (!seed || typeof seed !== 'string') continue;
     variants.add(seed);
     variants.add(seed.toLowerCase());
-    variants.add(capitalizeTag(seed));
+    variants.add(normalizeTagForStorage(seed));
   }
 
   for (const [normKey, aliasValue] of Object.entries(TAG_ALIASES)) {
     if (tagsMatch(normKey, displayName) || tagsMatch(aliasValue, displayName)) {
       variants.add(aliasValue);
       variants.add(normKey);
-      variants.add(capitalizeTag(normKey));
+      variants.add(normalizeTagForStorage(normKey));
       // Spaced guess from collapsed key (deephouse → deep house)
       if (!normKey.includes(' ') && normKey.length > 4) {
         // Skip inventing spaces; alias value already has correct form
