@@ -4,11 +4,13 @@ import { Coins, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { authAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { needsOnboarding } from '../utils/authHelpers';
 
 const PROMPT_DELAY_AFTER_SIGNUP_MS = 60 * 1000;
 
 const shouldShowPrompt = (user: ReturnType<typeof useAuth>['user']) => {
   if (!user) return false;
+  if (needsOnboarding(user)) return false;
   if (user.onboarding?.defaultTipPromptSeenAt) return false;
   if (!user.createdAt || !user.lastLoginAt) return false;
 

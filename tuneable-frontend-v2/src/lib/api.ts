@@ -949,6 +949,10 @@ export const gearAPI = {
 
 // Tag profile API
 export const tagAPI = {
+  getPopular: async (limit = 40) => {
+    const response = await api.get('/tags/popular', { params: { limit } });
+    return response.data as { tags: Array<{ tag: string; count: number; aggregate: number }> };
+  },
   getProfile: async (slug: string, params?: { page?: number; limit?: number }) => {
     const response = await api.get(`/tags/${encodeURIComponent(slug)}/profile`, { params });
     return response.data;

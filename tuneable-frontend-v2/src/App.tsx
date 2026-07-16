@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastContainer, cssTransition } from 'react-toastify';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -47,6 +47,8 @@ import LibraryEnrich from './pages/LibraryEnrich';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 import DefaultTipOnboardingModal from './components/DefaultTipOnboardingModal';
+import Onboarding from './pages/Onboarding';
+import { needsOnboarding } from './utils/authHelpers';
 import Notifications from './pages/Notifications';
 import { AuthDeepLinkListener } from './capacitor/authDeepLink';
 import { getApiOrigin } from './utils/platform';
@@ -142,12 +144,44 @@ const ProfileRedirect = () => {
   return <Navigate to={`/user/${user._id || user.uuid}`} replace />;
 };
 
+const OnboardingRedirect = () => {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading || !user || !needsOnboarding(user)) return null;
+
+  const exemptPrefixes = [
+    '/onboarding',
+    '/login',
+    '/register',
+    '/auth/callback',
+    '/forgot-password',
+    '/reset-password',
+    '/verify-email',
+    '/privacy-policy',
+    '/terms-of-service',
+    '/data-deletion',
+    '/about',
+    '/help',
+    '/join-us',
+    '/request-invite',
+    '/creator/register',
+  ];
+
+  if (exemptPrefixes.some((prefix) => location.pathname.startsWith(prefix))) {
+    return null;
+  }
+
+  return <Navigate to="/onboarding" replace />;
+};
+
 const AppContent = () => {
   return (
     <Router>
       <AuthDeepLinkListener />
       <div className="min-h-screen">
         <Navbar />
+        <OnboardingRedirect />
         <DefaultTipOnboardingModal />
         <main className="pt-16 pb-32">
           <Routes>
@@ -161,6 +195,14 @@ const AppContent = () => {
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/request-invite" element={<RequestInvite />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <Onboarding />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />

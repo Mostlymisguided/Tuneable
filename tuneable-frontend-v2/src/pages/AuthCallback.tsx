@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
-import { DEFAULT_POST_AUTH_PATH, sanitizeReturnUrl } from '../utils/authHelpers';
+import { getPostAuthPath } from '../utils/authHelpers';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -52,18 +52,14 @@ const AuthCallback: React.FC = () => {
 
       if (token) {
         try {
-          await handleOAuthCallback(token);
+          const user = await handleOAuthCallback(token);
 
-          // Prefer explicit returnUrl; never navigate back to /auth/callback (hangs forever)
-          const returnUrl = sanitizeReturnUrl(
-            searchParams.get('returnUrl'),
-            DEFAULT_POST_AUTH_PATH
-          );
+          const returnUrlParam = searchParams.get('returnUrl');
           const linked = searchParams.get('oauth_success') === 'true'
-            || Boolean(searchParams.get('returnUrl'));
+            || Boolean(returnUrlParam);
 
           toast.success(linked ? 'Account connected successfully!' : 'Login successful!');
-          navigate(returnUrl, { replace: true });
+          navigate(getPostAuthPath(user, returnUrlParam), { replace: true });
         } catch (err: any) {
           console.error('Error during OAuth callback:', err);
 

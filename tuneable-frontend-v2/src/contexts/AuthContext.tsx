@@ -69,6 +69,7 @@ export interface User {
     theme?: string;
     anonymousMode?: boolean;
     defaultTip?: number; // Default tip amount in pounds (e.g., 0.11 for 11p)
+    favoriteTags?: string[];
     notifications?: {
       email?: boolean;
       sms?: boolean;
@@ -83,6 +84,10 @@ export interface User {
   };
   onboarding?: {
     defaultTipPromptSeenAt?: string;
+    completedAt?: string;
+    favoriteTagsSelectedAt?: string;
+    importPromptSeenAt?: string;
+    importSkipped?: boolean;
   };
   creatorProfile?: {
     artistName?: string;
@@ -119,12 +124,12 @@ interface RegisterData {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (identifier: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<User>;
+  register: (userData: RegisterData) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalance: number) => void;
-  handleOAuthCallback: (token: string) => Promise<void>;
+  handleOAuthCallback: (token: string) => Promise<User>;
   isLoading: boolean;
 }
 
@@ -195,7 +200,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initAuth();
   }, []);
 
-  const login = async (identifier: string, password: string) => {
+  const login = async (identifier: string, password: string): Promise<User> => {
     try {
       const response = await authAPI.login(identifier, password);
       const { token: newToken, user: newUser } = response;
@@ -204,12 +209,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(newUser);
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
     } catch (error) {
       throw error;
     }
   };
 
-  const register = async (userData: RegisterData) => {
+  const register = async (userData: RegisterData): Promise<User> => {
     try {
       const response = await authAPI.register(userData);
       const { token: newToken, user: newUser } = response;
@@ -218,6 +224,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(newUser);
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
     } catch (error) {
       throw error;
     }
@@ -238,7 +245,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     usePodcastPlayerStore.getState().clear();
   };
 
-  const handleOAuthCallback = useCallback(async (token: string) => {
+  const handleOAuthCallback = useCallback(async (token: string): Promise<User> => {
     try {
       // Store token first
       setToken(token);
@@ -248,6 +255,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authAPI.getProfile();
       setUser(response.user);
       localStorage.setItem('user', JSON.stringify(response.user));
+      return response.user;
     } catch (error) {
       // If fetching user fails, clear the token
       console.error('Failed to fetch user after OAuth:', error);

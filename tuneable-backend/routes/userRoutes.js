@@ -2397,7 +2397,7 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { profilePic, homeLocation, secondaryLocation, locations, username, onboarding, ...updatedFields } = req.body; // Extract special fields separately for validation
+    const { profilePic, homeLocation, secondaryLocation, locations, username, onboarding, preferences, ...updatedFields } = req.body; // Extract special fields separately for validation
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -2493,41 +2493,99 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
     }
 
-    // Handle preferences.defaultTip separately if provided
-    if (req.body.preferences?.defaultTip !== undefined) {
+    const { getCanonicalTag } = require('../utils/tagNormalizer');
+
+    // Handle preferences updates separately
+    if (preferences?.defaultTip !== undefined) {
       if (!user.preferences) {
         user.preferences = {};
       }
-      const defaultTip = req.body.preferences.defaultTip;
-      
-      // Validate defaultTip is at least 0.01
+      const defaultTip = preferences.defaultTip;
+
       if (defaultTip < 0.01) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Default tip must be at least £0.01',
-          field: 'preferences.defaultTip'
+          field: 'preferences.defaultTip',
         });
       }
-      
+
       user.preferences.defaultTip = defaultTip;
     }
 
-    if (onboarding?.defaultTipPromptSeenAt !== undefined) {
+    if (preferences?.favoriteTags !== undefined) {
+      if (!user.preferences) {
+        user.preferences = {};
+      }
+      if (!Array.isArray(preferences.favoriteTags)) {
+        return res.status(400).json({
+          error: 'favoriteTags must be an array',
+          field: 'preferences.favoriteTags',
+        });
+      }
+      if (preferences.favoriteTags.length > 10) {
+        return res.status(400).json({
+          error: 'You can select at most 10 favourite tags',
+          field: 'preferences.favoriteTags',
+        });
+      }
+
+      const canonicalTags = [...new Set(
+        preferences.favoriteTags
+          .map((tag) => (typeof tag === 'string' ? getCanonicalTag(tag.trim()) : null))
+          .filter(Boolean)
+      )];
+
+      user.preferences.favoriteTags = canonicalTags;
+    }
+
+    if (onboarding) {
       if (!user.onboarding) {
         user.onboarding = {};
       }
 
-      const seenAt = onboarding.defaultTipPromptSeenAt
-        ? new Date(onboarding.defaultTipPromptSeenAt)
-        : new Date();
+      const parseOnboardingDate = (value, field) => {
+        if (value === null || value === undefined) return null;
+        const parsed = value ? new Date(value) : new Date();
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error(field);
+        }
+        return parsed;
+      };
 
-      if (Number.isNaN(seenAt.getTime())) {
+      try {
+        if (onboarding.defaultTipPromptSeenAt !== undefined) {
+          user.onboarding.defaultTipPromptSeenAt = parseOnboardingDate(
+            onboarding.defaultTipPromptSeenAt,
+            'onboarding.defaultTipPromptSeenAt'
+          );
+        }
+        if (onboarding.completedAt !== undefined) {
+          user.onboarding.completedAt = parseOnboardingDate(
+            onboarding.completedAt,
+            'onboarding.completedAt'
+          );
+        }
+        if (onboarding.favoriteTagsSelectedAt !== undefined) {
+          user.onboarding.favoriteTagsSelectedAt = parseOnboardingDate(
+            onboarding.favoriteTagsSelectedAt,
+            'onboarding.favoriteTagsSelectedAt'
+          );
+        }
+        if (onboarding.importPromptSeenAt !== undefined) {
+          user.onboarding.importPromptSeenAt = parseOnboardingDate(
+            onboarding.importPromptSeenAt,
+            'onboarding.importPromptSeenAt'
+          );
+        }
+        if (onboarding.importSkipped !== undefined) {
+          user.onboarding.importSkipped = Boolean(onboarding.importSkipped);
+        }
+      } catch (fieldError) {
         return res.status(400).json({
           error: 'Invalid onboarding timestamp',
-          field: 'onboarding.defaultTipPromptSeenAt'
+          field: String(fieldError.message),
         });
       }
-
-      user.onboarding.defaultTipPromptSeenAt = seenAt;
     }
 
     // Update other fields (excluding username which is already handled above)

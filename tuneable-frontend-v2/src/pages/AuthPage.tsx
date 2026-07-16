@@ -19,7 +19,7 @@ import { userAPI } from '../lib/api';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import type { ResolvedLocation } from '../utils/locationHelpers';
-import { buildRegisterUrl, buildLoginUrl, getReturnUrlFromSearch } from '../utils/authHelpers';
+import { buildRegisterUrl, buildLoginUrl, getPostAuthPath } from '../utils/authHelpers';
 
 // Default invite code for register page; set VITE_DEFAULT_INVITE_CODE to empty to require a code again
 const DEFAULT_INVITE_CODE = ((import.meta.env.VITE_DEFAULT_INVITE_CODE ?? 'PE856').trim() || null) as string | null;
@@ -78,7 +78,6 @@ const AuthPage: React.FC = () => {
 
   // Check if we're on the register page
   const isRegisterPage = location.pathname === '/register';
-  const returnUrl = getReturnUrlFromSearch(location.search);
   const returnPathParam = new URLSearchParams(location.search).get('returnUrl');
   const registerLink = buildRegisterUrl(returnPathParam ? { returnPath: returnPathParam } : undefined);
   const loginLink = buildLoginUrl(returnPathParam ?? undefined);
@@ -321,13 +320,13 @@ const AuthPage: React.FC = () => {
     setLoginError(''); // Clear any previous errors
 
     try {
-      await login(formData.email, formData.password);
+      const newUser = await login(formData.email, formData.password);
       // Reset failed attempts on successful login
       setFailedAttempts(0);
       setAccountLockedUntil(null);
       setLoginError(''); // Clear error on success
       toast.success('Login successful!');
-      navigate(returnUrl);
+      navigate(getPostAuthPath(newUser, returnPathParam));
     } catch (error: any) {
       // Log full error for debugging
       console.error('Login error:', error);
@@ -420,9 +419,9 @@ const AuthPage: React.FC = () => {
 
     try {
       const { confirmPassword, ...registerData } = formData;
-      await register(registerData);
+      const newUser = await register(registerData);
       toast.success('Registration successful!');
-      navigate(returnUrl);
+      navigate(getPostAuthPath(newUser, returnPathParam));
     } catch (error: any) {
       console.error('Error registering user:', error);
       const errorResponse = error.response?.data || {};

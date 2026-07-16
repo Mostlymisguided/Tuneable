@@ -146,6 +146,10 @@ const userSchema = new mongoose.Schema({
       default: 0.11, // 11p default
       min: [0.01, 'Default tip must be at least £0.01']
     },
+    favoriteTags: {
+      type: [String],
+      default: [],
+    },
     notifications: {
       email: { type: Boolean, default: true },
       sms: { type: Boolean, default: false },
@@ -164,6 +168,10 @@ const userSchema = new mongoose.Schema({
   },
   onboarding: {
     defaultTipPromptSeenAt: { type: Date },
+    completedAt: { type: Date },
+    favoriteTagsSelectedAt: { type: Date },
+    importPromptSeenAt: { type: Date },
+    importSkipped: { type: Boolean, default: false },
   },
   role: { 
     type: [String], 

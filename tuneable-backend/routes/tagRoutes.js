@@ -1,6 +1,73 @@
 const express = require('express');
 const router = express.Router();
+const Media = require('../models/Media');
 const { getTagProfile } = require('../services/tagProfileService');
+const { getCanonicalTag } = require('../utils/tagNormalizer');
+
+const FALLBACK_POPULAR_TAGS = [
+  'Hip Hop', 'Electronic', 'House', 'DnB', 'Indie', 'Rock', 'Pop', 'R&B',
+  'Jazz', 'Techno', 'Soul', 'Funk', 'Reggae', 'Metal', 'Folk', 'Ambient',
+  'UK Rap', 'Deep House', 'Garage', 'Disco', 'Punk', 'Blues', 'Classical',
+  'Latin', 'Afrobeats', 'Trap', 'Grime', 'Alternative', 'Country', 'World',
+];
+
+// @route   GET /api/tags/popular
+// @desc    Popular tags for onboarding / discovery
+// @access  Public
+router.get('/popular', async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 40, 1), 100);
+
+    const results = await Media.aggregate([
+      {
+        $match: {
+          status: 'active',
+          contentType: 'music',
+          tags: { $exists: true, $ne: [] },
+        },
+      },
+      { $unwind: '$tags' },
+      {
+        $group: {
+          _id: '$tags',
+          count: { $sum: 1 },
+          aggregate: { $sum: { $ifNull: ['$globalMediaAggregate', 0] } },
+        },
+      },
+      { $sort: { aggregate: -1, count: -1 } },
+      { $limit: limit * 4 },
+    ]);
+
+    const tagMap = new Map();
+    results.forEach((entry) => {
+      const canonical = getCanonicalTag(entry._id);
+      if (!canonical) return;
+      const existing = tagMap.get(canonical) || { tag: canonical, count: 0, aggregate: 0 };
+      existing.count += entry.count;
+      existing.aggregate += entry.aggregate || 0;
+      tagMap.set(canonical, existing);
+    });
+
+    let tags = [...tagMap.values()]
+      .sort((a, b) => b.aggregate - a.aggregate || b.count - a.count)
+      .slice(0, limit);
+
+    if (tags.length < 12) {
+      const seen = new Set(tags.map((t) => t.tag));
+      for (const tag of FALLBACK_POPULAR_TAGS) {
+        if (seen.has(tag)) continue;
+        tags.push({ tag, count: 0, aggregate: 0 });
+        seen.add(tag);
+        if (tags.length >= limit) break;
+      }
+    }
+
+    res.json({ tags });
+  } catch (error) {
+    console.error('Error fetching popular tags:', error);
+    res.status(500).json({ error: 'Failed to fetch popular tags' });
+  }
+});
 
 // @route   GET /api/tags/:slug/profile
 // @desc    Tag profile with top tipped media + related party

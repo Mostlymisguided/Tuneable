@@ -101,6 +101,7 @@ export interface User {
     theme?: string;
     anonymousMode?: boolean;
     defaultTip?: number; // Default tip amount in pounds (e.g., 0.11 for 11p)
+    favoriteTags?: string[];
     notifications?: {
       email?: boolean;
       sms?: boolean;
@@ -115,6 +116,10 @@ export interface User {
   };
   onboarding?: {
     defaultTipPromptSeenAt?: string;
+    completedAt?: string;
+    favoriteTagsSelectedAt?: string;
+    importPromptSeenAt?: string;
+    importSkipped?: boolean;
   };
   creatorProfile?: {
     artistName?: string;
