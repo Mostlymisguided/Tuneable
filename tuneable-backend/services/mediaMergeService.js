@@ -19,8 +19,14 @@ const Conversation = require('../models/Conversation');
 const Label = require('../models/Label');
 const Collective = require('../models/Collective');
 const bidMetricsEngine = require('./bidMetricsEngine');
-const { resolveMediaByIdentifier } = require('./mediaLifecycleService');
 const { mediaPrimaryArtistName } = require('../utils/mediaMatchUtils');
+
+async function resolveMediaByIdentifier(mediaId) {
+  // Lazy-load so endpoints that only need duplicate clustering don't fail
+  // when the lifecycle service isn't present in a given deployment build.
+  const lifecycleService = require('./mediaLifecycleService');
+  return lifecycleService.resolveMediaByIdentifier(mediaId);
+}
 
 function ensureMap(doc, field) {
   if (!(doc[field] instanceof Map)) {
