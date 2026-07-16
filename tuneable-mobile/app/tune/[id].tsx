@@ -176,9 +176,15 @@ export default function TuneProfileScreen() {
                   </Text>
                 ) : null}
                 {media.addedBy?.username ? (
-                  <Text style={styles.metaLine}>
-                    Added by · @{media.addedBy.username}
-                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      const target = media.addedBy?.uuid || media.addedBy?._id;
+                      if (target) router.push(`/user/${target}`);
+                    }}>
+                    <Text style={[styles.metaLine, styles.linkLine]}>
+                      Added by · @{media.addedBy.username}
+                    </Text>
+                  </Pressable>
                 ) : null}
               </View>
             )}
@@ -229,11 +235,21 @@ export default function TuneProfileScreen() {
                     key={bid._id || `${bid.userId?.username}-${index}`}
                     style={styles.bidRow}>
                     <Text style={styles.bidRank}>{index + 1}</Text>
-                    <Text style={styles.bidUser} numberOfLines={1}>
-                      {bid.userId?.username
-                        ? `@${bid.userId.username}`
-                        : 'Anonymous'}
-                    </Text>
+                    {bid.userId?.username && (bid.userId?.uuid || bid.userId?._id) ? (
+                      <Pressable
+                        style={styles.bidUserPress}
+                        onPress={() =>
+                          router.push(`/user/${bid.userId?.uuid || bid.userId?._id}`)
+                        }>
+                        <Text style={[styles.bidUser, styles.linkLine]} numberOfLines={1}>
+                          @{bid.userId.username}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Text style={styles.bidUser} numberOfLines={1}>
+                        Anonymous
+                      </Text>
+                    )}
                     <Text style={styles.bidAmount}>
                       {formatPoundsFromPence(bid.amount ?? 0)}
                     </Text>
@@ -343,6 +359,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
   },
+  linkLine: {
+    color: colors.accentLight,
+  },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -429,6 +448,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontSize: 14,
+  },
+  bidUserPress: {
+    flex: 1,
   },
   bidAmount: {
     color: colors.textSecondary,

@@ -11,7 +11,11 @@ export default function HomeScreen() {
   const { contentPaddingBottom } = usePlayerDockState();
 
   return (
-    <Screen style={[styles.pad, { paddingBottom: contentPaddingBottom }]}>
+    <Screen
+      style={{
+        ...styles.pad,
+        paddingBottom: contentPaddingBottom,
+      }}>
       <Text style={styles.greeting}>Hey {user?.username ?? 'there'}</Text>
       <Text style={styles.lede}>
         Explore the music and podcast charts, tip what you love, and top up when

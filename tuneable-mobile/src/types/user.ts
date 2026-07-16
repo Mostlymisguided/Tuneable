@@ -6,16 +6,117 @@ export interface User {
   email: string;
   profilePic?: string;
   personalInviteCode?: string;
+  primaryInviteCode?: string;
   balance: number; // pence
   tuneBytes?: number;
   role: string[];
   isActive: boolean;
   emailVerified?: boolean;
   createdAt?: string;
+  updatedAt?: string;
   lastLoginAt?: string;
+  homeLocation?: ResolvedLocation | null;
+  secondaryLocation?: ResolvedLocation | null;
   preferences?: {
     defaultTip?: number; // pounds
+    anonymousMode?: boolean;
   };
+}
+
+export interface ResolvedLocation {
+  city?: string;
+  region?: string;
+  country?: string;
+  countryCode?: string;
+  display?: string;
+}
+
+export interface UserStats {
+  totalBids: number;
+  totalAmountBid: number;
+  averageBidAmount: number;
+  uniqueSongsCount: number;
+}
+
+export interface TuneBytesTagRanking {
+  tag: string;
+  tuneBytesEarned: number;
+  rank: number;
+  totalUsers: number;
+  percentile: number;
+}
+
+export interface UserLibraryBid {
+  userId?: {
+    _id?: string;
+    uuid?: string;
+    username?: string;
+    profilePic?: string;
+  };
+  amount?: number;
+  createdAt?: string;
+  status?: string;
+}
+
+export interface UserLibraryItem {
+  mediaId: string;
+  mediaUuid?: string;
+  title: string;
+  artist: string;
+  coverArt?: string | null;
+  duration?: number | null;
+  bpm?: number | null;
+  tags?: string[];
+  contentForm?: string[];
+  sources?: Record<string, string>;
+  globalMediaAggregate?: number;
+  globalMediaAggregateAvg?: number;
+  globalUserMediaAggregate?: number;
+  bidCount?: number;
+  tuneBytesEarned?: number;
+  lastBidAt?: string;
+  firstBidAt?: string;
+  bids?: UserLibraryBid[];
+}
+
+export interface UserProfileResponse {
+  message?: string;
+  user: User;
+  stats: UserStats;
+  topBids?: Array<{
+    _id?: string;
+    amount?: number;
+    mediaId?: {
+      _id?: string;
+      uuid?: string;
+      title?: string;
+      artist?: string;
+      coverArt?: string;
+    };
+  }>;
+  mediaWithBids?: Array<{
+    media?: {
+      _id?: string;
+      uuid?: string;
+      title?: string;
+      artist?: string;
+      coverArt?: string;
+      duration?: number;
+      globalMediaAggregate?: number;
+      tags?: string[];
+    };
+    totalAmount?: number;
+    bidCount?: number;
+  }>;
+}
+
+export interface UserLibraryResponse {
+  library: UserLibraryItem[];
+  total: number;
+}
+
+export interface TuneBytesTagRankingsResponse {
+  tuneBytesTagRankings: TuneBytesTagRanking[];
 }
 
 export interface LoginResponse {
