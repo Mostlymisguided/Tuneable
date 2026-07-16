@@ -23,12 +23,23 @@ export interface User {
   };
 }
 
+export interface LocationAncestor {
+  placeId?: string;
+  placetype?: string;
+  label?: string;
+  countryCode?: string;
+}
+
 export interface ResolvedLocation {
   city?: string;
   region?: string;
   country?: string;
   countryCode?: string;
   display?: string;
+  placeId?: string;
+  featureType?: string;
+  label?: string;
+  ancestors?: LocationAncestor[];
 }
 
 export interface UserStats {

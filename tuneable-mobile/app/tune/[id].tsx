@@ -17,6 +17,7 @@ import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { canUploadMedia } from '@/src/lib/permissions';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
@@ -62,6 +63,7 @@ export default function TuneProfileScreen() {
   }
 
   const playable = isUploadPlayable(media);
+  const canUpload = canUploadMedia(user);
   const artist =
     media?.creatorDisplay ||
     (media ? formatArtist(media.artist) : 'Unknown artist');
@@ -212,6 +214,18 @@ export default function TuneProfileScreen() {
                   onPress={() => void onPlay()}>
                   <Ionicons name="play" size={20} color="#fff" />
                   <Text style={styles.actionText}>Play</Text>
+                </Pressable>
+              ) : canUpload ? (
+                <Pressable
+                  style={styles.playBtn}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/upload',
+                      params: { attachTo: mediaId(media) || id },
+                    })
+                  }>
+                  <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+                  <Text style={styles.actionText}>Upload audio</Text>
                 </Pressable>
               ) : (
                 <View style={[styles.playBtn, styles.playBtnDisabled]}>

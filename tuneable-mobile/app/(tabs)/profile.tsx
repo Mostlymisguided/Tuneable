@@ -15,6 +15,7 @@ import { UserProfileHero } from '@/src/components/UserProfileHero';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
+import { canUploadMedia } from '@/src/lib/permissions';
 import { colors } from '@/src/theme/colors';
 import type {
   TuneBytesTagRanking,
@@ -25,6 +26,7 @@ import type {
 export default function ProfileScreen() {
   const { user, logout, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
+  const canUpload = canUploadMedia(user);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
@@ -99,6 +101,13 @@ export default function ProfileScreen() {
                 onWalletPress={() => router.push('/wallet')}
               />
             ) : null}
+            {canUpload ? (
+              <Pressable
+                style={styles.uploadBtn}
+                onPress={() => router.push('/upload')}>
+                <Text style={styles.uploadBtnText}>Upload MP3</Text>
+              </Pressable>
+            ) : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {loading && !library.length ? (
               <ActivityIndicator
@@ -142,6 +151,18 @@ const styles = StyleSheet.create({
     color: '#fca5a5',
     marginBottom: 12,
     paddingHorizontal: 4,
+  },
+  uploadBtn: {
+    marginBottom: 16,
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  uploadBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   button: {
     marginTop: 16,

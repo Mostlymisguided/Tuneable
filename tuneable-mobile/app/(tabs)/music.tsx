@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,19 +10,34 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
+import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import { partyAPI } from '@/src/api/party';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
+import {
+  type BpmFilterRange,
+  computeTopTags,
+  filterChartMedia,
+  hasActiveChartFilters,
+} from '@/src/lib/chartFilters';
 import { formatPoundsFromPence } from '@/src/lib/format';
-import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { computeLocationQuickPicks } from '@/src/lib/location';
+import {
+  formatArtist,
+  getChartTipPence,
+  isUploadPlayable,
+  mediaId,
+} from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
+import type { ResolvedLocation } from '@/src/types/user';
 import {
+  CHART_PAGE_SIZE,
   GLOBAL_PARTY_ID,
-  TIME_PERIODS,
   type ChartMediaItem,
   type TimePeriodKey,
 } from '@/src/types/media';
@@ -30,20 +45,46 @@ import {
 export default function MusicScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
-  const [period, setPeriod] = useState<TimePeriodKey>('all-time');
+  const [period, setPeriod] = useState<TimePeriodKey>('today');
+  const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
+    null
+  );
+  const [showLocationFilter, setShowLocationFilter] = useState(false);
+  const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
+  const [showTagPanel, setShowTagPanel] = useState(false);
+  const [showTimePanel, setShowTimePanel] = useState(false);
+  const [showBpmPanel, setShowBpmPanel] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
+  const [visibleCount, setVisibleCount] = useState(CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
 
+  const filterState = useMemo(
+    () => ({ selectedTagTerms, searchQuery, bpmFilterRange }),
+    [selectedTagTerms, searchQuery, bpmFilterRange]
+  );
+
+  const filtersActive = hasActiveChartFilters(filterState);
+
+  useEffect(() => {
+    setVisibleCount(CHART_PAGE_SIZE);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange]);
+
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {
-      const res = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, period);
+      const res = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, period, {
+        locationPlaceId: locationPlaceId ?? undefined,
+      });
       setMedia(res.media ?? []);
     } catch (err) {
       const message =
@@ -53,7 +94,7 @@ export default function MusicScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period]);
+  }, [period, locationPlaceId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,21 +102,57 @@ export default function MusicScreen() {
     }, [load])
   );
 
+  const locationQuickPicks = useMemo(
+    () => computeLocationQuickPicks(media, user?.homeLocation, 5),
+    [media, user?.homeLocation]
+  );
+
+  const topTags = useMemo(
+    () => computeTopTags(media, period),
+    [media, period]
+  );
+
+  const filteredMedia = useMemo(
+    () => filterChartMedia(media, filterState),
+    [media, filterState]
+  );
+
+  const visibleMedia = useMemo(
+    () => filteredMedia.slice(0, visibleCount),
+    [filteredMedia, visibleCount]
+  );
+
   const totals = useMemo(() => {
-    const tips = media.reduce((sum, m) => sum + (m.partyMediaAggregate ?? 0), 0);
-    const playableCount = media.filter(isUploadPlayable).length;
-    return { tips, playableCount };
-  }, [media]);
+    const tips = filteredMedia.reduce(
+      (sum, m) => sum + getChartTipPence(m, period),
+      0
+    );
+    const playableCount = filteredMedia.filter(isUploadPlayable).length;
+    return { tips, playableCount, trackCount: filteredMedia.length };
+  }, [filteredMedia, period]);
+
+  const handleLocationChange = (location: ResolvedLocation | null) => {
+    setSelectedLocation(location);
+    setLocationPlaceId(location?.placeId ?? null);
+  };
+
+  const clearClientFilters = () => {
+    setSelectedTagTerms([]);
+    setSearchQuery('');
+    setBpmFilterRange('all');
+  };
 
   const onPlayItem = (item: ChartMediaItem) => {
-    const index = media.findIndex((m) => mediaId(m) === mediaId(item));
-    void setQueueAndPlay(media, Math.max(0, index));
+    const playableQueue = filteredMedia.filter(isUploadPlayable);
+    const index = playableQueue.findIndex((m) => mediaId(m) === mediaId(item));
+    if (index < 0) return;
+    void setQueueAndPlay(playableQueue, index);
   };
 
   const onPlayQueue = () => {
-    const firstPlayable = media.findIndex(isUploadPlayable);
-    if (firstPlayable < 0) return;
-    void setQueueAndPlay(media, firstPlayable);
+    const playableQueue = filteredMedia.filter(isUploadPlayable);
+    if (playableQueue.length === 0) return;
+    void setQueueAndPlay(playableQueue, 0);
   };
 
   const onConfirmTip = async (amountPounds: number) => {
@@ -89,24 +166,29 @@ export default function MusicScreen() {
     }
     setMedia((prev) =>
       prev
-        .map((m) =>
-          mediaId(m) === id
-            ? {
-                ...m,
-                partyMediaAggregate: (m.partyMediaAggregate ?? 0) + tipPence,
-              }
-            : m
-        )
+        .map((m) => {
+          if (mediaId(m) !== id) return m;
+          return {
+            ...m,
+            partyMediaAggregate: (m.partyMediaAggregate ?? 0) + tipPence,
+            timePeriodBidValue: (m.timePeriodBidValue ?? 0) + tipPence,
+          };
+        })
         .sort(
-          (a, b) => (b.partyMediaAggregate ?? 0) - (a.partyMediaAggregate ?? 0)
+          (a, b) => getChartTipPence(b, period) - getChartTipPence(a, period)
         )
     );
   };
 
+  const hasMore = visibleCount < filteredMedia.length;
+  const emptyMessage = filtersActive
+    ? 'No tunes match these filters.'
+    : 'No tunes in this period yet.';
+
   return (
     <Screen>
       <FlatList
-        data={media}
+        data={visibleMedia}
         keyExtractor={(item, index) => mediaId(item) || String(index)}
         contentContainerStyle={[
           styles.listContent,
@@ -121,8 +203,15 @@ export default function MusicScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>Music</Text>
-            <Text style={styles.subtitle}>Global chart</Text>
+            <GlobalChartHero
+              selectedLocation={selectedLocation}
+              showLocationFilter={showLocationFilter}
+              onToggleLocationFilter={() =>
+                setShowLocationFilter((open) => !open)
+              }
+              onLocationChange={handleLocationChange}
+              locationQuickPicks={locationQuickPicks}
+            />
 
             <Pressable
               style={styles.addTunesBtn}
@@ -130,30 +219,32 @@ export default function MusicScreen() {
               <Text style={styles.addTunesText}>Add tunes</Text>
             </Pressable>
 
-            <View style={styles.periods}>
-              {TIME_PERIODS.map((p) => {
-                const active = period === p.key;
-                return (
-                  <Pressable
-                    key={p.key}
-                    onPress={() => setPeriod(p.key)}
-                    style={[styles.periodChip, active && styles.periodChipActive]}>
-                    <Text
-                      style={[
-                        styles.periodText,
-                        active && styles.periodTextActive,
-                      ]}>
-                      {p.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <ChartFilterToolbar
+              period={period}
+              onPeriodChange={setPeriod}
+              selectedTagTerms={selectedTagTerms}
+              onTagTermsChange={setSelectedTagTerms}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              bpmFilterRange={bpmFilterRange}
+              onBpmFilterChange={setBpmFilterRange}
+              topTags={topTags}
+              showTagPanel={showTagPanel}
+              showTimePanel={showTimePanel}
+              showBpmPanel={showBpmPanel}
+              showSearchPanel={showSearchPanel}
+              onToggleTagPanel={() => setShowTagPanel((open) => !open)}
+              onToggleTimePanel={() => setShowTimePanel((open) => !open)}
+              onToggleBpmPanel={() => setShowBpmPanel((open) => !open)}
+              onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
+              onClearFilters={clearClientFilters}
+              hasActiveFilters={filtersActive}
+            />
 
             <View style={styles.metrics}>
               <Metric
                 label="Tracks"
-                value={String(media.length)}
+                value={String(totals.trackCount)}
                 border={colors.accent}
               />
               <Metric
@@ -170,27 +261,45 @@ export default function MusicScreen() {
 
             {totals.playableCount > 0 ? (
               <Pressable style={styles.playBtn} onPress={onPlayQueue}>
-                <Text style={styles.playBtnText}>Play uploads</Text>
+                <Text style={styles.playBtnText}>
+                  Play {totals.playableCount} upload
+                  {totals.playableCount !== 1 ? 's' : ''}
+                </Text>
               </Pressable>
             ) : null}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            {loading && media.length === 0 ? (
+              <ActivityIndicator
+                color={colors.accentLight}
+                style={styles.loader}
+              />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          loading ? (
-            <ActivityIndicator
-              color={colors.accentLight}
-              style={{ marginTop: 40 }}
-            />
-          ) : (
-            <Text style={styles.empty}>No tunes in this period yet.</Text>
-          )
+          !loading ? (
+            <Text style={styles.empty}>{emptyMessage}</Text>
+          ) : null
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <Pressable
+              style={styles.showMoreBtn}
+              onPress={() => setVisibleCount((n) => n + CHART_PAGE_SIZE)}>
+              <Text style={styles.showMoreText}>
+                Show more ({filteredMedia.length - visibleCount} remaining)
+              </Text>
+            </Pressable>
+          ) : null
         }
         renderItem={({ item, index }) => (
           <ChartTrackRow
             rank={index + 1}
             item={item}
+            variant="rich"
+            tipPence={getChartTipPence(item, period)}
             onOpen={() => {
               const id = mediaId(item);
               if (id) router.push(`/tune/${id}`);
@@ -236,22 +345,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   header: {
-    paddingTop: 8,
     marginBottom: 8,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  subtitle: {
-    marginTop: 4,
-    marginBottom: 14,
-    color: colors.textSecondary,
-    fontSize: 15,
-  },
   addTunesBtn: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -264,29 +361,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
     fontSize: 14,
-  },
-  periods: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  },
-  periodChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  periodChipActive: {
-    backgroundColor: '#7e22ce',
-  },
-  periodText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  periodTextActive: {
-    color: '#fff',
   },
   metrics: {
     flexDirection: 'row',
@@ -329,9 +403,28 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
+  loader: {
+    marginVertical: 24,
+  },
   empty: {
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
+  },
+  showMoreBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  showMoreText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

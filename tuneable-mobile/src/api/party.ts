@@ -27,10 +27,16 @@ export type AddMediaResponse = {
 export const partyAPI = {
   getMediaSortedByTime: async (
     partyId: string,
-    timePeriod: string
+    timePeriod: string,
+    options?: { locationPlaceId?: string }
   ): Promise<SortedMediaResponse> => {
+    const params: Record<string, string> = {};
+    if (options?.locationPlaceId) {
+      params.locationPlaceId = options.locationPlaceId;
+    }
     const response = await api.get<SortedMediaResponse>(
-      `/parties/${partyId}/media/sorted/${timePeriod}`
+      `/parties/${partyId}/media/sorted/${timePeriod}`,
+      { params }
     );
     return response.data;
   },

@@ -14,7 +14,9 @@ export interface ChartMediaItem {
   duration?: number;
   coverArt?: string;
   partyMediaAggregate?: number;
+  timePeriodBidValue?: number;
   globalMediaAggregate?: number;
+  bpm?: number | null;
   globalMediaAggregateTopRank?: number;
   album?: string | null;
   tags?: string[];
@@ -33,11 +35,14 @@ export interface ChartMediaItem {
   bids?: Array<{
     _id?: string;
     amount?: number;
+    status?: string;
+    createdAt?: string;
     userId?: {
       _id?: string;
       username?: string;
       profilePic?: string;
       uuid?: string;
+      homeLocation?: import('@/src/types/user').ResolvedLocation | null;
     };
   }>;
 }
@@ -51,7 +56,10 @@ export interface SortedMediaResponse {
   timePeriod: string;
   media: ChartMediaItem[];
   count: number;
+  locationFilter?: { placeId: string } | null;
 }
+
+export const CHART_PAGE_SIZE = 20;
 
 export const TIME_PERIODS = [
   { key: 'today', label: 'Today' },

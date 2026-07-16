@@ -1,4 +1,4 @@
-import type { ChartMediaItem, MediaSources } from '@/src/types/media';
+import type { ChartMediaItem, MediaSources, TimePeriodKey } from '@/src/types/media';
 
 export function normalizeSources(sources: MediaSources): Record<string, string> {
   if (!sources) return {};
@@ -57,4 +57,15 @@ export function formatArtist(
     return names.length ? names.join(', ') : 'Unknown artist';
   }
   return 'Unknown artist';
+}
+
+/** Tip value shown/sorted for chart rows — period tips when not all-time. */
+export function getChartTipPence(
+  item: ChartMediaItem,
+  period: TimePeriodKey
+): number {
+  if (period !== 'all-time' && typeof item.timePeriodBidValue === 'number') {
+    return item.timePeriodBidValue;
+  }
+  return item.partyMediaAggregate ?? 0;
 }
