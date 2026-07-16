@@ -3919,6 +3919,28 @@ router.get('/:userId/tag-rankings', async (req, res) => {
   }
 });
 
+// @route   GET /api/users/:userId/champion-titles
+// @desc    Tip-based #1–#3 champion titles (tags + media) for a user profile
+// @access  Public
+router.get('/:userId/champion-titles', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { mediaLimit, checkMediaLimit } = req.query;
+
+    const { getUserChampionTitles } = require('../services/mediaChampionsService');
+    const result = await getUserChampionTitles(userId, { mediaLimit, checkMediaLimit });
+
+    if (!result) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching user champion titles:', error);
+    res.status(500).json({ error: 'Failed to fetch champion titles' });
+  }
+});
+
 // @route   GET /api/users/:userId/tunebytes-tag-rankings
 // @desc    Get TuneBytes-based discovery tag rankings (champion badges) for a user
 // @access  Public

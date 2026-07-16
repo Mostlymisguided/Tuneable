@@ -213,7 +213,15 @@ const UserProfile: React.FC = () => {
     rank: number;
     totalUsers: number;
     percentile: number;
-    aggregate: number;
+    totalAmount: number;
+  }>>([]);
+  const [mediaChampionTitles, setMediaChampionTitles] = useState<Array<{
+    rank: number;
+    uuid?: string;
+    mediaId: string;
+    title: string;
+    totalAmount: number;
+    bidCount?: number;
   }>>([]);
   const [showArtistChampions, setShowArtistChampions] = useState(false);
   const [showTuneBytesTagRankings, setShowTuneBytesTagRankings] = useState(false);
@@ -411,15 +419,13 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  const loadTipTagChampions = async () => {
+  const loadChampionTitles = async () => {
     try {
-      const response = await userAPI.getTagRankings(userId!, 30);
-      const podium = (response.tagRankings || []).filter(
-        (r: { rank: number }) => r.rank >= 1 && r.rank <= 3
-      );
-      setTipTagChampions(podium);
+      const response = await userAPI.getChampionTitles(userId!, { mediaLimit: 8, checkMediaLimit: 40 });
+      setTipTagChampions(response.tags || []);
+      setMediaChampionTitles(response.media || []);
     } catch (err: any) {
-      console.error('Error loading tip tag champions:', err);
+      console.error('Error loading champion titles:', err);
     }
   };
 
@@ -718,7 +724,7 @@ const UserProfile: React.FC = () => {
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
       loadTuneBytesTagRankings();
-      loadTipTagChampions();
+      loadChampionTitles();
       loadLabelAffiliations();
       loadCollectiveMemberships();
       
@@ -2046,11 +2052,38 @@ const UserProfile: React.FC = () => {
                         key={`tip-${ranking.tag}-${ranking.rank}`}
                         to={getTagProfilePath(ranking.tag)}
                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
-                        title={`#${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.aggregate)} tipped · ${ranking.totalUsers} tippers`}
+                        title={`#${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.totalAmount)} tipped · ${ranking.totalUsers} tippers`}
                       >
                         <Crown className="h-3.5 w-3.5 flex-shrink-0" />
                         <span>#{ranking.rank} Champion</span>
                         <span className="opacity-90">#{ranking.tag}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Media champion badges */}
+              {mediaChampionTitles.length > 0 &&
+                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
+                <div className="mb-4 w-full max-w-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Music className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                    <h3 className="text-sm font-semibold text-white">
+                      {isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {mediaChampionTitles.slice(0, 8).map((title) => (
+                      <Link
+                        key={`media-${title.mediaId}-${title.rank}`}
+                        to={`/tune/${title.uuid || title.mediaId}`}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all max-w-full ${championBadgeStyles(title.rank)}`}
+                        title={`#${title.rank} Champion of "${title.title}" · ${penceToPounds(title.totalAmount)} tipped`}
+                      >
+                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="flex-shrink-0">#{title.rank}</span>
+                        <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
                       </Link>
                     ))}
                   </div>

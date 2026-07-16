@@ -335,10 +335,95 @@ async function getArtistChampions({ userId, name } = {}, options = {}) {
   );
 }
 
+/**
+ * Champion titles (#1–#3) held by a user globally.
+ * Tags from cached tagRankings; media from bid aggregate rank checks.
+ */
+async function getUserChampionTitles(userId, options = {}) {
+  const mediaLimit = Math.min(Math.max(parseInt(options.mediaLimit, 10) || 10, 1), 30);
+  const checkMediaLimit = Math.min(Math.max(parseInt(options.checkMediaLimit, 10) || 40, 5), 100);
+
+  const userObjectId = await resolveUserObjectId(userId);
+  if (!userObjectId) return null;
+
+  const User = require('../models/User');
+  const user = await User.findById(userObjectId).select('tagRankings').lean();
+  const userIdStr = userObjectId.toString();
+
+  const tags = (user?.tagRankings || [])
+    .filter((r) => r.rank >= 1 && r.rank <= CHAMPION_PODIUM_SIZE)
+    .map((r) => ({
+      entityType: 'tag',
+      tag: r.tag,
+      rank: r.rank,
+      totalAmount: r.aggregate,
+      totalUsers: r.totalUsers,
+      percentile: r.percentile,
+      medal: ['gold', 'silver', 'bronze'][r.rank - 1] || null,
+    }))
+    .sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+
+  const userMediaAggregates = await Bid.aggregate([
+    { $match: { userId: userObjectId, status: 'active' } },
+    {
+      $group: {
+        _id: '$mediaId',
+        totalAmount: { $sum: '$amount' },
+        bidCount: { $sum: 1 },
+      },
+    },
+    { $sort: { totalAmount: -1 } },
+    { $limit: checkMediaLimit },
+  ]);
+
+  const media = [];
+  for (const row of userMediaAggregates) {
+    const rankResult = await Bid.aggregate([
+      { $match: { mediaId: row._id, status: 'active' } },
+      {
+        $group: {
+          _id: '$userId',
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+      { $sort: { totalAmount: -1 } },
+    ]);
+
+    const rankIndex = rankResult.findIndex((r) => r._id.toString() === userIdStr);
+    const rank = rankIndex + 1;
+    if (rank < 1 || rank > CHAMPION_PODIUM_SIZE) continue;
+
+    const mediaDoc = await Media.findById(row._id).select('title uuid').lean();
+    if (!mediaDoc) continue;
+
+    media.push({
+      entityType: 'media',
+      rank,
+      mediaId: mediaDoc._id,
+      uuid: mediaDoc.uuid,
+      title: mediaDoc.title,
+      totalAmount: row.totalAmount,
+      bidCount: row.bidCount,
+      medal: ['gold', 'silver', 'bronze'][rank - 1] || null,
+    });
+
+    if (media.length >= mediaLimit) break;
+  }
+
+  media.sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+
+  return {
+    tags,
+    media,
+    podiumSize: CHAMPION_PODIUM_SIZE,
+  };
+}
+
 module.exports = {
   getMediaChampions,
   getTagChampions,
   getArtistChampions,
+  getUserChampionTitles,
   resolveMediaObjectId,
   resolveTagMediaIds,
   aggregateChampionsForMatch,

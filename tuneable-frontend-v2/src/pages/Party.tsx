@@ -31,7 +31,7 @@ import {
   countryPickToResolvedLocation,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
-import { getCanonicalTag } from '../utils/tagNormalizer';
+import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
 // Define types directly to avoid import issues
@@ -2882,6 +2882,24 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           </div>
                         ) : (
                           <p className="text-gray-400 text-sm">No tags in this party yet.</p>
+                        )}
+
+                        {selectedTagFilters.length === 1 && (
+                          <div className="mt-4 pt-4 border-t border-gray-700/50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Crown className="h-4 w-4 text-amber-400" />
+                              <h4 className="text-sm font-semibold text-white">
+                                Champions of #{selectedTagFilters[0]}
+                              </h4>
+                            </div>
+                            <MediaChampions
+                              tagSlug={generateTagSlug(selectedTagFilters[0])}
+                              entityLabel={`#${selectedTagFilters[0]}`}
+                              seedLocation={selectedLocation}
+                              compact
+                              maxDisplay={10}
+                            />
+                          </div>
                         )}
                       </div>
                     )}

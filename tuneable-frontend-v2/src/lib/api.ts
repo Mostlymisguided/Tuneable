@@ -1122,6 +1122,15 @@ export const userAPI = {
     return response.data;
   },
 
+  // Tip-based champion titles (#1–#3 on tags and media)
+  getChampionTitles: async (
+    userId: string,
+    params?: { mediaLimit?: number; checkMediaLimit?: number }
+  ) => {
+    const response = await api.get(`/users/${userId}/champion-titles`, { params });
+    return response.data;
+  },
+
   // TuneBytes discovery tag rankings (champion badges on profile)
   getTuneBytesTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};
