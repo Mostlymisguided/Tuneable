@@ -6,6 +6,8 @@ export interface OnboardingUser {
   onboarding?: {
     completedAt?: string;
     defaultTipPromptSeenAt?: string;
+    favoriteTagsSelectedAt?: string;
+    importPromptSeenAt?: string;
   };
 }
 
@@ -37,11 +39,21 @@ export function getCurrentReturnPath(): string {
   return `${window.location.pathname}${window.location.search}`;
 }
 
-/** New signups only — grandfathers existing users and those who saw the old tip modal. */
+/**
+ * New signups need the full wizard until `completedAt` is set.
+ * Grandfathers: completed wizard, old tip-modal-only users, and accounts older than 7 days.
+ * Do NOT treat `defaultTipPromptSeenAt` alone as done — that is set mid-wizard after the tip step.
+ */
 export function needsOnboarding(user: OnboardingUser | null | undefined): boolean {
   if (!user) return false;
   if (user.onboarding?.completedAt) return false;
-  if (user.onboarding?.defaultTipPromptSeenAt) return false;
+
+  // Old tip modal users never entered the tag/import wizard
+  const tipOnlyLegacy =
+    Boolean(user.onboarding?.defaultTipPromptSeenAt) &&
+    !user.onboarding?.favoriteTagsSelectedAt &&
+    !user.onboarding?.importPromptSeenAt;
+  if (tipOnlyLegacy) return false;
 
   if (user.createdAt) {
     const createdAtMs = Date.parse(user.createdAt);

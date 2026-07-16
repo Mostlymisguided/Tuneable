@@ -11,7 +11,7 @@ import {
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, tagAPI, userAPI } from '../lib/api';
-import { buildOnboardingCompletePath, needsOnboarding } from '../utils/authHelpers';
+import { buildOnboardingCompletePath } from '../utils/authHelpers';
 import { buildOAuthStartUrl } from '../utils/platform';
 import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
 import { penceToPoundsNumber } from '../utils/currency';
@@ -61,7 +61,8 @@ const Onboarding: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    if (!needsOnboarding(user)) {
+    // Only leave the wizard when onboarding is fully finished — tip step alone must not redirect
+    if (user.onboarding?.completedAt) {
       const tags = user.preferences?.favoriteTags ?? [];
       navigate(buildOnboardingCompletePath(tags), { replace: true });
     }
