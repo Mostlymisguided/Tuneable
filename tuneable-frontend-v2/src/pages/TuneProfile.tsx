@@ -47,7 +47,7 @@ import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { canEditMedia, isCreator, isAdminOrCreator } from '../utils/permissionHelpers';
+import { canEditMedia, canDeleteMedia, isCreator, isAdminOrCreator } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
@@ -60,6 +60,7 @@ import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
 import AiToolsEditor from '../components/AiToolsEditor';
 import AiToolsDisplay from '../components/AiToolsDisplay';
+import DeleteMediaSection from '../components/DeleteMediaSection';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
@@ -324,9 +325,8 @@ const TuneProfile: React.FC = () => {
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
 
-  // Collapsible sections: Top Fans, Tag Rankings
+  // Collapsible sections: Top Fans
   const [showTopFans, setShowTopFans] = useState(false);
-  const [showTagRankings, setShowTagRankings] = useState(false);
   const [showFansAlsoTip, setShowFansAlsoTip] = useState(false);
 
   // Share functionality state
@@ -431,6 +431,10 @@ const TuneProfile: React.FC = () => {
   // Check if user can edit this tune
   const canEditTune = () => {
     return canEditMedia(user, media);
+  };
+
+  const canDeleteTune = () => {
+    return canDeleteMedia(user, media);
   };
 
   const canAttachAudio = () => {
@@ -2635,47 +2639,6 @@ const TuneProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Tag Rankings - collapsible */}
-        {tagRankings.length > 0 && (
-          <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
-            <button
-              onClick={() => setShowTagRankings(!showTagRankings)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            >
-              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400 flex-shrink-0" />
-                {showTagRankings ? 'Tag Rankings' : 'Show Tag Rankings'}
-              </span>
-              {showTagRankings ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-            </button>
-            {showTagRankings && (
-              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {tagRankings.map((ranking, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
-                    >
-                      <div className="flex items-center space-x-2 md:space-x-3">
-                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-base md:text-lg font-bold text-purple-400">
-                          #{ranking.rank}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          of {ranking.total} • Top {ranking.percentile}%
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Fans Also Tip - collapsible */}
         {fansAlsoTip.length > 0 && (
           <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
@@ -4077,6 +4040,14 @@ const TuneProfile: React.FC = () => {
                     Cancel
                   </button>
                 </div>
+                {canDeleteTune() && mediaId && media?.title && (
+                  <DeleteMediaSection
+                    mediaId={media._id || mediaId}
+                    mediaTitle={media.title}
+                    contentLabel="Tune"
+                    redirectTo="/"
+                  />
+                )}
               </div>
             )}
             {editTab === 'ownership' && mediaId && (
