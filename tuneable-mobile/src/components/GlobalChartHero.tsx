@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import {
@@ -10,16 +9,12 @@ import type { ResolvedLocation } from '@/src/types/user';
 
 type Props = {
   selectedLocation: ResolvedLocation | null;
-  showLocationFilter: boolean;
-  onToggleLocationFilter: () => void;
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
 };
 
 export function GlobalChartHero({
   selectedLocation,
-  showLocationFilter,
-  onToggleLocationFilter,
   onLocationChange,
   locationQuickPicks,
 }: Props) {
@@ -31,23 +26,9 @@ export function GlobalChartHero({
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>The World&apos;s Best Music</Text>
       <Text style={styles.votedFrom}>Voted From</Text>
+      <Text style={styles.locationTitle}>{locationLabel}</Text>
 
-      <Pressable onPress={onToggleLocationFilter} style={styles.locationBtn}>
-        <Text style={styles.locationTitle}>{locationLabel}</Text>
-        <View style={styles.locationHint}>
-          <Ionicons name="location-outline" size={14} color={colors.accentLight} />
-          <Text style={styles.locationHintText}>
-            {selectedLocation?.placeId ? 'Change location' : 'Choose a location'}
-          </Text>
-          <Ionicons
-            name={showLocationFilter ? 'chevron-up' : 'chevron-down'}
-            size={14}
-            color={colors.textMuted}
-          />
-        </View>
-      </Pressable>
-
-      {(showLocationFilter || locationQuickPicks.length > 0) && (
+      {locationQuickPicks.length > 0 ? (
         <View style={styles.chips}>
           <LocationChip
             label="Earth"
@@ -80,7 +61,7 @@ export function GlobalChartHero({
             );
           })}
         </View>
-      )}
+      ) : null}
 
       {selectedLocation?.placeId ? (
         <Text style={styles.filterNote}>
@@ -140,24 +121,11 @@ const styles = StyleSheet.create({
     color: 'rgba(196, 181, 253, 0.85)',
     marginBottom: 8,
   },
-  locationBtn: {
-    alignItems: 'center',
-  },
   locationTitle: {
     fontSize: 32,
     fontWeight: '900',
     color: '#f3e8ff',
     textAlign: 'center',
-  },
-  locationHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  locationHintText: {
-    color: colors.textMuted,
-    fontSize: 13,
   },
   chips: {
     flexDirection: 'row',

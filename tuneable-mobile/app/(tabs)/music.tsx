@@ -50,7 +50,6 @@ export default function MusicScreen() {
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
     null
   );
-  const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
@@ -205,10 +204,6 @@ export default function MusicScreen() {
           <View style={styles.header}>
             <GlobalChartHero
               selectedLocation={selectedLocation}
-              showLocationFilter={showLocationFilter}
-              onToggleLocationFilter={() =>
-                setShowLocationFilter((open) => !open)
-              }
               onLocationChange={handleLocationChange}
               locationQuickPicks={locationQuickPicks}
             />

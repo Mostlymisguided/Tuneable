@@ -23,6 +23,8 @@ export interface LocationAutocompleteProps {
   disabled?: boolean;
   variant?: 'light' | 'dark';
   id?: string;
+  autoFocus?: boolean;
+  showIcon?: boolean;
 }
 
 const MIN_QUERY_LENGTH = 2;
@@ -56,6 +58,8 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   disabled = false,
   variant = 'dark',
   id,
+  autoFocus = false,
+  showIcon = true,
 }) => {
   const generatedId = useId();
   const inputId = id || generatedId;
@@ -221,11 +225,13 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       )}
 
       <div className="relative">
-        <MapPin
-          className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${
-            variant === 'light' ? 'text-gray-400' : 'text-gray-500'
-          }`}
-        />
+        {showIcon && (
+          <MapPin
+            className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${
+              variant === 'light' ? 'text-gray-400' : 'text-gray-500'
+            }`}
+          />
+        )}
         <input
           id={inputId}
           type="text"
@@ -234,6 +240,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           aria-controls={listboxId}
           aria-autocomplete="list"
           autoComplete="off"
+          autoFocus={autoFocus}
           disabled={disabled || isResolving}
           value={inputValue}
           onChange={handleInputChange}
@@ -241,7 +248,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={`${inputClassName || defaultInputClass} pl-9`}
+          className={`${inputClassName || defaultInputClass}${showIcon ? ' pl-9' : ''}`}
         />
 
         <div className="absolute inset-y-0 right-2 flex items-center gap-1">
