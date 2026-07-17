@@ -1858,7 +1858,15 @@ export const claimAPI = {
   // Admin only
   reviewClaim: async (claimId: string, status: 'approved' | 'rejected', reviewNotes?: string) => {
     const response = await api.patch(`/claims/${claimId}/review`, { status, reviewNotes });
-    return response.data;
+    return response.data as {
+      message: string;
+      claim: any;
+      takedown?: {
+        refundedBidsCount: number;
+        refundedUsersCount: number;
+        refundedAmount: number;
+      };
+    };
   },
 };
 

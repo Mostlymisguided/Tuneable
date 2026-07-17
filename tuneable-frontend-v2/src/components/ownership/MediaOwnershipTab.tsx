@@ -42,6 +42,7 @@ export interface OwnershipRecord {
 export interface OwnershipClaim {
   _id: string;
   mediaId: string;
+  intent?: 'claim_keep' | 'takedown' | string;
   status: 'pending' | 'approved' | 'rejected' | string;
   submittedAt?: string;
   updatedAt?: string;
@@ -841,6 +842,8 @@ const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
                       </div>
                       <div className="text-xs text-gray-500">
                         Submitted {claim.submittedAt ? new Date(claim.submittedAt).toLocaleString() : '—'}
+                        {' · '}
+                        {claim.intent === 'takedown' ? 'Takedown' : 'Claim & keep'}
                       </div>
                     </div>
                     <span

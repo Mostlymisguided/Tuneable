@@ -9,33 +9,59 @@ const { canEditMedia } = require('../utils/permissionHelpers');
 const { isValidObjectId } = require('../utils/validators');
 const { sendClaimNotification, sendOwnershipNotification, sendClaimStatusNotification } = require('../utils/emailService');
 const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
+const { softDeleteMedia } = require('../services/mediaLifecycleService');
 
 // Configure upload using R2 or local fallback
 const upload = createClaimUpload();
 
-// Submit a new claim
+function isRightsPendingLimbo(media) {
+  return media.rightsStatus === 'pending' && !media.rightsCleared;
+}
+
+function formatClaimant(userDoc) {
+  if (!userDoc) return null;
+  return {
+    _id: userDoc._id,
+    username: userDoc.username,
+    email: userDoc.email,
+    profilePic: userDoc.profilePic,
+    uuid: userDoc.uuid
+  };
+}
+
+// Submit a new claim (ownership keep or takedown) — only for rights-pending limbo media
 router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req, res) => {
   try {
-    const { mediaId, proofText } = req.body;
+    const { mediaId, proofText, intent: rawIntent } = req.body;
     const userId = req.user._id;
+    const intent = rawIntent === 'takedown' ? 'takedown' : 'claim_keep';
 
-    // Validate inputs
     if (!mediaId || !proofText) {
       return res.status(400).json({ error: 'mediaId and proofText are required' });
     }
 
-    // Check if media exists
     const media = await Media.findById(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Check if user is a creator
-    if (!req.user.role || !req.user.role.includes('creator')) {
-      return res.status(403).json({ error: 'User must have creator role to submit claims' });
+    if (media.status === 'deleted') {
+      return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Check if user already has a pending claim for this media
+    if (!isRightsPendingLimbo(media)) {
+      return res.status(400).json({
+        error: 'Claims are only accepted for media awaiting rights clearance'
+      });
+    }
+
+    // Ownership claims require creator role; takedown only requires auth
+    if (intent === 'claim_keep') {
+      if (!req.user.role || !req.user.role.includes('creator')) {
+        return res.status(403).json({ error: 'User must have creator role to claim ownership' });
+      }
+    }
+
     const existingClaim = await Claim.findOne({
       mediaId,
       userId,
@@ -46,18 +72,16 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
       return res.status(400).json({ error: 'You already have a pending claim for this tune' });
     }
 
-    // Process uploaded files - use custom domain URL (R2_PUBLIC_URL)
-    // req.file.key contains the S3 key, use it with getPublicUrl for custom domain
     const proofFiles = req.files ? req.files.map(file => ({
-      filename: file.key || file.filename, // R2 uses key, local uses filename
-      url: file.key ? getPublicUrl(file.key) : (file.location || getPublicUrl(`claims/${file.filename}`)), // Use custom domain
+      filename: file.key || file.filename,
+      url: file.key ? getPublicUrl(file.key) : (file.location || getPublicUrl(`claims/${file.filename}`)),
       uploadedAt: new Date()
     })) : [];
 
-    // Create the claim
     const claim = new Claim({
       mediaId,
       userId,
+      intent,
       proofText,
       proofFiles,
       status: 'pending'
@@ -65,20 +89,21 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
 
     await claim.save();
 
-    // Send email notification to admin
     try {
       const user = await User.findById(userId);
       await sendClaimNotification(claim, media, user);
     } catch (emailError) {
       console.error('Failed to send claim notification email:', emailError);
-      // Don't fail the request if email fails
     }
 
     res.status(201).json({
-      message: 'Claim submitted successfully',
+      message: intent === 'takedown'
+        ? 'Takedown request submitted successfully'
+        : 'Claim submitted successfully',
       claim: {
         _id: claim._id,
         status: claim.status,
+        intent: claim.intent,
         submittedAt: claim.submittedAt
       }
     });
@@ -126,25 +151,13 @@ router.get('/media/:mediaId', authMiddleware, async (req, res) => {
       .sort({ submittedAt: -1 });
 
     const formattedClaims = claims.map(claim => {
-      const claimant = claim.userId ? {
-        _id: claim.userId._id,
-        username: claim.userId.username,
-        email: claim.userId.email,
-        profilePic: claim.userId.profilePic,
-        uuid: claim.userId.uuid
-      } : null;
-
-      const reviewer = claim.reviewedBy ? {
-        _id: claim.reviewedBy._id,
-        username: claim.reviewedBy.username,
-        email: claim.reviewedBy.email,
-        profilePic: claim.reviewedBy.profilePic,
-        uuid: claim.reviewedBy.uuid
-      } : null;
+      const claimant = formatClaimant(claim.userId);
+      const reviewer = formatClaimant(claim.reviewedBy);
 
       return {
         _id: claim._id,
         mediaId: claim.mediaId?.toString?.() || claim.mediaId,
+        intent: claim.intent || 'claim_keep',
         status: claim.status,
         proofText: claim.proofText,
         proofFiles: claim.proofFiles || [],
@@ -171,7 +184,7 @@ router.get('/all', authMiddleware, adminMiddleware, async (req, res) => {
     const filter = status ? { status } : {};
 
     const claims = await Claim.find(filter)
-      .populate('mediaId', 'title artist coverArt')
+      .populate('mediaId', 'title artist coverArt rightsStatus rightsCleared')
       .populate('userId', 'username email profilePic')
       .sort({ submittedAt: -1 });
 
@@ -197,20 +210,127 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
       return res.status(404).json({ error: 'Claim not found' });
     }
 
-    claim.status = status;
-    claim.reviewNotes = reviewNotes;
-    claim.reviewedBy = req.user._id;
-    claim.reviewedAt = new Date();
+    if (claim.status !== 'pending') {
+      return res.status(400).json({ error: 'Claim has already been reviewed' });
+    }
 
-    await claim.save();
-
-    // Get media for notification and ownership assignment
     const media = await Media.findById(claim.mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    // Send notification to user
+    const intent = claim.intent || 'claim_keep';
+    let takedownResult = null;
+
+    if (status === 'approved') {
+      if (intent === 'takedown') {
+        if (media.status === 'deleted') {
+          return res.status(400).json({ error: 'Media is already deleted' });
+        }
+
+        try {
+          takedownResult = await softDeleteMedia(
+            media,
+            req.user,
+            'Rights holder claim — takedown approved; tips refunded'
+          );
+        } catch (deleteError) {
+          console.error('Error soft-deleting media for claim takedown:', deleteError);
+          return res.status(400).json({
+            error: deleteError.message || 'Failed to take down media'
+          });
+        }
+
+        // Close other pending claims on this media
+        await Claim.updateMany(
+          { mediaId: media._id, _id: { $ne: claim._id }, status: 'pending' },
+          {
+            status: 'rejected',
+            reviewNotes: 'Media taken down via another approved claim',
+            reviewedBy: req.user._id,
+            reviewedAt: new Date()
+          }
+        );
+      } else {
+        // claim_keep: assign ownership and clear rights limbo
+        if (!isRightsPendingLimbo(media) && media.rightsStatus !== 'cleared') {
+          // Still allow if somehow already partially processed, but prefer limbo
+        }
+
+        const hasExistingOwners = media.mediaOwners && media.mediaOwners.some(
+          (o) => o.percentage && o.percentage > 0
+        );
+        const ownershipPercentage = req.body.ownershipPercentage
+          ? Number(req.body.ownershipPercentage)
+          : (hasExistingOwners ? 50 : 100);
+
+        try {
+          media.addMediaOwner(
+            claim.userId,
+            ownershipPercentage,
+            'primary',
+            req.user._id,
+            {
+              verified: true,
+              verifiedAt: new Date(),
+              verifiedBy: req.user._id,
+              verificationMethod: 'Claim approval',
+              verificationNotes: reviewNotes || null,
+              verificationSource: 'claim_approval',
+              note: reviewNotes || null
+            }
+          );
+
+          media.rightsCleared = true;
+          media.rightsStatus = 'cleared';
+          media.rightsConfirmedBy = claim.userId;
+          media.rightsConfirmedAt = new Date();
+
+          media.editHistory.push({
+            editedBy: req.user._id,
+            editedAt: new Date(),
+            changes: [{
+              field: 'mediaOwners',
+              oldValue: 'Pending rights',
+              newValue: `Added ${claim.userId} as ${ownershipPercentage}% owner via claim approval; rights cleared`
+            }]
+          });
+
+          await media.save();
+
+          // Reject other pending claims for this media
+          await Claim.updateMany(
+            { mediaId: media._id, _id: { $ne: claim._id }, status: 'pending' },
+            {
+              status: 'rejected',
+              reviewNotes: 'Another ownership claim was approved for this media',
+              reviewedBy: req.user._id,
+              reviewedAt: new Date()
+            }
+          );
+
+          try {
+            const user = await User.findById(claim.userId);
+            const addedBy = await User.findById(req.user._id);
+            if (user && user.email && addedBy) {
+              await sendOwnershipNotification(user, media, ownershipPercentage, addedBy);
+            }
+          } catch (emailError) {
+            console.error('Failed to send ownership notification:', emailError);
+          }
+        } catch (error) {
+          console.error('Error adding media owner:', error);
+          return res.status(400).json({ error: 'Failed to assign ownership: ' + error.message });
+        }
+      }
+    }
+
+    claim.status = status;
+    claim.reviewNotes = reviewNotes;
+    claim.reviewedBy = req.user._id;
+    claim.reviewedAt = new Date();
+    await claim.save();
+
     try {
       const notificationService = require('../services/notificationService');
       await notificationService.notifyClaim(
@@ -224,79 +344,27 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
       console.error('Error setting up claim notification:', error);
     }
 
-        // If approved, add user to media's owners and assign ownership percentage
-        if (status === 'approved') {
-
-          // Determine ownership percentage:
-          // - If admin specifies a percentage, use that
-          // - If there are no existing owners, default to 100%
-          // - Otherwise, default to 50%
-          const hasExistingOwners = media.mediaOwners && media.mediaOwners.length > 0;
-          const ownershipPercentage = req.body.ownershipPercentage 
-            ? Number(req.body.ownershipPercentage)
-            : (hasExistingOwners ? 50 : 100);
-          
-          try {
-            media.addMediaOwner(
-              claim.userId,
-              ownershipPercentage,
-              'primary',
-              req.user._id,
-              {
-                verified: true,
-                verifiedAt: new Date(),
-                verifiedBy: req.user._id,
-                verificationMethod: 'Claim approval',
-                verificationNotes: reviewNotes || null,
-                verificationSource: 'claim_approval',
-                note: reviewNotes || null
-              }
-            );
-
-            // Add to edit history
-            media.editHistory.push({
-              editedBy: req.user._id,
-              editedAt: new Date(),
-              changes: [{
-                field: 'mediaOwners',
-                oldValue: 'No owners',
-                newValue: `Added ${claim.userId} as ${ownershipPercentage}% owner via claim approval`
-              }]
-            });
-
-            await media.save();
-
-            // Send ownership notification to the user
-            try {
-              const user = await User.findById(claim.userId);
-              const addedBy = await User.findById(req.user._id);
-              if (user && user.email && addedBy) {
-                await sendOwnershipNotification(user, media, ownershipPercentage, addedBy);
-              }
-            } catch (emailError) {
-              console.error('Failed to send ownership notification:', emailError);
-              // Don't fail the request if email fails
-            }
-          } catch (error) {
-            console.error('Error adding media owner:', error);
-            return res.status(400).json({ error: 'Failed to assign ownership: ' + error.message });
-          }
-        }
-
-        // Send claim status notification to user
-        try {
-          const user = await User.findById(claim.userId);
-          if (user && user.email) {
-            await sendClaimStatusNotification(user, claim, media, status, req.body.adminMessage);
-          }
-        } catch (emailError) {
-          console.error('Failed to send claim status notification:', emailError);
-          // Don't fail the request if email fails
-        }
+    try {
+      const user = await User.findById(claim.userId);
+      if (user && user.email) {
+        await sendClaimStatusNotification(user, claim, media, status, req.body.adminMessage);
+      }
+    } catch (emailError) {
+      console.error('Failed to send claim status notification:', emailError);
+    }
 
     res.json({
       message: `Claim ${status}`,
-      claim
+      claim,
+      ...(takedownResult
+        ? {
+            takedown: {
+              refundedBidsCount: takedownResult.refundedBidsCount,
+              refundedUsersCount: takedownResult.refundedUsersCount,
+              refundedAmount: takedownResult.refundedAmount
+            }
+          }
+        : {})
     });
   } catch (error) {
     console.error('Error reviewing claim:', error);
@@ -305,4 +373,3 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 });
 
 module.exports = router;
-

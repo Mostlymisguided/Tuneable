@@ -556,8 +556,14 @@ const Admin: React.FC = () => {
 
   const reviewClaim = async (claimId: string, status: 'approved' | 'rejected', reviewNotes?: string) => {
     try {
-      await claimAPI.reviewClaim(claimId, status, reviewNotes);
-      toast.success(`Claim ${status}!`);
+      const result = await claimAPI.reviewClaim(claimId, status, reviewNotes);
+      toast.success(
+        status === 'approved'
+          ? result.takedown
+            ? `Takedown approved — ${result.takedown.refundedBidsCount} tip(s) refunded`
+            : 'Claim approved — ownership assigned'
+          : 'Claim rejected!'
+      );
       // Reload to update counts
       await loadClaims();
       // Refresh report counts to ensure main tab dot updates
@@ -3510,6 +3516,17 @@ const Admin: React.FC = () => {
                               <p className="text-gray-400">
                                 {claim.mediaId ? <ClickableArtistDisplay media={claim.mediaId} /> : 'Unknown Artist'}
                               </p>
+                              <p className="text-sm mt-1">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                                    claim.intent === 'takedown'
+                                      ? 'bg-red-900/50 text-red-200 border border-red-500/40'
+                                      : 'bg-emerald-900/50 text-emerald-200 border border-emerald-500/40'
+                                  }`}
+                                >
+                                  {claim.intent === 'takedown' ? 'Takedown (refund tips)' : 'Claim & keep live'}
+                                </span>
+                              </p>
                               <p className="text-sm text-gray-500">
                                 Claimed by: @{claim.userId?.username} ({claim.userId?.email})
                               </p>
@@ -3550,10 +3567,14 @@ const Admin: React.FC = () => {
                               const notes = prompt('Add review notes (optional):');
                               reviewClaim(claim._id, 'approved', notes || '');
                             }}
-                            className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                            className={`flex items-center px-4 py-2 text-white rounded-lg transition-colors ${
+                              claim.intent === 'takedown'
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
                           >
                             <CheckCircle className="h-4 w-4 mr-2" />
-                            Approve
+                            {claim.intent === 'takedown' ? 'Approve takedown' : 'Approve ownership'}
                           </button>
                           <button
                             onClick={() => {

@@ -240,6 +240,10 @@ export interface Media {
   aiUsage?: AiUsage;
   rightsHolder?: string;
   
+  // Rights clearance (library import limbo vs cleared ownership)
+  rightsCleared?: boolean;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  
   // Video/Image metadata
   resolution?: string;
   aspectRatio?: string;

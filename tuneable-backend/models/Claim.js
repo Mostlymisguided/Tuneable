@@ -15,6 +15,14 @@ const claimSchema = new mongoose.Schema({
     required: true
   },
   
+  // What the claimant wants: keep the media live (and own tips) vs take it down (refund tippers)
+  intent: {
+    type: String,
+    enum: ['claim_keep', 'takedown'],
+    required: true,
+    default: 'claim_keep'
+  },
+
   // Proof of ownership
   proofText: {
     type: String,

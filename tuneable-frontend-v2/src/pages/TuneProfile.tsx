@@ -40,8 +40,9 @@ import {
   SlidersHorizontal,
   Bot
 } from 'lucide-react';
-import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
+import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import ReportModal from '../components/ReportModal';
+import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
@@ -229,6 +230,7 @@ const TuneProfile: React.FC = () => {
   const [showAllFields, setShowAllFields] = useState(false);
   
   // Claim tune modal (rights-pending limbo only)
+  const [showClaimModal, setShowClaimModal] = useState(false);
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -1478,21 +1480,13 @@ const TuneProfile: React.FC = () => {
     return value.toString();
   };
 
-  // Handle claim tune button click
+  // Handle claim tune button click — intent tree lives in ClaimMediaModal
   const handleClaimTune = () => {
-    if (!user) {
-      toast.info('Please log in to claim this tune');
-      navigate('/login');
+    if (!isRightsPendingClaimable(media)) {
+      toast.info('This tune is not awaiting rights clearance');
       return;
     }
-
-    if (!user.role?.includes('creator')) {
-      // User is not a creator - show creator signup modal
-      setShowCreatorSignupModal(true);
-    } else {
-      // User is already a creator - show claim verification modal
-      setShowClaimVerificationModal(true);
-    }
+    setShowClaimModal(true);
   };
 
   // Load tag rankings for this tune
@@ -2317,8 +2311,8 @@ const TuneProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
-              {/* Claim Tune Button - show only when user cannot edit */}
-              {!canEditTune() && (
+              {/* Claim Tune — rights-pending limbo only */}
+              {!canEditTune() && isRightsPendingClaimable(media) && (
                 <button
                   onClick={handleClaimTune}
                   className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
@@ -4001,6 +3995,15 @@ const TuneProfile: React.FC = () => {
             )}
           </>
         )}
+
+      {showClaimModal && media && (
+        <ClaimMediaModal
+          mediaId={media._id}
+          mediaTitle={media.title}
+          contentLabel="Tune"
+          onClose={() => setShowClaimModal(false)}
+        />
+      )}
 
       {/* Bid Confirmation Modal */}
       <BidConfirmationModal

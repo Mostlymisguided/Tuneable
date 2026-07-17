@@ -42,9 +42,10 @@ import {
   Linkedin,
   Instagram
 } from 'lucide-react';
-import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
+import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
 import ReportModal from '../components/ReportModal';
+import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
@@ -105,6 +106,8 @@ interface Media {
   popularity?: number;
   sources?: { [key: string]: string };
   externalIds?: { [key: string]: string };
+  rightsCleared?: boolean;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
   bids?: Bid[];
   comments?: Comment[];
   addedBy?: {
@@ -200,11 +203,8 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
   
-  // Claim podcast modals
-  const [showCreatorSignupModal, setShowCreatorSignupModal] = useState(false);
-  const [showClaimVerificationModal, setShowClaimVerificationModal] = useState(false);
-  const [claimProofText, setClaimProofText] = useState('');
-  const [claimProofFiles, setClaimProofFiles] = useState<File[]>([]);
+  // Claim modal (rights-pending limbo only)
+  const [showClaimModal, setShowClaimModal] = useState(false);
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -1480,55 +1480,13 @@ const PodcastEpisodeProfile: React.FC = () => {
     return value.toString();
   };
 
-  // Handle claim podcast button click
+  // Handle claim podcast button click — intent tree lives in ClaimMediaModal
   const handleClaimPodcast = () => {
-    if (!user) {
-      toast.info('Please log in to claim this podcast');
-      navigate('/login');
+    if (!isRightsPendingClaimable(media)) {
+      toast.info('This episode is not awaiting rights clearance');
       return;
     }
-
-    if (!user.role?.includes('creator')) {
-      // User is not a creator - show creator signup modal
-      setShowCreatorSignupModal(true);
-    } else {
-      // User is already a creator - show claim verification modal
-      setShowClaimVerificationModal(true);
-    }
-  };
-
-  // Handle creator signup
-  const handleCreatorSignup = () => {
-    setShowCreatorSignupModal(false);
-    // Navigate to creator registration page
-    navigate('/creator/register');
-  };
-
-  // Handle claim submission
-  const handleSubmitClaim = async () => {
-    if (!claimProofText.trim()) {
-      toast.error('Please provide proof of ownership');
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('mediaId', media?._id || '');
-      formData.append('proofText', claimProofText);
-      claimProofFiles.forEach((file) => {
-        formData.append('proofFiles', file);
-      });
-
-      await claimAPI.submitClaim(formData);
-      
-      toast.success('Claim submitted for review! We\'ll notify you when it\'s processed.');
-      setShowClaimVerificationModal(false);
-      setClaimProofText('');
-      setClaimProofFiles([]);
-    } catch (err: any) {
-      console.error('Error submitting claim:', err);
-      toast.error(err.response?.data?.error || 'Failed to submit claim');
-    }
+    setShowClaimModal(true);
   };
 
   // Load tag rankings for this tune
@@ -2312,8 +2270,8 @@ const PodcastEpisodeProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
-              {/* Claim Podcast Button - show only when user cannot edit */}
-              {!canEditTune() && (
+              {/* Claim — rights-pending limbo only */}
+              {!canEditTune() && isRightsPendingClaimable(media) && (
                 <button
                   onClick={handleClaimPodcast}
                   className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
@@ -3977,132 +3935,13 @@ const PodcastEpisodeProfile: React.FC = () => {
           </>
         )}
 
-      {/* Creator Signup Modal */}
-      {showCreatorSignupModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
-          <div className="card max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">Become a Creator</h2>
-              <button
-                onClick={() => setShowCreatorSignupModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <p className="text-gray-300 mb-6">
-              Join Tuneable as a creator to claim your music, earn directly from fan tips, 
-              and connect with your audience in a revolutionary new way.
-            </p>
-            
-            <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4 mb-6">
-              <h3 className="text-white font-semibold mb-2">Creator Benefits:</h3>
-              <ul className="text-gray-300 text-sm space-y-1">
-                <li>✓ Claim ownership of your tracks</li>
-                <li>✓ Earn directly from fan tips</li>
-                <li>✓ Access to creator analytics</li>
-                <li>✓ Verify your identity with badges</li>
-                <li>✓ Connect with your biggest fans</li>
-              </ul>
-            </div>
-            
-            <div className="flex space-x-3">
-              <button onClick={handleCreatorSignup} className="btn-primary flex-1">
-                Enable Creator Mode
-              </button>
-              <button onClick={() => setShowCreatorSignupModal(false)} className="btn-secondary">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Claim Verification Modal */}
-      {showClaimVerificationModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
-          <div className="card max-w-lg w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">
-                Claim "{media?.title}"
-              </h2>
-              <button
-                onClick={() => setShowClaimVerificationModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <p className="text-gray-300 mb-4">
-              To verify you're a creator of this podcast, please provide proof of ownership:
-            </p>
-            
-            <div className="mb-4">
-              <label className="block text-white font-medium mb-2">
-                Proof of Ownership
-              </label>
-              <textarea
-                value={claimProofText}
-                onChange={(e) => setClaimProofText(e.target.value)}
-                placeholder="Describe your role (artist, producer, mediawriter, etc.) and provide links to social media, streaming profiles, distribution platforms, or other verification..."
-                className="input min-h-32"
-                maxLength={2000}
-              />
-              <div className="text-xs text-gray-400 mt-1">
-                {claimProofText.length}/2000 characters
-              </div>
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-white font-medium mb-2">
-                Supporting Documents (Optional)
-              </label>
-              <input
-                type="file"
-                multiple
-                accept="image/*,.pdf"
-                onChange={(e) => setClaimProofFiles(Array.from(e.target.files || []))}
-                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                Upload screenshots, contracts, distribution receipts, or other proof
-              </p>
-              {claimProofFiles.length > 0 && (
-                <div className="mt-2 text-sm text-gray-300">
-                  {claimProofFiles.length} file(s) selected
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3 mb-4">
-              <p className="text-yellow-200 text-sm">
-                <strong>Note:</strong> Claims are reviewed by our team. False claims may result in account suspension.
-              </p>
-            </div>
-            
-            <div className="flex space-x-3">
-              <button 
-                onClick={handleSubmitClaim}
-                disabled={!claimProofText.trim()}
-                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Submit Claim
-              </button>
-              <button 
-                onClick={() => {
-                  setShowClaimVerificationModal(false);
-                  setClaimProofText('');
-                  setClaimProofFiles([]);
-                }} 
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {showClaimModal && media && (
+        <ClaimMediaModal
+          mediaId={media._id}
+          mediaTitle={media.title}
+          contentLabel="Episode"
+          onClose={() => setShowClaimModal(false)}
+        />
       )}
 
       {/* Bid Confirmation Modal */}

@@ -133,19 +133,25 @@ async function sendCreatorApplicationNotification(user) {
 // Send claim submission notification
 async function sendClaimNotification(claim, media, user) {
   try {
+    const intent = claim.intent || 'claim_keep';
+    const isTakedown = intent === 'takedown';
+    const intentLabel = isTakedown ? 'Takedown (refund tips)' : 'Claim & keep live';
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: ADMIN_EMAIL,
-      subject: `🎵 New Tune Claim: ${media.title}`,
+      subject: isTakedown
+        ? `🚫 Takedown Request: ${media.title}`
+        : `🎵 New Tune Claim: ${media.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #9333ea;">🎵 New Tune Claim Submitted</h2>
+          <h2 style="color: #9333ea;">${isTakedown ? '🚫 Media Takedown Request' : '🎵 New Tune Claim Submitted'}</h2>
           
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">Tune Information</h3>
             ${media.coverArt ? `<img src="${media.coverArt}" alt="${media.title}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover;">` : ''}
             <p><strong>Title:</strong> ${media.title}</p>
             <p><strong>Artist:</strong> ${media.artist?.[0]?.name || media.artist || 'Unknown'}</p>
+            <p><strong>Intent:</strong> ${intentLabel}</p>
             ${media.album ? `<p><strong>Album:</strong> ${media.album}</p>` : ''}
             ${media.releaseDate ? `<p><strong>Release Date:</strong> ${new Date(media.releaseDate).toLocaleDateString()}</p>` : ''}
           </div>
@@ -626,34 +632,23 @@ async function sendOwnershipNotification(user, media, ownershipPercentage, added
 async function sendClaimStatusNotification(user, claim, media, status, adminMessage = '') {
   try {
     const isApproved = status === 'approved';
-    const subject = isApproved 
-      ? `✅ Tune Claim Approved: "${media.title}"`
-      : `❌ Tune Claim Rejected: "${media.title}"`;
-    
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: user.email,
-      subject: subject,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: ${isApproved ? '#10b981' : '#ef4444'};">
-            ${isApproved ? '✅' : '❌'} Tune Claim ${isApproved ? 'Approved' : 'Rejected'}
-          </h2>
-          
-          <p>Hi ${user.username},</p>
-          
-          <p>Your claim for the tune <strong>"${media.title}"</strong> has been <strong>${status}</strong>.</p>
-          
-          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #1f2937;">Tune Details</h3>
-            ${media.coverArt ? `<img src="${media.coverArt}" alt="${media.title}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover; margin-bottom: 10px;">` : ''}
-            <p><strong>Title:</strong> ${media.title}</p>
-            <p><strong>Artist:</strong> ${media.artist?.[0]?.name || media.artist || 'Unknown'}</p>
-            <p><strong>Claimed:</strong> ${new Date(claim.submittedAt).toLocaleDateString()}</p>
-            <p><strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1)}</p>
-          </div>
-          
-          ${isApproved ? `
+    const isTakedown = (claim.intent || 'claim_keep') === 'takedown';
+    const subject = isApproved
+      ? (isTakedown
+        ? `✅ Takedown Approved: "${media.title}"`
+        : `✅ Tune Claim Approved: "${media.title}"`)
+      : (isTakedown
+        ? `❌ Takedown Rejected: "${media.title}"`
+        : `❌ Tune Claim Rejected: "${media.title}"`);
+
+    const approvedBody = isTakedown
+      ? `
+            <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <h3 style="margin-top: 0; color: #059669;">Media removed</h3>
+              <p>We verified your request and removed this media from Tuneable. Active tips have been refunded to supporters.</p>
+            </div>
+          `
+      : `
             <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
               <h3 style="margin-top: 0; color: #059669;">🎉 Congratulations!</h3>
               <p>You are now a verified owner of this tune and can:</p>
@@ -664,14 +659,39 @@ async function sendClaimStatusNotification(user, claim, media, status, adminMess
                 <li>Control how this tune is used on the platform</li>
               </ul>
             </div>
-          ` : `
+          `;
+    
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: ${isApproved ? '#10b981' : '#ef4444'};">
+            ${isApproved ? '✅' : '❌'} ${isTakedown ? 'Takedown' : 'Tune Claim'} ${isApproved ? 'Approved' : 'Rejected'}
+          </h2>
+          
+          <p>Hi ${user.username},</p>
+          
+          <p>Your ${isTakedown ? 'takedown request' : 'claim'} for <strong>"${media.title}"</strong> has been <strong>${status}</strong>.</p>
+          
+          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">Tune Details</h3>
+            ${media.coverArt ? `<img src="${media.coverArt}" alt="${media.title}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover; margin-bottom: 10px;">` : ''}
+            <p><strong>Title:</strong> ${media.title}</p>
+            <p><strong>Artist:</strong> ${media.artist?.[0]?.name || media.artist || 'Unknown'}</p>
+            <p><strong>Submitted:</strong> ${new Date(claim.submittedAt).toLocaleDateString()}</p>
+            <p><strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1)}</p>
+          </div>
+          
+          ${isApproved ? approvedBody : `
             <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
-              <h3 style="margin-top: 0; color: #dc2626;">Claim Not Approved</h3>
-              <p>Unfortunately, we couldn't verify your ownership of this tune. This could be because:</p>
+              <h3 style="margin-top: 0; color: #dc2626;">Request Not Approved</h3>
+              <p>Unfortunately, we couldn't verify this request. This could be because:</p>
               <ul style="margin: 0; padding-left: 20px;">
                 <li>Insufficient proof of ownership provided</li>
                 <li>Another user already has verified ownership</li>
-                <li>The tune information doesn't match your claim</li>
+                <li>The media information doesn't match your claim</li>
               </ul>
               ${adminMessage ? `<p><strong>Admin Note:</strong> ${adminMessage}</p>` : ''}
             </div>
