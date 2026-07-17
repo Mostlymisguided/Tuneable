@@ -2071,36 +2071,53 @@ const TuneProfile: React.FC = () => {
   const mediaFields = [
     { label: 'Title', value: media.title, icon: Music },
     { label: 'Artist', value: media.artist, icon: Mic },
-    { label: 'Producer', value: media.producer, icon: Volume2 },
-    { label: 'Featuring', value: media.featuring, icon: User },
-    { label: 'BPM', value: media.bpm, icon: Headphones },
     { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
-    { label: 'Tags', value: media.tags, icon: Tag },
-    { label: 'Pitch', value: media.pitch, fieldName: 'pitch', icon: Music },
-    { label: 'Album', value: media.album, icon: Disc },
-    { 
-      label: 'Release Date', 
-      value: media.releaseDate 
+    { label: 'BPM', value: media.bpm, icon: Headphones },
+    {
+      label: 'Release Date',
+      value: media.releaseDate
         ? new Date(media.releaseDate).toLocaleDateString()
-        : (media as any).releaseYear 
+        : (media as any).releaseYear
           ? `${(media as any).releaseYear}`
           : null,
-      icon: Calendar 
+      icon: Calendar,
     },
-    { label: 'Explicit', value: media.explicit ? 'Yes' : 'No', icon: Globe },
-    { label: 'ISRC', value: media.isrc, icon: Music },
-    { label: 'UPC', value: media.upc, icon: Disc },
     { label: 'Key', value: media.key, icon: Music },
+    { label: 'Elements', value: media.elements, icon: Tag },
+    { label: 'Pitch', value: media.pitch, fieldName: 'pitch', icon: Music },
+    { label: 'Album', value: media.album, icon: Disc },
+    { label: 'Featuring', value: media.featuring, icon: User },
+    { label: 'Producer', value: media.producer, icon: Volume2 },
+    { label: 'Tags', value: media.tags, icon: Tag },
+    { label: 'Explicit', value: media.explicit ? 'Yes' : 'No', icon: Globe },
     { label: 'Time Signature', value: media.timeSignature, icon: Music },
     { label: 'Bitrate', value: media.bitrate ? `${media.bitrate} kbps` : null, icon: Headphones },
-    { label: 'Elements', value: media.elements, icon: Tag },
+    { label: 'ISRC', value: media.isrc, icon: Music },
+    { label: 'UPC', value: media.upc, icon: Disc },
     { label: 'Encoded By', value: media.encodedBy, icon: SlidersHorizontal },
   ];
 
-  const HEADER_DETAIL_LABELS = new Set(['Title', 'Artist', 'BPM', 'Duration', 'Album', 'Release Date']);
+  // Populated discovery fields first; catalog/tech (ISRC, UPC, etc.) only in Show All
+  const COLLAPSED_FIELD_LABELS = [
+    'Duration',
+    'BPM',
+    'Release Date',
+    'Key',
+    'Elements',
+    'Pitch',
+    'Album',
+    'Featuring',
+    'Producer',
+    'Tags',
+  ];
+  const COLLAPSED_FIELD_LIMIT = 8;
+  const mediaFieldsByLabel = new Map(mediaFields.map((field) => [field.label, field]));
   const detailFields = showAllFields
     ? mediaFields
-    : mediaFields.filter((field) => !HEADER_DETAIL_LABELS.has(field.label)).slice(0, 8);
+    : COLLAPSED_FIELD_LABELS.map((label) => mediaFieldsByLabel.get(label))
+        .filter((field): field is (typeof mediaFields)[number] => Boolean(field))
+        .filter((field) => getFieldValue(field.value, (field as { fieldName?: string }).fieldName, '') !== '')
+        .slice(0, COLLAPSED_FIELD_LIMIT);
 
   const heroMetadata = [
     media.album,
