@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crown, Loader2, MapPin, TrendingUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Crown, Loader2, MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { mediaAPI, tagAPI, artistAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
@@ -62,6 +62,11 @@ interface MediaChampionsProps {
   seedLocation?: ResolvedLocation | null;
   /** Tighter layout for side panels / chart embeds. */
   compact?: boolean;
+  /**
+   * `strip` — compact #1–#3 avatar row (party now-playing). Renders nothing until
+   * there is a podium; tap expands to the full panel.
+   */
+  variant?: 'default' | 'strip';
   /** Optional subject label (track, tag, or artist name). */
   entityLabel?: string;
   /** @deprecated Use entityLabel */
@@ -123,6 +128,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   maxDisplay = 10,
   seedLocation = null,
   compact = false,
+  variant = 'default',
   entityLabel,
   mediaTitle,
 }) => {
@@ -130,9 +136,11 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   const { user } = useAuth();
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(seedLocation);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [stripExpanded, setStripExpanded] = useState(false);
   const [data, setData] = useState<MediaChampionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isStrip = variant === 'strip';
 
   const homeScopePicks = useMemo(
     () => getChampionScopePicksFromLocation(user?.homeLocation || null),
@@ -143,6 +151,11 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   useEffect(() => {
     setSelectedLocation(seedLocation ?? null);
   }, [seedLocation?.placeId]);
+
+  // Collapse strip when the subject track/tag/artist changes
+  useEffect(() => {
+    setStripExpanded(false);
+  }, [mediaId, tagSlug, artistUserId, artistName]);
 
   const scopeLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
@@ -232,14 +245,84 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     return data.rankings.filter((r) => !r.isChampion && r.rank > 3);
   }, [data]);
 
+  // Strip: no chrome until there is a podium (or user already expanded)
+  if (isStrip && !stripExpanded) {
+    if (loading || error || !hasPodium) return null;
+
+    // Rank order #1 · #2 · #3 for a compact now-playing strip
+    const stripOrder = [1, 2, 3]
+      .map((r) => podiumChampions.find((c) => c.rank === r))
+      .filter(Boolean) as MediaChampionRanking[];
+
+    return (
+      <div className="flex justify-center mt-3 mb-2">
+        <button
+          type="button"
+          onClick={() => setStripExpanded(true)}
+          className="inline-flex items-center gap-2.5 rounded-full bg-black/30 hover:bg-black/45 border border-white/10 px-3 py-1.5 transition-colors group"
+          aria-label="Show Champions details"
+        >
+          <Crown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+          <div className="flex items-center -space-x-2">
+            {stripOrder.map((ranking) => {
+              const medal = medalForRank(ranking.rank, ranking.isChampion, ranking.medal) || 'gold';
+              const styles = MEDAL_STYLES[medal];
+              return (
+                <div
+                  key={ranking.user._id || ranking.user.uuid || ranking.rank}
+                  className={`relative rounded-full overflow-hidden bg-gray-800 border-2 ${styles.border} ${
+                    ranking.rank === 1 ? 'w-8 h-8 z-10' : 'w-7 h-7'
+                  }`}
+                  title={`#${ranking.rank} ${ranking.user.username}`}
+                >
+                  <img
+                    src={ranking.user.profilePic || DEFAULT_PROFILE_PIC}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <span className="text-xs text-gray-300 group-hover:text-white hidden sm:inline">
+            Champions
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-gray-500 group-hover:text-gray-300" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className={compact ? 'space-y-3' : 'space-y-4'}>
+    <div className={`${compact || isStrip ? 'space-y-3' : 'space-y-4'}${isStrip ? ' mt-3 mb-2' : ''}`}>
+      {isStrip && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setStripExpanded(false)}
+            className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+            Hide Champions
+          </button>
+        </div>
+      )}
+      <div
+        className={
+          isStrip
+            ? 'card bg-black/20 rounded-lg p-3 md:p-4 max-h-[28rem] overflow-y-auto space-y-3'
+            : 'contents'
+        }
+      >
       {/* Scope header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-white">
-            <Crown className={`text-amber-400 flex-shrink-0 ${compact ? 'h-4 w-4' : 'h-5 w-5'}`} />
-            <h3 className={`font-bold ${compact ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>
+            <Crown className={`text-amber-400 flex-shrink-0 ${compact || isStrip ? 'h-4 w-4' : 'h-5 w-5'}`} />
+            <h3 className={`font-bold ${compact || isStrip ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>
               Champions of{' '}
               {subjectLabel ? (
                 <span className="text-amber-300">{subjectLabel}</span>
@@ -254,7 +337,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
               )}
             </h3>
           </div>
-          <p className={`text-gray-400 mt-1 ${compact ? 'text-[11px]' : 'text-xs md:text-sm'}`}>
+          <p className={`text-gray-400 mt-1 ${compact || isStrip ? 'text-[11px]' : 'text-xs md:text-sm'}`}>
             #1 · #2 · #3 Champions by tip total from tippers based here. Social status only — not ownership rights.
           </p>
         </div>
@@ -510,6 +593,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };

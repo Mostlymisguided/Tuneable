@@ -246,7 +246,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
-  const [showTopFansPanel, setShowTopFansPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
@@ -2674,60 +2673,29 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         </div>
         )}
 
-        {/* Champions for currently playing / focused media */}
-        <div className="max-w-7xl mx-auto flex justify-center mt-4 mb-2 px-2">
-          <div className="w-full max-w-xl">
-            {!showTopFansPanel ? (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowTopFansPanel(true)}
-                  className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors text-sm sm:text-base flex items-center gap-2"
-                >
-                  <Crown className="h-4 w-4 text-amber-400" />
-                  Champions
-                </button>
+        {/* Champions for currently playing media — compact podium strip */}
+        {(() => {
+          const mediaId =
+            currentMedia?._id ||
+            currentMedia?.id ||
+            (currentMedia as any)?.uuid ||
+            null;
+          if (!mediaId) return null;
+          return (
+            <div className="max-w-7xl mx-auto flex justify-center px-2">
+              <div className="w-full max-w-xl">
+                <MediaChampions
+                  mediaId={String(mediaId)}
+                  maxDisplay={10}
+                  compact
+                  variant="strip"
+                  mediaTitle={currentMedia?.title}
+                  seedLocation={selectedLocation}
+                />
               </div>
-            ) : (
-              <>
-                <div className="card bg-black/20 rounded-lg p-3 md:p-4 max-h-[28rem] overflow-y-auto">
-                  {(() => {
-                    const mediaId =
-                      currentMedia?._id ||
-                      currentMedia?.id ||
-                      (currentMedia as any)?.uuid ||
-                      null;
-                    if (!mediaId) {
-                      return (
-                        <p className="text-sm text-gray-400 text-center py-4">
-                          Play a track to see its Champions.
-                        </p>
-                      );
-                    }
-                    return (
-                      <MediaChampions
-                        mediaId={String(mediaId)}
-                        maxDisplay={10}
-                        compact
-                        mediaTitle={currentMedia?.title}
-                        seedLocation={selectedLocation}
-                      />
-                    );
-                  })()}
-                </div>
-                <div className="flex justify-center mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTopFansPanel(false)}
-                    className="text-xs text-gray-400 hover:text-gray-300"
-                  >
-                    Hide
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+            </div>
+          );
+        })()}
 
 
         {/* Wallet Balance removed per product update */}
