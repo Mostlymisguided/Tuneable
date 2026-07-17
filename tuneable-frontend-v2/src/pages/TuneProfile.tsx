@@ -170,6 +170,7 @@ interface RecommendedMediaItem {
   artist: string;
   coverArt?: string | null;
   duration?: number;
+  bpm?: number | null;
   globalMediaAggregate?: number;
   tags?: string[];
   sharedTags?: string[];
@@ -179,6 +180,15 @@ interface RecommendedMediaItem {
   contentType?: string[];
   contentForm?: string[];
   creatorDisplay?: string | null;
+  bids?: Array<{
+    amount?: number;
+    userId?: {
+      _id?: string;
+      uuid?: string;
+      username: string;
+      profilePic?: string;
+    };
+  }>;
   fanContext?: {
     user?: {
       _id: string;
@@ -1644,8 +1654,9 @@ const TuneProfile: React.FC = () => {
     artist: item.artist,
     coverArt: item.coverArt || DEFAULT_COVER_ART,
     duration: item.duration || 0,
+    bpm: item.bpm ?? null,
     tags: item.tags?.length ? item.tags : item.sharedTags || [],
-    bids: [],
+    bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,
     sources: item.sources || {},
   });
@@ -2272,36 +2283,20 @@ const TuneProfile: React.FC = () => {
       {items.map((item, index) => {
         const queueShape = recommendedToQueueShape(item);
         const mediaData = normalizeQueueMediaData(queueShape);
-        const reasonBits = [
-          ...(item.reasons?.slice(0, 2) || []),
-          ...(variant === 'fans' && item.fanContext?.user?.username
-            ? [`Picked via top fan ${item.fanContext.user.username}`]
-            : []),
-        ];
 
         return (
-          <div key={`${variant}-${item._id}`}>
-            <QueueMediaCard
-              item={queueShape}
-              index={index}
-              mediaData={mediaData}
-              showActions={false}
-              isBidding={isPlacingRecommendedTip}
-              onActionClick={() => {}}
-              onPlay={() => startRecommendedQueue(items, item)}
-              onTip={() => handleOpenRecommendedTip(item)}
-              mediaHref={`/tune/${item.uuid || item._id}`}
-            />
-            {reasonBits.length > 0 && (
-              <div className="mt-1 ml-7 md:ml-14 text-xs text-gray-400 flex flex-wrap gap-x-2 gap-y-0.5">
-                {reasonBits.map((reason) => (
-                  <span key={`${item._id}-${reason}`} className="truncate max-w-full">
-                    {reason}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <QueueMediaCard
+            key={`${variant}-${item._id}`}
+            item={queueShape}
+            index={index}
+            mediaData={mediaData}
+            showActions={false}
+            isBidding={isPlacingRecommendedTip}
+            onActionClick={() => {}}
+            onPlay={() => startRecommendedQueue(items, item)}
+            onTip={() => handleOpenRecommendedTip(item)}
+            mediaHref={`/tune/${item.uuid || item._id}`}
+          />
         );
       })}
     </div>

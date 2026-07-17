@@ -189,6 +189,7 @@ const formatMediaEntry = (record) => {
     artist: getPrimaryArtistName(media) || 'Unknown Artist',
     coverArt: media.coverArt || null,
     duration: media.duration || 0,
+    bpm: typeof media.bpm === 'number' && media.bpm > 0 ? media.bpm : null,
     globalMediaAggregate: media.globalMediaAggregate || 0,
     tags: media.tags || [],
     sharedTags: record.sharedTags || [],
@@ -199,6 +200,67 @@ const formatMediaEntry = (record) => {
     contentForm: media.contentForm || [],
     creatorDisplay: media.creatorDisplay || null,
     fanContext: record.fanContext || null,
+    bids: [],
+  };
+};
+
+/** Batch-load active bids (with tippers) for MiniSupportersBar / champion display */
+const loadBidsByMediaId = async (mediaIds) => {
+  const uniqueIds = [...new Set(mediaIds.filter(Boolean).map((id) => id.toString()))];
+  const bidsByMediaId = new Map();
+  if (!uniqueIds.length) return bidsByMediaId;
+
+  const bids = await Bid.find({
+    mediaId: { $in: uniqueIds },
+    status: 'active',
+  })
+    .select('mediaId userId amount')
+    .populate('userId', 'username profilePic uuid')
+    .lean();
+
+  for (const bid of bids) {
+    const mediaKey = bid.mediaId?.toString();
+    if (!mediaKey || !bid.userId?.username) continue;
+
+    const list = bidsByMediaId.get(mediaKey) || [];
+    list.push({
+      amount: typeof bid.amount === 'number' ? bid.amount : 0,
+      userId: {
+        _id: bid.userId._id?.toString?.() || String(bid.userId._id),
+        uuid: bid.userId.uuid || undefined,
+        username: bid.userId.username,
+        profilePic: bid.userId.profilePic || undefined,
+      },
+    });
+    bidsByMediaId.set(mediaKey, list);
+  }
+
+  return bidsByMediaId;
+};
+
+const attachBidsToEntries = async (entries) => {
+  if (!entries.length) return entries;
+  const bidsByMediaId = await loadBidsByMediaId(entries.map((entry) => entry._id));
+  return entries.map((entry) => ({
+    ...entry,
+    bids: bidsByMediaId.get(entry._id) || [],
+  }));
+};
+
+const attachBidsToPlaylistEntries = async (relatedMedia, fansAlsoTip) => {
+  const bidsByMediaId = await loadBidsByMediaId([
+    ...relatedMedia.map((entry) => entry._id),
+    ...fansAlsoTip.map((entry) => entry._id),
+  ]);
+
+  const withBids = (entry) => ({
+    ...entry,
+    bids: bidsByMediaId.get(entry._id) || [],
+  });
+
+  return {
+    relatedMedia: relatedMedia.map(withBids),
+    fansAlsoTip: fansAlsoTip.map(withBids),
   };
 };
 
@@ -238,7 +300,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   }
 
   const candidateMedia = await Media.find(candidateQuery)
-    .select('_id uuid title artist coverArt duration globalMediaAggregate tags sources contentType contentForm relationships creatorDisplay')
+    .select('_id uuid title artist coverArt duration bpm globalMediaAggregate tags sources contentType contentForm relationships creatorDisplay')
     .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
     .limit(settings.candidatePoolSize)
     .lean();
@@ -254,13 +316,14 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
 
-  const relatedMedia = limitPerPrimaryArtist(
+  let relatedMedia = limitPerPrimaryArtist(
     candidateRecords,
     settings.relatedLimit,
     settings.maxPerPrimaryArtist
   ).map(formatMediaEntry);
 
   if (candidateRecords.length === 0) {
+    relatedMedia = await attachBidsToEntries(relatedMedia);
     return {
       source,
       relatedMedia,
@@ -287,6 +350,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   ]);
 
   if (topFans.length === 0) {
+    relatedMedia = await attachBidsToEntries(relatedMedia);
     return {
       source,
       relatedMedia,
@@ -384,8 +448,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
 
   return {
     source,
-    relatedMedia,
-    fansAlsoTip,
+    ...(await attachBidsToPlaylistEntries(relatedMedia, fansAlsoTip)),
   };
 };
 
