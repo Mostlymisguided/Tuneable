@@ -2673,31 +2673,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         </div>
         )}
 
-        {/* Champions for currently playing media — compact podium strip */}
-        {(() => {
-          const mediaId =
-            currentMedia?._id ||
-            currentMedia?.id ||
-            (currentMedia as any)?.uuid ||
-            null;
-          if (!mediaId) return null;
-          return (
-            <div className="max-w-7xl mx-auto flex justify-center px-2">
-              <div className="w-full max-w-xl">
-                <MediaChampions
-                  mediaId={String(mediaId)}
-                  maxDisplay={10}
-                  compact
-                  variant="strip"
-                  mediaTitle={currentMedia?.title}
-                  seedLocation={selectedLocation}
-                />
-              </div>
-            </div>
-          );
-        })()}
-
-
         {/* Wallet Balance removed per product update */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -3363,6 +3338,30 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         </button>
                       </div>
                     )}
+
+                    {/* Champions for currently playing media — below queue / Show more */}
+                    {(() => {
+                      const mediaId =
+                        currentMedia?._id ||
+                        currentMedia?.id ||
+                        (currentMedia as any)?.uuid ||
+                        null;
+                      if (!mediaId) return null;
+                      return (
+                        <div className="flex justify-center px-2 pt-2">
+                          <div className="w-full max-w-xl">
+                            <MediaChampions
+                              mediaId={String(mediaId)}
+                              maxDisplay={10}
+                              compact
+                              variant="strip"
+                              mediaTitle={currentMedia?.title}
+                              seedLocation={selectedLocation}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
