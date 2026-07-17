@@ -6,6 +6,7 @@ const InstagramStrategy = require('passport-instagram-graph').Strategy;
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
@@ -204,37 +205,21 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       }
       
       const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
-      
-      // Generate username from first and last name, with ascending numerals if needed
-      let baseUsername = '';
-      if (profile.name && profile.name.givenName && profile.name.familyName) {
-        baseUsername = (profile.name.givenName + profile.name.familyName).replace(/\s+/g, '');
-      } else if (profile.name && profile.name.givenName) {
-        baseUsername = profile.name.givenName.replace(/\s+/g, '');
-      } else if (profile.name && profile.name.familyName) {
-        baseUsername = profile.name.familyName.replace(/\s+/g, '');
-      } else {
-        // Fallback if no name available
-        baseUsername = 'user';
-      }
-      
-      // Remove any non-alphanumeric characters
-      baseUsername = baseUsername.replace(/[^a-zA-Z0-9]/g, '');
-      
-      // Ensure username is unique by adding ascending numerals
-      let usernameValue = baseUsername;
-      let counter = 2; // Start at 2 (so first duplicate becomes "Name2", not "Name1")
-      while (await User.findOne({ username: usernameValue })) {
-        usernameValue = `${baseUsername}${counter}`;
-        counter++;
-      }
+      const givenName = profile.name ? profile.name.givenName : null;
+      const familyName = profile.name ? profile.name.familyName : null;
+
+      const usernameValue = await generateUniqueOAuthUsername({
+        profile,
+        email: emailValue,
+        provider: 'facebook',
+      });
       
       console.log('Creating new user with:', {
         facebookId: profile.id,
         email: emailValue,
         username: usernameValue,
-        givenName: profile.name.givenName,
-        familyName: profile.name.familyName
+        givenName,
+        familyName
       });
       
       // Get high-res profile picture
@@ -250,8 +235,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         facebookAccessToken: accessToken,
         email: emailValue,
         username: usernameValue,
-        givenName: profile.name.givenName,
-        familyName: profile.name.familyName,
+        givenName,
+        familyName,
         profilePic: profilePicUrl,
         isActive: true,
         role: ['user'],
@@ -579,47 +564,21 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         }
         
         const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
-        
-        // Generate username with proper sanitization and fallbacks
-        let baseUsername = null;
-        if (profile.name && profile.name.givenName && profile.name.familyName) {
-          // Prefer first and last name
-          baseUsername = (profile.name.givenName + profile.name.familyName).replace(/\s+/g, '');
-        } else if (profile.displayName) {
-          // Sanitize displayName: remove spaces, special chars, limit length
-          baseUsername = profile.displayName
-            .replace(/\s+/g, '')
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .substring(0, 20); // Limit length
-        } else if (profile.name && (profile.name.givenName || profile.name.familyName)) {
-          // Use name fields as fallback
-          const nameParts = [profile.name.givenName, profile.name.familyName].filter(Boolean);
-          baseUsername = nameParts.join('').replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
-        } else if (emailValue) {
-          // Use email prefix as last resort
-          baseUsername = emailValue.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-        } else {
-          // Final fallback
-          baseUsername = `google_${profile.id.substring(0, 10)}`;
-        }
-        
-        // Remove any non-alphanumeric characters (in case any slipped through)
-        baseUsername = baseUsername.replace(/[^a-zA-Z0-9]/g, '');
-        
-        // Ensure username is unique by adding ascending numerals
-        let finalUsername = baseUsername;
-        let counter = 2; // Start at 2 (so first duplicate becomes "Name2", not "Name1")
-        while (await User.findOne({ username: finalUsername })) {
-          finalUsername = `${baseUsername}${counter}`;
-          counter++;
-        }
+        const givenName = profile.name ? profile.name.givenName : null;
+        const familyName = profile.name ? profile.name.familyName : null;
+
+        const finalUsername = await generateUniqueOAuthUsername({
+          profile,
+          email: emailValue,
+          provider: 'google',
+        });
         
         console.log('Creating new user with:', {
           googleId: profile.id,
           email: emailValue,
           username: finalUsername,
-          givenName: profile.name.givenName,
-          familyName: profile.name.familyName
+          givenName,
+          familyName
         });
         
         // Get high-res profile picture
@@ -643,8 +602,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           googleRefreshToken: refreshToken,
           email: emailValue,
           username: finalUsername,
-          givenName: profile.name ? profile.name.givenName : null,
-          familyName: profile.name ? profile.name.familyName : null,
+          givenName,
+          familyName,
           profilePic: profilePicUrl,
           homeLocation: locationData,
           isActive: true,
