@@ -28,6 +28,8 @@ export interface LibraryItem {
   sources?: Record<string, string>;
   globalMediaAggregate: number;
   globalMediaAggregateAvg: number;
+  globalMediaAggregateTop?: number;
+  globalMediaAggregateTopUser?: string | { _id?: string; uuid?: string; id?: string };
   globalUserMediaAggregate: number;
   bidCount: number;
   tuneBytesEarned: number;

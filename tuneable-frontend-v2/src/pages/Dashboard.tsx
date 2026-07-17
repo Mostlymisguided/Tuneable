@@ -74,8 +74,8 @@ const Dashboard: React.FC = () => {
   const libraryChampionTip = useMemo(
     () =>
       computeChampionTipContext(libraryItemToTip?.bids, user, {
-        fallbackChampionAggregatePence: (libraryItemToTip as any)?.globalMediaAggregateTop,
-        fallbackChampionUser: (libraryItemToTip as any)?.globalMediaAggregateTopUser,
+        fallbackChampionAggregatePence: libraryItemToTip?.globalMediaAggregateTop,
+        fallbackChampionUser: libraryItemToTip?.globalMediaAggregateTopUser,
       }),
     [libraryItemToTip, user]
   );

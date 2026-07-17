@@ -982,7 +982,7 @@ const UserProfile: React.FC = () => {
     () =>
       computeChampionTipContext(libraryItemToTip?.bids, currentUser, {
         fallbackChampionAggregatePence: libraryItemToTip?.globalMediaAggregateTop,
-        fallbackChampionUser: (libraryItemToTip as any)?.globalMediaAggregateTopUser,
+        fallbackChampionUser: libraryItemToTip?.globalMediaAggregateTopUser,
       }),
     [libraryItemToTip, currentUser]
   );
