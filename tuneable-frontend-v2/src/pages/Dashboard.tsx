@@ -20,6 +20,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import TipCtaLabel from '../components/TipCtaLabel';
 import { normalizeSources } from '../utils/mediaPlayability';
 import { computeChampionTipContext } from '../utils/tipStats';
 
@@ -2511,7 +2512,7 @@ Join here: ${inviteLink}`.trim();
                         e.stopPropagation();
                         startAddTune(result);
                       }}
-                      className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                      className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap items-center"
                     >
                       {(() => {
                         const mediaIdKey = mediaId || '';
@@ -2519,11 +2520,7 @@ Join here: ${inviteLink}`.trim();
                         const userDefaultTip = getUserDefaultTip();
                         const defaultBid = Math.max(userDefaultTip, minBid);
                         const raw = addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2);
-                        const parsed = parseFloat(raw);
-                        if (!Number.isFinite(parsed)) {
-                          return 'Tip';
-                        }
-                        return `Tip £${parsed.toFixed(2)}`;
+                        return <TipCtaLabel amount={raw} heartClassName="h-3.5 w-3.5" />;
                       })()}
                     </button>
                   </div>

@@ -1828,7 +1828,11 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
 
     const playlists = await getRelatedPlaylistsForMedia(resolvedMediaId, {
       relatedLimit: Math.min(Math.max(parseInt(relatedLimit, 10) || 12, 1), 24),
-      fansAlsoTipLimit: Math.min(Math.max(parseInt(fansLimit, 10) || 8, 1), 16),
+      fansAlsoTipLimit: (() => {
+        const parsed = parseInt(fansLimit, 10);
+        if (!Number.isFinite(parsed)) return 8;
+        return Math.min(Math.max(parsed, 0), 16);
+      })(),
     });
 
     res.json({

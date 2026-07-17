@@ -20,9 +20,18 @@ interface MiniSupportersBarProps {
   bids?: Bid[];
   maxVisible?: number; // number of supporters shown before scrolling or expand
   scrollable?: boolean; // true → horizontal scroll; false + expandable “+N more” chip
+  /** When set, only show the top N tippers (no expand / scroll-all). */
+  limit?: number;
+  className?: string;
 }
 
-const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVisible = 5, scrollable = true }) => {
+const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
+  bids = [],
+  maxVisible = 5,
+  scrollable = true,
+  limit,
+  className,
+}) => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
@@ -49,8 +58,14 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
 
   if (supporters.length === 0) return null;
 
-  const visible = expanded || scrollable ? supporters : supporters.slice(0, maxVisible);
-  const moreCount = supporters.length - maxVisible;
+  const ranked = typeof limit === 'number' ? supporters.slice(0, Math.max(0, limit)) : supporters;
+  const visible =
+    typeof limit === 'number'
+      ? ranked
+      : expanded || scrollable
+        ? supporters
+        : supporters.slice(0, maxVisible);
+  const moreCount = typeof limit === 'number' ? 0 : supporters.length - maxVisible;
   const podiumRankById = useMemo(() => {
     const m = new Map<string, number>();
     supporters.slice(0, 3).forEach((s, idx) => {
@@ -66,8 +81,8 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
   };
 
   return (
-    <div className="md:mt-2">
-      <div className={scrollable ? 'flex gap-2 overflow-x-auto py-1' : 'flex flex-wrap gap-2'}>
+    <div className={className ?? 'md:mt-2'}>
+      <div className={scrollable && typeof limit !== 'number' ? 'flex gap-2 overflow-x-auto py-1' : 'flex flex-wrap gap-2'}>
         {visible.map((s) => {
           const id = s.id;
           const rank = podiumRankById.get(id);
@@ -76,7 +91,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
               key={id}
               onClick={() => navigate(`/user/${id}`)}
               className="flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 hover:bg-purple-400 transition-colors flex-shrink-0"
-              title={`${penceToPounds(s.total)} (${s.count} bids)`}
+              title={`${penceToPounds(s.total)} (${s.count} tips)`}
             >
               <img
                 src={s.user.profilePic || DEFAULT_PROFILE_PIC}
@@ -104,7 +119,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({ bids = [], maxVis
           );
         })}
 
-        {!scrollable && moreCount > 0 && !expanded && (
+        {typeof limit !== 'number' && !scrollable && moreCount > 0 && !expanded && (
           <button
             onClick={() => setExpanded(true)}
             className="px-2 py-1.5 rounded-lg bg-black/25 border border-white/10 text-xs text-purple-300 hover:text-white"

@@ -52,6 +52,8 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import TipStatChips from '../components/TipStatChips';
+import TipCtaLabel from '../components/TipCtaLabel';
 import { computeChampionTipContext } from '../utils/tipStats';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -2035,11 +2037,25 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   const topTagRankings = tagRankings.slice(0, 3);
 
-  const headerTipLabel = !user
-    ? 'Sign in to Tip'
-    : isGlobalBidValid
-      ? `Tip £${globalBidInput}`
-      : 'Tip';
+  const avgTipPounds = media ? calculateGlobalMediaBidAvg(media) || undefined : undefined;
+
+  const applyTipShortcut = (amount: number) => {
+    setHasInitializedBidInput(true);
+    setGlobalBidInput(amount.toFixed(2));
+  };
+
+  const renderTipStatShortcuts = (className?: string) => (
+    <TipStatChips
+      className={className}
+      minTip={minimumBid}
+      avgTip={avgTipPounds}
+      championAggregate={mediaChampionTip?.championAggregate}
+      viewerAggregate={mediaChampionTip?.viewerAggregate}
+      viewerIsChampion={mediaChampionTip?.viewerIsChampion}
+      disabled={isPlacingGlobalBid}
+      onSelect={applyTipShortcut}
+    />
+  );
 
   const seriesTitle =
     media.podcastSeries && typeof media.podcastSeries === 'object'
@@ -2186,28 +2202,19 @@ const PodcastEpisodeProfile: React.FC = () => {
             </button>
             <button
               onClick={handleGlobalBid}
-              disabled={isPlacingGlobalBid || !isGlobalBidValid}
+              disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
               className="ml-3 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center text-sm md:text-base"
             >
-              {isPlacingGlobalBid ? (
-                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
-              ) : (
-                <span>{headerTipLabel}</span>
-              )}
+              <TipCtaLabel
+                amount={globalBidInput}
+                signedIn={Boolean(user)}
+                loading={isPlacingGlobalBid}
+                fallback="Tip"
+              />
             </button>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-2 mt-3">
-            {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-              <button
-                key={amount}
-                onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                className="px-3 py-1 bg-gray-700/80 hover:bg-gray-600 text-gray-300 text-xs rounded-full transition-colors font-medium"
-              >
-                £{amount.toFixed(2)}
-              </button>
-            ))}
-          </div>
+          {renderTipStatShortcuts('flex flex-wrap justify-center gap-2 mt-3')}
         </div>
       </div>
     </div>
@@ -2982,34 +2989,22 @@ const PodcastEpisodeProfile: React.FC = () => {
                         </button>
                         <button
                           onClick={handleGlobalBid}
-                          disabled={isPlacingGlobalBid || !isGlobalBidValid}
+                          disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
                           className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                         >
-                          {isPlacingGlobalBid ? (
-                            <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
-                          ) : (
-                            <span>
-                              {!user ? 'Sign in to Tip' : (isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid')}
-                            </span>
-                          )}
+                          <TipCtaLabel
+                            amount={globalBidInput}
+                            signedIn={Boolean(user)}
+                            loading={isPlacingGlobalBid}
+                            fallback="Enter Tip"
+                          />
                         </button>
                       </div>
                       
-                      {/* Quick amounts */}
-                      <div className="flex flex-wrap justify-center gap-2 mb-4">
-                        {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-                          <button
-                            key={amount}
-                            onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                            className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
-                          >
-                            £{amount.toFixed(2)}
-                          </button>
-                        ))}
-                      </div>
+                      {renderTipStatShortcuts('flex flex-wrap justify-center gap-2 mb-4')}
                       
                       <p className="text-xs md:text-sm text-gray-400">
-                        Minimum bid: £{minimumBid.toFixed(2)}
+                        Minimum tip: £{minimumBid.toFixed(2)}
                       </p>
                       {user && (
                         <p className="text-xs md:text-sm text-gray-400 mt-2">
@@ -4213,15 +4208,15 @@ const PodcastEpisodeProfile: React.FC = () => {
           <button
             type="button"
             onClick={handleGlobalBid}
-            disabled={isPlacingGlobalBid}
+            disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
             className="pointer-events-auto w-full max-w-md mx-auto flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-bold rounded-full shadow-2xl border border-purple-400/30 transition-all"
           >
-            {isPlacingGlobalBid ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Coins className="h-4 w-4 text-yellow-300" />
-            )}
-            {headerTipLabel}
+            <TipCtaLabel
+              amount={globalBidInput}
+              signedIn={Boolean(user)}
+              loading={isPlacingGlobalBid}
+              fallback="Tip"
+            />
           </button>
         </div>
       )}

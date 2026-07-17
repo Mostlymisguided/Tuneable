@@ -322,7 +322,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
     settings.maxPerPrimaryArtist
   ).map(formatMediaEntry);
 
-  if (candidateRecords.length === 0) {
+  if (candidateRecords.length === 0 || settings.fansAlsoTipLimit <= 0) {
     relatedMedia = await attachBidsToEntries(relatedMedia);
     return {
       source,

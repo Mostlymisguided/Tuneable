@@ -18,7 +18,6 @@ import {
   Headphones,
   Volume2,
   Award,
-  Crown,
   X,
   Save,
   Coins,
@@ -42,7 +41,6 @@ import {
   Bot
 } from 'lucide-react';
 import { mediaAPI, claimAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
-import MediaChampions from '../components/MediaChampions';
 import ReportModal from '../components/ReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -52,6 +50,9 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import TipStatChips from '../components/TipStatChips';
+import TipCtaLabel from '../components/TipCtaLabel';
+import MiniSupportersBar from '../components/MiniSupportersBar';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
@@ -107,6 +108,8 @@ interface Media {
   popularity?: number;
   sources?: { [key: string]: string };
   externalIds?: { [key: string]: string };
+  rightsCleared?: boolean;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
   bids?: Bid[];
   comments?: Comment[];
   addedBy?: {
@@ -225,11 +228,7 @@ const TuneProfile: React.FC = () => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
   
-  // Claim tune modals
-  const [showCreatorSignupModal, setShowCreatorSignupModal] = useState(false);
-  const [showClaimVerificationModal, setShowClaimVerificationModal] = useState(false);
-  const [claimProofText, setClaimProofText] = useState('');
-  const [claimProofFiles, setClaimProofFiles] = useState<File[]>([]);
+  // Claim tune modal (rights-pending limbo only)
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -327,7 +326,6 @@ const TuneProfile: React.FC = () => {
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [relatedMedia, setRelatedMedia] = useState<RecommendedMediaItem[]>([]);
-  const [fansAlsoTip, setFansAlsoTip] = useState<RecommendedMediaItem[]>([]);
   const [isLoadingRelatedPlaylists, setIsLoadingRelatedPlaylists] = useState(false);
   const [recommendedItemToTip, setRecommendedItemToTip] = useState<RecommendedMediaItem | null>(null);
   const [isPlacingRecommendedTip, setIsPlacingRecommendedTip] = useState(false);
@@ -335,10 +333,6 @@ const TuneProfile: React.FC = () => {
 
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
-
-  // Collapsible sections: Top Fans
-  const [showTopFans, setShowTopFans] = useState(false);
-  const [showFansAlsoTip, setShowFansAlsoTip] = useState(false);
 
   // Share functionality state
   const [isMobile, setIsMobile] = useState(false);
@@ -1501,40 +1495,6 @@ const TuneProfile: React.FC = () => {
     }
   };
 
-  // Handle creator signup
-  const handleCreatorSignup = () => {
-    setShowCreatorSignupModal(false);
-    // Navigate to creator registration page
-    navigate('/creator/register');
-  };
-
-  // Handle claim submission
-  const handleSubmitClaim = async () => {
-    if (!claimProofText.trim()) {
-      toast.error('Please provide proof of ownership');
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('mediaId', media?._id || '');
-      formData.append('proofText', claimProofText);
-      claimProofFiles.forEach((file) => {
-        formData.append('proofFiles', file);
-      });
-
-      await claimAPI.submitClaim(formData);
-      
-      toast.success('Claim submitted for review! We\'ll notify you when it\'s processed.');
-      setShowClaimVerificationModal(false);
-      setClaimProofText('');
-      setClaimProofFiles([]);
-    } catch (err: any) {
-      console.error('Error submitting claim:', err);
-      toast.error(err.response?.data?.error || 'Failed to submit claim');
-    }
-  };
-
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
     if (!media && !mediaId) {
@@ -1562,14 +1522,12 @@ const TuneProfile: React.FC = () => {
       setIsLoadingRelatedPlaylists(true);
       const response = await mediaAPI.getRelatedPlaylists(mediaId, {
         relatedLimit: 12,
-        fansLimit: 8,
+        fansLimit: 0,
       });
       setRelatedMedia(response.relatedMedia || []);
-      setFansAlsoTip(response.fansAlsoTip || []);
     } catch (err) {
       console.error('❌ Error loading related playlists:', err);
       setRelatedMedia([]);
-      setFansAlsoTip([]);
     } finally {
       setIsLoadingRelatedPlaylists(false);
     }
@@ -2143,11 +2101,25 @@ const TuneProfile: React.FC = () => {
 
   const topTagRankings = tagRankings.slice(0, 3);
 
-  const headerTipLabel = !user
-    ? 'Sign in to Tip'
-    : isGlobalBidValid
-      ? `Tip £${globalBidInput}`
-      : 'Tip';
+  const avgTipPounds = media ? calculateGlobalMediaBidAvg(media) || undefined : undefined;
+
+  const applyTipShortcut = (amount: number) => {
+    setHasInitializedBidInput(true);
+    setGlobalBidInput(amount.toFixed(2));
+  };
+
+  const renderTipStatShortcuts = (className?: string) => (
+    <TipStatChips
+      className={className}
+      minTip={minimumBid}
+      avgTip={avgTipPounds}
+      championAggregate={mediaChampionTip?.championAggregate}
+      viewerAggregate={mediaChampionTip?.viewerAggregate}
+      viewerIsChampion={mediaChampionTip?.viewerIsChampion}
+      disabled={isPlacingGlobalBid}
+      onSelect={applyTipShortcut}
+    />
+  );
 
   const renderShareButton = () => (
     isMobile ? (
@@ -2278,34 +2250,25 @@ const TuneProfile: React.FC = () => {
             </button>
             <button
               onClick={handleGlobalBid}
-              disabled={isPlacingGlobalBid || !isGlobalBidValid}
+              disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
               className="ml-3 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center text-sm md:text-base"
             >
-              {isPlacingGlobalBid ? (
-                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
-              ) : (
-                <span>{headerTipLabel}</span>
-              )}
+              <TipCtaLabel
+                amount={globalBidInput}
+                signedIn={Boolean(user)}
+                loading={isPlacingGlobalBid}
+                fallback="Tip"
+              />
             </button>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-2 mt-3">
-            {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-              <button
-                key={amount}
-                onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                className="px-3 py-1 bg-gray-700/80 hover:bg-gray-600 text-gray-300 text-xs rounded-full transition-colors font-medium"
-              >
-                £{amount.toFixed(2)}
-              </button>
-            ))}
-          </div>
+          {renderTipStatShortcuts('flex flex-wrap justify-center gap-2 mt-3')}
         </div>
       </div>
     </div>
   );
 
-  const renderRecommendedQueueList = (items: RecommendedMediaItem[], variant: 'related' | 'fans') => (
+  const renderRecommendedQueueList = (items: RecommendedMediaItem[]) => (
     <div className="space-y-3">
       {items.map((item, index) => {
         const queueShape = recommendedToQueueShape(item);
@@ -2313,7 +2276,7 @@ const TuneProfile: React.FC = () => {
 
         return (
           <QueueMediaCard
-            key={`${variant}-${item._id}`}
+            key={`related-${item._id}`}
             item={queueShape}
             index={index}
             mediaData={mediaData}
@@ -2488,6 +2451,17 @@ const TuneProfile: React.FC = () => {
                 </span>
               </div>
 
+              {media.bids && media.bids.length > 0 && (
+                <div className="px-2 mb-3">
+                  <MiniSupportersBar
+                    bids={media.bids}
+                    limit={3}
+                    scrollable={false}
+                    className="flex justify-center md:justify-start"
+                  />
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2" ref={shareDropdownRef}>
                 {isMediaPlayable(media) && (
                   <button
@@ -2543,7 +2517,7 @@ const TuneProfile: React.FC = () => {
               {isLoadingRelatedPlaylists ? (
                 <div className="text-gray-400 text-sm">Loading related tunes...</div>
               ) : (
-                renderRecommendedQueueList(relatedMedia, 'related')
+                renderRecommendedQueueList(relatedMedia)
               )}
             </div>
           </div>
@@ -2639,51 +2613,6 @@ const TuneProfile: React.FC = () => {
         </div>
 
         {renderSlimSupportSection()}
-
-        {/* Champions / Top Fans - collapsible */}
-        {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
-            <button
-              onClick={() => setShowTopFans(!showTopFans)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            >
-              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Crown className="h-5 w-5 md:h-6 md:w-6 mr-2 text-amber-400 flex-shrink-0" />
-                {showTopFans ? 'Champions' : 'Show Champions'}
-              </span>
-              {showTopFans ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-            </button>
-            {showTopFans && (
-              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <MediaChampions mediaId={media.uuid || media._id} maxDisplay={10} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Fans Also Tip - collapsible */}
-        {fansAlsoTip.length > 0 && (
-          <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
-            <button
-              onClick={() => setShowFansAlsoTip(!showFansAlsoTip)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            >
-              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Users className="h-5 w-5 md:h-6 md:w-6 mr-2 text-pink-300 flex-shrink-0" />
-                {showFansAlsoTip ? 'Fans Also Tip' : 'Show Fans Also Tip'}
-              </span>
-              {showFansAlsoTip ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-            </button>
-            {showFansAlsoTip && (
-              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <p className="text-sm text-gray-300 mb-4">
-                  One-hop picks taken from this tune&apos;s strongest supporters, while still requiring tag overlap.
-                </p>
-                {renderRecommendedQueueList(fansAlsoTip, 'fans')}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Production Stack Section */}
         {hasProductionStack(media.productionStack) && (
@@ -3020,34 +2949,22 @@ const TuneProfile: React.FC = () => {
                         </button>
                         <button
                           onClick={handleGlobalBid}
-                          disabled={isPlacingGlobalBid || !isGlobalBidValid}
+                          disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
                           className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                         >
-                          {isPlacingGlobalBid ? (
-                            <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Placing...</span>
-                          ) : (
-                            <span>
-                              {!user ? 'Sign in to Tip' : (isGlobalBidValid ? `Bid £${globalBidInput}` : 'Enter Bid')}
-                            </span>
-                          )}
+                          <TipCtaLabel
+                            amount={globalBidInput}
+                            signedIn={Boolean(user)}
+                            loading={isPlacingGlobalBid}
+                            fallback="Enter Tip"
+                          />
                         </button>
                       </div>
                       
-                      {/* Quick amounts */}
-                      <div className="flex flex-wrap justify-center gap-2 mb-4">
-                        {[0.01, 1.11, 5.55, 11.11, 22.22].map(amount => (
-                          <button
-                            key={amount}
-                            onClick={() => setGlobalBidInput(amount.toFixed(2))}
-                            className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs md:text-sm rounded-full transition-colors font-medium"
-                          >
-                            £{amount.toFixed(2)}
-                          </button>
-                        ))}
-                      </div>
+                      {renderTipStatShortcuts('flex flex-wrap justify-center gap-2 mb-4')}
                       
                       <p className="text-xs md:text-sm text-gray-400">
-                        Minimum bid: £{minimumBid.toFixed(2)}
+                        Minimum tip: £{minimumBid.toFixed(2)}
                       </p>
                       {user && (
                         <p className="text-xs md:text-sm text-gray-400 mt-2">
@@ -4085,134 +4002,6 @@ const TuneProfile: React.FC = () => {
           </>
         )}
 
-      {/* Creator Signup Modal */}
-      {showCreatorSignupModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
-          <div className="card max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">Become a Creator</h2>
-              <button
-                onClick={() => setShowCreatorSignupModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <p className="text-gray-300 mb-6">
-              Join Tuneable as a creator to claim your music, earn directly from fan tips, 
-              and connect with your audience in a revolutionary new way.
-            </p>
-            
-            <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4 mb-6">
-              <h3 className="text-white font-semibold mb-2">Creator Benefits:</h3>
-              <ul className="text-gray-300 text-sm space-y-1">
-                <li>✓ Claim ownership of your tracks</li>
-                <li>✓ Earn directly from fan tips</li>
-                <li>✓ Access to creator analytics</li>
-                <li>✓ Verify your identity with badges</li>
-                <li>✓ Connect with your biggest fans</li>
-              </ul>
-            </div>
-            
-            <div className="flex space-x-3">
-              <button onClick={handleCreatorSignup} className="btn-primary flex-1">
-                Enable Creator Mode
-              </button>
-              <button onClick={() => setShowCreatorSignupModal(false)} className="btn-secondary">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Claim Verification Modal */}
-      {showClaimVerificationModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
-          <div className="card max-w-lg w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">
-                Claim "{media?.title}"
-              </h2>
-              <button
-                onClick={() => setShowClaimVerificationModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <p className="text-gray-300 mb-4">
-              To verify you're a creator of this tune, please provide proof of ownership:
-            </p>
-            
-            <div className="mb-4">
-              <label className="block text-white font-medium mb-2">
-                Proof of Ownership
-              </label>
-              <textarea
-                value={claimProofText}
-                onChange={(e) => setClaimProofText(e.target.value)}
-                placeholder="Describe your role (artist, producer, mediawriter, etc.) and provide links to social media, streaming profiles, distribution platforms, or other verification..."
-                className="input min-h-32"
-                maxLength={2000}
-              />
-              <div className="text-xs text-gray-400 mt-1">
-                {claimProofText.length}/2000 characters
-              </div>
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-white font-medium mb-2">
-                Supporting Documents (Optional)
-              </label>
-              <input
-                type="file"
-                multiple
-                accept="image/*,.pdf"
-                onChange={(e) => setClaimProofFiles(Array.from(e.target.files || []))}
-                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                Upload screenshots, contracts, distribution receipts, or other proof
-              </p>
-              {claimProofFiles.length > 0 && (
-                <div className="mt-2 text-sm text-gray-300">
-                  {claimProofFiles.length} file(s) selected
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-lg p-3 mb-4">
-              <p className="text-yellow-200 text-sm">
-                <strong>Note:</strong> Claims are reviewed by our team. False claims may result in account suspension.
-              </p>
-            </div>
-            
-            <div className="flex space-x-3">
-              <button 
-                onClick={handleSubmitClaim}
-                disabled={!claimProofText.trim()}
-                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Submit Claim
-              </button>
-              <button 
-                onClick={() => {
-                  setShowClaimVerificationModal(false);
-                  setClaimProofText('');
-                  setClaimProofFiles([]);
-                }} 
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Bid Confirmation Modal */}
       <BidConfirmationModal
         isOpen={showBidConfirmationModal}
@@ -4469,15 +4258,15 @@ const TuneProfile: React.FC = () => {
           <button
             type="button"
             onClick={handleGlobalBid}
-            disabled={isPlacingGlobalBid}
+            disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
             className="pointer-events-auto w-full max-w-md mx-auto flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-bold rounded-full shadow-2xl border border-purple-400/30 transition-all"
           >
-            {isPlacingGlobalBid ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Coins className="h-4 w-4 text-yellow-300" />
-            )}
-            {headerTipLabel}
+            <TipCtaLabel
+              amount={globalBidInput}
+              signedIn={Boolean(user)}
+              loading={isPlacingGlobalBid}
+              fallback="Tip"
+            />
           </button>
         </div>
       )}

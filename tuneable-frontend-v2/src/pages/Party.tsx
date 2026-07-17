@@ -12,6 +12,7 @@ import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import TipCtaLabel from '../components/TipCtaLabel';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
 import VetoedQueueMediaCard from '../components/VetoedQueueMediaCard';
@@ -3163,16 +3164,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                     </div>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
-                                      className="z-999 px-3 md:px-4 py-2 bg-purple-800 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                      className="z-999 px-3 md:px-4 py-2 bg-purple-800 text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap inline-flex items-center"
                                     >
                                       {(() => {
-                                                const defaultBid = getDefaultBidAmount(media);
+                                        const defaultBid = getDefaultBidAmount(media);
                                         const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
-                                        const parsed = parseFloat(raw);
-                                        if (!Number.isFinite(parsed)) {
-                                          return 'Tip';
-                                        }
-                                        return `Tip £${parsed.toFixed(2)}`;
+                                        return <TipCtaLabel amount={raw} heartClassName="h-3.5 w-3.5" />;
                                       })()}
                                     </button>
                                   </div>
@@ -3276,16 +3273,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                     </div>
                                     <button
                                       onClick={() => handleAddMediaToParty(media)}
-                                      className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap"
+                                      className="flex px-3 md:px-4 py-2 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors text-xs md:text-sm whitespace-nowrap items-center"
                                     >
                                       {(() => {
-                                                const defaultBid = getDefaultBidAmount(media);
+                                        const defaultBid = getDefaultBidAmount(media);
                                         const raw = newMediaBidAmounts[media._id || media.id] ?? defaultBid.toFixed(2);
-                                        const parsed = parseFloat(raw);
-                                        if (!Number.isFinite(parsed)) {
-                                          return 'Tip';
-                                        }
-                                        return `Tip £${parsed.toFixed(2)}`;
+                                        return <TipCtaLabel amount={raw} heartClassName="h-3.5 w-3.5" />;
                                       })()}
                                     </button>
                                   </div>

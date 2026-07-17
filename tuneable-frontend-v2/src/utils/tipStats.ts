@@ -20,6 +20,17 @@ export type ChampionTipContext = {
   viewerIsChampion: boolean;
 };
 
+export type TipStatChip =
+  | { kind: 'set'; label: string; value: number; title: string }
+  | {
+      kind: 'champion';
+      label: string;
+      value: number;
+      displayValue?: number;
+      title: string;
+      disabled?: boolean;
+    };
+
 function userKeys(user: TipViewerLike | TipBidLike['userId']): Set<string> {
   const keys = new Set<string>();
   if (!user) return keys;
@@ -120,4 +131,67 @@ export function amountToTakeChampion(
 ): number {
   const raw = championAggregate - viewerAggregate + step;
   return Math.max(minTip, Math.round(raw * 100) / 100);
+}
+
+/** Build Min / Avg / Champion shortcut chips for tip UIs. */
+export function buildTipStatChips(options: {
+  minTip: number;
+  avgTip?: number;
+  championAggregate?: number;
+  viewerAggregate?: number;
+  viewerIsChampion?: boolean;
+  actionLabelLower?: string;
+}): TipStatChip[] {
+  const {
+    minTip,
+    avgTip,
+    championAggregate,
+    viewerAggregate = 0,
+    viewerIsChampion = false,
+    actionLabelLower = 'tip',
+  } = options;
+
+  const chips: TipStatChip[] = [
+    {
+      kind: 'set',
+      label: 'Min',
+      value: minTip,
+      title: `Set ${actionLabelLower} to £${minTip.toFixed(2)}`,
+    },
+  ];
+
+  if (typeof avgTip === 'number' && avgTip > 0) {
+    chips.push({
+      kind: 'set',
+      label: 'Avg',
+      value: avgTip,
+      title: `Set ${actionLabelLower} to £${avgTip.toFixed(2)}`,
+    });
+  }
+
+  const hasChampion =
+    typeof championAggregate === 'number' && Number.isFinite(championAggregate) && championAggregate > 0;
+
+  if (hasChampion) {
+    if (viewerIsChampion) {
+      chips.push({
+        kind: 'champion',
+        label: "You're #1",
+        value: championAggregate,
+        title: `You hold #1 with £${championAggregate.toFixed(2)} total tipped`,
+        disabled: true,
+      });
+    } else {
+      const takeChampionAmount = amountToTakeChampion(championAggregate, viewerAggregate, minTip);
+      chips.push({
+        kind: 'champion',
+        label: 'Champion',
+        value: takeChampionAmount,
+        displayValue: championAggregate,
+        title: `Tip £${takeChampionAmount.toFixed(2)} to take #1 (currently £${championAggregate.toFixed(2)})`,
+      });
+    }
+  }
+
+  return chips;
 }
